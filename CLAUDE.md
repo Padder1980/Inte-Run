@@ -13871,11 +13871,135 @@ guard's own and failed on correct code; and an `ADJ_MODES` slice taken to the ne
 `adjustFor` and `adjPhrase` — both of which name `"recovery"` legitimately — and **reported the fix as the
 defect**. Collection-too-wide, in the guard rather than the code.
 
-### ⚠️ STILL OPEN: NOTHING PROMPTS
+### ✅ AND THE APP NOW NOTICES — see the next chapter
 
-The granularity gap is closed — the shallowest easing a runner can tap is no longer 57%. What is not built
-is the app **noticing** that a week is worth easing. `assessWeeklyJump`, `countTrailingMisses` and
-`assessLongRunSpike` are the three functions that would detect it and all three still have **0 callers**;
-`assessInjury` and `applyInjuryAdjustment` are equally dead. And the flags engine's "ease off" still
-**INCREASES** training time — measured 295 → 350 min/wk (+19%), because a slower anchor spends more
-minutes covering the same km target. That is a defect in its own right and it is not fixed.
+The granularity gap is closed and so is the prompt. `assessWeeklyJump`, `countTrailingMisses` and
+`assessLongRunSpike` are wired into the weekly review as an `ease-week` suggestion.
+⚠️ **STILL DEAD: `returnToRunningPlan`, `assessInjury` and `applyInjuryAdjustment`.** And the flags
+engine's "ease off" still **INCREASES** training time — measured 295 → 350 min/wk (+19%), because a
+slower anchor spends more minutes covering the same km target. That is a defect in its own right and it
+is not fixed.
+
+## ✅ THE APP NOTICES WHEN A WEEK IS WORTH EASING (owner, 2026-09-02: *"go"*)
+
+The last piece of Hudson's ch7 sentence. The tier-3 rule removed the *scheduled* recovery week for a
+low-mileage 5k/10k runner; "Make a week easier" gave every runner the manual control; this is the app
+**offering** one. Suite 1482 → **1499**; `test/ease-offer.test.ts` holds 17 guards and **20 deliberate
+re-breaks, 19 caught first time**.
+
+**Three detectors that had ZERO callers since they were written** — `assessWeeklyJump`,
+`assessLongRunSpike` and `countTrailingMisses`. **The fix is the import, not new arithmetic.**
+
+⚠️⚠️ **AND THE PROGRESSION AUDIT'S COMPLAINT ABOUT THE FIRST WAS ABOUT A DIFFERENT QUESTION.** It said
+`assessWeeklyJump` *"compares the planned week to LAST WEEK in KILOMETRES"* — which is wrong for
+auditing the **plan against itself**, and the generator already guards that (`LONG_LIFT_STEP_MAX`, the
+volume ramp, `enforceLongRunIsLongest`), which is why a planned week exceeds its own trailing mean by
+30% in 0.74% of transitions. **Pointed at the RUNNER they are right as written:** `longestRunLast30dKm`
+asks for the runner's own last 30 days in as many words. A plan can be internally smooth and still be a
+large step for somebody who has missed half of the last month.
+
+### ⚠️⚠️ THE FIRST VERSION FIRED ON A RUNNER DOING EVERYTHING RIGHT, AND THE CAUSE IS STRUCTURAL
+
+Measured: **5.1% of weeks at 100% adherence.** It is not a threshold needing a nudge. **A PROGRESSIVE
+PLAN MEANS EVERY WEEK IS BIGGER THAN THE TRAILING MEAN** — that is what progression *is* — so "next week
+is 30% up on your four-week average" is a positive number by design for somebody following the plan
+perfectly. Worse, **both detectors' own thresholds sit ON the generator's own guardrails**:
+`assessLongRunSpike` fires above 1.10 and `LONG_LIFT_STEP_MAX` clamps the long-run ladder **at** 1.10,
+so an on-plan runner trips it on rounding; and `assessWeeklyJump` fires above 1.30 where the plan's own
+worst measured km jump is 1.36.
+
+**So the SHORTFALL is the trigger, not the size of the step.** `EASE_MAX_COMPLETION` is
+`ADD_DAY_MIN_COMPLETION` **read from the other side** — one number, two directions: above it a runner
+may be offered another running day, below it an easier week. Two constants for one line would be two
+answers to "is this runner keeping up", and the app builds the prescribed-against-logged array **once**,
+reused by both offers.
+
+### Measured, 2,256 weeks per row, seeded per-session coin flip for adherence
+
+| the runner does | silent | missed | jump | long-run |
+|---|---|---|---|---|
+| **100% of sessions** | **100.0%** | 0 | 0 | 0 |
+| 95% | 96.2% | 0.4% | 3.4% | 0.0% |
+| 85% | 71.2% | 2.0% | 26.5% | 0.3% |
+| 70% | 34.0% | 8.3% | 57.5% | 0.1% |
+| 50% | 17.5% | 19.9% | 62.5% | 0.1% |
+
+⚠️ **MY FIRST PROBE'S ADHERENCE MODEL WAS BROKEN AND REPORTED 7 TRAILING MISSES AT EVERY LEVEL.**
+`((k*997)%100)/100 < adherence` is a fixed descending pattern that always puts the misses at the END, so
+it could never produce the realistic case of a couple of recent misses — and it read `missed 0.0%` at
+85% and `85.6%` at 60%, both meaningless. A seeded RNG replaced it. **Check what a synthetic model
+actually generates before believing a rate it reports.**
+
+### The decisions
+
+⚠️ **IT LIVES IN THE WEEKLY REVIEW as a new suggestion kind, exactly as `add-a-day` did**, so it
+inherits one-question-a-week, the answered store, `quiet` meaning show nothing, and the existing
+refusals rather than re-implementing four of them in a second banner.
+
+⚠️⚠️ **BEFORE THE RETEST, AND THAT ORDER IS A SAFETY CLAIM RATHER THAN A PREFERENCE.** A retest asks for
+a **maximal 2 km effort**; offering one in a week the app has just judged a large step for this runner is
+the prompt doing harm. Ahead of `add-a-day` means a runner who is not absorbing the current load is never
+asked to do MORE in the same breath, without add-a-day needing a second refusal for it. Behind the pace
+suggestion, which is the flags engine's own verdict on work already done and the bigger change — the
+"one voice" rule.
+
+⚠️ **NOT GATED ON `unwell`, WHICH IS THE OPPOSITE OF `retestDue`.** Being unwell is a **reason** to ease
+a week; what must never be offered to somebody unwell is a maximal effort. `EaseWeekInput` carries no
+such field at all, asserted at the type's own shape and against `retestDue` as the contrast.
+
+⚠️ **BOTH ANSWERS COOL IT DOWN, not just a decline like `addDayOffer`.** A runner at 50% adherence would
+otherwise be offered an easier week, accept it, and be offered another one seven days later — **and a
+plan eased every week is not a plan.** One field, `lastAnsweredIso`, one 14-day cooldown; measured silent
+at 0, 1, 7 and 13 days and firing at 15.
+
+⚠️ **THE LONG-RUN SIGNAL FIRES ON 0.1–0.3% OF WEEKS**, which is rare enough to ask whether it is dead
+code. **It is not:** driven directly, its distinct case is a runner whose weekly volume has held up but
+who has been skipping the **long run** specifically — the session people skip most — and the control
+(long runs done too) is silent.
+
+⚠️ **THE EVIDENCE COMES FROM LOGGED RUNS, NEVER `state.done`.** `seedDone()` rebuilds that at every boot
+by marking every non-rest session dated before today as done, run or not, so a completion figure from
+there reads **100% for somebody who has not run at all**.
+
+⚠️ **ACCEPTING GOES THROUGH `applyEaseWeek`**, the manual control's own path, so an offer accepted cannot
+ease a week differently from one chosen by hand — and it inherits the snapshot-before-rebuild undo, the
+breaks-list row and the week marking. **The offer itself never eases anything:** the standing instruction
+is that the app may observe and propose and never change a plan on its own, which is also why
+`applyMissedSessionAdjustment`'s **detector** raises the offer while its **mechanism** waits for the tap.
+
+⚠️ **THE OFFERED WEEK IS REMEMBERED, NOT RE-DERIVED AT THE TAP.** `WeeklySuggestion` is an engine type
+and the engine knows nothing about plan indices, so the accept handler would otherwise work it out a
+second time — and the two would disagree the first time the clock crossed a Monday between the card
+rendering and the tap. And the week offered is **the first one that has not started**: easing the current
+week on a Saturday would trim a long run that has already happened and swap a session already done.
+
+### ⚠️ IT IS UNREACHABLE ON A FRESH PLAN, AND THAT IS NOT A DEFECT
+
+`applyProfile` clamps the start date to today, so a new profile is in week 0 and the four-week evidence
+window cannot fill — **`addDayOffer` records the same obstacle**. The evidence builder returns `null` and
+the engine treats absent as "do not offer"; what it must not do is throw or invent evidence. So the
+engine decision is unit-tested and the **card** was driven by patching `currentWeeklyReview`, since
+⚠️ **patching `RC.*` does nothing — esbuild exports are getters.**
+
+### Verification
+
+Driven end to end in a real browser: the card renders with "Make it easier" / "No thanks", both wired;
+accepting takes the offered week **53.9 → 46.3 km**, quality **1 → 0**, long run **92 → 74 min** and
+stores one recovery row; the seen marker then makes the real `currentWeeklyReview` return null and the
+card is gone; all six refusals behave; document overflow 0, **zero console errors**.
+
+⚠️ **AND `cardGone: false` IN THE FIRST DRIVE WAS MY STUB, NOT A DEFECT.** The patched
+`currentWeeklyReview` ignores the `loadReviewSeen()` gate that is the real function's first line.
+Restored, the marker matches the review week and the card is gone. **Check whether a harness explains a
+reading before fixing the code.**
+
+⚠️ **THE ONE RE-BREAK ESCAPE WAS MENTION-IS-NOT-USE.** The guard matched `addDayEvidence(` and a break
+that **kept the call** — it is also the null guard — while hand-building its own `recentWeeks` array
+walked straight past it. Restated to assert what is **passed**.
+
+Build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean apart from
+the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1499 pass / 0 fail** under UTC,
+`TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`, both design ratchets unchanged.
+
+⚠️ **STILL DEAD: `returnToRunningPlan`, `assessInjury` and `applyInjuryAdjustment`.** And the flags
+engine's "ease off" still **INCREASES** training time — measured 295 → 350 min/wk (+19%).

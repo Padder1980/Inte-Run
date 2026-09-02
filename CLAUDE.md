@@ -13160,8 +13160,10 @@ of what a plan-adaptation menu needs already written.
 - ✅ **Two hard days a week regardless of level — ASKED AND ANSWERED, 2026-09-01. Do not reopen it
   without reading the chapter below.** The book does recommend it, the app already delivers it for every
   runner the book addresses, and lifting the remaining caps was measured as harmful.
-- **The no-deload-for-low-load half of the cadence rule.** ⚠️ **The block-length recalibration is DONE
-  — see the shorter-plans chapter; do not re-cost it.**
+- ✅ **The no-deload-for-low-load half of the cadence rule — ASKED, RULED ON AND SHIPPED, 2026-09-01.**
+  See the tier-3 chapter at the end of this file for the gate, why the half and the marathon are
+  excluded, and the control that refuted the "it spikes" objection. ⚠️ **The block-length recalibration
+  is also DONE — see the shorter-plans chapter; do not re-cost either.**
 
 ## TWO HARD DAYS A WEEK: ASKED, MEASURED, AND ALREADY DONE (owner, 2026-09-01)
 
@@ -13526,3 +13528,220 @@ off 2 min, cadence 4 → 5–6 weeks) in `src/adapt/weekly-review.ts` · `retest
 **no-deload-for-low-load** half of the cadence rule. ⚠️ **`assessFeasibility` IS NOW LESS WRONG BUT STILL
 UNAUDITED FOR BEGINNERS** — it believes 11.6% in fourteen weeks is realistic, and nothing measures
 whether the new quality diet makes that true.
+
+## ✅ HUDSON'S THIRD RECOVERY-WEEK TIER (owner, 2026-09-01: *"Recovery weeks for low-mileage runners.
+The book says skip them entirely and i'm happy with that"*)
+
+**He overruled a concern this file had recorded, so it is his decision and it is built.** Suite 1456 →
+**1469**; `test/deload-tier3.test.ts` holds 13 guards and **15 deliberate re-breaks were each watched
+failing**. A read-only investigation ran first (13 agents, 7.3M tokens) and **two of its three
+adversarial verdicts said DO NOT SHIP** — the reasons they gave are below, and two of the three
+headline objections were refuted by measurement.
+
+⚠️⚠️ **THE RULE HAS THREE TIERS AND WE DELIVERED TIER 2 TO EVERYBODY.** Verbatim (ch7): *"Competitive
+runners who typically maintain a workload that's close to the limit of what their bodies can handle
+require a recovery week every third week throughout the training cycle. Runners who maintain a more
+easily managed workload relative to their personal limits may only need a recovery week every fourth
+week. Low-key, low-volume competitive runners typically don't need to schedule recovery weeks at all.
+Instead, they can just take a day off or replace a hard run with an easy run as necessary."*
+
+⚠️ **`phaseSchedule` GAINED A 4th ARGUMENT DEFAULTING TO TRUE**, and that default is the whole safety of
+the change: every other caller — the tests, and any future one — keeps the behaviour it had.
+`schedulesRecoveryWeeks(athlete, goal)` is the only caller that passes false.
+
+⚠️ **EVERY FIELD THE GATE READS IS A PURE INPUT, AND THAT IS ARCHITECTURE RATHER THAN TIDINESS.** The
+book keys its rule on *"the planned average training workload of your training plan"*, which is a BUILT
+quantity — and `buildAll(vScale)` is rebuilt to a fixed point whose input is this very schedule. A gate
+reading the built plan is circular and could make that fixed point oscillate. So the gate reads what the
+runner told us, and its arms are DERIVED from measuring what the plan then delivers for them.
+
+### The gate, arm by arm
+
+| arm | why, and it is measured or declared a judgement |
+|---|---|
+| **non-beginner** | ⚠️ Table 3.1 lists **FIVE** volume categories and **"Beginners" is a separate, LOWER one than "Low-Key Competitive"** — the category the exemption names. So the book says nothing about a beginner's recovery weeks; this is not it saying yes. Our deload also absorbs the geometric beginner long-run ramp whose block length was DERIVED assuming one deload in four, and the engine ignores a stated volume for beginners entirely (0 of 840 beginner plans differ with one). |
+| **not returning** | Both comeback flags mean **detrained** — `generate-plan.ts` says so where it computes `returning` — and `returnToRunningPlan` draws this repo's long-layoff line at four weeks. All three verdicts demanded this arm; without it, 100% of returning band plans lost every recovery week. |
+| **≤ 4 running days** | ⚠️ **THE MECHANISM, NOT A PROXY FOR VOLUME.** The book's own remedy is *"just take a day off"*, which presumes a week that already has days off in it: a 4-day week has three, a 7-day week has none. Days per week is a **poor** volume key — measured, 7.8% of the spread, and a 4-day runner can be at 403 min/wk — and that is not the job it is doing here. It is also where the measured risk lives: the easy-fraction cost is concentrated in 5- and 6-day runners. |
+| **a STATED volume, 22 (5k) / 25 (10k) to 35 km** | absence keeps the recovery weeks — see below |
+| **5k and 10k only** | the half and the marathon are excluded on the long-run share — see below |
+
+⚠️ **`!stated` IS THE SAME EXPRESSION AS `targetPeakWeeklyKm` AND IT IS LOAD-BEARING.** `volKm` is 0 in
+`DEFAULT_PROFILE` and the web layer only sets the engine field `if (pf.volKm > 0)`, so **0 and undefined
+must mean the same thing**. Written `stated < 35` this reads 0 as the lowest mileage there is and strips
+the recovery weeks from every runner who skipped the question — the phantom-default disaster this file
+records for `weeklyVolumeKm: 30`, which rebuilt every existing runner's block on one boot. **Absence
+keeps the recovery weeks; the change is fail-safe by construction.**
+
+### The floors are the book's own criterion, measured on this engine
+
+Worst mean-week/stated across 3–4 days, five abilities and three runways per cell. Below these the
+per-session floors bind (a 20-minute easy run cannot shrink; `MIN_VOLUME_SCALE` bottoms out at 0.45) and
+the plan delivers MORE than the runner said they run — so by the book's own test they are tier 1 or 2:
+
+| stated | 12 | 15 | 18 | 20 | 22 | 25 | 28 | 30 | 35 |
+|---|---|---|---|---|---|---|---|---|---|
+| **5k** | 1.81× | 1.45× | 1.21× | 1.09× | **1.02×** | 1.01× | 0.99× | 0.97× | 0.97× |
+| **10k** | 1.93× | 1.55× | 1.29× | 1.16× | 1.05× | **0.99×** | 0.99× | 0.96× | 0.97× |
+
+⚠️ **MY FIRST VERSION OF THAT TABLE SWEPT THE MEAN AND STARTED AT 20 km, AND ITS OWN GUARD CAUGHT IT:** a
+10 km runner stating 15 km/week was being gated while their plan averaged **1.63×** what they said. The
+fixture-too-kind trap, in the one measurement the whole gate rests on.
+
+⚠️ **THE PEAK IS NOT THE RULER AND MUST NOT BE SUBSTITUTED.** Peak/stated is 1.27× on average in this
+band and an adversarial verifier used it to argue the premise was refuted. That figure is
+`PEAK_VOLUME_MULTIPLIER` (1.25) working exactly as designed — a block is *supposed* to build above
+maintenance, and the book's own 5K Level 1 peaks at 2.2× its opening week. Reading the peak here
+condemns every correctly-built plan.
+
+### ⚠️⚠️ THE HALF AND THE MARATHON ARE EXCLUDED, ON A BETTER MEASUREMENT THAN ANY RATIO
+
+The peak long run as a share of **its own week**, worst cell:
+
+| stated | 25 | 28 | 30 | 35 | 45 |
+|---|---|---|---|---|---|
+| 5k | 51% | 48% | 46% | 46% | 46% |
+| 10k | 57% | 54% | 51% | 49% | 48% |
+| **half** | 71% | 66% | 63% | 58% | 53% |
+| **marathon** | **77%** | 76% | 74% | 71% | 65% |
+
+A marathon runner stating 25 km/week is prescribed a **19 km long run inside a 25 km week** — their week
+IS one long run plus a couple of short ones, because `LONG_FLOOR_KM` forces a 24–28 km endpoint whatever
+they said. **There is no "easily managed workload relative to their personal limits" there to exempt, and
+removing their one eased week takes it from the runner who needs it most.** The half is milder but still
+63–66% across its whole candidate band — marginal on two independent measures at once, and where a
+population is marginal this engine keeps the behaviour it has.
+⚠️ **NEITHER SHARE IS CAUSED BY THIS CHANGE** — the long run and the week scale together, so it is
+identical with and without the recovery weeks. It is `assessFeasibility`'s documented volume-blindness
+showing through, **read as a tier signal rather than fixed here**.
+⚠️ **AND EXCLUDING THE MARATHON REMOVED THE WORST CASE ON A DIFFERENT METRIC AS A SIDE EFFECT** — the
+21-consecutive-week plan, which came from our 24-week marathon cap.
+
+### ⚠️ THE CEILING IS A JUDGEMENT, AND HUDSON'S OWN TABLE CANNOT SUPPLY ONE
+
+Measured across 2,940 plans there is **NO EMPTY BIN** anywhere in mean weekly minutes, mean km or peak km
+at 25-min/5-km resolution — the quantity is continuous, so **a threshold is a judgement, not a
+discovery**. The largest gap between consecutive observations is 20.9 min, in the extreme top tail.
+
+⚠️⚠️ **AND TABLE 3.1 IS IN MILES, WHICH ANYONE "ALIGNING" THE THRESHOLD TO THE BOOK MUST KNOW.** The
+sentence after it reads *"if you plan to exceed 70 miles a week, you will need to run twice a day"* and
+its Elite marathon row is 110–130. Converted:
+
+| per week | Beginner | Low-Key Competitive |
+|---|---|---|
+| 5K | 32–48 km | **40–56 km** |
+| 10K | 40–56 km | **48–64 km** |
+| Half | 56–64 km | **56–72 km** |
+| Marathon | 64–80 km | **80–97 km** |
+
+**Every volume this app serves is at or BELOW Hudson's *Beginner* band**, so his tier-3 band covers our
+whole population — transplanting it would strip the recovery weeks from everybody. The 35 km ceiling is a
+judgement about OUR population, bounded by the guards.
+
+⚠️ **AND "LOW-KEY, LOW-VOLUME *COMPETITIVE*" MUST NEVER BE WIRED TO `experience === "competitive"`.**
+Table 3.1 makes "Low-Key Competitive" a category BELOW "Competitive", so the phrase names the low end of
+racers rather than our flag. Measured, our flag carries essentially **no volume information at all** —
+0.1% of the spread; it holds 102 of the 200 busiest plans and 89 of the 200 lightest. So reading it as
+the key is **a coin flip, not merely an inversion**; reading it as "the high end" would remove recovery
+from the runners the book says need it MOST often.
+
+### ⚠️⚠️ THE HEADLINE OBJECTION WAS REFUTED BY A CONTROL, AND THAT IS THE LESSON OF THE WHOLE JOB
+
+An adversarial verifier reported: *"the ex-recovery week is a local maximum 36.8% of the time against
+0.0% at baseline — this is not 'no recovery week', it is a spike where the recovery week was."* The 0.0%
+is **trivially true**: a week whose volume is deliberately cut cannot exceed its neighbours. The honest
+comparison is how often **ANY** week in the same plans is a local maximum:
+
+| | measured |
+|---|---|
+| ex-recovery week is a local max | **27.9%** |
+| **control — any non-taper week in the same plans** | **29.9%** |
+
+So the ex-recovery week is a local maximum **less** often than an average week. It levels; it does not
+spike. **A ratio against a control of 0.0% measures the definition of a deload, not the effect of
+removing one.**
+
+### Measured, 24,750 plans, variant against a HEAD worktree
+
+| | |
+|---|---|
+| gated | **900 = 3.6%**, in 60 distinct shapes |
+| collateral | **0** non-gated plans changed; all 900 gated ones did |
+| gate purity | **0** beginners, **0** returning, **0** above 4 days |
+| easy floor | **IDENTICAL** whole-grid (868 breaches of 415,250 both ways); **0 of 13,100** in the gated set both ways, worst 69.1% → 68.5% |
+| longest unbroken stretch | **3 → 13..16 weeks** (the book's longest plan implies 18) |
+| long-run step | worst **1.1000×**, exactly the guardrail |
+
+⚠️ **REMOVING THE RECOVERY WEEKS MAKES THE LONG-RUN STEPS SMALLER, NOT LARGER**, and that is worth knowing
+before anyone fears it: `rampFractions` HOLDS the progress count on a deload or taper week, so a gated
+plan has **more** progressing weeks for the same range and each step shrinks.
+
+### The runner is told, and the app rendered only one note
+
+⚠️ This app never changes a plan silently and a block with no recovery week is a permanent structural
+difference. The note also carries the other half of Hudson's sentence — where to ease a week off by
+hand — because removing the automatic easing is only safe if the manual easing is findable.
+⚠️ **`viewPlan` WENT FROM `.find` TO `.filter`, AND THAT IS A FIX RATHER THAN A TIDY-UP.** Both volume
+notes can fire for one runner — measured, a runner stating 35 km on 4 days trips the under-delivery note
+AND is inside the band — and `.find` silently dropped the second, so they were told their plan could not
+reach their mileage and never told it also had no easier weeks in it.
+
+### ⚠️⚠️ THE REPO'S OWN INSTRUMENT WAS BLIND TO ALL OF THIS
+
+`tools/audit-progression.mjs` swept `[null, 40]`: `null` means the runner never answered (which keeps the
+recovery weeks) and 40 is above the ceiling — so **it reported the entire change as byte-identical**. With
+30 added to the axis, **4 of 17 metrics move and three are the change describing itself**: no-deload plans
+0.0% → 8.3%, the deload-depth sample size (n 4032 → 3732, depth 29.6% → 29.3%), and two transition rates
+whose **denominator grew 7848 → 8412** because more consecutive non-deload pairs now exist (counts 731 →
+733 minutes, 1338 → 1375 km). Every safety metric identical, both worst jumps included.
+
+### Two of my own guards were refuted by their own measurements
+
+⚠️ **THE FLOOR'S BOUND WAS SET AT 1.03× ON THE VARIANT AND WAS UNSATISFIABLE BY CONSTRUCTION.** Removing
+four ~30%-deep recovery weeks from a ~20-week block raises the plan's own mean by
+`4/20 × 0.30 / (1 − 4/20 × 0.30)` = **6.4%**, so a variant ratio of ~1.06 **IS** a baseline ratio of 1.00.
+Measured, the variant plateaus at 1.04–1.08 for every distance at every stated volume — there is no floor
+at which 1.03 is reachable. **Measuring the thing being gated against the criterion that gates it is the
+circularity to avoid**; the bound is 1.10 on the variant, which corresponds to ~1.03 at baseline.
+
+⚠️ **AND `test/profile-inputs.test.ts`'s OVERSHOOT-NOTE BLOCKER IS RESTATED, NOT DELETED** — it pinned
+`.find`, and its invariant (a note the engine writes must be one the app shows, and the design notes must
+stay off it) never changed. Both directions re-broken. **That is the fifteenth-plus firing of
+guard-scoped-to-a-HOW in this file.**
+
+### ⚠️⚠️ STILL OPEN, AND IT IS THE HALF THAT MAKES THE RULE SAFE
+
+**The book's "instead" clause is only half delivered, and this is the most useful finding of the
+investigation.** Measured, every route by which a runner can currently get unplanned recovery:
+
+| depth of easing | route |
+|---|---|
+| **−21%** | `applyMissedSessionAdjustment` — substitutes a hard run for an easy one, i.e. **Hudson's sentence implemented exactly** — and it has **ZERO callers** |
+| −24 to −28% | a scheduled recovery week (what this change removes) |
+| **−57%** | the shallowest thing a runner can actually TAP (Manage plan › Not feeling 100% › "Easy and speed") |
+| −70 to −91% | the wired **default** ("Easy runs only") |
+
+⚠️ **SO THE GRANULARITY IS WRONG: the shallowest tappable easing is twice a recovery week and the default
+is three times it.** Recovery IS reachable and undoable in 4 taps, so the change is not unsafe — but the
+app cannot currently *replace a hard run with an easy one*, which is the mechanism the book names.
+⚠️ **AND NOTHING PROMPTS.** `assessWeeklyJump`, `countTrailingMisses` and `assessLongRunSpike` — the three
+functions that would detect a needed recovery week — have **0 callers in `web/app.ts`**, and
+`assessWeeklyJump`, `applyMissedSessionAdjustment` and `countTrailingMisses` are not even on the `RC`
+global. `assessInjury` and `applyInjuryAdjustment` are equally dead. **Wiring `applyMissedSessionAdjustment`
+as a "take an easier week" option is the obvious next job and would serve every runner, not just this
+3.6%.**
+⚠️ **AND THE FLAGS ENGINE'S "EASE OFF" INCREASES TRAINING TIME** — measured 295 → 350 min/wk (+19%),
+because a slower anchor spends more minutes covering the same km target. That is a defect in its own
+right, found on the way and not fixed.
+
+### Also worth knowing
+
+⚠️ **THE BOOK'S OWN PLANS ARE IMAGES.** `grep -c '<table'` gives c07 **69** and c11/c12 **0**; the twelve
+chapter-12 plans are **47 JPEG plates** with no `alt` text, and all six chapter-11 plans likewise. The
+week-by-week structure of every plan the book *ships* is unreadable as text — only the worked examples in
+chapters 6 and 7 can be quoted. Chapter 7's 20-week / 70-mile plan puts its recovery weeks at **6, 9, 12,
+15 — every third week** (tier 1), achieving −18.9 / −19.2 / −32.3 / **−10.6%**, so the book's own worked
+example does not always hit its own stated 20–30% depth. Chapter 6's 12-week progression uses **every
+fourth week**.
+⚠️ **AND A 13-AGENT WORKFLOW'S FINDINGS WERE PARTLY CORRUPTED BY ME EDITING `src/` WHILE IT RAN** — in an
+earlier session, 23 of 133 checks. This one was run strictly read-only with the rule stated in every
+prompt, and the tree was byte-identical throughout.

@@ -13724,11 +13724,11 @@ investigation.** Measured, every route by which a runner can currently get unpla
 is three times it.** Recovery IS reachable and undoable in 4 taps, so the change is not unsafe — but the
 app cannot currently *replace a hard run with an easy one*, which is the mechanism the book names.
 ⚠️ **AND NOTHING PROMPTS.** `assessWeeklyJump`, `countTrailingMisses` and `assessLongRunSpike` — the three
-functions that would detect a needed recovery week — have **0 callers in `web/app.ts`**, and
-`assessWeeklyJump`, `applyMissedSessionAdjustment` and `countTrailingMisses` are not even on the `RC`
-global. `assessInjury` and `applyInjuryAdjustment` are equally dead. **Wiring `applyMissedSessionAdjustment`
-as a "take an easier week" option is the obvious next job and would serve every runner, not just this
-3.6%.**
+functions that would detect a needed recovery week — have **0 callers in `web/app.ts`**. `assessInjury` and
+`applyInjuryAdjustment` are equally dead.
+✅ **THE −21% MECHANISM IS NOW WIRED — see the "Make a week easier" chapter at the end of this file.**
+The granularity gap is closed: the shallowest easing a runner can tap is no longer 57%. What is still
+open is the PROMPT, and the three dead detectors above are what would supply it.
 ⚠️ **AND THE FLAGS ENGINE'S "EASE OFF" INCREASES TRAINING TIME** — measured 295 → 350 min/wk (+19%),
 because a slower anchor spends more minutes covering the same km target. That is a defect in its own
 right, found on the way and not fixed.
@@ -13745,3 +13745,137 @@ fourth week**.
 ⚠️ **AND A 13-AGENT WORKFLOW'S FINDINGS WERE PARTLY CORRUPTED BY ME EDITING `src/` WHILE IT RAN** — in an
 earlier session, 23 of 133 checks. This one was run strictly read-only with the rule stated in every
 prompt, and the tree was byte-identical throughout.
+
+## ✅ "MAKE A WEEK EASIER" (owner, 2026-09-02: *"go"*)
+
+The second half of the ch7 sentence whose first half shipped the day before: *"Low-key, low-volume
+competitive runners typically don't need to schedule recovery weeks at all. **Instead, they can just take
+a day off or REPLACE A HARD RUN WITH AN EASY RUN as necessary.**"* Suite 1469 → **1482**;
+`test/ease-week.test.ts` holds 13 guards and **16 deliberate re-breaks were each watched failing**.
+
+⚠️⚠️ **WHY IT WAS NEEDED, MEASURED.** Every level the app could already offer is a **FILTER**
+(`adjDrops`), so the shallowest easing a runner could reach took **57%** off their week and the default
+took **70–91%** — where a scheduled recovery week takes 24–28%. Somebody who wanted one notch easier had
+to choose between nothing and half their week. And `applyMissedSessionAdjustment` had done exactly the
+right thing since it was written — substitute the hardest session for an easy run — with **zero callers**.
+
+⚠️ **THE GATE MOVED TO THE CALLER.** `easeWeek(week, reason)` is the mechanism; `applyMissedSessionAdjustment`
+owns the two-misses gate and delegates. Written the other way round, a runner-initiated easier week would
+have to **fake two missed sessions** to get one — lying to the function to obtain the behaviour — and the
+wording it produces would then be false on screen.
+
+### ⚠️⚠️ THE OBSTACLE `ADJ_MODES`'S OWN NOTE RECORDED FOR MONTHS DID NOT EXIST
+
+It read: *"Replacing a threshold session with an easy run of the same length would mean building a session
+in the app layer and keeping PLAN's display summary in step with RAW's steps by hand — two shapes, and
+CLAUDE.md records what that costs."* **It never had to be built there.** `src/view/plan-summary.ts`'s
+`weekView(w: PlannedWeek): WeekView` has always been the RAW→display projection; it was simply private.
+Exported, the engine rewrites the RAW week and the app **re-projects** — no second builder, and the two
+shapes cannot drift.
+⚠️ **ONLY THE SESSION-DERIVED FIELDS ARE ADOPTED** (`sessions`, `distanceKm`, `quality`, `longRunMin`,
+`focus`). `normalizeWeekStarts()` snaps every week back to its Monday **after** adoption, so
+`startIso`/`start`/`startFull` on the live PLAN are no longer the engine's own — copying a whole
+re-projection over the top un-normalises the week and `computeToday()` stops matching today. Guarded in
+both directions.
+⚠️ **AND THE ENGINE IS RUN TWICE**, which is worth knowing before relying on the correspondence:
+`applyProfile` calls `RC.buildPlanSummary(ath, goal)` for PLAN **and** `RC.generatePlan(ath, goal)` for
+RAW. It is deterministic, so they agree — but they are two runs, not one.
+
+### Measured across 9,945 generated weeks
+
+| | |
+|---|---|
+| training-time cut | **13.4% to 24.2%, mean 18.9%** — inside the book's own "20-to 30-percent" band |
+| session COUNT changed | **0** — it substitutes, it never deletes |
+| goal race touched | **0** |
+| nothing to ease | **540 weeks, every one a race week** whose only sessions are the race and rest days |
+| counted km RISES | **44 of 9,405 = 0.5%**, worst **+0.94 km**, while the load still falls 21–24% |
+
+⚠️⚠️ **TIME IS THE RULER AND DISTANCE IS NOT — the third firing of that lesson in this file.** A hill or
+fartlek session carries almost no counted distance for its length (CLAUDE.md records 0.50 km for a
+39-minute session), so replacing it with an easy run of 70% of its duration can leave the week with MORE
+kilometres. It is rare and tiny, and **the copy is worded around it**: where the distance would rise the
+row reads *"about the same distance, a lot less hard"* rather than printing a rise as though it were a
+cut. Tuning the mechanism to flatter the km figure would have deepened the cut past the book's band.
+⚠️ **AND "NOTHING TO EASE" NAMES THE REAL REASON.** Every such week is a race week, so the row says
+*"race week — nothing to ease here"*; *"already a light week"* would be technically true and useless, on
+the one week the whole block exists for.
+
+### ⚠️ IT IS ITS OWN CONTROL BECAUSE A RECOVERY WEEK IS A WEEK
+
+The book defines one as *"a week of training in which the workload is moderately reduced"*; Going away and
+Not feeling 100% are **day ranges**. Put in that sheet, a Tuesday-to-Thursday window would ease a whole
+week — the control rounding its own facts up. It stores into the **same adjustment store** with a
+whole-week span, so it inherits the breaks list, the Cancel, the week marking on the Plan screen and
+`adoptPlan`'s ordering for free.
+⚠️ **THE MODE IS DELIBERATELY NOT IN `ADJ_MODES`** — that array is rendered straight into the level
+picker (`ADJ_MODES.map(mode)`), so an entry there would put a week-granular level among the day-granular
+ones. `adjPhrase` is the one resolver instead, or the breaks list shows the bare word *"recovery"* while
+the week marking shows something else.
+⚠️ **`adjDrops` RETURNS FALSE FOR IT EXPLICITLY.** The chain happens to fall through to false for an
+unknown mode, so the behaviour would be right **by accident** and the next person adding a level would
+have no way of knowing a recovery row must never reach it. Easing substitutes; deleting as well would
+double the cut.
+⚠️ **AND THE EASE RUNS AFTER THE DAY FILTER.** If a holiday has already taken sessions out of the week,
+easing it should ease what is **left** — otherwise the two windows compound into a cut neither asked for.
+An ORDERING claim, guarded as one.
+
+### ⚠️⚠️ I SHIPPED THE INVENTED-IDENTIFIER TRAP AGAIN, AND THE DURABLE FIX IS THE REAL DELIVERABLE
+
+`openEaseWeekSheet` called **`sheetBody()`** and **`sheetOv()`** — two helpers I invented; neither exists.
+The sheet opened showing the menu it came from, and the control looked live and did nothing. It built, it
+typechecked, `node --check` passed all three emitted blocks and **1,469 tests passed**. Eighth firing.
+Every other sheet in the app uses the `$("sheetBody")` form; `renderAdjustSheet` twelve lines up is the
+pattern. **Found by driving the BUTTON rather than the function behind it.**
+
+⚠️⚠️ **AND `test/manage-plan.test.ts` ALREADY HELD THE SWEEP THAT ASKS THIS QUESTION.** Its collection was
+a **hand-written list of eight function names**, so it could not see the ninth. It now walks OUT from the
+two dispatchers to the functions they call directly plus their sheet builders and wirers — **derived**, so
+the next feature is in scope by construction.
+⚠️ **ONE LEVEL, NOT TRANSITIVE, AND THAT IS MEASURED.** A fixed-point walk reaches most of the app and
+reports **47 false positives** — platform globals (`setTimeout`, `Blob`, `FileReader`, `matchMedia`,
+typed arrays), callback parameters (`onDone`, `onConfirm`, `resolve`, `rej`), and words lifted out of
+prose (`everything`, `speech`, `equivalent`) — and a guard with 47 false positives is one nobody reads.
+One level is where an invented helper is fatal: a control that opens a sheet.
+
+### Four of that file's own guards updated deliberately rather than around
+
+| guard | what changed |
+|---|---|
+| the menu row set | pinned at six; a seventh row is **meant** to be a decision, so the list gained `"easier"` with its reason |
+| the icon count | ⚠️ now **DERIVED from the row count**. A vacuity check that needs a manual bump on every new row is one somebody eventually bumps without reading. |
+| the membership list | `eased` is a third **ASKER** and not a third definition — it delegates to `adjustFor` and adds a mode test. Named with the reason, **plus a new check that it does not re-implement the range comparison**. |
+| `weekMark`'s lift list | gained `adjPhrase`. The **acceptable** kind of stale: it failed loudly with a ReferenceError rather than quietly measuring less. |
+
+### ⚠️ A SECOND WORDING DEFECT, FOUND THE SAME WAY
+
+A runner who chose an easier week was handed a session titled **"31′ easy (eased re-entry)"** having
+missed nothing, described as *"Reintroduce running gently after a break"*. The title, the description, the
+focus line and both change lines now follow the reason — and it is guarded in **both** directions, so the
+fix cannot be "delete the wording from both paths".
+
+### Verification
+
+Driven end to end in a real browser at 430×932: 18 rows with live previews, week 1 goes **48.3 → 42.4 km**,
+quality **1 → 0**, long run **80 → 64 min**, session count **7 → 7**, RAW and PLAN agreeing at 42.4, the
+swap titled *"31′ easy (easier week)"*, stored as one whole-week row, marked **"Easier week"** on the Plan
+screen, listed under Planned breaks with a Cancel that restores all three figures and empties the store.
+Document, body and sheet overflow **0**, every control at least **51px**, **zero console errors**.
+
+Build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean apart from the
+one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1482 pass / 0 fail** under UTC,
+`TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`, both design ratchets unchanged.
+
+⚠️ **TWO OF MY OWN GUARDS WERE WRONG FIRST.** Three vacuity bounds were set from a wider grid than the
+guard's own and failed on correct code; and an `ADJ_MODES` slice taken to the next `const` swallowed
+`adjustFor` and `adjPhrase` — both of which name `"recovery"` legitimately — and **reported the fix as the
+defect**. Collection-too-wide, in the guard rather than the code.
+
+### ⚠️ STILL OPEN: NOTHING PROMPTS
+
+The granularity gap is closed — the shallowest easing a runner can tap is no longer 57%. What is not built
+is the app **noticing** that a week is worth easing. `assessWeeklyJump`, `countTrailingMisses` and
+`assessLongRunSpike` are the three functions that would detect it and all three still have **0 callers**;
+`assessInjury` and `applyInjuryAdjustment` are equally dead. And the flags engine's "ease off" still
+**INCREASES** training time — measured 295 → 350 min/wk (+19%), because a slower anchor spends more
+minutes covering the same km target. That is a defect in its own right and it is not fixed.

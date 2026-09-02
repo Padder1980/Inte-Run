@@ -36087,6 +36087,7 @@ function dismissWeeklyReview() {
   try { localStorage.setItem("interun_review_v1", reviewWeekStartIso()); } catch (e) {}
   render();
 }
+let EASE_OFFER_WEEK = null;
 function currentWeeklyReview() {
   const wkStart = reviewWeekStartIso();
   if (loadReviewSeen() === wkStart) return null;      // already answered this week
@@ -36101,6 +36102,12 @@ function currentWeeklyReview() {
   const last = trials[0] && trials[0].completedAt ? String(trials[0].completedAt).slice(0, 10) : null;
   const wk = PLAN.weeks && PLAN.weeks[state.selWeek];
   const phase = wk && wk.phase ? String(wk.phase) : "";
+  // ⚠️ THE WEEK INDEX IS REMEMBERED HERE BECAUSE THE SUGGESTION CANNOT CARRY IT. WeeklySuggestion is an
+  // engine type and the engine knows nothing about plan indices, so the accept handler would otherwise
+  // have to re-derive which week was offered — a second derivation, and the two would disagree the
+  // first time the clock crossed a Monday between the card rendering and the tap.
+  const ev = easeWeekEvidence(phase);
+  EASE_OFFER_WEEK = ev ? ev.weekIndex : null;
   try {
     return RC.buildWeeklyReview({
       runs, flags, lastTrialIso: last, weekStartIso: wkStart, todayIso: todayIso(),
@@ -36108,6 +36115,7 @@ function currentWeeklyReview() {
       // Anything the runner has told us that makes a maximal effort the wrong idea.
       unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
       addDay: addDayEvidence(phase),
+      easeWeek: ev,
     });
   } catch (e) { return null; }
 }
@@ -36164,6 +36172,108 @@ function addDayEvidence(phase) {
     return null;
   }
 }
+/**
+ * The evidence behind the "make this week easier" offer. Null when it cannot be answered, and the
+ * engine treats absent as "do not offer" — a caller who cannot supply evidence must never get it by
+ * default.
+ *
+ * ⚠️⚠️ IT REUSES addDayEvidence'S OWN recentWeeks ARRAY, which is the point rather than a shortcut.
+ * "Is this runner keeping up" must have ONE answer: above the line they may be offered another running
+ * day, below it they may be offered an easier week. Two computations of prescribed-against-logged would
+ * be two answers to one question, and they would drift.
+ *
+ * ⚠️ THE WEEK OFFERED IS THE FIRST ONE THAT HAS NOT STARTED — the first plan week whose Monday is on or
+ * after today. On a Monday that is this week; later in the week it is the next one. You can only ease a
+ * week you have not run: easing the current week on a Saturday would trim a long run that has already
+ * happened and swap a session that is already done, so the offer would be true on screen and empty in
+ * practice.
+ */
+function easeWeekEvidence(phase) {
+  try {
+    if (!PLAN || !PLAN.weeks || !RAW || !RAW.weeks) return null;
+    const today = todayIso();
+    let idx = -1;
+    for (let i = 0; i < PLAN.weeks.length; i++) {
+      const wk = PLAN.weeks[i];
+      if (wk && wk.startIso && wk.startIso >= today) { idx = i; break; }
+    }
+    if (idx < 0) return null;
+    const wk = PLAN.weeks[idx], raw = RAW.weeks[idx];
+    if (!wk || !raw) return null;
+    const add = addDayEvidence(phase);
+    if (!add || !add.recentWeeks || !add.recentWeeks.length) return null;
+
+    // What the runner ACTUALLY ran, one entry per plan week, over the same weeks.
+    const cur = CURRENT_WEEK;
+    const actualWeeksKm = [];
+    for (let i = cur - add.recentWeeks.length; i < cur; i++) {
+      const w = PLAN.weeks[i];
+      if (!w || !w.startIso) continue;
+      const end = isoAdd(w.startIso, 6).toISOString().slice(0, 10);
+      let km = 0;
+      for (const r of (state.hist || []))
+        if (r && r.d && r.d >= w.startIso && r.d <= end) km += Number(r.k) || 0;
+      actualWeeksKm.push(km);
+    }
+    // Their longest single logged run in the past 30 days.
+    const from = isoAdd(today, -30).toISOString().slice(0, 10);
+    let longest = 0;
+    for (const r of (state.hist || []))
+      if (r && r.d && r.d >= from && r.d <= today) longest = Math.max(longest, Number(r.k) || 0);
+
+    // ⚠️ THE OUTCOMES ARE PRESCRIBED SESSIONS AGAINST LOGGED RUNS, NEVER state.done. seedDone() marks
+    // every non-rest session dated before today as done whether it happened or not, so a figure from
+    // there reads 100% for somebody who has not run at all — this file records that in as many words.
+    const runsBy = {};
+    for (const r of (state.logged || [])) if (r && r.dateIso) runsBy[r.dateIso] = true;
+    const recentOutcomes = [];
+    for (let i = Math.max(0, cur - 4); i < cur; i++) {
+      const w = PLAN.weeks[i], rw = RAW.weeks[i];
+      if (!w || !w.startIso || !rw) continue;
+      for (const sess of rw.sessions) {
+        if (!PRIMARY_TYPES[sess.type]) continue;
+        const iso = isoAdd(w.startIso, sess.dayOfWeek).toISOString().slice(0, 10);
+        if (iso >= today) continue;
+        recentOutcomes.push({ completed: !!runsBy[iso] });
+      }
+    }
+    const lr = raw.sessions.find((x) => x.type === "long");
+    return {
+      weekIndex: idx,
+      plannedWeekKm: RC.weekVolumeMeters(raw.sessions) / 1000,
+      plannedLongestRunKm: lr ? (lr.estimatedDistanceMeters || 0) / 1000 : 0,
+      actualWeeksKm: actualWeeksKm,
+      longestRunLast30dKm: longest,
+      recentWeeks: add.recentWeeks,
+      recentOutcomes: recentOutcomes,
+      phase: (wk.phase || "base"),
+      alreadyEased: eased(wk, loadAdjust()),
+      lastAnsweredIso: loadEaseAnswered(),
+      todayIso: today,
+    };
+  } catch (e) {
+    // ⚠️ NOT SILENT — the same reasoning addDayEvidence records above. A caught error here is a bug in
+    // this function, not an expected state, and a silent catch is how an offer ships as a permanent
+    // no-op with nothing to see.
+    try { console.error("easeWeekEvidence failed", e); } catch (e2) {}
+    return null;
+  }
+}
+function loadEaseAnswered() { try { return localStorage.getItem("interun_easeweek_v1") || null; } catch (e) { return null; } }
+function saveEaseAnswered() { try { localStorage.setItem("interun_easeweek_v1", todayIso()); } catch (e) {} }
+/**
+ * ⚠️ ACCEPTING GOES THROUGH applyEaseWeek, THE SAME PATH THE MANUAL CONTROL USES. One mechanism, so an
+ * offer the runner accepts cannot ease a week differently from one they chose themselves — and it
+ * inherits the snapshot-before-rebuild undo, the breaks-list row and the week marking for free.
+ */
+function applyEaseOffer() {
+  const ev = EASE_OFFER_WEEK;
+  saveEaseAnswered();
+  dismissWeeklyReview();
+  if (ev == null) return;
+  applyEaseWeek(ev);
+}
+function declineEaseOffer() { saveEaseAnswered(); dismissWeeklyReview(); }
 function loadAddDayDeclined() { try { return localStorage.getItem("interun_addday_v1") || null; } catch (e) { return null; } }
 function saveAddDayDeclined() { try { localStorage.setItem("interun_addday_v1", todayIso()); } catch (e) {} }
 // ⚠️ ACCEPTING REWRITES THE WEEKS AHEAD, and that is the owner's explicit instruction (2026-08-06):
@@ -36196,6 +36306,9 @@ function weeklyReviewCard() {
     cta = '<button class="ctrl" id="wrNo">Not now</button><button class="primary" id="wrTrial">Do a 2 km</button>';
   } else if (s && s.kind === "add-a-day") {
     cta = '<button class="ctrl" id="wrNoDay">Not yet</button><button class="primary" id="wrAddDay">Add a ' + s.to + 'th day</button>';
+  } else if (s && s.kind === "ease-week") {
+    cta = '<button class="ctrl" id="wrNoEase">No thanks</button>' +
+      '<button class="primary" id="wrEase">Make it easier</button>';
   } else if (s && s.kind === "easy-days-easier") {
     cta = '<button class="ctrl" id="wrOk">Got it</button>';
   }
@@ -37691,6 +37804,8 @@ function wire() {
   const wrTrial = $("wrTrial"); if (wrTrial) wrTrial.onclick = () => { dismissWeeklyReview(); startTrialFlow(); };
   const wrAddDay = $("wrAddDay"); if (wrAddDay) wrAddDay.onclick = applyAddDay;
   const wrNoDay = $("wrNoDay"); if (wrNoDay) wrNoDay.onclick = declineAddDay;
+  const wrEase = $("wrEase"); if (wrEase) wrEase.onclick = applyEaseOffer;
+  const wrNoEase = $("wrNoEase"); if (wrNoEase) wrNoEase.onclick = declineEaseOffer;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
   const viewSession = $("viewSession"); if (viewSession) viewSession.onclick = () => openSessionSheet(selectedSession(), curWeekNo());

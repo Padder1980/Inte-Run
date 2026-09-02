@@ -20,6 +20,11 @@
  */
 
 import type { RunObservation, TrainingFlagsResult } from "./training-flags.ts";
+// ⚠️ THE THREE DETECTORS, WHICH HAVE HAD ZERO CALLERS SINCE THEY WERE WRITTEN. This import is the
+// whole of the fix; the arithmetic was already there and already tested.
+import { assessWeeklyJump, assessLongRunSpike } from "./load-guardrails.ts";
+import { countTrailingMisses } from "./missed-sessions.ts";
+import type { SessionOutcome } from "../domain/types.ts";
 
 /** A logged run, as the review needs it: the flags engine's view plus when and how it felt. */
 export type ReviewRun = RunObservation & {
@@ -51,6 +56,12 @@ export type WeeklyReviewInput = {
    * a caller that cannot supply the evidence must not get the offer by default. See `addDayOffer`.
    */
   addDay?: AddDayInput;
+  /**
+   * Everything needed to decide whether to OFFER an easier week. Absent means do not consider it — a
+   * caller that cannot supply the runner's actual recent running must not get the offer by default,
+   * because every signal here is the plan measured against what the runner has really been doing.
+   */
+  easeWeek?: EaseWeekInput;
 };
 
 export type WeeklyReview = {
@@ -68,7 +79,8 @@ export type WeeklySuggestion =
   | { kind: "adjust-paces"; direction: "faster" | "slower"; proposedRecent5kSeconds: number; basis: "pace" | "rpe"; why: string }
   | { kind: "easy-days-easier"; why: string }
   | { kind: "retest"; why: string }
-  | { kind: "add-a-day"; from: number; to: number; why: string };
+  | { kind: "add-a-day"; from: number; to: number; why: string }
+  | { kind: "ease-week"; basis: "jump" | "long-run" | "missed"; why: string };
 
 /**
  * Offering a fourth (or fifth, or sixth) running day.
@@ -108,6 +120,175 @@ export type AddDayInput = {
   /** True when the flags engine is already suggesting the runner eases off. */
   easingSuggested?: boolean;
 };
+
+/**
+ * Everything needed to decide whether the week ahead is worth easing.
+ *
+ * ⚠️⚠️ EVERY SIGNAL IS THE PLAN MEASURED AGAINST WHAT THE RUNNER HAS ACTUALLY DONE, and that is the
+ * whole point of this offer. The three detectors it uses — `assessWeeklyJump`, `assessLongRunSpike` and
+ * `countTrailingMisses` — have existed since the load-guardrails work and have had ZERO callers, and the
+ * progression audit's complaint about `assessWeeklyJump` ("it compares the planned week to LAST WEEK in
+ * KILOMETRES") was about using it to audit the PLAN AGAINST ITSELF. That is a different question, and one
+ * the generator already guards (`LONG_LIFT_STEP_MAX`, the volume ramp, `enforceLongRunIsLongest`), which
+ * is why a planned week jumps more than 30% over its own trailing mean in 0.74% of transitions.
+ * Pointed at the runner instead, the functions are exactly right as written: `longestRunLast30dKm` asks
+ * for the RUNNER's last 30 days in as many words. A plan can be internally smooth and still be a large
+ * jump for somebody who has missed half of the last month.
+ */
+export type EaseWeekInput = {
+  /** The week ahead, as the plan has it. */
+  plannedWeekKm: number;
+  /** The longest single run the week ahead asks for. */
+  plannedLongestRunKm: number;
+  /** What the runner ACTUALLY ran, one entry per week, most recent last. */
+  actualWeeksKm: number[];
+  /** Their longest single logged run in the past 30 days. */
+  longestRunLast30dKm: number;
+  /** Prescribed runnable sessions in date order, most recent last, and whether each was logged. */
+  recentOutcomes: SessionOutcome[];
+  /**
+   * Recent weeks, most recent last: how many runs the plan asked for and how many were logged.
+   * ⚠️ THE SAME SHAPE `AddDayInput` ALREADY TAKES, deliberately — the app builds this array once and
+   * both offers read it, so "is this runner keeping up" has one answer rather than two.
+   */
+  recentWeeks: { prescribedRuns: number; completedRuns: number }[];
+  /** The phase of the week being offered. */
+  phase: "base" | "build" | "peak" | "taper";
+  /** True when the week ahead already carries a stored easier-week row. */
+  alreadyEased?: boolean;
+  /**
+   * ISO date the runner last ANSWERED this question, either way.
+   * ⚠️ EITHER WAY, AND NOT `lastDeclinedIso` LIKE `addDayOffer`. Declining another running day is the
+   * only answer worth remembering there, because accepting it changes the plan permanently. Here BOTH
+   * answers must cool the question down: a runner at 50% adherence would otherwise be offered an easier
+   * week, accept it, and be offered another one seven days later — and a plan eased every week is not a
+   * plan. One field, one cooldown, both answers.
+   */
+  lastAnsweredIso?: string | null;
+  todayIso: string;
+};
+
+/**
+ * ⚠️ FOUR WEEKS OF EVIDENCE, AND THE WINDOW IS THE GUARD RATHER THAN A PREFERENCE. The evidence
+ * report's own rule is against the trailing FOUR-week mean, and this repo has measured what a shorter
+ * window does: allowing short windows gave 315 breaches with a worst case of 1.897x AT WEEK 2 — which
+ * is week 2 compared against week 1 alone — against 94 and 1.549x windowed properly. A single light
+ * week (a deload the runner did as asked, a holiday) moves a four-week mean by about 7%, nowhere near
+ * the threshold, so the window is also what stops the offer firing on a plan working correctly.
+ */
+export const EASE_WEEKS_OF_EVIDENCE = 4;
+/**
+ * ⚠️ A FORTNIGHT, NOT ADD_DAY's TWO MONTHS, AND THE DIFFERENCE IS WHAT THE QUESTION IS ABOUT. Declining
+ * another running day is a decision about the whole block, so it is remembered for 56 days. Answering
+ * this one is a decision about ONE week; the week after is a different question, and refusing to ask it
+ * for two months would leave a runner who is genuinely overreached with no prompt at all. Two weeks is
+ * long enough that neither answer is re-asked next Sunday, and short enough that a runner still
+ * struggling a fortnight later gets asked again.
+ */
+export const EASE_COOLDOWN_DAYS = 14;
+/** The same bar `applyMissedSessionAdjustment` has always used: two in a row, not one bad day. */
+export const EASE_MIN_MISSES = 2;
+/**
+ * ⚠️⚠️ THE SHORTFALL GATE, AND WITHOUT IT THIS OFFER FIRES ON A RUNNER DOING EVERYTHING RIGHT.
+ * Measured before it existed: at 100% adherence the offer still fired on 5.1% of weeks. The cause is
+ * not a threshold that needs nudging — it is that A PROGRESSIVE PLAN MEANS EVERY WEEK IS BIGGER THAN
+ * THE TRAILING MEAN. That is what progression IS, so "next week is 30% more than your four-week
+ * average" is a positive number by design for somebody following the plan perfectly. Worse, both
+ * detectors' own thresholds sit ON the generator's own guardrails: `assessLongRunSpike` fires above
+ * 1.10 and `LONG_LIFT_STEP_MAX` clamps the long-run ladder AT 1.10, so an on-plan runner trips it on
+ * rounding; and `assessWeeklyJump` fires above 1.30 where the plan's own worst measured km jump is
+ * 1.36.
+ *
+ * So the size of the step is not the trigger — the SHORTFALL is. This gate asks whether the runner has
+ * actually been keeping up, and it is zero for somebody who has, which makes a perfect runner silent by
+ * construction rather than by a margin.
+ *
+ * ⚠️ AND IT IS `ADD_DAY_MIN_COMPLETION` READ FROM THE OTHER SIDE — one number, two directions: above it
+ * a runner may be offered another running day, below it they may be offered an easier week. Two
+ * separate constants for one line would be two answers to "is this runner keeping up".
+ */
+export const EASE_MAX_COMPLETION = 0.85;
+
+/**
+ * ⚠️ THE NARROW TYPE, NOT THE UNION. `basis` exists on `adjust-paces` too, with different values
+ * ("pace" | "rpe"), so returning the union makes `offer.basis` unreachable at the call site — tsc
+ * rejects it outright rather than letting the two meanings blur.
+ */
+export type EaseWeekSuggestion = Extract<WeeklySuggestion, { kind: "ease-week" }>;
+
+export function easeOffer(input: EaseWeekInput): EaseWeekSuggestion | null {
+  // ⚠️ A TAPER OR RACE WEEK IS ALREADY EASED, so offering to ease it is offering to undo the plan's own
+  // sharpening at the worst possible moment. `easeWeek` itself reports nothing to ease for a bare race
+  // week, but by then the question has already been put on screen.
+  if (input.phase === "taper") return null;
+  if (input.alreadyEased) return null;
+  if (input.lastAnsweredIso
+    && daysBetween(input.lastAnsweredIso, input.todayIso) < EASE_COOLDOWN_DAYS) return null;
+  // ⚠️ NOT GATED ON `unwell`, DELIBERATELY, AND THAT IS THE OPPOSITE OF `retestDue`. Being unwell is a
+  // REASON to ease a week, not a reason to withhold the offer; what must never be offered to somebody
+  // unwell is a maximal effort, which is why the retest refuses and this does not.
+
+  const weeks = input.actualWeeksKm.slice(-EASE_WEEKS_OF_EVIDENCE);
+  const misses = countTrailingMisses(input.recentOutcomes);
+
+  // ⚠️ THE MISSED-SESSION SIGNAL NEEDS NO HISTORY WINDOW and is checked first: it is the one the runner
+  // already knows about, so it is the most credible thing to lead with. It is also the signal
+  // `applyMissedSessionAdjustment` was written for — and that function applies its adjustment on the
+  // spot, which this app's standing instruction forbids ("the app may observe and it may propose; it may
+  // never change a pace, a plan or a target on its own"). So its DETECTOR raises the offer and its
+  // MECHANISM runs only when the runner accepts.
+  if (misses >= EASE_MIN_MISSES) {
+    return {
+      kind: "ease-week",
+      basis: "missed",
+      why: `You have missed your last ${misses} sessions. Rather than carrying that work forward, the `
+        + "week ahead can swap its hardest session for an easy run so you pick the plan back up gently.",
+    };
+  }
+
+  // Everything below compares the week ahead to what the runner has really been running, so it needs a
+  // full window or it is measuring the opening ramp rather than the runner.
+  if (weeks.length < EASE_WEEKS_OF_EVIDENCE) return null;
+  const mean = weeks.reduce((a, b) => a + b, 0) / weeks.length;
+  if (mean <= 0) return null;
+
+  // ⚠️ THE SHORTFALL IS THE TRIGGER, NOT THE SIZE OF THE STEP — see EASE_MAX_COMPLETION. A runner who
+  // is getting their sessions done does not need the week ahead easing however big a step the plan
+  // makes, because the plan's own guardrails already bound that step and they have been absorbing it.
+  const ev = input.recentWeeks.slice(-EASE_WEEKS_OF_EVIDENCE);
+  if (ev.length < EASE_WEEKS_OF_EVIDENCE) return null;
+  const prescribed = ev.reduce((a, w) => a + w.prescribedRuns, 0);
+  const completed = ev.reduce((a, w) => a + w.completedRuns, 0);
+  if (prescribed <= 0) return null;
+  if (completed / prescribed >= EASE_MAX_COMPLETION) return null;
+
+  const jump = assessWeeklyJump({ plannedWeekKm: input.plannedWeekKm, lastWeekKm: mean });
+  if (!jump.withinComfort) {
+    return {
+      kind: "ease-week",
+      basis: "jump",
+      why: `You have run ${completed} of the last ${prescribed} sessions your plan asked for, and the `
+        + `week ahead is about ${jump.jumpPct}% more running than you have actually averaged over the last `
+        + `${weeks.length} weeks (${Math.round(mean)} km). Easing it once is a gentler way back into the `
+        + "plan than trying to absorb the whole step at once.",
+    };
+  }
+
+  const spike = assessLongRunSpike({
+    plannedLongestRunKm: input.plannedLongestRunKm,
+    longestRunLast30dKm: input.longestRunLast30dKm,
+  });
+  if (!spike.withinComfort) {
+    return {
+      kind: "ease-week",
+      basis: "long-run",
+      why: `The long run ahead is ${Math.round(input.plannedLongestRunKm)} km, about ${spike.overPct}% `
+        + `longer than anything you have run in the past month (${Math.round(input.longestRunLast30dKm)} km). `
+        + "Easing the week trims it back while keeping the rest of the plan where it is.",
+    };
+  }
+  return null;
+}
 
 /** Never offered automatically. Six days is a rest day a week; the seventh is a coached decision. */
 export const ADD_DAY_MAX = 6;
@@ -252,6 +433,22 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
 
   const hr = heartRateNote(runs);
   if (hr) observations.push(hr);
+
+  // ⚠️⚠️ BEFORE THE RETEST, AND THAT ORDER IS A SAFETY CLAIM RATHER THAN A PREFERENCE. A retest asks for
+  // a MAXIMAL 2 km effort; offering one in a week the app has just decided is a large jump for this
+  // runner is the prompt doing harm. It sits after the pace suggestion because that is the flags
+  // engine's own verdict on work already done and is the bigger change — the "one voice" rule. And
+  // being ahead of `add-a-day` means a runner who is not absorbing the current load is never asked to
+  // do more in the same breath, without add-a-day needing a second refusal for it.
+  if (!suggestion && input.easeWeek) {
+    const offer = easeOffer(input.easeWeek);
+    if (offer) {
+      suggestion = offer;
+      observations.push(offer.basis === "missed"
+        ? "The last few sessions have not happened."
+        : "The week ahead is a bigger step than you have been running lately.");
+    }
+  }
 
   // ⚠️ ONE QUESTION AT A TIME. A retest is only offered when there is no pace suggestion pending:
   // asking someone to both re-test and accept a pace change in the same breath guarantees that one

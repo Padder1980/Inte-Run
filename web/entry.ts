@@ -64,6 +64,10 @@ export {
   // Frequency — the one FITT axis the plan never progressed. It OFFERS a day; it never adds one.
   addDayOffer, ADD_DAY_MAX, ADD_DAY_COOLDOWN_DAYS, ADD_DAY_MIN_RUNWAY_WEEKS,
   ADD_DAY_MIN_WEEKS_ON_PLAN, ADD_DAY_MIN_COMPLETION,
+  // Hudson ch7's on-demand easier week: it OFFERS one; it never eases a week on its own. Exported so a
+  // guard reads the thresholds out of the engine rather than retyping them — a test carrying its own
+  // copy of a constant measures the test's value, which this repo has watched escape a re-break twice.
+  easeOffer, EASE_WEEKS_OF_EVIDENCE, EASE_COOLDOWN_DAYS, EASE_MIN_MISSES, EASE_MAX_COMPLETION,
 } from "../src/adapt/weekly-review.ts";
 export type { WeeklyReview, WeeklySuggestion, ReviewRun, AddDayInput } from "../src/adapt/weekly-review.ts";
 

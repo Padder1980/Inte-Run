@@ -109,6 +109,7 @@ export function phaseSchedule(
   structuredWeeks: number,
   distance: RaceDistanceKey,
   returningFromInjury: boolean,
+  scheduleDeloads = true,
 ): WeekPlan[] {
   const taperWeeks = Math.min(taperFor(distance).weeks, Math.max(1, structuredWeeks - 3));
   const remaining = structuredWeeks - taperWeeks;
@@ -137,7 +138,17 @@ export function phaseSchedule(
   return phases.map((phase, i) => {
     const weekNumber = i + 1;
     // Deload every 4th week, but never during the taper (taper already unloads).
-    const isDeload = phase !== "taper" && weekNumber % 4 === 0;
+    //
+    // ⚠️ `scheduleDeloads` IS THE BOOK'S THIRD TIER AND IT DEFAULTS TO TRUE. Hudson ch7 gives three
+    // cadences, not one: every third week for a runner near their limit, every fourth for "a more
+    // easily managed workload relative to their personal limits", and for "low-key, low-volume
+    // competitive runners" none at all — "instead, they can just take a day off or replace a hard run
+    // with an easy run as necessary". We implement tier 2 for everybody and tier 3 where the gate says
+    // so; see `schedulesRecoveryWeeks` in generate-plan.ts, which is the ONLY caller that passes false.
+    // ⚠️ THE DEFAULT IS TRUE SO THAT EVERY OTHER CALLER — the tests, and any future one — keeps the
+    // behaviour it had. A parameter that changes what an existing caller gets is not a parameter, it is
+    // a silent rewrite of every plan.
+    const isDeload = scheduleDeloads && phase !== "taper" && weekNumber % 4 === 0;
     return { phase, isDeload };
   });
 }

@@ -74,7 +74,12 @@ for (const distance of ["5k", "10k", "half", "marathon"])
 for (const days of [3, 4, 5, 6])
 for (const tenK of [2400, 3000, 3600])
 for (const experience of ["recreational", "competitive"])
-for (const vol of [null, 40]) {
+// ⚠️ 30 IS IN THIS LIST BECAUSE WITHOUT IT THE AUDIT IS BLIND TO THE TIER-3 RECOVERY-WEEK RULE.
+// `schedulesRecoveryWeeks` fires only on a STATED volume at or under 35 km with 4 or fewer running
+// days; `null` means the runner never answered (which keeps the recovery weeks) and 40 is above the
+// ceiling, so with `[null, 40]` alone this tool reported the whole change as byte-identical. An
+// instrument that cannot see the thing it is pointed at reports "no effect" and is believed.
+for (const vol of [null, 30, 40]) {
   const athlete = { daysPerWeek: days, recent: { distanceMeters: 10000, timeSeconds: tenK },
     experience, includeStrength: false, returningFromInjury: false, ...(vol ? { weeklyVolumeKmCurrent: vol } : {}) };
   let p;

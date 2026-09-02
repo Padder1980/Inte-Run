@@ -16,6 +16,7 @@ import type {
   IntensityModel,
   Phase,
   PlannedWeek,
+  RaceDistanceKey,
   Session,
   SessionType,
   TrainingPaces,
@@ -308,6 +309,109 @@ function targetPeakWeeklyKm(athlete: Athlete): number | null {
 }
 
 /**
+ * Hudson ch7's THIRD recovery-week tier: does this runner get scheduled recovery weeks at all?
+ *
+ * Verbatim: "Competitive runners who typically maintain a workload that's close to the limit of what
+ * their bodies can handle require a recovery week every third week throughout the training cycle.
+ * Runners who maintain a more easily managed workload relative to their personal limits may only need a
+ * recovery week every fourth week. Low-key, low-volume competitive runners typically don't need to
+ * schedule recovery weeks at all. Instead, they can just take a day off or replace a hard run with an
+ * easy run as necessary."
+ *
+ * We deliver tier 2 (every fourth week) to everybody. This is tier 3, and the owner asked for it
+ * (2026-09-01: "Recovery weeks for low-mileage runners. The book says skip them entirely and i'm happy
+ * with that"). It returns TRUE — keep the recovery weeks — for everyone it is not sure about.
+ *
+ * ⚠️ EVERY FIELD READ HERE IS A PURE INPUT, AND THAT IS THE ARCHITECTURE, NOT TIDINESS. The book keys
+ * its rule on "the planned average training workload of your training plan", which is a BUILT quantity
+ * — and `buildAll(vScale)` is rebuilt to a fixed point whose input is this very schedule. A gate reading
+ * the built plan would be circular and could make that fixed point oscillate. So the gate reads what the
+ * runner told us, and the arms below are DERIVED from measuring what the plan then delivers for them.
+ *
+ * ⚠️ `!stated` IS THE SAME EXPRESSION AS `targetPeakWeeklyKm` ABOVE, AND IT IS LOAD-BEARING. `volKm` is
+ * 0 in `DEFAULT_PROFILE` and the web layer only sets the engine field `if (pf.volKm > 0)`, so 0 and
+ * undefined MUST mean the same thing — `test/generate-plan.test.ts` asserts it. Written `stated < 32`
+ * this would read 0 as "very low mileage" and strip the recovery weeks from every runner who never
+ * answered the question, which is the phantom-default disaster CLAUDE.md records for `weeklyVolumeKm`.
+ * ABSENCE KEEPS THE RECOVERY WEEKS.
+ */
+// ⚠️⚠️ MEASURED, NOT CHOSEN, AND MEASURED ON THE WORST CELL RATHER THAN THE MEAN. The book's own test
+// is whether the plan's AVERAGE sits comfortably below the runner's limit: "If you consider the planned
+// average training workload of your training plan to be very near your limit, then schedule a 20-to
+// 30-percent mileage reduction every third week." Below these floors the per-session floors bind — a
+// 20-minute easy run cannot shrink, and MIN_VOLUME_SCALE bottoms out at 0.45 — so the plan delivers MORE
+// than the runner said they run, and by the book's own criterion they are tier 1 or 2.
+//
+// Worst mean-week/stated across 3-4 running days, five abilities and three runways per cell:
+//        stated   8      10     12     15     18     20     22     25     28     30     35
+//   5k          2.71x  2.17x  1.81x  1.45x  1.21x  1.09x  1.02x  1.01x  0.99x  0.97x  0.97x
+//   10k         2.90x  2.32x  1.93x  1.55x  1.29x  1.16x  1.05x  0.99x  0.99x  0.96x  0.97x
+//   half        3.49x  2.79x  2.33x  1.86x  1.55x  1.40x  1.27x  1.12x  1.02x  0.99x  0.97x
+//   marathon    3.87x  3.09x  2.58x  2.06x  1.72x  1.55x  1.41x  1.24x  1.11x  1.04x  1.00x
+//
+// ⚠️ A FIRST VERSION OF THIS TABLE SWEPT ONLY THE MEAN AND STARTED AT 20 km, AND ITS OWN GUARD CAUGHT
+// IT: a 10 km runner stating 15 km/week was being gated while their plan averaged 1.63x what they said.
+// The fixture-too-kind trap, in the one measurement the whole gate rests on.
+//
+// ⚠️⚠️ THE HALF AND THE MARATHON ARE EXCLUDED ENTIRELY, AND THE SECOND MEASUREMENT IS WHY — it is a
+// better reason than any ratio. The peak long run as a share of ITS OWN WEEK, worst cell across 3-4
+// days, five abilities and three runways:
+//        stated      25      28      30      35      45
+//   5k             51%     48%     46%     46%     46%
+//   10k            57%     54%     51%     49%     48%
+//   half           71%     66%     63%     58%     53%
+//   marathon       77%     76%     74%     71%     65%
+// A marathon runner who states 25 km/week is prescribed a 19 km long run inside a 25 km week: their week
+// IS one long run plus a couple of short ones, because LONG_FLOOR_KM forces a 24-28 km endpoint whatever
+// they said. There is no "easily managed workload relative to their personal limits" there to exempt, and
+// removing their one eased week would take it from the runner who needs it most. The half is milder but
+// still 63-66% across its whole candidate band, which is marginal on two independent measures at once —
+// and where a population is marginal this engine keeps the behaviour it has.
+// ⚠️ NEITHER SHARE IS CAUSED BY THIS CHANGE. They are identical with and without the recovery weeks (the
+// long run and the week scale together); this is the documented volume-blindness of `assessFeasibility`
+// showing through, and it is being READ as a tier signal rather than fixed here.
+const NO_DELOAD_MIN_STATED_KM: Record<RaceDistanceKey, number | null> = {
+  "1mile": 22,
+  "5k": 22,
+  "10k": 25,
+  half: null, // never — long run is 63-66% of the week across the whole band
+  marathon: null, // never — long run is 74-77% of the week
+};
+const NO_DELOAD_MAX_STATED_KM = 35;
+// ⚠️ THIS ARM IS THE MECHANISM, NOT A PROXY FOR VOLUME, and the book supplies it: the reason a low-key
+// runner needs no scheduled recovery week is that "they can just take a day off" — which presumes a week
+// that already contains days off. A 4-day week has three; a 7-day week has none. It is also where the
+// measured risk lives: the easy-fraction cost of removing recovery weeks is concentrated in 5- and
+// 6-day runners. Days per week is a POOR key for volume (measured, only 7.8% of the spread, and a 4-day
+// runner can be at 403 min/wk) and that is not what it is doing here.
+const NO_DELOAD_MAX_DAYS = 4;
+
+export function schedulesRecoveryWeeks(athlete: Athlete, goal: Goal): boolean {
+  // ⚠️ A BEGINNER ALWAYS KEEPS THEM, and the book's own taxonomy is why rather than caution. Table 3.1
+  // lists FIVE volume categories and "Beginners" is a separate, LOWER one than "Low-Key Competitive" —
+  // which is the category the recovery-week exemption names. The book says nothing about a beginner's
+  // recovery weeks, so this is not it saying yes. Two further reasons: our deload does a second job for
+  // a beginner, absorbing the geometric long-run ramp whose block length was DERIVED assuming one
+  // deload in four (see MAX_STRUCTURED_WEEKS_BEGINNER); and the engine ignores a stated volume for
+  // beginners entirely, so the gate's own key carries no information about them.
+  if (athlete.experience === "beginner") return true;
+  // ⚠️ AND A RUNNER COMING BACK ALWAYS KEEPS THEM. Both comeback flags mean DETRAINED — the line above
+  // says so in as many words, and `returnToRunningPlan` draws this repo's long-layoff line at four
+  // weeks. Someone rebuilding is not "a low-key competitive runner" on any reading of the book.
+  if ((athlete.returningFromInjury ?? false) || (athlete.returningFromBreak ?? false)) return true;
+  const stated = athlete.weeklyVolumeKmCurrent;
+  if (!stated || !Number.isFinite(stated) || stated <= 0) return true;
+  if (athlete.daysPerWeek > NO_DELOAD_MAX_DAYS) return true;
+  if (stated > NO_DELOAD_MAX_STATED_KM) return true;
+  const floor = NO_DELOAD_MIN_STATED_KM[goal.distance];
+  // ⚠️ `null` MEANS NEVER, AND `?? 0` WOULD HAVE MEANT ALWAYS. The marathon is excluded because the
+  // measurement leaves it no band at all; read with a numeric fallback it would be the most
+  // permissive distance instead of the only excluded one.
+  if (floor === null || stated < floor) return true;
+  return false;
+}
+
+/**
  * How long the easy runs are in WEEK ONE, as a fraction of their peak-week length.
  *
  * ⚠️ EASY RUNNING HAD NO PROGRESSION AT ALL, and that is what broke week-one anchoring. `baseMin` in
@@ -543,7 +647,9 @@ export function generatePlan(
     // own threshold pace. See reconcileVo2.
     paces.vo2 = reconcileVo2(paces, masVo2Range(computeMas(athlete.oneKmTrialSeconds).masMps));
   }
-  const schedule = annotate(phaseSchedule(structuredWeeks, goal.distance, returning));
+  const schedule = annotate(
+    phaseSchedule(structuredWeeks, goal.distance, returning, schedulesRecoveryWeeks(athlete, goal)),
+  );
 
   const targetPeakKm = targetPeakWeeklyKm(athlete);
   const nonTaperCount = schedule.filter((s) => s.phase !== "taper").length;
@@ -2582,6 +2688,24 @@ function buildNotes(
   if (athlete.oneKmTrialSeconds && athlete.oneKmTrialSeconds > 0) {
     notes.push(
       "VO₂/interval paces are anchored to your 1 km time-trial (MAS) — a direct, test-based target you can re-test to track progress.",
+    );
+  }
+  // ⚠️ SAY SO WHEN THE PLAN CARRIES NO SCHEDULED EASIER WEEKS. This app's standing rule is that it may
+  // observe and propose and never impose, and that it never changes a plan silently; a block with no
+  // recovery week in it is a permanent structural difference from every other block the app builds, and
+  // the runner would have no way of knowing it was deliberate. The note also carries the other half of
+  // Hudson's own sentence — "instead, they can just take a day off or replace a hard run with an easy
+  // run as necessary" — because a rule that removes the automatic easing is only safe if the runner
+  // knows where the manual easing is.
+  // ⚠️ ITS FIRST CLAUSE IS THE HOOK viewPlan MATCHES ON. `PLAN.notes` is generated in full and the app
+  // renders only the notes its regex names — the computed-and-discarded trap that has caught this file
+  // five times. Changing this wording means changing web/app.ts's `volNote` regex in the same commit.
+  if (!weeks.some((w) => w.isDeload)) {
+    notes.push(
+      "No scheduled easier weeks: this block runs straight through, because you told us you run " +
+        "a modest weekly mileage across a few days — so your week already has rest days in it and does " +
+        "not need a lighter week built in every fourth week. If you do want one, ease a week off " +
+        "yourself from Plan › Manage plan › Not feeling 100%.",
     );
   }
   if (athlete.returningFromInjury) {

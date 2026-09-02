@@ -12383,9 +12383,16 @@ function viewPlan() {
   // ⚠️ MATCHED ON A PHRASE THE NOTE OWNS, not on the word km. Any of the eight notes could mention a
   // distance, and widening this to catch them all would put the plan's own design notes on the
   // header, which the paragraph above deliberately keeps off it.
-  const volNote = (PLAN.notes || []).find((n) => /second run in the day|Adding a day|this block opens at/.test(n));
-  const mileageNote = volNote
-    ? '<div class="plan-note" style="border-left-color:var(--peak)">' + volNote + '</div>'
+  // ⚠️ FILTER, NOT FIND — AND THAT IS A FIX, NOT A TIDY-UP. Both of these notes are about the same
+  // answer (the runner's stated weekly mileage) and both can fire for one runner: measured, a runner
+  // stating 35 km on 4 days gets a peak of 36.4 km against a 43.8 km target, which trips the
+  // under-delivery note, AND is inside the no-recovery-weeks band. With .find the second one was
+  // silently dropped, so the runner was told their plan could not reach their mileage and never told
+  // it also had no easier weeks in it.
+  const volNotes = (PLAN.notes || []).filter((n) =>
+    /second run in the day|Adding a day|this block opens at|No scheduled easier weeks/.test(n));
+  const mileageNote = volNotes.length
+    ? volNotes.map((n) => '<div class="plan-note" style="border-left-color:var(--peak)">' + n + '</div>').join("")
     : "";
   // ⚠️ The example banner belongs here too — see examplePlanBanner. This screen is the one a new
   // tester reaches first, and it was the one screen that never said the numbers were invented.

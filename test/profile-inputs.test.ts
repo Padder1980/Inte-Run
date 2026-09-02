@@ -260,11 +260,16 @@ test("BLOCKER: a plan that opens above the stated mileage says so", () => {
 });
 
 test("BLOCKER: the overshoot note is one the app actually shows", () => {
-  // ⚠️ ADDING THE NOTE UPSTREAM ACHIEVES NOTHING ON ITS OWN. The app renders exactly ONE of the eight
-  // notes, chosen by a regex that named only the two under-delivery phrasings — so the new branch
-  // would have been generated and discarded, which is the trap this whole file is about.
+  // ⚠️ ADDING THE NOTE UPSTREAM ACHIEVES NOTHING ON ITS OWN. The app renders only the notes its own
+  // regex names, so a branch the regex misses is generated and discarded — the trap this whole file is
+  // about.
+  // ⚠️ RESTATED 2026-09-02, NOT DELETED. This guard pinned `.find` and failed when the recovery-week
+  // work changed it to `.filter` (both notes can fire for one runner, and `.find` silently dropped the
+  // second). The invariant — a note the engine writes must be one the app actually shows, and the
+  // design notes must stay off it — never changed, so the claim is now written against WHICHEVER
+  // collector is in use rather than against one spelling of it. Guard the fact, not the mechanism.
   const app = nocomment(appBlock());
-  const m = app.match(/const volNote = \(PLAN\.notes \|\| \[\]\)\.find\(\(n\) => (\/[^/]+\/)\.test\(n\)\)/);
+  const m = app.match(/const volNotes? = \(PLAN\.notes \|\| \[\]\)\.(?:find|filter)\(\(n\) =>\s*(\/[^/]+\/)\.test\(n\)\)/);
   assert.ok(m, "the note filter could not be found");
   const re = new RegExp(m[1]!.slice(1, -1));
   assert.ok(re.test("You told us you run about 15 km a week, and this block opens at 28 km."),

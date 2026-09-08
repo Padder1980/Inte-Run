@@ -14003,3 +14003,171 @@ the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1499 pass
 
 ⚠️ **STILL DEAD: `returnToRunningPlan`, `assessInjury` and `applyInjuryAdjustment`.** And the flags
 engine's "ease off" still **INCREASES** training time — measured 295 → 350 min/wk (+19%).
+
+## ⚠️⚠️ A FINISHED RUN MADE THE WRIST DEAF TO THE PHONE, FOR EVER, IN SILENCE (owner, 2026-09-08)
+
+*"the session and watch app doesnt recording start when selecting to start on watch if the previous
+run from a different day didn't get finished on the watch"* — with two screenshots: the watch on an
+old run's summary ("Well done, Adam", 0.00KM, TIME 0:17) and the phone on *"Starting on your Apple
+Watch… it counts you in from your wrist."* Suite 1499 → **1510**; `test/watch-start-refusal.test.ts`
+holds 8 guards (two driving the real Swift under `swiftc`), 3 more in `test/live-screens.test.ts`,
+and **17 deliberate re-breaks were each watched failing**.
+
+⚠️⚠️ **THE CATEGORY ERROR: `TodayView.running` IS A NAVIGATION FACT ANSWERING A RECORDER-BUSY
+QUESTION.** It is the `isPresented:` binding of a `navigationDestination` — one assignment
+(`running = true`), **no clearing code anywhere in the target**, and it returns to false only when
+SwiftUI pops the pushed view, which takes **two deliberate taps** (Summary's Next, then the effort
+screen's Save or Skip). Nothing auto-dismisses and nothing times out. `store.onStartNow` asked
+`guard !running else { return }` and returned **silently**, before `beginNow`'s `reset()` could make
+everything consistent again.
+
+⚠️⚠️ **AND IT WAS A HALF-FIXED BUG WHOSE OWN FIX COMMENT NAMED THE MECHANISM.** That comment block
+already said *"A run that ended without clearing `running` therefore left the watch permanently deaf
+to the phone, with nothing on screen to say so"* — and then concluded *"acting is what needs a guard,
+and the closure already has one."* **The closure's guard was the wrong guard.** `end()` carries the
+same admission from a third fix — *"or a watch that slept on the summary screen"* — which made the run
+reach the Logbook and left `running` set. **When a comment names a scenario, check it is the scenario
+the fix addresses.**
+
+⚠️ **THE TWO FLAGS HAVE BEEN MEASURED DISAGREEING IN BOTH DIRECTIONS**, so the old guard both refused
+starts it should have allowed AND allowed a second recorder it should have refused:
+`SessionDetailView`'s own note records the inverse — nav popped while a real `HKWorkoutSession`, GPS
+and Live Activity were still running, with *"nothing on the wrist able to set `running` true again"*.
+
+### `WorkoutManager.recorderBusy(phase:countdown:)` is the one decision, and every answer is DRIVEN
+
+Pure and `static` so `test/watch-start-refusal.test.ts` compiles the **real** function under `swiftc`
+and drives all six phases × countdown, rather than inferring it from the source text. Exhaustive
+rather than `phase != .idle` or a `default:` — **a new `Phase` case is then a compile error, which is
+the guard a structural test cannot be.**
+
+| | | why |
+|---|---|---|
+| `.ended`, `.failed` | **free** | ⚠️ **THE REPORTED BUG.** `end()` calls `sendHome()` **before** the HealthKit teardown that owns the transition to `.ended`, so a run sitting on its summary is already in the phone's Logbook. Treating a finished run as busy IS the defect. |
+| `.requesting` | **busy** | ⚠️ Not caution: `begin()` has exactly one caller — `start()`'s HealthKit authorisation callback — and **no phase guard of its own**, so a second start while the first request is in flight lands two `begin()` calls and two `HKWorkoutSession`s, the second overwriting `session` and orphaning the first. |
+| `.running`, `.paused` | busy | the one-recorder rule |
+| a live countdown | **busy** | ⚠️ `startCountingDown` never touches `phase`, so for three seconds the phase alone answers "free" while a run is already coming. |
+
+⚠️ **ASKED INSIDE `beginNow` AND ASKED BEFORE `reset()`, AND THE ORDERING IS THE GUARANTEE.** `reset()`
+sets `phase = .idle`, so the same question one line later always answers "free" and proves nothing.
+Asked in `beginNow` it also covers **the wrist's own buttons**, which the old guard did not.
+⚠️ **The ordering guard proves both halves present first** — `indexOf` returns −1 for a missing needle
+and −1 is less than any index, so an ordering check written without that passes when the thing it
+orders has been deleted. That has silently satisfied two guards in this project.
+
+⚠️ **A REFUSAL RE-PRESENTS THE RUN THAT IS GOING, RATHER THAN JUST DECLINING.** `.running`, `.paused`
+and a countdown all render a page carrying a control (Controls' End, the countdown's Cancel), so
+`running = true` is a **recovery** — and the only recovery there has ever been from the inverse fault
+above. `.requesting` renders the metrics TabView at zero with no way back, so it is refused **without**
+pushing: a screen with no exit is worse than no screen.
+
+### ⚠️⚠️ THE PHONE'S 25-SECOND GIVE-UP IS STRUCTURALLY UNABLE TO SEE THIS
+
+`flushStartNow` clears `pendingStartNow` **before** the send, so a message that was **delivered and
+then refused** leaves that timer's guard failing and returning early — and that send passes
+`replyHandler: nil`, so there is no reply channel either. **Nothing could ever tell the phone.**
+
+- **The wrist sends a MARKER (`["startRefused": "busy"]`), not prose.** The sentence lives in
+  `WatchBridge.swift` beside the other four, because **the page's allowlist is derived from that
+  file** — a watch writing UI copy for the phone is a sentence that silently becomes the generic
+  fallback the day the two files disagree about a comma.
+- ⚠️ **Routed FIRST in `route`**, because its fallthrough is `acceptRun(from:)`. That guards on
+  `payload["run"]` so an unrouted marker is a harmless no-op, but a message whose last resort is
+  "treat it as a finished run" is not a place to leave a new key.
+- ⚠️ **And it bumps `startNowGeneration`**, or the armed 25-second timer fires afterwards and toasts
+  *"Couldn't reach your watch"* over the top of the true sentence.
+- ⚠️ **`message["startRefused"] != nil` rather than `as? String`**, which removes the NSNumber/Bool
+  bridging question `SessionStore` documents worrying about.
+
+### Two defects found on the way, both fixed here
+
+⚠️⚠️ **A NEW RUN RE-PURPOSES `WorkoutView` IN PLACE, SO ITS `@State` SURVIVES — AND THE NEXT RUN WOULD
+HAVE SKIPPED ITS OWN SUMMARY.** With `running` already true the destination is already presented:
+no push, no pop. A runner who had tapped Next and lowered their wrist leaves `askingEffort` true, and
+the **new** run then goes straight to `EffortView`. Moved onto the manager as `showingEffort`, where
+`reset()` — the one place per-run state is wiped — already owns exactly this class of bug.
+⚠️ **`page` (WorkoutView's TabView selection) is deliberately left alone and it is a stated cost:** a
+runner who ended on Controls starts again on Controls. The general answer is `.id(runSeq)` on the
+destination content, which rests on a SwiftUI identity claim nothing here can verify, in the one area
+of this codebase with a documented history of NavigationStack surprises.
+
+⚠️ **`reportStart` NOW OWNS TAKING THE PLACEHOLDER LIVE ACTIVITY DOWN, AND ONLY ONE OF FOUR PATHS
+DID.** `startWatchWorkout` raises a `"watch-pending"` card on the tap and has two early returns that
+reported a failure without ending it, so both stranded a dead card on the lock screen that survives
+relaunches — **which is the teal 0:00 pill in the owner's watch screenshot**, mirrored from the phone.
+⚠️ **Nothing in the watch app draws that pill**; the only `figure.run`-with-a-clock in the codebase is
+`ios/InteRunWidgets/RunLiveActivity.swift`. That is how it was identified. `endIfCurrent` guards on
+the runId, so a COMPANION launch — which raises no placeholder — is untouched.
+
+### The page half, which is the only part that ships over the air
+
+⚠️ **`WATCH_PENDING_MS` = 40000 BOUNDS THE WAITING ROOM, AND IT IS LONGER THAN THE NATIVE 25s ON
+PURPOSE** so the specific sentence always wins and this is only ever the last resort. It fixes the
+"waits for ever" **symptom** on its own — it does not make the run start — and it is the general
+answer for a wrist that has stopped answering for any reason, including the second way in: the
+wrist's own start FAILING, which sends nothing at all because `phaseName` maps `.failed` to `"idle"`
+so not even a tick arrives.
+⚠️ **The timer is never cleared and does not need to be**: every path that leaves the waiting room
+sets the flag false and the give-up re-reads it, so a stale timer is a no-op by construction.
+⚠️ **`WATCH_START_GENERIC` was extracted so the bound has one owner for it** — and that immediately
+made `test/live-screens.test.ts`'s hand-written lift list go stale with a `ReferenceError`. **The
+acceptable kind of stale**: it failed loudly rather than quietly measuring less.
+
+### ⚠️ A GUARD DIRECTION THAT WAS ENTIRELY UNGUARDED, AND THE OTA SKEW IS WHY IT MATTERS
+
+`test/live-screens.test.ts` went page → drive and **never Swift → page**, so a sentence the native
+side chose to show a runner was invisible if it was missing from `WATCH_START_MESSAGES`. Now derived
+from every `reportStart` call.
+⚠️ **Pull every string literal out of each argument, not the argument itself** — one call is
+`reportStart(ok, ok ? nil : "…")`, an expression rather than a string.
+⚠️ **AND THE ENCODING MUST BE NORMALISED OR THE GUARD FAILS ON CORRECT CODE.** Swift writes a literal
+curly apostrophe; the page writes `’` escaped. The existing test already needed the same fix.
+
+### ⚠️ THE ONE GENUINE GUARD WEAKNESS: A SUBSTRING MATCH LET A RENAMED KEY THROUGH
+
+13 of the first 15 re-breaks were caught; one was an anchor fault in my harness, and one was real.
+`route.indexOf("startRefused")` **passed with the key renamed to `"startRefusedXX"`** — branch dead,
+guard green — because the longer name contains the shorter one. **Seventh firing of that trap here**
+(after `stravaAutoSend` satisfying a sweep for `stravaauto`, and `clubTxIn` matching `clubTxInk`).
+Tightened to the exact key `message["startRefused"]`, then caught.
+⚠️ **Two harness lessons repeated:** a re-break whose anchor is not unique tests nothing and reads as
+an escape (`if (!WATCH_LIVE_PENDING) return;` appears in **both** `__interunWatchStart` and
+`watchPendingGiveUp`, so the break had to be scoped to the function); and node prints **`ℹ fail N`**
+with a U+2139, which Python's `\W` does not match — a regex written `^\W*fail` once reported 0 of 25
+caught while every one was being caught.
+
+### ⚠️ NATIVE, SO IT DOES NOT TRAVEL OVER THE AIR — AND THE INSTALL NEEDS HIS PHONE UNLOCKED
+
+Only the two `web/app.ts` edits reach a phone in `docs/index.html`. The watch's refusal and the
+phone's report need an Xcode build and an install.
+✅ **Release for `generic/platform=iOS` builds with 0 errors, 0 warnings in the changed files, the
+watch app and widget embedded, and 0 dylibs.**
+⚠️ **A DEVICE build refuses with *"Addo's iPhone (2) needs to be unlocked to enable development
+services"*** — `devicectl` reporting `available (paired)` is not enough; the handset must be awake,
+unlocked and on the same Wi-Fi. `xcodebuild` reports the hardware UDID
+(`00008140-001A3D080A84801C`) where `devicectl` reports `9AC09027-…`; both name the same phone.
+⚠️ **Six other native fixes have been waiting for this same install** — the lock-screen distance, the
+Swift half of the coach teardown, the free-run title, Apple Health, and the photo/scheme entries.
+
+### Named, measured, NOT fixed
+
+- ⚠️ **`begin()` still has no guard of its own** — an orphaned `requestAuthorization` callback would
+  call it unconditionally. Refusing `.requesting` makes that unreachable through this app's own
+  paths rather than repaired; `guard phase == .requesting else { return }` would close it
+  structurally. One line, deliberately out of scope for a bug fix.
+- ⚠️ **`.requesting` and `.running` can in principle stick.** If `requestAuthorization` or
+  `finishWorkout` never calls back, the wrist stays busy and the phone gets the refusal sentence
+  rather than a run. Same *shape* as the reported bug — but no longer **silent**, and the page's
+  bounded wait catches it regardless. How often either callback fails to fire is not established.
+- ⚠️⚠️ **`LaunchRequest.companionOnly` IS THE SAME CATEGORY ERROR WITH A WORSE CONSEQUENCE, AND IS
+  UNADDRESSED.** `companionEnd` is fire-and-forget with **no re-arm** while `companionStart` has both
+  a pending flag and a reachability flush, and `CompanionView` has no exit — so a lost `companionEnd`
+  strands the wrist on a frozen companion screen with Today unreachable. **Worth its own change.**
+- ⚠️ **`openStartWhereSheet` does not consult the watch** (it reads `liveRunning()` only), so a phone
+  start is still offered during a wrist run. The wrist now refuses the reverse; this direction is open.
+- ⚠️ **`store.onStopRequested`/`onPauseRequested`/`onResumeRequested` are set in `beginNow` and never
+  cleared**, while `SessionStore` documents them as *"Nil when nothing is running"* — a false comment.
+  Contained by `pause`/`resume`'s phase guards; `end()` has none.
+- ⚠️ **`autoStart` is dead** — declared on `TodayView`, passed by `InteRunWatchApp`, read nowhere.
+- ⚠️ **The 0:17 / 0.00 km of the stray run is unexplained and was not guessed at.** It is not
+  load-bearing: any ended-and-undismissed run reproduces the bug.

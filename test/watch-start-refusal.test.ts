@@ -83,7 +83,7 @@ function fn(src: string, signature: string): string {
  * second implementation that agrees with itself and proves nothing about the shipped one — and this
  * project has watched a lifted probe supply its own constants and pass a re-break twice.
  */
-function recorderBusy(rows: Array<{ phase: string; countdown: number | null }>) {
+function recorderBusy(rows: Array<{ phase: string; countdown: number | null; age?: number }>) {
   const swiftc = "/usr/bin/swiftc";
   if (!existsSync(swiftc)) {
     assert.fail("swiftc is not on this machine, so the busy predicate cannot be driven. Install the "
@@ -94,6 +94,8 @@ function recorderBusy(rows: Array<{ phase: string; countdown: number | null }>) 
   const src = WATCH("WorkoutManager.swift");
   const phase = /enum Phase[^\n]*\n/.exec(src);
   assert.ok(phase, "WorkoutManager.Phase is no longer a one-line enum — has it been reshaped?");
+  const sticks = /static let requestingSticksFor: TimeInterval = ([0-9.]+)/.exec(src);
+  assert.ok(sticks, "the requesting bound is gone — a stuck authorisation refuses for ever again");
   const body = /static func recorderBusy\([\s\S]*?\n    \}/.exec(src);
   assert.ok(body, "WorkoutManager.recorderBusy is no longer recognisable — has it been inlined?");
   const dir = mkdtempSync(join(tmpdir(), "interun-busy-"));
@@ -102,6 +104,9 @@ function recorderBusy(rows: Array<{ phase: string; countdown: number | null }>) 
     "import Foundation",
     "enum Probe {",
     "    " + phase![0].trim(),
+    // ⚠️ THE BOUND IS LIFTED TOO. A lift list that omits a dependency measures a strictly easier
+    // program — and this one failed loudly with "cannot find requestingSticksFor in scope".
+    "    static let requestingSticksFor: TimeInterval = " + sticks![1] + "",
     body![0],
     "}",
     'for line in (try! String(contentsOfFile: CommandLine.arguments[1], encoding: .utf8))',
@@ -117,14 +122,15 @@ function recorderBusy(rows: Array<{ phase: string; countdown: number | null }>) 
     '  default: ph = .failed("whatever")',
     "  }",
     '  let c = p[1] == "nil" ? nil : Int(p[1])',
-    "  print(Probe.recorderBusy(phase: ph, countdown: c) ? \"busy\" : \"free\")",
+    '  let age = Double(p[2])!',
+    "  print(Probe.recorderBusy(phase: ph, countdown: c, requestingFor: age) ? \"busy\" : \"free\")",
     "}",
   ].join("\n"));
   const bin = join(dir, "probe");
   execFileSync(swiftc, ["-O", "-o", bin, file], { stdio: "pipe" });
   const input = join(dir, "in.txt");
   writeFileSync(input, rows.map((r) =>
-    r.phase + " " + (r.countdown === null ? "nil" : r.countdown)).join("\n"));
+    [r.phase, r.countdown === null ? "nil" : r.countdown, r.age ?? 0].join(" ")).join("\n"));
   return execFileSync(bin, [input], { encoding: "utf8" }).trim().split("\n");
 }
 
@@ -142,6 +148,7 @@ test("BLOCKER: a recorder is busy exactly when starting again would make a secon
     // authorisation callback — and no phase guard of its own, so a second start while the first
     // request is in flight lands two begin() calls and two HKWorkoutSessions, the second
     // overwriting `session` and orphaning the first.
+    // ⚠️ .requesting is busy only BRIEFLY — see the bound below. Driven here at age 0.
     requesting: "busy", running: "busy", paused: "busy",
   };
   PHASES.forEach((p, i) => {
@@ -197,10 +204,16 @@ test("BLOCKER: the busy flag is a delegation, so there is no second opinion to d
   const tv = stripComments(WATCH("TodayView.swift"));
   // ⚠️ THIS IS WHAT STOPS A RENAME EVADING THE GUARD ABOVE. Without it, a fresh
   // `@State private var busy` alongside `running` would satisfy every other assertion here.
-  const prop = fn(tv, "private var recorderBusy");
-  assert.match(prop,
-    /WorkoutManager\.recorderBusy\(phase:\s*workout\.phase,\s*countdown:\s*workout\.countdown\)/,
+  const prop = stripComments(fn(tv, "private var recorderBusy"));
+  assert.match(prop, /WorkoutManager\.recorderBusy\(/,
     "TodayView is deciding busy-ness itself rather than asking the one driven predicate");
+  // All three arguments come from the manager, so the view holds no opinion of its own.
+  for (const arg of ["phase:", "countdown:", "requestingFor:"]) {
+    assert.ok(prop.includes(arg), `the delegation no longer passes ${arg}`);
+  }
+  assert.match(prop, /workout\.phase/, "the phase is not the manager's");
+  assert.match(prop, /workout\.countdown/, "the countdown is not the manager's");
+  assert.match(prop, /workout\.requestingSince/, "the age is not the manager's");
 });
 
 /* ------------------------------------------------------- G3: the refusal leaves the wrist */
@@ -259,4 +272,80 @@ test("BLOCKER: the effort screen cannot survive into the next run", () => {
     "the effort flag has a second home on the view again — it must live where reset() can reach it");
   assert.match(wv, /workout\.showingEffort/,
     "WorkoutView no longer reads the manager's effort flag");
+});
+
+/* -------------------------------------------------------------------------------------------------
+ * ⚠️⚠️ THE FIRST VERSION OF THIS FIX SHIPPED A WORSE BUG THAN THE ONE IT FIXED, AND THESE TWO GUARDS
+ * ARE THAT LESSON. Reported the same day: "its still not working, in fact its worse, some sessions
+ * are just not starting now". Two causes, both mine, both from treating a state as authoritative
+ * without asking whether it can be LEFT.
+ * ---------------------------------------------------------------------------------------------- */
+
+test("BLOCKER: a stuck authorisation cannot refuse every start for ever", () => {
+  // ⚠️ `.requesting` HAS NO CLEARING PATH. If requestAuthorization's completion never fires the
+  // phase stays there, so treating it as unconditionally busy turned a stuck round trip into a
+  // permanent, silent dead end — nothing on screen and no way to retry. The navigation flag it
+  // replaced was WRONG but ESCAPABLE: backing out cleared it. A fix that removes an escape hatch is
+  // not a fix.
+  const src = readFileSync(new URL("../ios/InteRunWatch/WorkoutManager.swift", import.meta.url), "utf8");
+  const sticks = /static let requestingSticksFor: TimeInterval = ([0-9.]+)/.exec(src);
+  assert.ok(sticks, "the bound is gone");
+  const secs = Number(sticks![1]);
+
+  const got = recorderBusy([
+    { phase: "requesting", countdown: null, age: 0 },
+    { phase: "requesting", countdown: null, age: secs - 1 },
+    { phase: "requesting", countdown: null, age: secs + 1 },
+    { phase: "requesting", countdown: null, age: 600 },
+  ]);
+  assert.deepEqual(got, ["busy", "busy", "free", "free"],
+    "a .requesting older than the bound must be treated as stuck and let the runner start again");
+
+  // ⚠️ .running and .paused are deliberately NOT time-bounded — a run legitimately lasts hours, and
+  // their escape is that the refusal RE-PRESENTS a screen carrying an End button.
+  assert.deepEqual(recorderBusy([
+    { phase: "running", countdown: null, age: 99999 },
+    { phase: "paused", countdown: null, age: 99999 },
+  ]), ["busy", "busy"], "a long run must still refuse a second recorder");
+
+  const tv = stripComments(readFileSync(
+    new URL("../ios/InteRunWatch/TodayView.swift", import.meta.url), "utf8"));
+  assert.match(fn(tv, "private var recorderBusy"), /requestingFor:/,
+    "TodayView no longer passes the age, so the bound cannot bind");
+});
+
+test("BLOCKER: a re-delivered start is a duplicate, not a refusal to report", () => {
+  // ⚠️⚠️ flushStartNow RE-ARMS AND RESENDS WHENEVER sendMessage ERRORS, AND ITS OWN COMMENT SAID IT
+  // RELIED ON THE GUARD THAT WAS REMOVED: "A duplicate on the watch is harmless — its start guards
+  // on !running." Once the refusal began being REPORTED, that harmless duplicate started clearing
+  // the phone's waiting room and toasting "already recording" over a run that had started fine.
+  const wb = readFileSync(new URL("../ios/InteRun/WatchBridge.swift", import.meta.url), "utf8");
+  assert.match(wb, /pendingStartNow = true/,
+    "the retry has gone — if it truly has, this guard's premise needs revisiting rather than deleting");
+
+  const tv = stripComments(readFileSync(
+    new URL("../ios/InteRunWatch/TodayView.swift", import.meta.url), "utf8"));
+  const closure = fn(tv, "store.onStartNow =");
+  // The refusal must be CONDITIONAL on not having just accepted a start.
+  const refuse = closure.indexOf("sendStartRefused");
+  const guardAt = closure.indexOf("startJustAccepted");
+  assert.notEqual(refuse, -1, "the refusal is gone entirely — the phone waits for ever again");
+  assert.notEqual(guardAt, -1,
+    "the refusal is unconditional, so a delivery retry reports a failure over a run that started");
+  assert.ok(guardAt < refuse, "the duplicate check must gate the report, not follow it");
+
+  // ⚠️ THE STAMP IS ON THE SUCCESS PATH ONLY, AND THAT IS THE CLAIM THAT BITES. An ordering claim
+  // against reset() was written here first and watched PASSING with the stamp moved — reset() does
+  // not clear acceptedStartAt (deliberately; see its own note), so the order cannot matter. What
+  // does matter: stamped on a REFUSAL, every refusal would silence the next one within 45 seconds
+  // and the phone would wait for ever again — the original bug, restored by the fix for it.
+  const begin = fn(tv, "private func beginNow(");
+  const stamp = begin.indexOf("noteStartAccepted");
+  assert.notEqual(stamp, -1, "no start is ever stamped, so every duplicate is reported as a refusal");
+  const busyBranch = begin.slice(begin.indexOf("if recorderBusy"), begin.indexOf("workout.reset()"));
+  assert.ok(!busyBranch.includes("noteStartAccepted"),
+    "a REFUSAL stamps the accepted-start clock, so the next genuine refusal is silenced and the "
+    + "phone waits for ever — which is the bug this whole file exists for");
+  assert.ok(stamp > begin.indexOf("running = true"),
+    "the stamp is not on the path that actually starts a run");
 });

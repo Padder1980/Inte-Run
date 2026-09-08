@@ -119,6 +119,37 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// about precisely this class of bug.
     @Published var showingEffort = false
 
+    /// When the phase entered `.requesting`, so a stuck HealthKit callback cannot refuse for ever.
+    /// Read only while the phase IS `.requesting`, so a stale value in any other phase is inert.
+    private(set) var requestingSince: Date?
+
+    /// When a start was last ACCEPTED, so a re-delivered "startNow" is recognised as the duplicate
+    /// it is rather than reported to the phone as a refusal.
+    ///
+    /// ⚠️⚠️ THIS EXISTS BECAUSE `flushStartNow`'s RETRY PATH DOCUMENTED RELYING ON THE GUARD THAT WAS
+    /// REMOVED. Its own comment reads: "Undelivered: re-arm and let the next reachability change
+    /// retry. A duplicate on the watch is harmless — its start guards on !running." Once the refusal
+    /// began being REPORTED, that harmless duplicate started clearing the phone's waiting room and
+    /// toasting "your watch is already recording" over a run that was starting perfectly well. Time
+    /// is the discriminator and it is a wide margin: the bug this all exists for is a run left from a
+    /// DIFFERENT DAY, while a delivery retry is seconds later.
+    private(set) var acceptedStartAt: Date?
+
+    /// True if a start was accepted recently enough that another arriving now is a re-delivery.
+    var startJustAccepted: Bool {
+        guard let at = acceptedStartAt else { return false }
+        return Date().timeIntervalSince(at) < 45
+    }
+
+    /// Stamped by the one place a run starts.
+    ///
+    /// ⚠️ DELIBERATELY NOT CLEARED BY `reset()`, WHICH MAKES ANY ORDERING CLAIM ABOUT THE TWO
+    /// VACUOUS — a guard asserting `reset()` comes first was written and watched passing with the
+    /// stamp moved, so it was replaced rather than left standing. This is not per-run state: it
+    /// records when this WATCH last honoured a start request, which deliberately outlives a run.
+    /// Clearing it in `reset()` would change nothing anyway, since the stamp follows immediately.
+    func noteStartAccepted() { acceptedStartAt = Date() }
+
     /// The session being run, if the phone sent one. Nil means a free run.
     var plan: PlannedSession?
     /// The runner's own reasons, handed over by the phone. Spoken once, deep into a hard run.
@@ -373,10 +404,24 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// test/watch-start-refusal.test.ts rather than inferred from the source text. Exhaustive
     /// rather than `phase != .idle` or a `default:`, so a new Phase case cannot inherit an answer
     /// nobody chose — there, the compiler is the guard.
-    static func recorderBusy(phase: Phase, countdown: Int?) -> Bool {
+    ///
+    /// ⚠️⚠️ AND THE ANSWER IS BOUNDED IN TIME, BECAUSE THE FIRST VERSION OF THIS SHIPPED A WORSE BUG
+    /// THAN THE ONE IT FIXED. Reported within the day: "its still not working, in fact its worse,
+    /// some sessions are just not starting now". `.requesting` has NO CLEARING PATH — if
+    /// `requestAuthorization`'s completion never fires, the phase stays there for ever — so treating
+    /// it as unconditionally busy turned a stuck authorisation into a permanent, silent dead end,
+    /// with no re-presented screen and nothing to tap. The old navigation flag was WRONG but it was
+    /// ESCAPABLE: backing out cleared it and a retry worked. A fix that removes an escape hatch is
+    /// not a fix. A HealthKit round trip is milliseconds when granted, so a `.requesting` older than
+    /// this is stuck, and letting the runner start again — which calls `reset()` and re-requests —
+    /// is strictly better than refusing for ever.
+    static let requestingSticksFor: TimeInterval = 12
+
+    static func recorderBusy(phase: Phase, countdown: Int?, requestingFor: TimeInterval) -> Bool {
         if countdown != nil { return true }
         switch phase {
-        case .requesting, .running, .paused: return true
+        case .running, .paused: return true
+        case .requesting: return requestingFor < requestingSticksFor
         case .idle, .ended, .failed: return false
         }
     }
@@ -445,6 +490,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         autoCompleted = false
         // ⚠️ Or the next run skips its own summary — see the declaration.
         showingEffort = false
+        requestingSince = nil
         stillSince = nil
         movingSince = nil
         autoPaused = false
@@ -541,6 +587,7 @@ final class WorkoutManager: NSObject, ObservableObject {
             return
         }
         phase = .requesting
+        requestingSince = Date()
 
         let share: Set = [
             HKQuantityType.workoutType(),

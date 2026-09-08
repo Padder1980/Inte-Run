@@ -41,7 +41,10 @@ struct TodayView: View {
     /// True while a recorder is busy on this wrist. Delegates, so the decision is the one driven by
     /// test/watch-start-refusal.test.ts and there is no second copy of it to drift.
     private var recorderBusy: Bool {
-        WorkoutManager.recorderBusy(phase: workout.phase, countdown: workout.countdown)
+        WorkoutManager.recorderBusy(
+            phase: workout.phase, countdown: workout.countdown,
+            // ⚠️ Only meaningful while the phase IS .requesting, which is the only place it is read.
+            requestingFor: workout.requestingSince.map { -$0.timeIntervalSinceNow } ?? .infinity)
     }
 
     /// The one place a run starts on this watch. Returns whether it did.
@@ -84,6 +87,9 @@ struct TodayView: View {
         store.onPauseRequested = { [weak workout] in workout?.pause() }
         store.onResumeRequested = { [weak workout] in workout?.resume() }
         running = true
+        // ⚠️ AFTER reset(), which clears it. Stamped so a re-delivered "startNow" is recognised as a
+        // duplicate rather than reported to the phone as a refusal — see acceptedStartAt.
+        workout.noteStartAccepted()
         if count { workout.startCountingDown() } else { workout.start() }
         return true
     }
@@ -212,9 +218,13 @@ struct TodayView: View {
                         // back to whatever the watch's own cache thought today was — the defect the
                         // comment above this closure records fixing once already.
                         store.pendingSession = nil
-                    } else {
-                        // Never silently. The phone is sitting in its waiting room and its own
-                        // give-up cannot see a message that was delivered and then refused.
+                    } else if !workout.startJustAccepted {
+                        // Never silently — EXCEPT for a re-delivery of the start we just honoured.
+                        // ⚠️ flushStartNow re-arms and resends whenever sendMessage errors, and its
+                        // own comment says a duplicate "is harmless — its start guards on !running".
+                        // Removing that guard made the duplicate destructive: it cleared the phone's
+                        // waiting room and toasted "already recording" over a run that had started
+                        // fine. Reported the same day as "some sessions are just not starting now".
                         store.sendStartRefused()
                     }
                 }

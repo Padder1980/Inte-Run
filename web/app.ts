@@ -8764,6 +8764,16 @@ window.__interunWatchLive = function (live) {
 };
 // True between "start on my watch" being sent and the first live tick arriving — the waiting room.
 let WATCH_LIVE_PENDING = false;
+// ⚠️ AND IT IS BOUNDED, BECAUSE THE NATIVE GIVE-UP IS ARMED FOR UNREACHABILITY ONLY. flushStartNow
+// clears its own pendingStartNow BEFORE sending, so a message that was DELIVERED and then refused
+// leaves that timer's guard failing and nothing ever answers this screen — the owner sat on
+// "Starting on your Apple Watch…" indefinitely on 2026-09-08. Two ways in: the wrist refusing (now
+// fixed in Swift, but that needs an Xcode build) and the wrist's own start FAILING, which sends
+// nothing at all because phaseName maps .failed to "idle" so not even a tick arrives.
+// ⚠️ LONGER THAN THE NATIVE 25s, so the specific sentence wins wherever it applies and this is only
+// ever the last resort. A cold watch wake plus the three-second count needs the headroom.
+const WATCH_PENDING_MS = 40000;
+let WATCH_PENDING_T = null;
 // The watch run the coach's per-run state was last reset for.
 let WATCH_LIVE_ID = null;
 // Set when the runner deliberately backs out of the full-screen wrist view, so the next tick does
@@ -24102,6 +24112,7 @@ function startOnWatch(sess, opts) {
     coachLoadManifest().then(() => coachPushWatchCueMap(s && s.type));
     LIVE = null;
     WATCH_LIVE_PENDING = true;
+    watchPendingArm();
     state.screen = "watchlive"; WATCH_LIVE_LEFT = false; render();
     runCountIn(() => watchCommand("startNow"), (sess && sess.title) || "Run");
   } catch (e) { startSession(sess); }
@@ -24143,12 +24154,38 @@ const WATCH_START_MESSAGES = [
   "Inte-Run isn\u2019t installed on your Apple Watch yet.",
   "Couldn\u2019t reach your watch — open Inte-Run on it and press start.",
   "Couldn\u2019t open Inte-Run on your watch.",
+  // ⚠️ THE WRIST'S OWN REFUSAL, and the reason this list gained a fifth entry. Sent when a recorder
+  // is genuinely busy on the watch. Without it the runner meets the generic fallback, which tells
+  // them to press start on a watch that is already recording.
+  "Your watch is already recording a run — finish that one first.",
 ];
+// ⚠️ EXTRACTED so the bounded wait below has one owner for it rather than a second copy.
+const WATCH_START_GENERIC = "Couldn\u2019t start your watch — open Inte-Run on it and press start.";
+/**
+ * Bound the waiting room. Armed by startOnWatch, which is WATCH_LIVE_PENDING's only writer of true.
+ *
+ * ⚠️ THE TIMER IS NOT CLEARED ANYWHERE, AND IT DOES NOT NEED TO BE. Every path that leaves the
+ * waiting room sets the flag false, and the give-up re-reads it, so a stale timer is a no-op by
+ * construction.
+ */
+function watchPendingArm() {
+  clearTimeout(WATCH_PENDING_T);
+  WATCH_PENDING_T = setTimeout(watchPendingGiveUp, WATCH_PENDING_MS);
+}
+function watchPendingGiveUp() {
+  // ⚠️ THE FLAG IS RE-READ, and it is the discriminator for the same reason __interunWatchStart uses
+  // it: a run that started, or a runner who backed out, must never be interrupted by a timer armed
+  // before either happened.
+  if (!WATCH_LIVE_PENDING) return;
+  WATCH_LIVE_PENDING = false;
+  clearCountIn();
+  if (state.screen === "watchlive" && !watchLiveActive()) { state.screen = null; }
+  toast(WATCH_START_GENERIC);
+  render();
+}
 function watchStartMessage(reason) {
   const r = String(reason || "");
-  return WATCH_START_MESSAGES.indexOf(r) >= 0
-    ? r
-    : "Couldn\u2019t start your watch — open Inte-Run on it and press start.";
+  return WATCH_START_MESSAGES.indexOf(r) >= 0 ? r : WATCH_START_GENERIC;
 }
 // Put the GENERATED warm-up into the session you actually run.
 //

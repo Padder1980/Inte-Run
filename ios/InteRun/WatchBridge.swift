@@ -185,6 +185,25 @@ extension WatchBridge: WCSessionDelegate {
 
     /// Everything the watch can send that is not a sync request.
     private func route(_ message: [String: Any]) {
+        // The wrist refusing a start it cannot honour — a recorder is genuinely busy there.
+        //
+        // ⚠️ FIRST IN THIS FUNCTION, because `route`'s fallthrough is `acceptRun(from:)`. That
+        // guards on `payload["run"]` so an unrouted marker is a harmless no-op, but a message whose
+        // last resort is "treat it as a finished run" is not a place to leave a new key.
+        //
+        // ⚠️ AND IT BUMPS THE GENERATION, so the armed 25-second give-up cannot fire afterwards and
+        // toast a second, wrong sentence ("Couldn't reach your watch") over this one. WatchBridge is
+        // not @MainActor and this delegate can arrive on any queue, so the mutation hops to main.
+        if message["startRefused"] != nil {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.startNowGeneration += 1
+                self.pendingStartNow = false
+                self.pendingWatchSession = nil
+                self.reportStart(false, "Your watch is already recording a run — finish that one first.")
+            }
+            return
+        }
         // Heart rate from the wrist while the PHONE records — the companion's whole purpose.
         if let hr = message["companionHR"] as? Int {
             DispatchQueue.main.async { [weak self] in
@@ -314,7 +333,6 @@ extension WatchBridge: WCSessionDelegate {
             guard let self, self.pendingStartNow, self.startNowGeneration == gen else { return }
             self.pendingStartNow = false
             self.pendingWatchSession = nil
-            Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") }
             self.reportStart(false, "Couldn’t reach your watch — open Inte-Run on it and press start.")
         }
     }
@@ -352,6 +370,15 @@ extension WatchBridge: WCSessionDelegate {
     }
 
     private func reportStart(_ ok: Bool, _ reason: String?) {
+        // ⚠️ A FAILED START MUST TAKE THE PLACEHOLDER CARD DOWN, AND ONLY ONE OF FOUR PATHS DID.
+        // startWatchWorkout raises a "watch-pending" Live Activity on the tap and then has two early
+        // returns (no HealthKit, watch app not installed) that reported a failure without ending it,
+        // so both stranded a dead card on the lock screen that survives relaunches — which is what
+        // the owner photographed on 2026-09-08, a 0:00 run mirrored onto his watch. Owned here, a
+        // fifth failure path cannot forget it. endIfCurrent guards on the runId, so a COMPANION
+        // launch — which raises no placeholder and leaves currentRunId on the phone's own run — is
+        // untouched.
+        if !ok { Task { @MainActor in LiveActivityService.shared.endIfCurrent("watch-pending") } }
         DispatchQueue.main.async { [weak self] in
             guard let webView = self?.webView else { return }
             let msg = (reason ?? "").replacingOccurrences(of: "\\", with: "\\\\")

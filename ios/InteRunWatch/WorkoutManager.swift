@@ -109,6 +109,16 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// Filled in when the run ends, ready to be sent home.
     @Published var reportedRpe: Int?
 
+    /// True while the effort screen is up instead of the summary.
+    ///
+    /// ⚠️ ON THE MANAGER RATHER THAN ON WorkoutView, BECAUSE A NEW RUN NO LONGER GETS A NEW
+    /// WorkoutView. A phone-initiated start can now begin while the previous run's finish screen is
+    /// still presented, so the destination is re-purposed IN PLACE and the view's own @State
+    /// survives — leaving this set would take the new run straight to the effort screen and skip its
+    /// summary entirely. `reset()` is the one place per-run state is wiped and its own comment is
+    /// about precisely this class of bug.
+    @Published var showingEffort = false
+
     /// The session being run, if the phone sent one. Nil means a free run.
     var plan: PlannedSession?
     /// The runner's own reasons, handed over by the phone. Spoken once, deep into a hard run.
@@ -337,6 +347,40 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     // MARK: - Lifecycle
 
+    /// Is a recorder busy — would starting again make a SECOND one?
+    ///
+    /// ⚠️ THE LIFECYCLE, NOT THE NAVIGATION, AND THAT DISTINCTION IS THE WHOLE OF THIS FIX.
+    /// TodayView asked `!running`, which is the `isPresented:` binding of a navigationDestination —
+    /// a fact about which screen is on top, written once and cleared only when SwiftUI pops the
+    /// pushed view. The two have been measured disagreeing in BOTH directions: a run left
+    /// ended-but-undismissed on the summary screen made the wrist permanently deaf to the phone
+    /// with nothing on screen to say so (the owner's report, 2026-09-08), and SessionDetailView's
+    /// own note records the inverse — nav popped, a real HKWorkoutSession still running.
+    ///
+    /// ⚠️ `.ended` AND `.failed` ARE NOT BUSY. `end()` calls `sendHome()` BEFORE the HealthKit
+    /// teardown that owns the transition to `.ended`, so by the time this is ever asked the run is
+    /// already in the phone's Logbook. Treating a finished run as busy IS the defect.
+    ///
+    /// ⚠️ `.requesting` IS BUSY, and not merely out of caution: `begin()` has exactly one caller —
+    /// `start()`'s HealthKit authorisation callback — and that callback has no phase guard, so a
+    /// second start while the first request is in flight lands two `begin()` calls and two
+    /// HKWorkoutSessions, the second overwriting `session` and orphaning the first.
+    ///
+    /// ⚠️ AND A COUNTDOWN IS BUSY THOUGH THE PHASE IS STILL `.idle`. `startCountingDown` never
+    /// touches `phase`, so for three seconds the phase alone answers "free" while a run is coming.
+    ///
+    /// Pure and static so the answer for every phase is DRIVEN under swiftc by
+    /// test/watch-start-refusal.test.ts rather than inferred from the source text. Exhaustive
+    /// rather than `phase != .idle` or a `default:`, so a new Phase case cannot inherit an answer
+    /// nobody chose — there, the compiler is the guard.
+    static func recorderBusy(phase: Phase, countdown: Int?) -> Bool {
+        if countdown != nil { return true }
+        switch phase {
+        case .requesting, .running, .paused: return true
+        case .idle, .ended, .failed: return false
+        }
+    }
+
     /// Wipe every trace of the previous run.
     ///
     /// ⚠️ The manager outlives a run — it is a @StateObject on TodayView — so without this a second
@@ -399,6 +443,8 @@ final class WorkoutManager: NSObject, ObservableObject {
         // ⚠️ A completion flag left set makes run two of an app session start already finished —
         // the documented reason this whole function exists.
         autoCompleted = false
+        // ⚠️ Or the next run skips its own summary — see the declaration.
+        showingEffort = false
         stillSince = nil
         movingSince = nil
         autoPaused = false

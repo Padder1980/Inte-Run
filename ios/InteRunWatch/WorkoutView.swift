@@ -19,7 +19,6 @@ struct WorkoutView: View {
     // Stable integer tags: a conditionally-included page makes SwiftUI's selection unreliable, and
     // landing on the wrong page mid-run is exactly the wrong first impression.
     @State private var page = 1
-    @State private var askingEffort = false
 
     var body: some View {
         Group {
@@ -30,10 +29,10 @@ struct WorkoutView: View {
             case let .failed(message):
                 failure(message)
             case .ended:
-                if askingEffort {
+                if workout.showingEffort {
                     EffortView(workout: workout) { dismiss() }
                 } else {
-                    SummaryView(workout: workout, name: store.runnerName) { askingEffort = true }
+                    SummaryView(workout: workout, name: store.runnerName) { workout.showingEffort = true }
                 }
             default:
                 TabView(selection: $page) {

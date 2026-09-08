@@ -410,11 +410,16 @@ function watchStart(pending: boolean, reason: string) {
   const body = src.slice(at, end);
   const consts = /\nconst WATCH_START_MESSAGES = \[[\s\S]*?\];/.exec(src);
   assert.ok(consts, "no WATCH_START_MESSAGES in the build");
+  // ⚠️ THE FALLBACK IS A SUPPLIED CONST NOW, not a literal inside watchStartMessage. Extracted so
+  // the bounded wait has one owner for it — which meant this hand-written lift list went stale and
+  // failed loudly with a ReferenceError. That is the acceptable kind of stale.
+  const generic = /\nconst WATCH_START_GENERIC = "[^"]*";/.exec(src);
+  assert.ok(generic, "no WATCH_START_GENERIC in the build");
   const out = { toasts: [] as string[], renders: 0, cleared: 0, pending };
   const f = new Function("window", "out", "state", "toast", "render", "clearCountIn",
     "watchLiveActive", "WATCHDIAG",
     "let WATCH_LIVE_PENDING = out.pending;\n"
-    + consts![0] + "\n" + fn("watchStartMessage") + "\n" + body
+    + consts![0] + "\n" + generic![0] + "\n" + fn("watchStartMessage") + "\n" + body
     + "\nwindow.__interunWatchStart(false, arguments[8]);"
     + "\nout.pending = WATCH_LIVE_PENDING;");
   (f as (...a: unknown[]) => void)(
@@ -489,6 +494,106 @@ test("BLOCKER: the Swift no longer hands an NSError's own words to the page", ()
     assert.doesNotMatch(arg, /localizedDescription/,
       "reportStart's string goes straight into a toast: " + arg);
   }
+});
+
+test("BLOCKER: every sentence the native side sends is in the page's allowlist", () => {
+  // ⚠️ THIS DIRECTION WAS UNGUARDED, AND IT IS THE ONE THE OTA SKEW MAKES DANGEROUS. The test above
+  // goes page -> drive; nothing went Swift -> page, so a sentence Swift chose to show a runner was
+  // silently replaced by the generic fallback the moment the two files disagreed. The wrist's own
+  // refusal added on 2026-09-08 is exactly such a sentence.
+  const swift = readFileSync(new URL("../ios/InteRun/WatchBridge.swift", import.meta.url), "utf8");
+  const clean = swift.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // ⚠️ EVERY string literal in each argument, not the argument itself: line 320 is
+  // `reportStart(ok, ok ? nil : "...")`, an expression rather than a string.
+  const args = [...clean.matchAll(/reportStart\((?:false|ok), ([^\n]*)\)/g)].map((m) => m[1]!);
+  const sentences = args.flatMap((a) => [...a.matchAll(/"([^"]*)"/g)].map((m) => m[1]!))
+    .filter((s) => s.length > 0);
+  assert.ok(sentences.length >= 5,
+    "expected at least the five native sentences, found " + sentences.length + " — this guard is "
+    + "vacuous if it cannot see them");
+
+  const list = /\nconst WATCH_START_MESSAGES = \[([\s\S]*?)\];/.exec(page());
+  assert.ok(list, "no allowlist");
+  // ⚠️ THE NORMALISATION IS NOT OPTIONAL. Swift writes a literal curly apostrophe; the page writes
+  // it as a \u2019 escape. Compared raw, this guard fails on correct code.
+  const allowed = [...(list![1] ?? "").matchAll(/"([^"]+)"/g)]
+    .map((m) => m[1]!.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))));
+
+  for (const s of sentences) {
+    assert.ok(allowed.includes(s),
+      "the native side sends a sentence the page will swallow and replace with the generic "
+      + "fallback. Add it to WATCH_START_MESSAGES: " + JSON.stringify(s));
+  }
+});
+
+test("BLOCKER: the phone's waiting room is bounded, and the native sentence still wins first", () => {
+  // ⚠️ THE NATIVE GIVE-UP IS ARMED FOR UNREACHABILITY ONLY. flushStartNow clears pendingStartNow
+  // BEFORE the send, so a message DELIVERED and then refused leaves that timer's guard failing and
+  // nothing answers the screen — the owner sat on "Starting on your Apple Watch..." indefinitely.
+  const src = page();
+  assert.match(fn("startOnWatch"), /watchPendingArm\(/,
+    "startOnWatch no longer bounds its own waiting room");
+
+  const give = fn("watchPendingGiveUp");
+  const reads = give.indexOf("if (!WATCH_LIVE_PENDING)");
+  const writes = give.indexOf("WATCH_LIVE_PENDING = false");
+  assert.notEqual(reads, -1, "the give-up no longer re-reads the flag");
+  assert.notEqual(writes, -1, "the give-up no longer clears the flag");
+  assert.ok(reads < writes,
+    "the give-up clears the flag before reading it, so it can fire over a run that started");
+
+  // ⚠️ THE BOUND IS DERIVED FROM THE NATIVE GIVE-UP, NOT TYPED. The specific sentence must get to
+  // win wherever it applies; this is only ever the last resort.
+  const swift = readFileSync(new URL("../ios/InteRun/WatchBridge.swift", import.meta.url), "utf8");
+  const native = /asyncAfter\(deadline: \.now\(\) \+ (\d+)\)/.exec(swift);
+  assert.ok(native, "the native give-up is no longer recognisable");
+  const ms = /const WATCH_PENDING_MS = (\d+);/.exec(src);
+  assert.ok(ms, "the page has no bounded wait");
+  assert.ok(Number(ms![1]) / 1000 > Number(native![1]),
+    "the page gives up at " + ms![1] + "ms, at or before the native " + native![1] + "s — so the "
+    + "generic line would beat the specific one");
+});
+
+test("BLOCKER: the bounded wait ends the waiting room, and only when it should", () => {
+  const src = page();
+  const generic = /const WATCH_START_GENERIC = "([^"]+)";/.exec(src);
+  assert.ok(generic, "the generic sentence has no single owner");
+
+  const drive = (pending: boolean, live: boolean) => {
+    const out = { toasts: [] as string[], renders: 0, cleared: 0, pending, screen: "watchlive" };
+    const state = { screen: "watchlive" };
+    const f = new Function("out", "state", "toast", "render", "clearCountIn", "watchLiveActive",
+      "let WATCH_LIVE_PENDING = out.pending;\n"
+      + "const WATCH_START_GENERIC = " + JSON.stringify(generic![1]) + ";\n"
+      + fn("watchPendingGiveUp")
+      + "\nwatchPendingGiveUp();"
+      + "\nout.pending = WATCH_LIVE_PENDING; out.screen = state.screen;");
+    (f as (...a: unknown[]) => void)(
+      out, state,
+      (m: string) => { out.toasts.push(m); },
+      () => { out.renders++; },
+      () => { out.cleared++; },
+      () => live,
+    );
+    return out;
+  };
+
+  const expired = drive(true, false);
+  assert.equal(expired.pending, false, "an expired wait must leave the waiting room");
+  assert.equal(expired.cleared, 1, "an expired wait must stop the count-in");
+  assert.equal(expired.screen, null, "an expired wait must leave the watch-live screen");
+  assert.match(expired.toasts[0] ?? "", /open Inte-Run on it and press start/,
+    "an expired wait must say something the runner can act on");
+
+  // ⚠️ A timer armed before the run started must never interrupt it.
+  const already = drive(false, false);
+  assert.equal(already.toasts.length, 0, "it fired over a run that had already started");
+  assert.equal(already.cleared, 0, "it cleared a count-in it does not own");
+  assert.equal(already.renders, 0, "it re-rendered for nothing");
+
+  // The wrist IS talking — leave the screen where it is.
+  const talking = drive(true, true);
+  assert.equal(talking.screen, "watchlive", "it closed the mirror while the wrist was reporting");
 });
 
 /* ------------------------------------------------------------------------------------------------

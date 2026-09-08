@@ -230,6 +230,29 @@ final class SessionStore: NSObject, ObservableObject {
     /// ⚠️ Only ever called from a control the wrist is showing, and the wrist only shows one when the
     /// phone has declared `phoneCanControl`. Sending into a page with no handler would be a button
     /// that looks live and does nothing.
+    /// Tell the phone the wrist could not honour the start it just sent.
+    ///
+    /// ⚠️ WITHOUT THIS THE PHONE WAITS FOR EVER, and its own give-up is structurally unable to
+    /// notice. `flushStartNow` clears `pendingStartNow` BEFORE the send, so the 25-second timer
+    /// guards on a flag a DELIVERED message has already cleared and returns early. There is no
+    /// reply channel either — that send passes `replyHandler: nil`. Reported 2026-09-08: the phone
+    /// stuck on "Starting on your Apple Watch…" for ever when a previous run had been left
+    /// unfinished on the wrist.
+    ///
+    /// ⚠️ A MARKER, NOT PROSE. The sentence the runner reads lives in WatchBridge beside the other
+    /// four, and the page's allowlist is derived from that file — a watch writing UI copy for the
+    /// phone is a sentence that silently becomes the generic fallback the day the two files differ
+    /// about a comma.
+    ///
+    /// Fire and forget, like every other command in this direction: an undelivered refusal leaves
+    /// the phone exactly where it was, which the page's own bounded wait then answers.
+    func sendStartRefused() {
+        guard WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        s.sendMessage(["startRefused": "busy"], replyHandler: nil, errorHandler: { _ in })
+    }
+
     func sendPhoneCommand(_ cmd: String) {
         guard WCSession.isSupported() else { return }
         let s = WCSession.default

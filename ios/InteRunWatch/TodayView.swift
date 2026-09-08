@@ -31,17 +31,44 @@ struct TodayView: View {
     /// Hand the plan to the workout and go. One path, so a run started from the phone and a run
     /// started on the wrist are the same run with the same targets and the same reasons.
     private func begin(_ s: PlannedSession?) {
-        beginNow(s, count: true)
+        // ⚠️ Deliberately NOT @discardableResult on beginNow. The wrist needs no message when it
+        // refuses — beginNow has already put the run that IS going back on screen, which is a
+        // better answer than any sentence — but a future caller must be made to think about the
+        // refusal rather than inherit silence, which is the whole class of defect being fixed here.
+        _ = beginNow(s, count: true)
     }
 
-    /// The one place a run starts on this watch.
+    /// True while a recorder is busy on this wrist. Delegates, so the decision is the one driven by
+    /// test/watch-start-refusal.test.ts and there is no second copy of it to drift.
+    private var recorderBusy: Bool {
+        WorkoutManager.recorderBusy(phase: workout.phase, countdown: workout.countdown)
+    }
+
+    /// The one place a run starts on this watch. Returns whether it did.
     ///
     /// `count` is false when the PHONE has already counted the runner in — two independent
     /// three-second counts is how the two clocks ended up a second apart.
-    private func beginNow(_ s: PlannedSession?, count: Bool = false) {
+    private func beginNow(_ s: PlannedSession?, count: Bool = false) -> Bool {
         // The preview harness renders this view with seeded fake sessions; starting one would open
         // a real HKWorkoutSession and send a fictional run home to the phone's logbook.
-        guard !previewInert else { return }
+        guard !previewInert else { return false }
+        // ⚠️ THE ONE RECORDER RULE, ASKED OF THE LIFECYCLE AND ASKED BEFORE reset(). reset() sets
+        // the phase to .idle, so asked one line later this question always answers "free" and proves
+        // nothing. Asked here it is the only thing standing between a second start and a second
+        // HKWorkoutSession — and it covers the wrist's own buttons too, which the old navigation
+        // guard in onStartNow did not.
+        if recorderBusy {
+            // ⚠️ AND PUT THE RUN BACK ON SCREEN WHERE IT CAN BE GOT OUT OF. `.running`, `.paused`
+            // and a live countdown all render a page carrying a control (Controls' End, the
+            // countdown's Cancel), so re-presenting is a recovery. `.requesting` renders the metrics
+            // TabView at zero with no way back, so it is refused WITHOUT pushing: a screen with no
+            // exit is worse than no screen. This is also the only recovery there has ever been from
+            // the inverse fault SessionDetailView records measuring — nav popped, run still going.
+            if workout.countdown != nil || workout.phase == .running || workout.phase == .paused {
+                running = true
+            }
+            return false
+        }
         // Reset FIRST: the manager outlives a run, and a stale phase or a reused run id silently
         // breaks the next one. See WorkoutManager.reset().
         workout.reset()
@@ -58,6 +85,7 @@ struct TodayView: View {
         store.onResumeRequested = { [weak workout] in workout?.resume() }
         running = true
         if count { workout.startCountingDown() } else { workout.start() }
+        return true
     }
 
     /// "Inte-" white, "Run" in the brand teal — the same wordmark the phone's splash draws
@@ -172,11 +200,23 @@ struct TodayView: View {
             .onAppear {
                 guard !previewInert else { return }   // a preview must never be able to start a run
                 store.onStartNow = {
-                    guard !running else { return }
-                    LaunchRequest.shared.consume()
+                    // ⚠️ NO NAVIGATION GUARD HERE. This was `guard !running else { return }`, and
+                    // `running` is the navigationDestination's own binding — a run that ended and
+                    // was never dismissed leaves it true for ever, so every later phone-initiated
+                    // start returned in silence on BOTH devices. beginNow asks the LIFECYCLE.
                     let s = store.pendingSession ?? store.session ?? store.todayFromCache
-                    store.pendingSession = nil
-                    beginNow(s)          // no count: the phone has already done it
+                    if beginNow(s) {     // no count: the phone has already done it
+                        LaunchRequest.shared.consume()
+                        // ⚠️ Cleared only on SUCCESS. Cleared before the attempt, a refused start
+                        // threw away the exact session the phone had sent, and a retry would fall
+                        // back to whatever the watch's own cache thought today was — the defect the
+                        // comment above this closure records fixing once already.
+                        store.pendingSession = nil
+                    } else {
+                        // Never silently. The phone is sitting in its waiting room and its own
+                        // give-up cannot see a message that was delivered and then refused.
+                        store.sendStartRefused()
+                    }
                 }
             }
             // ⚠️ Deliberately NO .onChange(of: store.session) auto-start here. One existed, and it

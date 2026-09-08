@@ -14171,3 +14171,50 @@ Swift half of the coach teardown, the free-run title, Apple Health, and the phot
 - ⚠️ **`autoStart` is dead** — declared on `TodayView`, passed by `InteRunWatchApp`, read nowhere.
 - ⚠️ **The 0:17 / 0.00 km of the stray run is unexplained and was not guessed at.** It is not
   load-bearing: any ended-and-undismissed run reproduces the bug.
+
+### ⚠️⚠️ AND THAT FIX SHIPPED A WORSE BUG THAN THE ONE IT FIXED (same day, both regressions mine)
+
+*"its still not working, in fact its worse, some sessions are just not starting now"* — reported
+within hours of the install. **Two causes, both from treating a state as authoritative without asking
+whether it can be LEFT.** Suite 1510 → **1512**.
+
+⚠️⚠️ **1. `.requesting` HAS NO CLEARING PATH, SO MAKING IT BUSY MADE A PERMANENT SILENT DEAD END.**
+If `requestAuthorization`'s completion never fires the phase stays there for ever — and the refusal
+branch deliberately does **not** re-present a screen for `.requesting` (that screen has no exit), so
+the runner tapped Start, nothing happened, and nothing ever would. **The navigation flag it replaced
+was WRONG but ESCAPABLE:** backing out cleared `running` and a retry worked. **A fix that removes an
+escape hatch is not a fix.** `requestingSticksFor` (12s) bounds it: a HealthKit round trip is
+milliseconds when granted, so an older `.requesting` is stuck, and letting the runner start again —
+which calls `reset()` and re-requests — is strictly better than refusing for ever.
+⚠️ **`.running` and `.paused` are deliberately NOT bounded.** A run legitimately lasts hours, and
+their escape is that the refusal DOES re-present a screen carrying an End button.
+
+⚠️⚠️ **2. A RE-DELIVERED `startNow` BECAME DESTRUCTIVE — AND `flushStartNow`'S OWN COMMENT HAD WARNED
+ME.** It reads: *"Undelivered: re-arm and let the next reachability change retry. **A duplicate on
+the watch is harmless — its start guards on `!running`.**"* The fix **deleted the guard that comment
+depends on**, so a delivery retry was refused — and a *reported* refusal clears the phone's waiting
+room and toasts *"your watch is already recording"* over a run that had started perfectly well.
+`acceptedStartAt` + `startJustAccepted` make time the discriminator, and the margin is wide: the bug
+this all exists for is a run left from a **different day**, while a retry is seconds later.
+⚠️ **THE GENERAL RULE THIS COST: BEFORE DELETING A GUARD, GREP FOR CODE THAT DOCUMENTS RELYING ON
+IT.** That comment was thirty lines away in another file and named the exact guard by name.
+
+⚠️ **AND ONE OF MY NEW ASSERTIONS WAS VACUOUS AND IS RECORDED AS SUCH RATHER THAN LEFT STANDING.** It
+claimed the accepted-start stamp must follow `reset()`. `reset()` does **not** clear
+`acceptedStartAt` — deliberately, because it records when this WATCH last honoured a request, which
+outlives a run — so the ordering could not matter, and the guard passed with the stamp moved.
+Replaced by the claim that bites: **the stamp must be on the success path only**, because stamped on
+a refusal every refusal silences the next one within 45s and the phone waits for ever again — the
+original bug, restored by the fix for it.
+⚠️ Both regressions were re-broken with **exactly what shipped** and watched failing.
+
+⚠️ **TWO STALE LIFT/REGEX FAILURES ON THE WAY, BOTH LOUD AND BOTH THE ACCEPTABLE KIND:** the `swiftc`
+probe omitted the bound the function now reads (*"cannot find requestingSticksFor in scope"* — **a
+lift list that omits a dependency measures a strictly easier program**), and the delegation regex was
+written for the one-line call and failed once the age was passed.
+
+⚠️ **`strings` IS A WEAK INSTRUMENT FOR VERIFYING A SWIFT FIX IS IN A BINARY, AND I USED IT TWICE
+BEFORE SAYING SO.** An optimised release inlines a `static let` and strips private symbol names, and
+Swift stores literals of ≤15 UTF-8 bytes inline rather than in the strings table — so a zero count
+proves nothing. **Verify instead that the build compiled the file and that the embedded page is
+byte-identical to the committed one.**

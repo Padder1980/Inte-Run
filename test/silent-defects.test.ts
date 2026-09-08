@@ -1,5 +1,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+
+/**
+ * A page function, brace-matched from its declaration to the matching close.
+ *
+ * ⚠️ A CHARACTER WINDOW IS NOT A FUNCTION, and this guard was written with one. doSaveProfile grew
+ * past the window when the rebuild moved behind a progress moment, so a navigation that is still
+ * there read as missing — a guard failing on correct code, which is how a real assertion gets
+ * relaxed by whoever meets it next. Thirteenth firing of this trap in this project.
+ */
+function fnOf(html: string, name: string): string {
+  const at = html.indexOf("function " + name + "(");
+  assert.ok(at > 0, "no function " + name);
+  let d = 0;
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") d++;
+    else if (html[i] === "}") { d--; if (!d) return html.slice(at, i + 1); }
+  }
+  return assert.fail(name + " has no matching close brace");
+}
+
 import { readFileSync } from "node:fs";
 
 /**
@@ -445,7 +465,7 @@ test("⚠️ undo puts back everything the rebuild destroys, not just the profil
   // ⚠️ COMMENTS STRIPPED, because the comment explaining the fix names seedDone() — so an
   // ordering assertion measured against the raw text finds the WORD before the CALL and fails on
   // correct code. Fourth outing of that trap in this file; it is why fnSrc strips them.
-  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 5000)
+  const save = fnOf(html, "doSaveProfile")
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   // ⚠️ SNAPSHOT BEFORE THE REBUILD. seedDone() prunes state.dayOverride and PERSISTS the prune, so
   // by the time a toast appears the reschedules are already gone from disk. An undo restoring only

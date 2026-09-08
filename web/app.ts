@@ -6019,6 +6019,35 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
    a box cannot report its own pseudo-element, so the only way to know is to probe for it. */
 .pb-x::after { content: ""; position: absolute; inset: -15px -10px; }
 .pb-note { font-size: var(--t-label); color: var(--ink-faint); margin: var(--s2) 0 0; line-height: 1.5; }
+
+/* THE MOMENT A PLAN IS REBUILT — see planMoment().
+   A card over a dimmed app naming the stages that are really running. Deliberately NOT a spinner
+   over an invented delay: a runner with no watch and no reminders has nothing to wait for and gets
+   no moment at all. z-index 95 clears the profile sheet (70) and the guide overlay (80) it can be
+   opened from, and sits under the launch splash (100). */
+.pmoment { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center;
+  justify-content: center; padding: var(--s4); background: rgba(6, 17, 15, .82);
+  backdrop-filter: blur(8px); opacity: 0; transition: opacity .18s ease; }
+.pmoment.on { opacity: 1; }
+.pm-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, .5); padding: var(--s4); width: 100%;
+  max-width: 340px; display: flex; flex-direction: column; gap: var(--s3); }
+.pm-h { font-size: var(--t-card); font-weight: 700; color: var(--ink); }
+.pm-l { display: flex; flex-direction: column; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+.pm-s { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--t-body);
+  color: var(--ink-faint); transition: color .2s ease; }
+.pm-s.now, .pm-s.did { color: var(--ink); }
+.pm-i { flex: 0 0 auto; width: 17px; height: 17px; margin-top: 2px; border-radius: var(--r-pill);
+  border: 2px solid var(--line); box-sizing: border-box; }
+.pm-s.now .pm-i { border-color: var(--accent); border-top-color: transparent;
+  animation: pmSpin .7s linear infinite; }
+.pm-s.did .pm-i { border-color: var(--accent); background: var(--accent); position: relative; }
+.pm-s.did .pm-i::after { content: ""; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px;
+  border: 2px solid var(--accent-ink); border-top: 0; border-left: 0; transform: rotate(40deg); }
+@keyframes pmSpin { to { transform: rotate(360deg); } }
+/* The global Reduce Motion rule kills TRANSITIONS only, so an animation needs its own block —
+   there are 26 such blocks in this stylesheet for exactly that reason. */
+@media (prefers-reduced-motion: reduce) { .pm-s.now .pm-i { animation: none; } }
 </style>
 </head>
 <body>
@@ -7093,6 +7122,118 @@ function adoptPlan(out) {
   try { journalSync(); } catch (e) {}
 }
 function recompute() { adoptPlan(applyProfile(profile)); }
+
+/* ------------------------------------------------------------------------------------------------
+ * THE MOMENT A PLAN IS REBUILT.
+ *
+ * The owner's question, 2026-09-08: "when i change anything in the app or rebuild the plan, why does
+ * it happen instantly? In the runna app ... it takes a few seconds/moments ... almost as if the app
+ * is thinking about the changes". Measured: a full 20-week half-marathon block — 140 sessions, 593
+ * steps — rebuilds in 1.1ms p50, and that already includes the volume fit rebuilding the whole thing
+ * up to five times to land on the stated mileage. It is instant because it is arithmetic on this
+ * phone; the comparison app is almost certainly a server round trip. His instinct was that instant
+ * reads as "it did not really recalculate", and he chose to SHOW THE WORK rather than fake a delay.
+ *
+ * ⚠️ SO EVERY STAGE NAMED HERE IS ONE THAT GENUINELY RUNS, AND A STAGE THAT DOES NOT APPLY IS NOT
+ * SHOWN. There is no invented work and no minimum total: a runner with no watch and no reminders has
+ * nothing to wait for and gets no moment at all — planMoment returns without drawing anything.
+ *
+ * ⚠️ AND THE TWO SLOW STAGES WERE ALREADY REAL AND ALREADY INVISIBLE. syncNativeReminders debounces
+ * 400ms and reschedules up to 60 iOS notifications; syncWatch debounces 500ms and pushes the block
+ * over WatchConnectivity. Both sit in adoptPlan inside try/catch with an EMPTY body, so they ran
+ * after the screen had already changed and a failure was indistinguishable from success. This
+ * surfaces work that was always there rather than adding any.
+ * --------------------------------------------------------------------------------------------- */
+
+/** How long a stage's line is held so it can be read. Legibility, not work. */
+const PM_DWELL_MS = 340;
+/** Nothing may trap the runner. A stage that has not stamped by now is simply not confirmed. */
+const PM_CEIL_MS = 3500;
+
+/**
+ * The stages that will really run for THIS runner, in the order adoptPlan performs them.
+ *
+ * ⚠️ Derived from the same conditions the work itself is gated on, never a fixed list — a line
+ * promising "Sending it to your Apple Watch" to somebody with no watch is the whole thing this
+ * design refuses.
+ */
+function planMomentStages() {
+  const out = [{ k: "build", t: "Building your plan" }];
+  try { if (loadAdjust().length) out.push({ k: "adjust", t: "Applying your breaks" }); } catch (e) {}
+  if (NATIVE_NOTIFY && NATIVE_PERM === "granted" && REMIND.enabled) {
+    out.push({ k: "remind", t: "Rescheduling your reminders" });
+  }
+  if (NATIVE_WATCH) out.push({ k: "watch", t: "Sending it to your Apple Watch" });
+  return out;
+}
+
+function planMomentHtml(stages) {
+  return '<div class="pm-card" role="status" aria-live="polite">'
+    + '<div class="pm-h">' + esc("Rebuilding your plan") + "</div>"
+    + '<ul class="pm-l">'
+    + stages.map((s, i) => '<li class="pm-s" data-pm="' + i + '"><span class="pm-i"></span><span>'
+        + esc(s.t) + "</span></li>").join("")
+    + "</ul></div>";
+}
+
+/**
+ * Run a deliberate rebuild behind the moment, then hand back to the caller's own navigation.
+ *
+ * The commit argument is the existing SYNCHRONOUS commit — adoptPlan and everything the call site
+ * already did — run unchanged, so this cannot become a second commit path (the trap adoptPlan's own
+ * note is about). The then argument is the caller's navigation and render, run once the moment
+ * closes.
+ *
+ * ⚠️ IF THE COMMIT THROWS, THE MOMENT CLOSES AND THE ERROR IS RE-THROWN. The plan was not rebuilt,
+ * so an overlay claiming it was would be a lie, and every call site already has a catch for it.
+ */
+function planMoment(commit, then) {
+  const stages = planMomentStages();
+  // ⚠️ NOTHING REAL TO WAIT FOR MEANS NO MOMENT AT ALL. Instant stays instant.
+  if (stages.length < 2) { commit(); then(); return; }
+  const ov = el("div", "pmoment");
+  ov.id = "pmoment";
+  ov.innerHTML = planMomentHtml(stages);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add("on"));
+  const mark = (i, cls) => {
+    const n = ov.querySelector('[data-pm="' + i + '"]');
+    if (n) { n.classList.remove("now", "did"); n.classList.add(cls); }
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Wait for a stamp NEWER than the moment began, so a previous rebuild's success cannot be read as
+  // this one's. Bounded, because a native side that never answers must not trap anybody.
+  const since = Date.now();
+  const waitFor = async (key) => {
+    const until = Date.now() + PM_CEIL_MS;
+    while (Date.now() < until) {
+      if (Math.abs(SYNC_RAN[key]) >= since) return SYNC_RAN[key] > 0;
+      await sleep(60);
+    }
+    return false;
+  };
+  const finish = () => {
+    ov.classList.remove("on");
+    setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 200);
+  };
+  (async () => {
+    try {
+      for (let i = 0; i < stages.length; i++) {
+        mark(i, "now");
+        const t0 = Date.now();
+        if (stages[i].k === "build") commit();
+        else if (stages[i].k === "remind") await waitFor("remind");
+        else if (stages[i].k === "watch") await waitFor("watch");
+        const left = PM_DWELL_MS - (Date.now() - t0);
+        if (left > 0) await sleep(left);
+        mark(i, "did");
+      }
+      await sleep(140);
+    } catch (e) { finish(); throw e; }
+    finish();
+    then();
+  })();
+}
 // Weeks display on a Monday–Sunday grid, and day indices are Monday-based (0 = Mon). applyProfile can
 // move the first (partial) week's start to a mid-week date; snap each week's start back to its Monday
 // so isoAdd(startIso, dayIndex) — used by the strip, overview, calendar and .ics — always lands on the
@@ -8141,15 +8282,26 @@ function buildReminderSchedule() {
 }
 let NOTIFY_SYNC_T = null;
 // Debounced, so the plan rebuild and the settings change that follow one another collapse into one.
+// When each deferred sync's body LAST RAN, so planMoment can report a stage as done only when it
+// genuinely happened rather than after a guessed delay.
+//
+// ⚠️ AND IT CLOSES A SILENT CATCH. adoptPlan wraps both of these in try/catch with an empty body, so
+// until now a failed reminder reschedule or a failed watch push was indistinguishable from a
+// successful one — the class of fault this file records for the map, the coach and the GPS. A
+// negative stamp is a failure, which the moment names out loud.
+let SYNC_RAN = { remind: 0, watch: 0 };
 function syncNativeReminders() {
   if (!NATIVE_NOTIFY) return;
   clearTimeout(NOTIFY_SYNC_T);
   NOTIFY_SYNC_T = setTimeout(() => {
+    try {
     if (NATIVE_PERM !== "granted" || !REMIND.enabled) { nativeNotify("clear"); }
     else { nativeNotify("schedule", { items: buildReminderSchedule() }); }
     // Read back what the OS now holds. Messages are delivered in order, so this reflects the schedule
     // (or clear) just applied — the count that Support › Your data shows.
     nativeNotify("pending");
+    SYNC_RAN.remind = Date.now();
+    } catch (e) { SYNC_RAN.remind = -Date.now(); }
   }, 400);
 }
 // ---- Your why: the reasons behind the running ---------------------------------------------------
@@ -9307,7 +9459,8 @@ function syncWatch() {
     // while the phone app happens to be open.
     const up = watchUpcomingPayload(9);
     if (up.length) payload.upcoming = up;
-    try { window.webkit.messageHandlers.interunWatch.postMessage(payload); } catch (e) {}
+    try { window.webkit.messageHandlers.interunWatch.postMessage(payload); SYNC_RAN.watch = Date.now(); }
+    catch (e) { SYNC_RAN.watch = -Date.now(); }
   }, 500);
 }
 let REMIND_TIMERS = [];
@@ -37767,14 +37920,23 @@ function wire() {
     // restoreTicks; this one did not, so editing your profile silently un-ticked the run you had
     // already done today.
     const keptTicks = todayTicks();
-    profile = pf; adoptPlan(out); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
-    // ⚠️ After the undo snapshot above: if the runner confirmed a clash-move, commitScheduledTrial
-    // moves the run on the live plan, and Undo relies on that snapshot to put it back.
+    // ⚠️ READ BEFORE THE COMMIT, because the commit clears the draft and the navigation below needs
+    // this answer. It was computed after the rebuild while the two were one straight line.
     const scheduledNewTrial = draft.trialWant === "1" && !!draft.trialIso;
-    if (scheduledNewTrial) commitScheduledTrial();
-    // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it — otherwise
-    // the answers a runner just committed are re-restored over the top of the profile they built.
-    draft = {};
+    // ⚠️ THE COMMIT IS UNCHANGED AND STILL SYNCHRONOUS — planMoment runs it as-is rather than
+    // becoming a second commit path, which is the trap adoptPlan's own note is about. What the
+    // moment adds is that the two DEFERRED syncs inside adoptPlan are waited for and named instead
+    // of happening invisibly after the screen has already changed.
+    const commit = () => {
+      profile = pf; adoptPlan(out); computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW; seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
+      // ⚠️ After the undo snapshot above: if the runner confirmed a clash-move, commitScheduledTrial
+      // moves the run on the live plan, and Undo relies on that snapshot to put it back.
+      if (scheduledNewTrial) commitScheduledTrial();
+      // ⚠️ The draft is now sticky across navigation, so SAVING has to be what releases it —
+      // otherwise the answers a runner just committed are re-restored over the profile they built.
+      draft = {};
+    };
+    planMoment(commit, () => {
     // ⚠️ COMING BACK TO WHERE YOU STARTED. Saving from the profile overlay used to land the
     // runner on the Plan tab, which is the right destination for first-run setup and disorienting for
     // somebody who just corrected their age.
@@ -37805,6 +37967,7 @@ function wire() {
         render();
       });
     }
+    });
   }
   // Cancel means cancel: an explicit "no thanks" discards the draft, where a glance at another tab does not.
   const cancel = $("cancelSetup"); if (cancel) cancel.onclick = () => { draft = {}; state.setupFocus = null; state.screen = null; state.tab = "today"; render(); };

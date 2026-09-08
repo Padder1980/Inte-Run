@@ -14218,3 +14218,83 @@ BEFORE SAYING SO.** An optimised release inlines a `static let` and strips priva
 Swift stores literals of ≤15 UTF-8 bytes inline rather than in the strings table — so a zero count
 proves nothing. **Verify instead that the build compiled the file and that the embedded page is
 byte-identical to the committed one.**
+
+## THE MOMENT A PLAN IS REBUILT (owner, 2026-09-08: *"do the first one"*)
+
+His question: *"when i change anything in the app or rebuild the plan, why does it happen instantly?
+In the runna app ... it takes a few seconds/moments ... almost as if the app is thinking about the
+changes"*. **Measured: a 20-week half-marathon block — 140 sessions, 593 steps — rebuilds in 1.1ms
+p50, 2.9ms worst**, and that already includes the volume fit rebuilding the whole thing up to five
+times to land on the stated mileage. It is instant because it is arithmetic on the phone; the
+comparison app is almost certainly a server round trip. Offered three answers he chose **show the
+work, don't fake a delay**. Suite 1512 → **1521**; 10 deliberate re-breaks, all 10 caught.
+
+⚠️⚠️ **AND THE TWO SLOW STAGES WERE ALREADY REAL AND ALREADY INVISIBLE, WHICH IS WHAT MAKES THIS
+HONEST RATHER THAN A SPINNER.** `syncNativeReminders` debounces **400ms** and reschedules up to 60
+iOS notifications; `syncWatch` debounces **500ms** and pushes the block over WatchConnectivity. Both
+sit in `adoptPlan` inside `try/catch` **with an empty body** — so they ran after the screen had
+already changed, and a failure was indistinguishable from success. This surfaces work that was always
+there rather than adding any.
+
+⚠️ **EVERY STAGE NAMED GENUINELY RUNS, AND A STAGE THAT DOES NOT APPLY IS NOT SHOWN.**
+`planMomentStages()` is **derived from the same conditions the work itself is gated on** — never a
+fixed list — so a line promising *"Sending it to your Apple Watch"* cannot reach somebody with no
+watch. Driven across every combination rather than grepped: reminders off, permission denied, no
+notification bridge and no breaks booked each correctly drop their stage.
+
+⚠️ **NOTHING REAL TO WAIT FOR MEANS NO MOMENT AT ALL** (`stages.length < 2` returns after committing).
+A runner in a browser, or on a phone with nothing connected, still gets the instant rebuild — because
+for them it genuinely IS instant, and a spinner there would be exactly the invented delay he
+rejected. **That bail-out is the half that keeps the feature honest, and it is guarded.**
+
+⚠️ **THE DWELL IS A FLOOR UNDER REAL WORK, NOT AN ADDITION TO IT** —
+`PM_DWELL_MS - (Date.now() - t0)`, so a stage that took longer waits no extra time. 340ms, guarded in
+**both** directions: under ~200 a line cannot be read (defeating the point) and over ~600 it stops
+being legibility and becomes the fake delay.
+
+⚠️ **A STAGE IS CONFIRMED BY A STAMP NEWER THAN THIS REBUILD.** `SYNC_RAN` records when each deferred
+body last ran, **negative on failure**, and `planMoment` waits for `Math.abs(stamp) >= since`.
+Reading the raw stamp would let a PREVIOUS rebuild's success be reported as this one's — the
+stale-evidence fault this file records for anchor stamping and the flags engine.
+⚠️ **AND THE WAIT IS BOUNDED** (`PM_CEIL_MS` 3500). A native side that never answers must not trap
+the runner behind a modal, and the ceiling must outlast both debounces without stranding anybody.
+
+⚠️ **IT RUNS THE CALLER'S OWN COMMIT AND IS NOT A SECOND COMMIT PATH.** `planMoment(commit, then)`
+takes the existing synchronous commit unchanged, so `adoptPlan` stays the one place a plan is
+adopted — the trap that function's own note is about. A guard forbids `adoptPlan(`, `applyProfile(`,
+`PLAN =` and `RAW =` inside `planMoment`, and requires the commit handed to it to still contain
+`restoreTicks(keptTicks)` — the line that has silently gone missing from this path before.
+
+⚠️ **OPT-IN AT THE DELIBERATE PATHS, NEVER IN `adoptPlan`.** **33 call sites** reach
+`recompute()`/`adoptPlan()`, including one at module top level, so baking it in would put a modal over
+the launch and over every internal repaint. Guarded both ways: absent from `adoptPlan`, and the
+reference count bounded so it cannot spread.
+
+⚠️ **`wizardFinish` IS DELIBERATELY NOT WIRED, AND THE REASON IS THE HONESTY RULE.** It applies the
+reminder choice **after** `adoptPlan` (`REMIND.enabled` is still false when the stage list would be
+derived), so the moment would omit a reminders stage that then runs — a misreport. Fixing that means
+reordering the first-run sequence, which is its own change. At genuine first run there is no watch and
+no reminders anyway, so the moment would be empty; the misreport only bites on a SECOND plan.
+⚠️ **Worth knowing separately: that ordering means the first plan's `syncNativeReminders` runs with
+reminders still disabled and posts `clear`**, and `initReminders()` afterwards is what actually
+schedules. Not touched here.
+
+### Traps this paid for
+
+⚠️ **A CHARACTER WINDOW IS NOT A FUNCTION — THIRTEENTH FIRING, AND IT BROKE TWO EXISTING GUARDS.**
+`doSaveProfile` grew from ~4.4KB to **5116 chars** when the rebuild moved behind the moment, and both
+`test/first-run.test.ts` and `test/silent-defects.test.ts` slice it at a fixed 4000/5000 — so a
+navigation that is demonstrably still there read as missing. ⚠️ **`first-run`'s own comment already
+recorded being bitten by adjacency once** and had anchored on the facts while keeping the window.
+**Both now brace-match via `fnOf`, because widening a window only defers the same failure** — and the
+restated guard was proven to still bite by removing the navigation for real. My own new guard made the
+same mistake in its first version.
+
+⚠️ **THE BACKTICK RULE FIRED AGAIN — BUT MY OWN PATCH GUARD CAUGHT IT BEFORE THE BUILD COULD**, the
+first time that has happened here. Doc-comment backticks around identifier names; the patch script
+asserts no backtick in any added text.
+
+⚠️ **I COULD NOT EYEBALL IT.** Browser navigation to localhost is denied to this session and
+`Page.captureScreenshot` hangs in this headless Chrome, so the card's **appearance is unverified**.
+What is covered without eyes: every `var()` resolves (13 tokens, 0 undeclared), both design ratchets
+unchanged, and every colour pairing it uses is already asserted by `test/contrast.test.ts`.

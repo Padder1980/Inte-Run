@@ -1,4 +1,24 @@
 import assert from "node:assert/strict";
+
+/**
+ * A page function, brace-matched from its declaration to the matching close.
+ *
+ * ⚠️ A CHARACTER WINDOW IS NOT A FUNCTION, and this guard was written with one. doSaveProfile grew
+ * past the window when the rebuild moved behind a progress moment, so a navigation that is still
+ * there read as missing — a guard failing on correct code, which is how a real assertion gets
+ * relaxed by whoever meets it next. Thirteenth firing of this trap in this project.
+ */
+function fnOf(html: string, name: string): string {
+  const at = html.indexOf("function " + name + "(");
+  assert.ok(at > 0, "no function " + name);
+  let d = 0;
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") d++;
+    else if (html[i] === "}") { d--; if (!d) return html.slice(at, i + 1); }
+  }
+  return assert.fail(name + " has no matching close brace");
+}
+
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 
@@ -109,7 +129,7 @@ test("⚠️ the setup form survives a glance at another tab", () => {
   // ...and saving must RELEASE it, or the answers just committed are restored over the new profile.
   // ⚠️ Anchored on the two facts, not on their adjacency — a line landed between them (clearing the
   // edit focus) and failed a guard that was only ever about the draft being released.
-  const save = html.slice(html.indexOf("function doSaveProfile("), html.indexOf("function doSaveProfile(") + 4000);
+  const save = fnOf(html, "doSaveProfile");
   assert.match(save, /draft = \{\};/, "saving the profile does not clear the sticky draft");
   assert.match(save, /state\.screen = null; state\.tab = "plan"/, "saving does not leave the setup screen");
 });

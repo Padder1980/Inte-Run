@@ -31,6 +31,7 @@ import {
 import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
 import { sessionVolumeMeters } from "../domain/steps.ts";
+import { runningDaysFor, runningDayChoices } from "../domain/running-days.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
@@ -1211,7 +1212,7 @@ function buildWeek(
   // 1.04 at seven), making the goal projection ~6% more optimistic on the strength of a day the
   // plan never gave them. The slots already existed: long at rel 0, quality at 2 and 4, easy at
   // 3, 5, 1, 6 — seven distinct days, which is exactly 1 + 2 + 4.
-  const runningDays = Math.min(7, Math.max(3, ctx.athlete.daysPerWeek));
+  const runningDays = runningDaysFor(ctx.athlete);
   const longDay = longRunDayOf(ctx.athlete);
   // ⚠️ THE LONG RUN IS BUILT FIRST, because the quality count needs to see what it carries. A
   // structured long run with a real race-pace dose is a key day in everything but name, and at
@@ -1858,7 +1859,7 @@ function buildBeginnerWeek(
   // endpoint reasoning above is unchanged; what changed is which weeks count toward reaching it.
   const f = rampWeeks <= 1 ? 0.5 : Math.min(1, Math.max(0, ctx.begFrac ?? 1));
   const ease = wp.isDeload || wp.phase === "taper";
-  const runningDays = Math.min(runWalk ? 3 : 4, Math.max(2, ctx.athlete.daysPerWeek));
+  const runningDays = runningDaysFor(ctx.athlete);
   const longDay = longRunDayOf(ctx.athlete);
 
   const sessions: SessionContent[] = [];
@@ -2065,7 +2066,7 @@ function qualityContentsFor(
     //
     // ⚠️ IT ONLY EVER REMOVES THE BIGGEST FORMATS, never adds anything, and `narrow` drops the filter
     // rather than emptying the pool — so a runner whose only eligible formats are big still gets one.
-    avoidBig: Math.min(7, Math.max(3, ctx.athlete.daysPerWeek)) <= 3,
+    avoidBig: runningDaysFor(ctx.athlete) <= 3,
   };
 
   if (wp.phase === "taper") {
@@ -2631,8 +2632,30 @@ function buildNotes(
       // "you need doubles" note fired on 247 of 560 plans under 105 km/week, most of them three- and
       // four-day weeks where the honest advice is the opposite: run MORE DAYS before running twice
       // in one. Only a runner already at the six-day ceiling is looking at a doubles problem.
-      const runDays = Math.min(7, Math.max(3, athlete.daysPerWeek));
-      if (runDays < 6) {
+      const runDays = runningDaysFor(athlete);
+      // ⚠️ A THIRD CAUSE, AND IT IS THE ONE THE OTHER TWO BOTH GET WRONG FOR A BEGINNER. Both
+      // branches below advise a lever the runner has: run more days, or run twice a day. A beginner
+      // is capped by their TRACK (4 running days, 3 on run-walk), so neither is available to them —
+      // and until 2026-09-09 this read the main-track clamp with no beginner branch, computed 6 from
+      // a stored answer of 6, and told somebody on a four-run build-up plan that they needed a
+      // SECOND RUN IN THE DAY. Reachable only through a restored or legacy profile carrying a stated
+      // volume, because draftFromForm forces volKm to 0 for beginners — but it is what a runner
+      // would read, and "add a day" is barely less wrong than "run twice".
+      // ⚠️ "CAPPED BY YOUR TRACK", NOT "AT YOUR MAXIMUM", and the first version got that wrong: a
+      // RECREATIONAL runner on seven days is also at their maximum, and for them doubles genuinely is
+      // the answer — which is what the branch below says and what CLAUDE.md records measuring. The
+      // discriminator is whether the ceiling is one the runner could raise by choosing more days.
+      // Derived by comparing this runner's own offered set against the main track's, so it carries no
+      // sixth copy of the cap.
+      const myMax = Math.max(...runningDayChoices(athlete));
+      const mainMax = Math.max(...runningDayChoices({ experience: "recreational", runWalk: false }));
+      if (myMax < mainMax && runDays >= myMax) {
+        notes.push(
+          `${head}, because a build-up plan schedules ${runDays} running days and no more. That cap is ` +
+          "the point of this level rather than a limit we would lift — the way to more running is to " +
+          "finish this block, then move up a level once you can run comfortably several times a week.",
+        );
+      } else if (runDays < 6) {
         notes.push(
           `${head}, because ${runDays} running days can only carry so much. Adding a day would carry more of it ` +
           "than stretching the days you have — frequency is the gentler lever, and the sessions stay a sane length.",

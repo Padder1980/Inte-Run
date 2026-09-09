@@ -6605,11 +6605,19 @@ function profileImpact(pf) {
     cmp("Length of the block", a.totalWeeks, b.totalWeeks, wks);
     cmp("Biggest week", a.peakKm, b.peakKm, km);
   }
-  const runDays = (plan) => {
-    const w = plan.weeks[Math.min(plan.weeks.length - 1, Math.floor(plan.weeks.length / 2))];
-    return w ? w.sessions.filter((x) => PRIMARY_TYPES[x.type]).length : null;
-  };
+  // ⚠️ ONE MID-WEEK PICK, SHARED. Two closures choosing their own week would describe different
+  // weeks in two rows of the same table.
+  const midWeek = (plan) => plan.weeks[Math.min(plan.weeks.length - 1, Math.floor(plan.weeks.length / 2))];
+  const runDays = (plan) => { const w = midWeek(plan); return w ? w.sessions.filter((x) => PRIMARY_TYPES[x.type]).length : null; };
+  // ⚠️⚠️ PRIMARY_TYPES IS A RUNNING FILTER AND THIS SCREEN NEEDED A SESSION ONE. Strength and
+  // mobility sit outside it and carry no distance, so peakKm cannot see them either — which meant
+  // turning "Include strength & conditioning?" from Yes to No reported "Nothing about your plan
+  // changes" while taking two sessions out of every week of the block. Measured: totalWeeks 27/27,
+  // peakKm 37.5/37.5, runs 5/5, strength 2/0. That is the same falsehood the owner reported on the
+  // days question (2026-09-09), reached through a different answer and still live for everybody.
+  const otherDays = (plan) => { const w = midWeek(plan); return w ? w.sessions.filter((x) => !PRIMARY_TYPES[x.type] && x.type !== "rest").length : null; };
   cmp("Runs in a typical week", PLAN ? runDays(PLAN) : null, runDays(out.plan), (v) => String(Math.round(v)));
+  cmp("Strength & mobility sessions", PLAN ? otherDays(PLAN) : null, otherDays(out.plan), (v) => String(Math.round(v)));
   // ⚠️ THE ONE NOBODY WOULD THINK TO WARN ABOUT, and the reason this screen needed an undo at
   // all. seedDone() prunes state.dayOverride of every session id the new plan does not contain, and
   // PERSISTS the prune. Those are the runner's OWN reschedules, made on a different screen entirely
@@ -6622,8 +6630,10 @@ function profileImpact(pf) {
 function profileImpactHtml(imp) {
   if (!imp) return "";
   if (imp.none) {
-    return '<div class="pi-none">Nothing about your plan changes — the answers you edited do not ' +
-      'affect how it is built. Saving is safe.</div>';
+    // ⚠️ THE CAUSAL CLAUSE WAS REMOVED BECAUSE IT WAS FALSE. It read "the answers you edited do not
+    // affect how it is built" — and for the runner who reported this, the answer he edited affects
+    // the plan enormously; it was CAPPED by his level. State the fact, never the reason.
+    return '<div class="pi-none">Your plan comes out the same either way. Saving is safe.</div>';
   }
   const rows = imp.rows.map((r) =>
     '<div class="pi-row"><span class="pi-l">' + esc(r.label) + '</span>' +
@@ -7191,8 +7201,10 @@ function planMoment(commit, then) {
   const stages = planMomentStages();
   // ⚠️ NOTHING REAL TO WAIT FOR MEANS NO MOMENT AT ALL. Instant stays instant.
   if (stages.length < 2) { commit(); then(); return; }
-  const ov = el("div", "pmoment");
-  ov.id = "pmoment";
+  // ⚠️ el() TAKES AN HTML STRING, NOT A TAG AND A CLASS. Written el("div", "pmoment") it returns a
+  // TEXT NODE — classList is undefined and the moment threw on its first real use. It shipped that
+  // way on 2026-09-08 and the driven test did not catch it, because the test SUPPLIED its own el.
+  const ov = el('<div class="pmoment" id="pmoment"></div>');
   ov.innerHTML = planMomentHtml(stages);
   document.body.appendChild(ov);
   requestAnimationFrame(() => ov.classList.add("on"));
@@ -9829,7 +9841,7 @@ function alfiePlanContext() {
     goal: f.race, target: f.target, raceDate: f.date, daysToRace: f.daysAway,
     week: wk.index, phase: wk.phase, deload: !!wk.isDeload, weekKm: wk.distanceKm,
     paces: { easy: p.easy || null, threshold: p.threshold || null, goal: p.goal || null },
-    today: today, experience: profile.status || null, daysPerWeek: profile.daysPerWeek || null,
+    today: today, experience: profile.status || null, daysPerWeek: dayAnswerOf(profile) || null,
   };
 }
 function alfieRemote(question) {
@@ -18884,7 +18896,7 @@ function viewProfile() {
     '<div class="card pf-card">' +
       profRow({ icon: "rRace", colour: "var(--eff-hard)", label: "Goal", value: (RACE_LABEL[profile.goalDist] || "") + (targetChosen(profile) && profile.targetS ? " \u00b7 " + fmtTimeFull(profile.targetS) : ""), action: "setup:goal" }) +
       profRow({ icon: "gauge", colour: "var(--steady)", label: "Current fitness", value: profFitness(), action: "setup:fitness" }) +
-      profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: (profile.daysPerWeek || 0) + " days / week", action: "setup:rhythm" }) +
+      profRow({ icon: "today", colour: "var(--build)", label: "Training rhythm", value: dayAnswerOf(profile) + " days / week", action: "setup:rhythm" }) +
       profRow({ icon: "heart", colour: "var(--rest)", label: "Current context", value: profContext(), action: "setup:context" }) +
       profRow({ icon: "flame", colour: "var(--ease)", label: "Motivation", value: profWhy(), action: "setup:why" }) +
     '</div>' +
@@ -21637,6 +21649,54 @@ function ageOpts(sel) {
 }
 const DAY_NAMES_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 function dayOpts(sel) { const s = sel != null ? Number(sel) : 6; return DAY_NAMES_FULL.map((d, i) => '<option value="' + i + '"' + (i === s ? " selected" : "") + '>' + d + '</option>').join(""); }
+/**
+ * Which track is this runner on, in the two fields the engine keys off.
+ *
+ * ⚠️ THE TWO EXPRESSIONS ARE COPIED FROM applyProfile AND NOWHERE ELSE — experienceFor(pf) and
+ * pf.status === "new". A third derivation is how the picker and the plan come to disagree about which
+ * track somebody is on, which is the whole class of defect this fixes. They are deliberately NOT
+ * re-pointed at applyProfile: test/plan-adapts.test.ts and test/profile-inputs.test.ts both pin
+ * "experience = experienceFor(pf)" as a literal there, and churning that line for no behavioural gain
+ * is how a guard gets weakened.
+ */
+function dayTrackFor(pf) { return { experience: experienceFor(pf), runWalk: (pf && pf.status) === "new" }; }
+/** The day answers this runner's plan tells apart — the engine's own set, never a local table. */
+function dayChoiceOpts(pf) { return RC.runningDayChoices(dayTrackFor(pf)).map((d) => [String(d), String(d)]); }
+/** The runner's answer folded onto that set. Used everywhere the number is shown or reasoned about. */
+function dayAnswerOf(pf) { return RC.clampDayAnswer(dayTrackFor(pf), Number(pf && pf.daysPerWeek)); }
+/**
+ * What the picker should show as selected.
+ *
+ * ⚠️ "" MEANS NOT ANSWERED YET AND MUST SURVIVE, which the first version of this broke. The seeder
+ * sets draft.days to "" on a first run so nothing is selected and draftFromForm refuses to build a
+ * plan until the runner chooses — clamping that empty string gives Number("") === 0, which folds to
+ * the minimum and silently pre-answers the question. Caught by silent-defects' own guard: "a
+ * first-time runner cannot build a plan on questions they never answered".
+ */
+function daySegVal(pf) {
+  if (draft.days === "" || draft.days == null && !(pf && pf.daysPerWeek)) return "";
+  if (draft.days != null) return dayAnswerOf({ status: draft.status || (pf && pf.status), daysPerWeek: draft.days });
+  return dayAnswerOf(pf);
+}
+/**
+ * One line saying what this level uses and how to get more. "" where nothing is restricted.
+ *
+ * ⚠️ THE RUN COUNT IS ASKED OF THE ENGINE WITH AN ABSURD ANSWER RATHER THAN TYPED, so the sentence
+ * and the plan cannot disagree — and it is why the run-walk copy reads 3 while the picker offers 4
+ * (a fourth day buys a second strength session without a fourth run).
+ * ⚠️ AND THE CARD NAME IS READ OUT OF STATUS_OPTS, not typed. A rename would otherwise orphan the
+ * sentence, and this file records the label misroute lesson on that exact array.
+ */
+function dayCapNote(pf) {
+  const t = dayTrackFor(pf);
+  if (t.experience !== "beginner") return '<div class="day-cap-note"></div>';
+  const card = (STATUS_OPTS.find((o) => o[0] === "regular") || ["", "Regular runner"])[1];
+  const runs = RC.runningDaysFor({ experience: t.experience, runWalk: t.runWalk, daysPerWeek: 99 });
+  return '<div class="day-cap-note q-hint" style="margin-top:6px">This level builds up to ' + runs +
+    ' runs a week' + (t.runWalk ? ', and a fourth day adds a strength session' : '') +
+    '. For more running days, switch to ' + esc(card) +
+    ' once you can run comfortably several times a week.</div>';
+}
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
 // ---- Name & profile picture ----------------------------------------------
 // ⚠️ QUOTES TOO. This escaped only & < > while user-controlled text already reached HTML
@@ -21902,7 +21962,12 @@ function viewSetup() {
   // questions borrowed out of "A few details". The old section 4 held both rhythm and context, so
   // the two rows either shared a screen or the split had to be invented per-question.
   const secRhythm =
-    '<div class="q" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", [["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]], draft.days != null ? draft.days : p.daysPerWeek) + '</div>' +
+    // ⚠️ THE OPTIONS COME FROM THE ENGINE AND THE .q NOW HAS AN id, both load-bearing. The list was a
+    // hardcoded 3-7 while both beginner tracks cap at 4, so three of the five buttons produced the
+    // same plan as the fourth and the preview sheet correctly said nothing changed — reported as a bug
+    // (owner, 2026-09-09). And syncStatus has to REBUILD this control when the status card changes,
+    // hence the id, following the #volQ precedent one line down.
+    '<div class="q" id="dayQ" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", dayChoiceOpts(p), daySegVal(p)) + dayCapNote(p) + '</div>' +
     '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \— so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \— we\\u2019ll use a sensible default for your goal.</div></div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
@@ -22543,6 +22608,32 @@ function syncStatus() {
   // whose answer is thrown away is worse than no question, and "new"/"building" runners are the
   // least likely of anyone to have a weekly figure to give.
   const vq = $("volQ"); if (vq) vq.style.display = beginner ? "none" : "";
+  // ⚠️ THE DAYS CONTROL HAS TO BE REBUILT, and it was the one question on this form that changes
+  // MEANING with the status and never got told. Switching Regular runner -> Building the habit left
+  // the picker showing 3-7 with a stale 6 selected; and because seg() has no fallback, once the list
+  // narrows it shows NOTHING selected while draftFromForm saves the 6 anyway.
+  const dayPf = { status: draft.status || profile.status, daysPerWeek: Number(draft.days) };
+  // ⚠️ CLAMP THE DRAFT, NOT JUST THE PAINT — and this line is the one that fixes the owner's actual
+  // case. Two of the three routes to a status change never render this control: SETUP_TOPICS.fitness
+  // includes "status" and not "days", so the question is display:none throughout, which is the
+  // likeliest way a beginner came to be storing 6. Clamping here covers all three routes at once.
+  // ⚠️ NEVER OVER AN UNANSWERED QUESTION. On a first run draft.days is "" so that nothing is
+  // selected and draftFromForm refuses to build until the runner chooses; writing a clamped value
+  // here would answer it for them the moment they tapped a status card.
+  if (draft.days !== "" && draft.days != null) draft.days = String(dayAnswerOf(dayPf));
+  const dq = $("dayQ"), dseg = dq && dq.querySelector('[data-set="days"]');
+  if (dseg) {
+    // ⚠️ innerHTML ON THE SEG, NOT THE .q. The .q carries its own setup-off class from
+    // applySetupFocus, and the .seg carries the aria-labelledby linkFormLabels gave it — and that
+    // pass BAILS on an already-labelled group, so a replaced .q would come back unnamed to a screen
+    // reader. Replacing the seg's children keeps both.
+    // ⚠️ el() PARSES AN HTML STRING — seg() returns the whole .seg wrapper, so take its children.
+    const built = el(seg("days", dayChoiceOpts(dayPf), draft.days));
+    dseg.innerHTML = built ? built.innerHTML : "";
+    bindSegButtons(dseg);      // ⚠️ or the right two options appear and neither can be tapped
+    const note = dq.querySelector(".day-cap-note");
+    if (note) note.outerHTML = dayCapNote(dayPf);
+  }
   if (!beginner) syncFitSrc();
   // Rebuild the goal card body so its distance options and time field match the status (the numbered
   // section header stays put outside #goalBody).
@@ -22813,7 +22904,11 @@ function wizBody(id, p, st) {
     const dist = wizFieldVal("s_dist") || p.goalDist;
     const weeks = sum ? (sum.structuredWeeks || sum.totalWeeks) : 0;
     const peak = sum ? Math.round(sum.peakKm || 0) : 0;
-    const days = Number(draft.days) || 0;
+    // ⚠️ CLAMPED, like every other display of this number. The store may hold an answer the
+    // runner's level cannot use — a legacy profile, a restored plan, or a status changed from a
+    // screen where the days question is hidden — and printing it raw tells them their week is
+    // something it is not.
+    const days = dayAnswerOf({ status: draft.status || profile.status, daysPerWeek: Number(draft.days) }) || 0;
     const goalLbl = (GOAL_BY_STATUS[st] && GOAL_BY_STATUS[st].time === true) ? RACE_LABEL[dist] : FINISH_LABEL[dist];
     return '<div class="wz-summary">' +
       '<div class="wz-sum-goal">' + esc(goalLbl || "Your plan") + '</div>' +
@@ -37830,28 +37925,13 @@ function wire() {
   const fh = $("fhStatus"); if (fh) fh.onchange = runFh;
   if ($("redsRes")) runReds();
   // Setup screen wiring
-  document.querySelectorAll("[data-set]").forEach((s) => s.querySelectorAll("button").forEach((b) => b.onclick = () => {
-    draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-    if (s.dataset.set === "status") syncStatus();
-    if (s.dataset.set === "fitsrc") syncFitSrc();
-    if (s.dataset.set === "coach_on") {
-      COACH.cfg.enabled = b.dataset.v === "1"; saveCoachCfg();
-      const o = $("coachOpts"); if (o) o.style.display = COACH.cfg.enabled ? "" : "none";
-      if (COACH.cfg.enabled) { coachUnlock(); coachLoadManifest(); } else coachStop();
-    }
-    if (s.dataset.set === "coach_freq") { COACH.cfg.frequency = b.dataset.v; saveCoachCfg(); }
-    // ⚠️ Wizard-only toggles that CHANGE what the step shows: the trial-day picker only exists when
-    // the runner said Yes to a trial; the reminder-time field only when reminders are On. A full
-    // re-render is the simplest way to reveal/hide those without wiring per-toggle DOM surgery. Only
-    // triggered inside the wizard, so the profile edit form is unchanged.
-    if (state.screen === "wizard" && (s.dataset.set === "trialWant" || s.dataset.set === "wizRemind")) {
-      captureSetupFields(); render();
-    }
-    if ((state.screen === "setup" || PROFILE_EDIT_OPEN) && s.dataset.set === "trialWant") {
-      captureSetupFields(); render();
-    }
-    refreshTypePreview();
-  }));
+  // ⚠️ EXTRACTED SO syncStatus CAN RE-WIRE A REBUILT CONTROL, and it is not tidiness. This binding is
+  // PER BUTTON at wire() time, while syncStatus is called both from here and from the click handler
+  // long afterwards — so buttons written into the DOM by that later call have no onclick at all. A
+  // rebuilt days picker would show the right two options and neither could be tapped, which is the
+  // looks-live-does-nothing class this project has shipped three times. One definition, two callers;
+  // a hand copy is the fix-one-builder-not-the-other trap.
+  document.querySelectorAll("[data-set]").forEach(bindSegButtons);
   wireCoachSettings();
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   // ---- Manage plan ----------------------------------------------------------------------
@@ -38226,6 +38306,43 @@ function wire() {
   const lDiscard = $("lDiscard"); if (lDiscard) lDiscard.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "today"; render(); };
   const lDone = $("lDone"); if (lDone) lDone.onclick = () => { coachStop(); stopSpeech(); LIVE = null; state.screen = null; state.tab = "activities"; state.actTab = "workouts"; render(); };
 }
+
+/**
+ * The [data-set] segmented controls, wired.
+ *
+ * ⚠️ EXTRACTED FROM wire() SO syncStatus CAN RE-WIRE A REBUILT CONTROL, and it is not tidiness.
+ * The binding is PER BUTTON at wire() time, while syncStatus is called both from wire() and from
+ * the click handler long afterwards — so buttons written into the DOM by that later call would have
+ * no onclick at all. A rebuilt days picker would show the right two options and neither could be
+ * tapped, which is the looks-live-does-nothing class this project has shipped three times.
+ * ⚠️ ONE DEFINITION, TWO CALLERS. A hand copy in syncStatus is the fix-one-builder-not-the-other
+ * trap this file records paying for six times.
+ */
+function bindSegButtons(s) {
+  s.querySelectorAll("button").forEach((b) => b.onclick = () => {
+    draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    if (s.dataset.set === "status") syncStatus();
+    if (s.dataset.set === "fitsrc") syncFitSrc();
+    if (s.dataset.set === "coach_on") {
+      COACH.cfg.enabled = b.dataset.v === "1"; saveCoachCfg();
+      const o = $("coachOpts"); if (o) o.style.display = COACH.cfg.enabled ? "" : "none";
+      if (COACH.cfg.enabled) { coachUnlock(); coachLoadManifest(); } else coachStop();
+    }
+    if (s.dataset.set === "coach_freq") { COACH.cfg.frequency = b.dataset.v; saveCoachCfg(); }
+    // ⚠️ Wizard-only toggles that CHANGE what the step shows: the trial-day picker only exists when
+    // the runner said Yes to a trial; the reminder-time field only when reminders are On. A full
+    // re-render is the simplest way to reveal/hide those without wiring per-toggle DOM surgery. Only
+    // triggered inside the wizard, so the profile edit form is unchanged.
+    if (state.screen === "wizard" && (s.dataset.set === "trialWant" || s.dataset.set === "wizRemind")) {
+      captureSetupFields(); render();
+    }
+    if ((state.screen === "setup" || PROFILE_EDIT_OPEN) && s.dataset.set === "trialWant") {
+      captureSetupFields(); render();
+    }
+    refreshTypePreview();
+  });
+}
+
 function buildNav() {
   $("nav").innerHTML = ["today","plan","activities","community","support"].map((t) => '<button type="button" class="navbtn' + (t===state.tab?" on":"") + '" data-tab="' + t + '">' + (t === "today" ? todayNavIcon() : ICON[t]) + '<span class="nl">' + (NAV_LABEL[t] || TITLES[t].replace("Your ","")) + '</span></button>').join("");
   // ⚠️ Same rule as liveBack: mid-run a tab tap is NAVIGATION, and the live pill is the way back.

@@ -843,7 +843,7 @@ test("⚠️ the profile photo is tappable, and back goes where you came from", 
     "opening a hub card leaves a stale origin behind");
 });
 
-test("⚠️ a first-time runner cannot build a plan on questions they never answered", () => {
+test("⚠️ a first-time runner cannot build a plan on questions they never answered", async () => {
   const html = page();
   const fn = fnSrc("draftFromForm");
   // ⚠️ THE DRAFT WAS SEEDED FROM DEFAULT_PROFILE, so the two questions that shape the whole plan —
@@ -862,7 +862,32 @@ test("⚠️ a first-time runner cannot build a plan on questions they never ans
   assert.match(seed, /status: first \? "" :/, "the running status is pre-answered from the defaults");
   // ⚠️ And both controls must render from the DRAFT, or they show a selection nobody made.
   assert.match(html, /statusCards\(draft\.status != null/, "the status cards render from the stored profile");
-  assert.match(html, /draft\.days != null \? draft\.days/, "the days control renders from the stored profile");
+  // ⚠️ THE DAYS CONTROL IS ASSERTED BY BEHAVIOUR, NOT BY ITS EXPRESSION. It used to read
+  // `draft.days != null ? draft.days` and this guard pinned that literal — then the picker had to
+  // start clamping the answer onto the values the runner's level can use, and a guard about "renders
+  // from the draft" failed on a change that still renders from the draft. Driven instead, with the
+  // REAL engine functions rather than stubs: a stub is exactly how el("div", "pmoment") reached a
+  // phone on 2026-09-08.
+  const rd = await import("../src/domain/running-days.ts");
+  const segVal = (draftObj: Record<string, unknown>, pf: Record<string, unknown>) => {
+    const f = new Function("draft", "RC", "experienceFor", "pf",
+      fnOf(html, "dayTrackFor") + "\n" + fnOf(html, "dayAnswerOf") + "\n" + fnOf(html, "daySegVal")
+      + "\nreturn daySegVal(pf);");
+    return (f as (...a: unknown[]) => unknown)(
+      draftObj, { clampDayAnswer: rd.clampDayAnswer, runningDayChoices: rd.runningDayChoices },
+      (p: Record<string, unknown>) => (p && (p.status === "new" || p.status === "building") ? "beginner" : "recreational"),
+      pf);
+  };
+  // Unanswered on a first run must stay unanswered — the whole point of the seeder's "".
+  assert.equal(segVal({ days: "" }, { status: "", daysPerWeek: 0 }), "",
+    "the days control pre-answers itself on a first run, so nobody has to choose");
+  // The DRAFT wins over the stored profile.
+  assert.equal(segVal({ days: "3", status: "regular" }, { status: "regular", daysPerWeek: 6 }), 3,
+    "the days control shows the stored profile instead of what the runner just picked");
+  // With no draft, the stored answer shows — folded onto what the level can use.
+  assert.equal(segVal({}, { status: "regular", daysPerWeek: 6 }), 6);
+  assert.equal(segVal({}, { status: "building", daysPerWeek: 6 }), 4,
+    "a beginner is shown a stored 6 the plan will never build");
 });
 
 test("⚠️ the Logbook summarises the period, then interprets it, then lists it", () => {
@@ -1166,4 +1191,69 @@ test("⚠️ a render of the same screen keeps its scroll position", () => {
   for (const content of ["logFilter", "supportQ", "planWeek"]) {
     assert.ok(!key.includes(content), key + " treats " + content + " as a navigation, so it will jump on a filter");
   }
+});
+
+test("⚠️⚠️ el() takes an HTML string — never a tag name and a class", () => {
+  // ⚠️ THIS SHIPPED TO A PHONE. el is `function el(html) { const t = document.createElement("template");
+  // t.innerHTML = html.trim(); return t.content.firstChild; }` — so el("div", "pmoment") sets a
+  // template's innerHTML to the text "div" and returns a TEXT NODE. classList is then undefined and
+  // the caller throws on its first real use. It was written that way in planMoment on 2026-09-08,
+  // built, typechecked, passed 1521 tests and was installed, because the driven test SUPPLIED ITS
+  // OWN el and therefore measured a program in which el accepted a tag name. Found only by driving
+  // the real page. Third invented-identifier defect in one day.
+  const html = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
+  // ⚠️ THE WHOLE APP SCRIPT, NOT FROM el's DEFINITION ONWARDS. Written as a slice from the
+  // definition, this guard could not see planMoment — which is declared EARLIER in the file and was
+  // the one place with the defect. It reported clean against the exact break it exists for. Scoped to
+  // the block that contains el() so the minified engine's own one-letter names cannot match.
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
+  // ⚠️ COMMENTS STRIPPED, because this guard's own explanation in web/app.ts QUOTES the forbidden
+  // call — and it duly reported that comment as a defect on its first run. Thirteenth firing of that
+  // trap here. The block-comment sweep is anchored to the start of a line: the app markup contains
+  // accept="image/*", an unbalanced opener mid-line, and an unanchored sweep eats 10,382 characters
+  // of live code (measured, and recorded in CLAUDE.md).
+  const app = (blocks.find((b) => b.includes("function el(html)")) ?? "")
+    .replace(/^\s*\/\/.*$/gm, "").replace(/^\s*\/\*[\s\S]*?\*\//gm, "");
+  assert.ok(app.length > 100000, "the app script block is no longer recognisable");
+  assert.ok(app.includes("function planMoment("),
+    "the scanned block does not contain planMoment, which is where this defect shipped");
+
+  // (1) The signature is ONE parameter. If that ever changes, the rest of this guard is moot and
+  //     should be revisited rather than deleted.
+  assert.match(app, /function el\(html\) \{ const t = document\.createElement\("template"\)/,
+    "el's signature has changed — this guard's premise needs re-deriving");
+
+  // (2) No call site may pass a second argument. Derived by scanning every el( call and counting
+  //     top-level commas in its argument list, so el(seg(a, b)) and el("<p>" + x) are both fine.
+  const bad = [];
+  const re = /(?<![.\w$])el\(/g;
+  let m;
+  while ((m = re.exec(app))) {
+    let d = 0, i = m.index + m[0].length, args = "", q = "";
+    for (; i < app.length && i < m.index + 4000; i++) {
+      const c = app[i];
+      if (q) { if (c === "\\") { i++; continue; } if (c === q) q = ""; args += c; continue; }
+      if (c === '"' || c === "'") { q = c; args += c; continue; }
+      if (c === "(" || c === "[" || c === "{") d++;
+      else if (c === ")" || c === "]" || c === "}") { if (c === ")" && d === 0) break; d--; }
+      args += c;
+    }
+    // A top-level comma means a second argument.
+    let depth = 0, quoted = "", commas = 0;
+    for (let k = 0; k < args.length; k++) {
+      const c = args[k];
+      if (quoted) { if (c === "\\") { k++; continue; } if (c === quoted) quoted = ""; continue; }
+      if (c === '"' || c === "'") { quoted = c; continue; }
+      if (c && "([{".includes(c)) depth++; else if (c && ")]}".includes(c)) depth--;
+      else if (c === "," && depth === 0) commas++;
+    }
+    const first = args.trim();
+    if (commas > 0) bad.push("two arguments: el(" + first.slice(0, 60) + ")");
+    // (3) A string-literal first argument must be markup.
+    const lit = /^(["'])([\s\S]*?)\1\s*$/.exec(first);
+    if (lit && !(lit[2] ?? "").trimStart().startsWith("<")) bad.push("not markup: el(" + first.slice(0, 60) + ")");
+  }
+  assert.deepEqual(bad, [],
+    "el() builds a node from MARKUP. These calls hand it something else, which returns a text node "
+    + "or null and throws at the first property access:\n  " + bad.join("\n  "));
 });

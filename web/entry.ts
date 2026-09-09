@@ -89,3 +89,11 @@ export type { Stretch } from "../src/science/stretches.ts";
 // were updated and two were not, and an adjusted week came back measured on a different scale from
 // every other week in the same plan (40.9 → 44.1 km while every session in it got shorter).
 export { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
+
+// ⚠️ ONE ANSWER TO "HOW MANY DAYS WILL THIS PLAN ACTUALLY USE", AND THE PICKER NEEDS IT. The form
+// offered 3-7 to everybody while both beginner tracks cap at 4, so a runner who moved from 4 days to
+// 6 was told "Nothing about your plan changes" — which was true, and read as a bug (owner,
+// 2026-09-09). A sixth copy of the cap in the app layer is what this prevents; the reachable set is
+// derived from the engine's own tables and driven through the real generator by
+// test/running-days.test.ts.
+export { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "../src/domain/running-days.ts";

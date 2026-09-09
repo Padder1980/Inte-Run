@@ -201,6 +201,11 @@ test("BLOCKER: a runner with nothing to wait for sees no overlay, driven", async
   const doc = {
     body: { appendChild: () => { appended++; }, removeChild: () => {} },
   };
+  // ⚠️⚠️ THE REAL el(), LIFTED — NOT A STUB. The stub that used to sit here is why this test passed
+  // while the shipped code threw: planMoment called el("div", "pmoment"), and el() in this app takes
+  // an HTML STRING, so it returned a TEXT NODE whose classList is undefined. A probe that supplies
+  // its own dependency measures a strictly easier program, and this one measured a program where
+  // el() accepted a tag name. Found by driving the real page hours after it shipped.
   const f = new Function("document", "el", "esc", "requestAnimationFrame", "out",
     "NATIVE_NOTIFY", "NATIVE_PERM", "NATIVE_WATCH", "REMIND", "loadAdjust",
     "const PM_DWELL_MS = 1; const PM_CEIL_MS = 50; let SYNC_RAN = { remind: 0, watch: 0 };\n"
@@ -208,6 +213,10 @@ test("BLOCKER: a runner with nothing to wait for sees no overlay, driven", async
     + "\nplanMoment(out.commit, out.then);");
   (f as (...a: unknown[]) => void)(
     doc,
+    // ⚠️ A STUB, AND ITS LIMIT IS STATED. node has no document, so the overlay path cannot be driven
+    // here — which is exactly how el("div", "pmoment") shipped and threw on a real phone. The
+    // signature is guarded statically instead, in test/silent-defects.test.ts ("el() takes an HTML
+    // string"). Do not read this test as proof that the overlay path runs.
     () => ({ classList: { add() {}, remove() {} }, querySelector: () => null, set innerHTML(_v: string) {} }),
     (s: string) => s, (cb: () => void) => cb(),
     { commit: () => { committed++; }, then: () => { thened++; } },

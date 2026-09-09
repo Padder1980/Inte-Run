@@ -14298,3 +14298,142 @@ asserts no backtick in any added text.
 `Page.captureScreenshot` hangs in this headless Chrome, so the card's **appearance is unverified**.
 What is covered without eyes: every `var()` resolves (13 tokens, 0 undeclared), both design ratchets
 unchanged, and every colour pairing it uses is already asserted by `test/contrast.test.ts`.
+
+## ✅ THE APP STOPPED ASKING FOR RUNNING DAYS IT THROWS AWAY (owner, 2026-09-09)
+
+*"ive just changed my. training from 4 days per week to 6 and it is saying nothing changes? thats not
+right"* — and **the sheet was telling the truth.** Measured through the real engine, identical at every
+race distance: a **continuous beginner** asking 3/4/5/6/7 gets **3/4/4/4/4** runs, and a **run-walk
+beginner** gets **3 at every answer**. So on the beginner track 4 and 6 build an identical plan.
+
+⚠️⚠️ **THE DEEPER FAULT IS THAT THE QUESTION WAS ASKED AT ALL, AND THIS APP HAD ALREADY REASONED ITS WAY
+TO THE ANSWER ONCE.** The **volume** question is HIDDEN for beginners (`syncStatus`) on exactly this
+ground — *"a question whose answer is thrown away is worse than no question"* — while the days question
+sat two rows above it offering five options that collapse to one. His ruling, from three offered:
+**offer only the days the plan can use, and say why.** Not raise the cap (a coaching change to the
+beginner track, which is deliberately gentle), not warn-and-ignore. Suite 1521 → **1533**;
+`test/running-days.test.ts` holds 11 guards and **14 deliberate re-breaks, all 14 caught**.
+
+### ONE DEFINITION, AND THE UI ASKS IT RATHER THAN BECOMING A FIFTH COPY
+
+The cap was an inline literal in **four** places in `generate-plan.ts` — and one of the four drives a
+**sentence the runner reads**, which is how a wrong copy became visible rather than merely untidy.
+`src/domain/running-days.ts` is the only copy now, exported through `web/entry.ts`.
+
+⚠️⚠️ **AND NOTHING MAY CLAMP THE ANSWER ON ITS WAY INTO THE ENGINE — that is the tidy-looking fix and it
+is wrong.** `Athlete.daysPerWeek` carries the runner's **answer**; `runningDaysFor` says what the plan
+does with it. The beginner **strength** count reads the raw answer (`generate-plan.ts:1930`,
+`daysPerWeek >= 4`), so a run-walk beginner answering 3 gets 3 runs + 1 strength and answering 4 gets 3
+runs + **2** strength — two different plans. Clamping at the seam would silently take a strength session
+off every run-walk runner who had answered 4 or more. **That is why `CHOICE_MAX.runWalk` is 4 and not
+3**, and why the two tables in that file (`RUN_DAY_SLOTS`, the running cap; `CHOICE_MAX`, what to offer)
+are deliberately different numbers rather than one.
+
+⚠️ **FIVE RAW READS MUST STAY RAW, and each is a different question from "how many runs".**
+`:404` (`NO_DELOAD_MAX_DAYS` — the tier-3 gate keys on the runner's own declared frequency), `:1930`
+(the strength count above), `:2045` and `:2374` (the format rotation seeds — clamping them would
+collapse five answers onto one rotation and cost real session variety), and `:2392`
+(`daysPerWeek <= 4`, the long-run-carries-work gate). Only the four *running-day* reads moved.
+
+### PROVED NOT TO CHANGE ANY PLAN, THEN THE NOTE DIFFERENCE TURNED OUT TO BE A FIX
+
+Two worktrees, sha256 over each week and over the notes, **1,920 cells** (5 distances × 6 tracks × days
+1–8 × strength on/off × volume absent/present × Monday and mid-week starts): **weeks byte-identical in
+every cell.** Notes differ in **280** cells, all of them beginner-with-a-stated-volume — because that
+note read the main-track clamp with no beginner branch and **told somebody on a four-run build-up plan
+that they needed a second run in the day.**
+
+⚠️⚠️ **AND ITS FIRST REPAIR GAVE A RECREATIONAL 7-DAY RUNNER THE BEGINNER COPY.** Written as *"you are at
+your maximum"* it fired for anyone at the top of their own offered set, which on the main track is the
+six-day runner the doubles note exists for. **Caught by checking the case I was not fixing.** The branch
+is keyed on *"capped by your track"* — the runner's own offered set compared against the main track's —
+so it is unreachable for a runner whose ceiling is the app's ceiling.
+
+### THE STORED VALUE IS CLAMPED TOO, AND WITHOUT THAT HALF THE FIX SHIPS BROKEN
+
+⚠️ **TWO OF THE THREE ROUTES TO A STATUS CHANGE NEVER RENDER THE DAYS CONTROL AT ALL.**
+`SETUP_TOPICS.fitness` is `["status", "volume", "recent", ...]` and does **not** include `"days"`, so a
+runner can move onto the beginner track from a screen that never shows the picker — which is the
+likeliest way a beginner came to be storing 6 in the first place. Clamping only what is rendered leaves
+the stored value lying on every other surface. `dayAnswerOf(profile)` is now read by the profile row
+(which said **"6 days / week"** over a four-run plan), by **Alfie's plan context** (the same false
+premise, sent to a language model as fact) and by the wizard tile.
+
+⚠️⚠️ **`syncStatus` RE-WIRES THE BUTTONS IT REBUILDS, AND THAT HALF IS EASY TO MISS BECAUSE `#goalBody`
+NEVER NEEDED IT.** The `[data-set]` handler is attached **per button inside `wire()`**, so a segmented
+control written later has no handler at all — the runner would have seen the correct two options with
+**neither of them tappable**. (`#goalBody` gets away with it because its rebuild happens *before*
+`wire()` runs, which is the documented reason `linkFormLabels()` has to re-run there.) `bindSegButtons`
+is one definition with two callers.
+
+⚠️ **AND THE CLAMP PRE-ANSWERED THE QUESTION ON A FIRST RUN.** `Number("")` is **0**, which folds onto
+the lowest offer — so a brand-new runner arrived at the wizard with 3 already selected and no way to
+tell an answer from a default. Caught by an existing guard. `daySegVal` returns `""` while unanswered
+and `syncStatus` clamps only a *real* answer.
+
+### ⚠️⚠️ THE SAME FALSEHOOD WAS LIVE ON A SECOND QUESTION, FOR EVERY RUNNER
+
+`profileImpact` counted sessions with `PRIMARY_TYPES` — which is a **RUNNING** filter (it exists so the
+picker offers only runnable types) — and used it as a session count. So turning **"Include strength &
+conditioning?"** from Yes to No reported *"Nothing about your plan changes"* while removing sessions
+from every week of the block. Measured after: **"Strength & mobility sessions: 3 → 1"**. Nobody reported
+it; it was found by proving `profileImpact` correct on the question he *had* reported.
+⚠️ **The "none" copy also dropped its causal clause.** *"Your paces and your weekly shape are the same,
+so the plan comes out the same"* is a **claim about why**, and it was false for the runner who reported
+this — the paces and shape were identical and the plan was too, but not for that reason. It now says
+what it knows: *"Your plan comes out the same either way. Saving is safe."*
+
+### ⚠️⚠️ AND THE PROGRESS MOMENT SHIPPED THE NIGHT BEFORE WAS BROKEN ON HIS PHONE
+
+`el()` in this app takes an **HTML string** (`el('<div class="x"></div>')`); `planMoment` called
+`el("div", "pmoment")`, which returns a **text node** whose `classList` is `undefined` — so it threw on
+its first real use. It built, typechecked, passed `node --check` on all three blocks, passed **1,521
+tests**, and was **installed on his phone**.
+
+⚠️⚠️ **THE DRIVEN TEST HID IT BY SUPPLYING ITS OWN `el`.** The harness stubbed a two-argument `el`, so
+it measured a program in which `el` accepts a tag name — **a probe that supplies its own dependency
+measures a strictly easier program**, which this file already records for the engine's distance tables
+and for `clubToneQ`'s constants. Found only by driving the real page. `test/silent-defects.test.ts` now
+rejects any `el(` call given two arguments or a first argument that is not markup.
+⚠️ **THAT GUARD ESCAPED ITS OWN RE-BREAK FIRST**, because its scope started at `el`'s definition and
+`planMoment` is declared **earlier** in the file — so it reported clean against the exact break it
+exists for. Widened to the whole app block, at which point it flagged **its own explanatory comment**
+(the twelfth firing of comment-quotes-what-it-forbids) and needed comments stripped.
+⚠️ **AND STRIPPING THEM HIT THE 10 KB BLIND WINDOW.** `accept="image/*"` is an unbalanced block-comment
+opener mid-line, so an unanchored `/* … */` sweep eats 10,382 characters of live code — a guard with a
+ten-kilobyte blind spot reports clean for anything inside it. Anchored to the start of a line and proved
+with the `id="s_easypace"` landmark, exactly as this file prescribes.
+
+### The guard that carries the claim is derived AND driven
+
+For each of the **four status cards × four race distances**, every day the picker offers must build a
+**distinguishable** plan (compared as an `Nr/Ms` shape through the real `generatePlan`), and nothing
+withheld above the top offer may build something new. So the offered set cannot drift from what the
+engine does in either direction, and a future change to the beginner cap fails here rather than
+re-creating the report.
+
+⚠️ **THREE EXISTING GUARDS BROKE ON CHARACTER WINDOWS** — `doSaveProfile` grew past a 4000-char slice and
+past a 5000-char one, and `plan-moment`'s own 3000-char window closed early. All brace-matched now
+(`fnOf`). **A character window is not a function**, for the thirteenth time in this file.
+⚠️ **AND TWO OF MY OWN NEW GUARDS WERE STALE-SCOPED WITHIN THE HOUR** — one pinned a literal expression
+that the extraction moved, one counted a caller whose form is `.forEach(bindSegButtons)`.
+
+### ⚠️ HIS TRACK IS AN INFERENCE I NEVER CONFIRMED
+
+I asked him to read his own profile row back to me (*"if it says 4 or 5, tell me — because then you're
+not on the beginner track and I've got the wrong end of this"*) and shipped without the answer, because
+every fix here is correct on **any** track: the picker offers what the plan can use, whatever that is,
+and the four literals were a real duplication regardless. But **the diagnosis of his particular report
+rests on him being a beginner-track runner**, and that is unconfirmed.
+
+### Open, and deliberately not done
+
+⚠️ **`wizVariants`' CANDIDATE LISTS ARE NOT FILTERED THROUGH `runningDayChoices`.** The design called it
+cheap insurance; it is a separate surface with its own guards and it does not currently offer a day
+count at all, so nothing is wrong today. It is the place a fifth copy would appear.
+⚠️ **`assessFeasibility` PROMISES IMPROVEMENT FOR DAYS THE PLAN IGNORES — measured 143 s across day
+counts whose beginner plans are byte-identical.** `daysFactor` is `0.8 + 0.06 × (days − 3)` and reads the
+raw answer, so a beginner told "6 days" was quoted a goal ~6% more optimistic on the strength of runs
+they will never be given. **Not fixed here**: it is a projection change needing its own sweep and proof,
+and this file already records the same shape of defect being found in that function's day handling once
+before.

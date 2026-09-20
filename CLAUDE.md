@@ -14566,3 +14566,88 @@ inside this test.
 **Still to come in this track (see `PLAN.md`):** A2 the exercise library (17 → 60+, and the Learn hub's
 duplicate catalogue deleted), A3 preferences, A4 swap, A5 the session player with rest timers, A6 e1RM
 and progression, A7 standalone programmes, A8 Strava as Weight Training, A9 the watch.
+
+## ✅ A2 — ONE EXERCISE CATALOGUE, GROWN TO 62 AND MADE BROWSABLE (2026-09-20)
+
+The exercise library was TWO catalogues, not one. `EX` in `session-templates.ts` (17 entries, built
+sessions) and `STRENGTH_LIB` in `web/app.ts` (a separate hand-picked ~20, taught the Learn hub) — a
+cue fixed in one never reached the other, and neither could answer "what can I do with a kettlebell",
+which A3's preferences stage needs to ask. Suite 1546 → **1561**; `test/strength-library.test.ts` holds
+15 guards and **9 deliberate re-breaks, all 9 caught** (two only after the guard, and the re-break
+itself, were fixed — those two are below).
+
+⚠️⚠️ **THE OLD LEARN HUB COULD ONLY EVER SHOW THE EXERCISES SOMEBODY HAD DRAWN ART FOR.** `exCard()`
+returned `""` for anything with no bespoke `.webp`, so 62 exercises would have rendered as 16 cards
+with a lot of silent gaps. `exVisual()` — the same renderer the session sheet already uses — already
+falls back to a schematic figure for the movement's PATTERN, so reusing it instead of writing a second
+card renderer is what makes all 62 show a demonstration today, whether or not their own animation
+exists yet.
+
+`src/strength/library.ts` is the one definition now: `EXERCISES` (62 entries, up from 17), `EQUIPMENT`
+(Runna's nine: bodyweight/bands/barbell/box/bench/dumbbell/kettlebell/pullUpBar/swissBall), `PATTERNS`
+(13, up from 10 — pull, carry and rotate are new), `alternativesFor(id, owned)` for A4's swap.
+`session-templates.ts`'s `mkEx` now resolves against it; `web/entry.ts` exports the library surface
+directly rather than through the engine module. **Every equipment tag has ≥2 exercises and every
+pattern has ≥2** — checked, not assumed, because a filter with no coverage is "a dead end wearing the
+clothes of a feature" (this app's own rule for the Logbook's filters, applied here).
+
+⚠️ **THREE NEW POSES NEEDED HAND-DRAWN COORDINATES, AND I LOOKED AT THEM BEFORE TRUSTING THEM.**
+`pull` reuses the `hinge` stance (a bent-over row is the same body position, a different arm path);
+`carry` alternates the STRIDE while the arm stays locked at the side in both frames (a loaded carry
+doesn't move the load, it moves the legs); `rotate` sweeps the arm from low on one side to high on the
+other. Screenshotted all three in a real browser: pull and hinge render as the same kind of solid
+silhouette at thumbnail size (confirmed by comparing against the EXISTING, already-shipped
+`Single-leg RDL`/`Kettlebell deadlift` cards, which use the untouched `hinge` pose and look identical
+— not a regression I introduced, just what this rig does at 82px for any bent-over stance); carry and
+rotate both read clearly as their movements.
+
+⚠️⚠️ **THE EQUIPMENT FILTER IS "OR", NOT "AND" — and combined with full coverage, that makes its own
+"nothing matches" message provably unreachable.** A runner with dumbbells AND a kettlebell wants
+exercises using EITHER, so ticking two tags only ever grows the visible set from ticking one — and
+since every tag alone already guarantees ≥1 match, no real combination of ticks can ever be empty. I
+wrote the "nothing matches, try clearing a filter" message anyway on the first pass, then drove it in
+a real browser and found there was no way to reach it: `bench + pullUpBar` (a combo I picked because
+it sounded narrow) returned four groups, because OR unions rather than intersects. **Deleted rather
+than kept as defensive code** — an untestable branch for a state the UI cannot reach is worse than no
+branch, and the comment left in its place says exactly why, so a future change to the semantics (an
+AND filter, a poorly-covered new tag) knows it needs one back.
+
+⚠️ **A GUARD'S OWN TRAILING WORD BOUNDARY COULDN'T CATCH AN INFLECTED FORM.** The copy sweep for
+"prevents injury / guarantee / cure" used `\bguarantee\b` — and the character right after "guarantee"
+in "guarantees" or "guaranteed" is a word character, so the trailing `\b` never fires and the whole
+match fails. Caught only by re-breaking with a real sentence ("This guarantees you never get
+injured.") rather than the bare word. Fixed by dropping the trailing boundary on the open-ended stems
+and letting `\w*` absorb the suffix, keeping the LEADING boundary so it still can't fire inside an
+unrelated word like "obscure".
+
+⚠️ **AND MY FIRST RE-BREAK OF THE COVERAGE GUARD WASN'T SEVERE ENOUGH TO TEST WHAT IT PROTECTS.**
+Removing `barbell` from one of its ten exercises left nine — nowhere near the ≥2 floor the guard
+actually checks, so it correctly stayed green and I nearly logged that as an escape. Redone properly
+(barbell down to exactly one exercise) and it failed exactly where it should. **A re-break has to cross
+the boundary the guard is testing, not just perturb the code near it.**
+
+⚠️ **`.excard`/`.excard-img`/`.excard-b`/`.excard-n`/`.excard-m`/`.excard-c` WENT WITH `exCard()`,
+DELETED RATHER THAN LEFT — an orphaned rule is what the next screen copies.** The replacement
+(`.lib-card`, `.lib-cb`, `.lib-cn`, `.lib-cm`, `.lib-cc`, `.lib-ceq`, `.lib-eqf`, `.lib-eqc`) uses the
+same visual values on the design-system LADDER (`var(--s2)`, `var(--r-card)`, `var(--r-pill)`,
+`var(--t-card)`, `var(--tap)`) instead of the old off-ladder literals — both ratchets (radii, font
+sizes) are unchanged or improved, because this stage net-removed off-ladder rules rather than adding
+any.
+
+⚠️ **THE `plank` ENTRY'S NAME CHANGED FROM "Plank + side plank" TO "Plank"** — side plank is now its
+own catalogue entry (`sidePlank`, with the "side-plank.webp" asset that existed on disk but was never
+referenced by anything). This is a display-name change, not an id change: the id `plank` is unchanged
+and every logged set against it still resolves. Checked that nothing in `test/`, `src/` or the built
+page depended on the old combined string.
+
+⚠️ **BACKTICKS FIRED AGAIN, TWICE, ONCE IN `session-templates.ts` (HARMLESS — that file is ordinary
+TypeScript with 119 pre-existing backticks, not the template-literal-delimited `web/app.ts`) AND ONCE
+IN THE NEW POSES COMMENTS (real — the build failed, exit code read, both fixed).** Worth restating the
+scope precisely: the no-backticks rule is about `web/app.ts`'s runtime JS specifically, not every file
+in the repo — checking WHICH file a backtick landed in before treating it as a defect saved chasing a
+non-issue in `session-templates.ts`.
+
+**Still to come in this track:** A3 preferences (sessions/week, minutes, level, equipment owned —
+reads what A2 now exposes) and the engine builder that respects them, A4 swap (built on
+`alternativesFor`, already shipped here), A5 the session player, A6 e1RM and progression, A7
+standalone programmes, A8 Strava as Weight Training, A9 the watch.

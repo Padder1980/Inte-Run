@@ -1865,30 +1865,15 @@ export function raceSpecificSession(paces: TrainingPaces, variant = 0, ctx: Form
 
 // ---- Strength / mobility / cross-training / rest --------------------------
 
-// Exercise catalog: name, target muscles, movement pattern (for the demo animation) and a form cue.
-// `anim` is the slug of a looping demonstration animation (assets/exercise-animations/<slug>.webp),
-// inlined into the app at build time; the UI falls back to the schematic figure when it's absent.
-type ExDef = { name: string; primary: string; secondary: string[]; pattern: string; cue: string; anim?: string };
-const EX: Record<string, ExDef> = {
-  squat: { name: "Goblet / bodyweight squat", primary: "Quads", secondary: ["Glutes", "Core"], pattern: "squat", anim: "goblet-squat", cue: "Sit your hips back and down, knees tracking over your toes, chest tall. Drive up through your heels." },
-  stepUp: { name: "Step-up", primary: "Quads", secondary: ["Glutes"], pattern: "squat", anim: "step-up", cue: "Drive through the top foot to stand tall, then lower with control. Start with a low step." },
-  splitSquat: { name: "Split squat", primary: "Quads", secondary: ["Glutes"], pattern: "lunge", anim: "split-squat-dumbbell", cue: "Feet split front-to-back. Lower straight down, front knee over the foot; push back up." },
-  lunge: { name: "Reverse lunge", primary: "Quads", secondary: ["Glutes", "Core"], pattern: "lunge", anim: "reverse-lunge", cue: "Step back and lower the back knee toward the floor; push through the front heel to return." },
-  rdl: { name: "Romanian deadlift", primary: "Hamstrings", secondary: ["Glutes", "Lower back"], pattern: "hinge", anim: "romanian-deadlift-dumbbell", cue: "Soft knees, push your hips back with a flat back until you feel the hamstrings, then stand tall." },
-  gluteBridge: { name: "Glute bridge", primary: "Glutes", secondary: ["Hamstrings"], pattern: "bridge", anim: "glute-bridge", cue: "Drive your hips up by squeezing your glutes, pause at the top, lower slowly." },
-  clamshell: { name: "Clamshell", primary: "Glutes", secondary: ["Hips"], pattern: "bridge", anim: "clamshell", cue: "On your side, knees bent, lift the top knee while keeping your feet together and hips still." },
-  calf: { name: "Calf raise", primary: "Calves", secondary: [], pattern: "calf", anim: "standing-calf-raise", cue: "Rise onto the balls of your feet, pause at the top, lower slowly under control." },
-  soleus: { name: "Bent-knee calf raise", primary: "Soleus", secondary: ["Calves"], pattern: "calf", anim: "single-leg-standing-calf-raise", cue: "Same as a calf raise but with knees slightly bent, to reach the deeper soleus muscle." },
-  plank: { name: "Plank + side plank", primary: "Core", secondary: ["Shoulders"], pattern: "plank", anim: "plank", cue: "Straight line from head to heels. Brace your abs and glutes; don't let the hips sag." },
-  deadbug: { name: "Dead bug", primary: "Core", secondary: [], pattern: "core", anim: "dead-bug", cue: "On your back, slowly lower an opposite arm and leg while keeping your lower back pressed down." },
-  birddog: { name: "Bird-dog", primary: "Core", secondary: ["Glutes"], pattern: "core", anim: "bird-dog", cue: "On hands and knees, extend an opposite arm and leg, stay level, then switch sides." },
-  // anim is pre-wired: the artwork doesn't exist yet, so this falls back to the schematic figure and
-  // activates automatically once assets/exercise-animations/single-leg-balance.webp is added.
-  balance: { name: "Single-leg balance", primary: "Ankles", secondary: ["Core"], pattern: "balance", anim: "single-leg-balance", cue: "Stand tall on one leg and stay steady. Progress by closing your eyes or standing on something soft." },
-  pushup: { name: "Push-up (incline if needed)", primary: "Chest", secondary: ["Triceps", "Core"], pattern: "push", anim: "push-up", cue: "Hands under shoulders, body in a straight line. Lower with control, then press away." },
-  pogo: { name: "Pogo hops", primary: "Calves", secondary: [], pattern: "jump", anim: "pogo-hops", cue: "Small, springy hops off the balls of your feet — stiff ankles, minimal time on the ground." },
-  boxjump: { name: "Box / hurdle jump", primary: "Quads", secondary: ["Glutes", "Calves"], pattern: "jump", anim: "box-jump", cue: "Explode up, land soft and quiet with bent knees. Full recovery between jumps — quality over fatigue." },
-};
+/**
+ * ⚠️ THE CATALOGUE LIVES IN strength/library.ts NOW, NOT HERE. It used to be a 17-entry `EX` local to
+ * this file, and web/app.ts kept a SECOND, independent list (`STRENGTH_LIB`) for the Learn hub — so a
+ * cue fixed in one never reached the other, and neither could answer "what needs no equipment". One
+ * definition, grown to 60+ entries with equipment and level tags a builder or a browsable page can
+ * both read. `mkEx` below is unchanged in shape; it just resolves against the shared library.
+ */
+import { EXERCISES, exerciseById, exerciseIds } from "../strength/library.ts";
+export { exerciseById, exerciseIds };
 
 function mkEx(
   key: string,
@@ -1896,28 +1881,12 @@ function mkEx(
   reps: string,
   extra: { loadPercent1RM?: string; contacts?: number } = {},
 ): StrengthExercise {
-  const d = EX[key]!;
+  const d = EXERCISES[key]!;
   // ⚠️ THE CATALOGUE KEY *IS* THE ID. One source, so an exercise cannot be given a second name by a
   // builder, and `exerciseById` can resolve a logged row without the plan it was logged against.
   return { id: key, name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern,
     anim: d.anim, cue: d.cue, sets, reps, ...extra };
 }
-
-/**
- * Look up an exercise by its stable id, for readers holding a logged row rather than a session.
- *
- * ⚠️ THIS IS WHAT LETS THE SET LOG SURVIVE A PLAN REBUILD. The history screen used to re-resolve every
- * logged set through `RAW.weeks[...].exercises[index]`, so a rebuilt plan orphaned the lot. It asks
- * here instead, and a row for an exercise no longer in the catalogue degrades to showing its id rather
- * than vanishing.
- */
-export function exerciseById(id: string): { id: string; name: string; primary: string; secondary: string[]; pattern: string; anim?: string; cue: string } | null {
-  const d = EX[id];
-  return d ? { id, name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern, anim: d.anim, cue: d.cue } : null;
-}
-
-/** Every exercise id the catalogue defines, so a guard can sweep them rather than list them. */
-export function exerciseIds(): string[] { return Object.keys(EX); }
 
 /**
  * The plyometric dose, and why it is a table rather than the two lines it replaced.

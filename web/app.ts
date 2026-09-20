@@ -1766,16 +1766,23 @@ html.kbup .sheet-ov { padding-bottom: var(--kbh, 0px); }
 .lib-g { margin-top: 18px; }
 .lib-gh h3 { margin: 0 2px 3px; font-size: 16.5px; font-weight: 740; letter-spacing: -.02em; color: var(--ink); }
 .lib-gh p { margin: 0 2px 10px; font-size: 12.5px; line-height: 1.5; color: var(--ink-faint); }
-.lib-grid { display: flex; flex-direction: column; gap: 9px; }
-.excard { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 10px; font: inherit; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-radius: 15px; box-shadow: var(--shadow); transition: border-color .14s ease, transform .12s ease; }
-.excard:active { transform: scale(.99); }
-.excard:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
-.excard-img { position: relative; flex: 0 0 auto; width: 82px; height: 82px; border-radius: 11px; overflow: hidden; background: #fff; border: 1px solid var(--line); }
-.excard-img img { width: 100%; height: 100%; object-fit: contain; }
-.excard-b { display: flex; flex-direction: column; min-width: 0; padding-top: 2px; }
-.excard-n { font-size: 14.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
-.excard-m { margin-top: 1px; font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
-.excard-c { margin-top: 5px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+.lib-grid { display: flex; flex-direction: column; gap: var(--s3); }
+/*
+ * ⚠️ .excard/.excard-img/.excard-b/... ARE GONE, NOT LEFT BEHIND. They rendered exCard(), which this
+ * stage deleted (it skipped any exercise with no bespoke animation, so the old 20-item hand-picked
+ * list was the only thing the page could ever show). An orphaned rule is what the next screen copies.
+ * .lib-card below reuses the SAME visual values, on the ladder this time, rather than inventing new
+ * off-ladder ones for a page that had none before.
+ */
+.lib-card { display: flex; gap: var(--s3); align-items: flex-start; width: 100%; text-align: left; padding: var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); box-shadow: var(--shadow); }
+.lib-cb { display: flex; flex-direction: column; min-width: 0; padding-top: 2px; }
+.lib-cn { font-size: var(--t-card); font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.lib-cm { margin-top: 1px; font-size: var(--t-meta); font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.lib-cc { margin-top: var(--s1); font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
+.lib-ceq { margin-top: var(--s1); font-size: var(--t-meta); color: var(--ink-faint); }
+.lib-eqf { display: flex; flex-wrap: wrap; gap: var(--s2); margin: 0 2px var(--s4); }
+.lib-eqc { flex: none; padding: var(--s2) var(--s3); min-height: var(--tap); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 700; cursor: pointer; }
+.lib-eqc.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 /* Guides: expandable explainers */
 .gd-list { display: flex; flex-direction: column; gap: 9px; }
 .gd { background: var(--surface); border: 1px solid var(--line); border-radius: 15px; box-shadow: var(--shadow); overflow: hidden; }
@@ -10673,6 +10680,29 @@ const POSES = {
     { head: [34, 72], hip: [82, 76], knee: [96, 98], ankle: [108, 100], el: [38, 92], ha: [38, 104] },
     { head: [32, 66], hip: [82, 74], knee: [98, 60], ankle: [114, 52], el: [24, 58], ha: [10, 50] },
   ],
+  // Three new patterns for the grown exercise library, added the same shape as the ones above: a
+  // resting position, then the same body worked — arm/leg positions differ, the standing frame does
+  // not, so all three read as this figure doing something rather than as three new figures.
+  // Pull: the SAME hinged stance as hinge, an arm hanging low then driven back and up past the
+  // ribs — a bent-over row rather than a different body position.
+  pull: [
+    { head: [98, 58], hip: [62, 76], knee: [62, 101], ankle: [64, 124], el: [90, 88], ha: [84, 106] },
+    { head: [98, 58], hip: [62, 76], knee: [62, 101], ankle: [64, 124], el: [78, 68], ha: [70, 62] },
+  ],
+  // Carry: upright and walking — the legs alternate stride (via knee2/ankle2, same device lunge
+  // uses) while the arm stays LOCKED straight down at the side in both frames, because a loaded
+  // carry is exactly that: the load does not move, the stride does.
+  carry: [
+    { head: [60, 26], hip: [60, 80], knee: [54, 104], ankle: [48, 124], el: [49, 64], ha: [46, 92], knee2: [66, 100], ankle2: [74, 118] },
+    { head: [60, 26], hip: [60, 80], knee: [66, 100], ankle: [74, 118], el: [49, 64], ha: [46, 92], knee2: [54, 104], ankle2: [48, 124] },
+  ],
+  // Rotate: upright stance, hands swinging together from low on one side to high on the other — a
+  // woodchop or a twist, read from the arm sweeping across the body rather than a torso joint this
+  // rig has no way to draw.
+  rotate: [
+    { head: [60, 26], hip: [60, 80], knee: [60, 102], ankle: [60, 124], el: [78, 70], ha: [86, 92] },
+    { head: [54, 24], hip: [54, 80], knee: [58, 102], ankle: [60, 124], el: [38, 56], ha: [30, 38] },
+  ],
   // Post-run stretch positions. Each pair is "arriving" then "settled", so the cross-fade reads as
   // easing INTO the hold rather than as a repetition — a stretch that bobs looks like an exercise.
   // ⚠️ Placeholders for the demonstration video, not a substitute for it: they exist so every stretch
@@ -19421,70 +19451,56 @@ function supportDetail(id) {
 }
 // ---- Strength & mobility library -------------------------------------------
 // Grouped by movement pattern rather than muscle: that's how the plan prescribes them, and it makes
-// the "pick one from each group" logic obvious. Every entry maps to a real animation asset.
-const STRENGTH_LIB = [
-  { g: "Squat", why: "Loads the quads and glutes through a deep knee bend — the base of nearly every strength plan.", items: [
-    { s: "goblet-squat", n: "Goblet squat", m: "Quads, glutes", c: "Hold the weight at your chest, sit between your hips, knees tracking over your toes." },
-    { s: "split-squat-dumbbell", n: "Split squat", m: "Quads, glutes", c: "Back knee drops straight down. Most of the weight through the front heel." },
-  ] },
-  { g: "Hinge", why: "Trains the hamstrings and glutes to produce force with a long lever — the pattern that drives you forward.", items: [
-    { s: "romanian-deadlift-dumbbell", n: "Romanian deadlift", m: "Hamstrings, glutes", c: "Push your hips back, not down. Soft knees, flat back, feel the hamstrings load." },
-    { s: "glute-bridge", n: "Glute bridge", m: "Glutes", c: "Drive through the heels and squeeze at the top. Ribs down — don't arch the lower back." },
-  ] },
-  { g: "Single leg", why: "Running is a series of single-leg hops. Training one side at a time exposes and fixes asymmetries.", items: [
-    { s: "step-up", n: "Step-up", m: "Glutes, quads", c: "Drive through the top foot; don't push off the trailing leg. Control the way down." },
-    { s: "reverse-lunge", n: "Reverse lunge", m: "Glutes, quads", c: "Step back, drop the knee, then drive back to standing. Kinder on the knees than a forward lunge." },
-    { s: "clamshell", n: "Clamshell", m: "Glute medius", c: "Hips stacked, heels together, open the top knee without rolling backwards." },
-  ] },
-  { g: "Calf", why: "The calf and Achilles handle huge loads every stride. Strong calves are among the best protections against Achilles and shin problems.", items: [
-    { s: "standing-calf-raise", n: "Straight-leg calf raise", m: "Gastrocnemius", c: "Full range: heel below the step, then all the way up. Slow on the way down." },
-    { s: "single-leg-standing-calf-raise", n: "Bent-knee / single-leg raise", m: "Soleus", c: "A soft knee shifts the work to the soleus — the muscle that takes most of the running load." },
-  ] },
-  { g: "Core", why: "Not about abs: about resisting movement so the force you make with your legs isn't lost through a wobbly middle.", items: [
-    { s: "plank", n: "Plank", m: "Deep core", c: "Straight line from head to heels. Squeeze the glutes; don't let the hips sag." },
-    { s: "side-plank", n: "Side plank", m: "Obliques, glute medius", c: "Stack the shoulders and hips. Lift the bottom hip rather than resting on it." },
-    { s: "dead-bug", n: "Dead bug", m: "Deep core", c: "Lower opposite arm and leg slowly, keeping the lower back flat on the floor." },
-    { s: "bird-dog", n: "Bird-dog", m: "Deep core, glutes", c: "Reach long, not high. Keep the hips level — imagine balancing a glass on your lower back." },
-  ] },
-  { g: "Push", why: "Upper-body strength keeps your arm drive and posture intact when you're tired late in a race.", items: [
-    { s: "push-up", n: "Push-up", m: "Chest, triceps", c: "Body in one line, elbows at about 45 degrees — not flared straight out." },
-    { s: "incline-push-up", n: "Incline push-up", m: "Chest, triceps", c: "Hands raised makes it easier. Work down to a lower surface as you get stronger." },
-  ] },
-  { g: "Balance", why: "Running is a series of single-leg landings. Steadying one leg trains the ankle and hip stabilisers that keep you tracking straight.", items: [
-    // Pre-wired: exCard renders nothing until single-leg-balance.webp exists, then this appears.
-    { s: "single-leg-balance", n: "Single-leg balance", m: "Ankles, glute medius", c: "Stand tall on one leg and stay steady. Progress by closing your eyes or standing on something soft." },
-  ] },
-  { g: "Plyometric", why: "Trains tendon stiffness and elastic return — cheap speed. Introduce these only once you're running comfortably.", items: [
-    { s: "box-jump", n: "Box jump", m: "Whole chain", c: "Land soft and quiet, knees tracking out. Step down — don't jump down." },
-    { s: "pogo-hops", n: "Pogo hops", m: "Calves, Achilles", c: "Small, springy hops off the balls of your feet — stiff ankles, minimal ground contact." },
-  ] },
-];
-function exCard(it) {
-  const still = EX_STILL[it.s] || EX_ANIM[it.s];
-  if (!still) return "";
-  return '<button class="excard" data-exdemo="' + it.s + '" data-exname="' + esc(it.n) + '">' +
-    '<span class="excard-img"><img src="' + still + '" alt="' + esc(it.n) + '" loading="lazy" draggable="false"><span class="ex-play">' + ICON.play + '</span></span>' +
-    '<span class="excard-b"><span class="excard-n">' + esc(it.n) + '</span><span class="excard-m">' + esc(it.m) + '</span>' +
-    '<span class="excard-c">' + esc(it.c) + '</span></span></button>';
+// the "pick one from each group" logic obvious.
+/**
+ * ⚠️ THE CARD RENDERER FOR THE LEARN HUB IS exerciseBlock's VISUAL HALF, exVisual() — SHARED WITH
+ * THE SESSION SHEET, NOT A SECOND ONE. The old exCard() returned "" for any exercise with no bespoke
+ * .webp, which is why the whole library page could only ever show the handful of movements someone had
+ * drawn. exVisual() already falls back to the schematic figure for the movement's PATTERN, so all 62
+ * exercises get a demonstration whether or not their own animation exists yet.
+ */
+function libCard(e) {
+  return '<div class="lib-card"><span class="ex-anim">' + exVisual(e) + '</span>' +
+    '<span class="lib-cb"><span class="lib-cn">' + esc(e.name) + '</span>' +
+    '<span class="lib-cm">' + esc(e.primary) + (e.secondary && e.secondary.length ? ", " + e.secondary.map(esc).join(", ") : "") + '</span>' +
+    '<span class="lib-cc">' + esc(e.cue) + '</span>' +
+    '<span class="lib-ceq">' + e.equipment.map((q) => esc(RC.EQUIPMENT_LABEL[q] || q)).join(" · ") + '</span></span></div>';
 }
+/**
+ * Which equipment tags the runner has ticked on this screen. Session-only, not saved: this is a
+ * browsing filter over a reference page, not a training preference — A3 is where "what do you own"
+ * becomes a real profile answer the plan generator reads.
+ */
+let LIB_FILTER = [];
 function strengthView() {
-  // Skip a group whose artwork doesn't exist yet — exCard returns "" for a missing asset, and a
-  // heading with no cards under it looks broken.
-  const groups = STRENGTH_LIB.map((g) => {
-    const cards = g.items.map(exCard).join("");
-    if (!cards) return "";
-    return '<div class="lib-g"><div class="lib-gh"><h3>' + esc(g.g) + '</h3><p>' + esc(g.why) + '</p></div>' +
-      '<div class="lib-grid">' + cards + '</div></div>';
+  const all = RC.exerciseIds().map((id) => RC.exerciseById(id));
+  const groups = RC.PATTERNS.map((pat) => {
+    const items = all.filter((e) => e.pattern === pat &&
+      (!LIB_FILTER.length || e.equipment.some((q) => LIB_FILTER.indexOf(q) >= 0)));
+    if (!items.length) return "";
+    return '<div class="lib-g" data-libg="' + pat + '"><div class="lib-gh"><h3>' + esc(RC.PATTERN_LABEL[pat]) + '</h3><p>' + esc(RC.PATTERN_WHY[pat]) + '</p></div>' +
+      '<div class="lib-grid">' + items.map(libCard).join("") + '</div></div>';
   }).join("");
+  // ⚠️ TICKING SEVERAL TAGS IS "OR", NOT "AND" — a runner with dumbbells AND a kettlebell wants
+  // exercises using EITHER, not only ones that need both at once. Combined with every tag having real
+  // coverage on its own (checked when the library was written: none is a dead end), that guarantees
+  // the visible set can never be empty once at least one tag is ticked — so there is deliberately NO
+  // "nothing matches" message. An untestable branch for a state the UI cannot reach is worse than no
+  // branch; if that guarantee is ever loosened (an AND filter, a poorly-covered new tag), it needs one.
+  const eqChips = '<div class="lib-eqf" role="group" aria-label="Filter by what you have">' + RC.EQUIPMENT.map((q) => {
+    const on = LIB_FILTER.indexOf(q) >= 0;
+    return '<button class="lib-eqc' + (on ? " on" : "") + '" data-libeq="' + q + '" aria-pressed="' + on + '">' + esc(RC.EQUIPMENT_LABEL[q]) + '</button>';
+  }).join("") + '</div>';
   return '<div class="lib-hero"><div class="lib-eyebrow">Strength &amp; mobility</div>' +
     '<h2 class="lib-title">Two sessions a week is enough</h2>' +
-    '<p class="lib-lead">Heavy strength training is one of the best-evidenced ways to improve running economy and cut injury risk \— and at these volumes it won\\u2019t make you bulky or leave you too sore to run.</p></div>' +
+    '<p class="lib-lead">Heavy strength training is one of the best-evidenced ways to improve running economy and cut injury risk \\u2014 and at these volumes it won\\u2019t make you bulky or leave you too sore to run.</p></div>' +
     '<div class="card lib-facts">' +
     '<div class="lf"><b>2\\u00d7 a week</b><span>Enough to get nearly all the benefit</span></div>' +
     '<div class="lf"><b>4\\u20136 reps</b><span>Heavy and controlled beats high-rep burn</span></div>' +
     '<div class="lf"><b>After a run</b><span>Same day as quality, not the day before</span></div>' +
     '</div>' +
-    '<div class="lib-note">Tap any movement to watch it.</div>' +
+    '<div class="lib-note">Tick what you have, then tap any movement to watch it.</div>' +
+    eqChips +
     groups +
     '<div class="card guide-body" style="margin-top:14px"><div class="subhead" style="margin-top:0">How to build a session</div>' +
     '<p>Pick <b>one from each group</b> \— a squat, a hinge, a single-leg movement, calves and core. Six exercises, three sets each, about 40 minutes.</p>' +
@@ -37938,6 +37954,15 @@ function wire() {
   document.querySelectorAll("[data-hub]").forEach((b) => b.onclick = () => { if (b.dataset.hub === "alfie") { openAlfie(); return; } state.support = b.dataset.hub; state.supportFrom = null; render(); });
   // Support library pages: play any movement, expand any guide.
   wireExDemos();
+  // Strength library: tick equipment on/off, re-render. Session-only (LIB_FILTER), same pattern as
+  // the Logbook's own filter row — a full render() rather than a surgical DOM patch, because ticking
+  // a box changes which whole pattern-groups exist, not just which cards within one do.
+  document.querySelectorAll("[data-libeq]").forEach((b) => b.onclick = () => {
+    const q = b.dataset.libeq;
+    const i = LIB_FILTER.indexOf(q);
+    if (i >= 0) LIB_FILTER.splice(i, 1); else LIB_FILTER.push(q);
+    render();
+  });
   document.querySelectorAll("[data-gd]").forEach((g) => { const h = g.querySelector(".gd-h"); if (h) h.onclick = () => g.classList.toggle("on"); });
   const gAlfie = $("guidesAlfie"); if (gAlfie) gAlfie.onclick = openAlfie;
   const guideReplay = $("guideReplay"); if (guideReplay) guideReplay.onclick = () => openSessionGuide(GUIDE_EXAMPLE, { fromSupport: true });

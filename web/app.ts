@@ -6270,6 +6270,29 @@ const ADJUST_KEY = "interun_adjust_v1";
  * SHARE_EVEN_SPREAD_S. A store key belongs where the store keys are.
  */
 const CLUBPROF_KEY = "interun_clubprofile_v1";
+/**
+ * ⚠️ DECLARED HERE, WITH THE OTHER STORE KEYS, FOR THE THIRD TIME AND THE SAME REASON. migrateSlog
+ * runs from inside adoptPlan, which recompute() calls at module top level; a key declared beside its
+ * own functions five thousand lines below would be read in its temporal dead zone, throw, and be
+ * swallowed by the try/catch around it — exactly what JOURNAL_KEY and CLUBPROF_KEY above record.
+ *
+ * The set log, and why it was rewritten. v1 (interun_slog, still read once by the migration and never
+ * written again) keyed a logged set on sessionId|exerciseIndex|setIndex with NO DATE, and resolved it
+ * back through the live plan. Rebuild the plan and the index moved, so every row was dropped in
+ * silence. v2 is a flat list of dated rows keyed on the exercise's own id:
+ *   { d: "yyyy-mm-dd", s: sessionId, x: exerciseId, i: setIndex, w: kg, r: reps, at: epochMs, m?: 1 }
+ * d is REQUIRED, not decoration: session ids are deterministic (w3d2-strength) and recur across
+ * rebuilds on different dates, so (s, x, i) alone collides with a different day's work. m marks a row
+ * carried over by the migration, whose date is the session's PLANNED date rather than an observed one.
+ */
+const SLOG2_KEY = "interun_slog_v2";
+/**
+ * ⚠️ A CAP, BECAUSE THE STORE IS localStorage AND THAT IS WHERE THE WHOLE TRAINING HISTORY LIVES.
+ * A row is about 70 bytes, so 12,000 is roughly four years at three sessions a week with eight sets a
+ * session, for under a megabyte. Pruning folds the dropped rows' maxima into bests first (below), so
+ * an all-time best is never lowered by housekeeping.
+ */
+const SLOG_MAX_ROWS = 12000;
 // ⚠️ Roughly the range shoe manufacturers themselves quote. It is a REMINDER, NOT A RULE, and the
 // copy must never claim that replacing a shoe on schedule prevents injury — the evidence does not
 // support it, and this app sits beside a RED-S screen where an unsupportable claim costs the
@@ -7130,6 +7153,9 @@ function adoptPlan(out) {
   // record because it was adopted by the other path. And inside a try, like the two syncs above — losing
   // a journal row must never cost somebody their plan.
   try { journalSync(); } catch (e) {}
+  // ⚠️ AFTER RAW IS SET, because it resolves v1 rows through the live plan. Guarded by meta.migratedAt,
+  // so the rebuild that happens on every launch runs it exactly once.
+  try { migrateSlog(); } catch (e) {}
 }
 function recompute() { adoptPlan(applyProfile(profile)); }
 
@@ -10863,7 +10889,7 @@ function stretchSheetHtml() {
     stretchVideoHtml() +
     '<p class="muted str-intro">' + esc(RC.STRETCH_INTRO) + '</p>' +
     '<div class="ex-list str-list" id="strList">' +
-    rows.map((e, i) => '<div class="str-item" data-si="' + i + '">' + exerciseBlock("stretch", i, e) + '</div>').join("") +
+    rows.map((e, i) => '<div class="str-item" data-si="' + i + '">' + exerciseBlock("stretch", "", e) + '</div>').join("") +
     '</div>' +
     // ⚠️ mini-btn is an EXISTING class. The first cut invented a "ghost" class that does not exist in
     // this stylesheet, so the button rendered as an unstyled browser default and the primary's flex: 1
@@ -10951,19 +10977,128 @@ function stretchFinish() {
   haptic("success");
 }
 // ---- Strength logging (weights & reps, saved locally) ----------------------
-function loadSlog() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
-function slogSet(key, field, val) {
-  const s = loadSlog();
-  s[key] = s[key] || {};
-  if (val === "") delete s[key][field]; else s[key][field] = val;
-  if (!Object.keys(s[key]).length) delete s[key];
-  localStorage.setItem("interun_slog", JSON.stringify(s));
+/**
+ * v1, READ ONCE BY THE MIGRATION AND NEVER WRITTEN AGAIN. It is deliberately not deleted: it is the
+ * only copy of anything the migration could not resolve, and a store nobody writes costs nothing.
+ */
+function loadSlogV1() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
+/**
+ * ⚠️ THE STORE IS HELD IN MEMORY AND THE DISK WRITE IS DEBOUNCED, because the weight box writes on
+ * every KEYSTROKE. Re-parsing and re-stringifying the whole log per character costs most for exactly
+ * the runner who has used the app longest — the same reasoning state.hist records for the run
+ * history, and the same split the run-note field uses: keep the value synchronously, debounce only
+ * the disk. Every path that can lose the page flushes first.
+ */
+let SLOG = null;
+let SLOG_T = null;
+function slogAll() {
+  if (SLOG) return SLOG;
+  try {
+    const v = JSON.parse(localStorage.getItem(SLOG2_KEY) || "null");
+    SLOG = v && Array.isArray(v.rows) ? { rows: v.rows, bests: v.bests || {}, meta: v.meta || {} } : { rows: [], bests: {}, meta: {} };
+  } catch (e) { SLOG = { rows: [], bests: {}, meta: {} }; }
+  return SLOG;
+}
+function slogFlush() {
+  if (SLOG_T) { clearTimeout(SLOG_T); SLOG_T = null; }
+  if (!SLOG) return;
+  // ⚠️ PRUNING FOLDS WHAT IT DROPS INTO bests FIRST. Housekeeping must never lower an all-time best:
+  // the runner's heaviest squat is the one number here that may only ever go up. Rows stay the source
+  // of truth for everything else, so correcting a typo still lowers the figure — which is why bests is
+  // written HERE and not on every keystroke.
+  if (SLOG.rows.length > SLOG_MAX_ROWS) {
+    SLOG.rows.slice(SLOG_MAX_ROWS).forEach((r) => {
+      const w = parseFloat(r.w);
+      if (!(w > 0)) return;
+      const b = SLOG.bests[r.x];
+      if (!b || w > b.w) SLOG.bests[r.x] = { w: w, d: r.d };
+    });
+    SLOG.rows = SLOG.rows.slice(0, SLOG_MAX_ROWS);
+  }
+  try { localStorage.setItem(SLOG2_KEY, JSON.stringify(SLOG)); } catch (e) {}
+}
+function slogTouch() { if (SLOG_T) clearTimeout(SLOG_T); SLOG_T = setTimeout(slogFlush, 250); }
+/**
+ * Record one field of one set.
+ *
+ * ⚠️ A ROW IS IDENTIFIED BY (date, session, exercise, set) AND THE DATE IS PART OF IT. Session ids are
+ * deterministic, so w3d2-strength recurs in every rebuilt plan; without the date, a set logged in week
+ * 3 of the old plan and one logged in week 3 of the new plan are the same row and overwrite each other.
+ */
+function slogWrite(d, sid, x, i, field, val) {
+  const s = slogAll();
+  let row = null;
+  for (let k = 0; k < s.rows.length; k++) {
+    const r = s.rows[k];
+    if (r.d === d && r.s === sid && r.x === x && r.i === i) { row = r; break; }
+  }
+  if (!row) {
+    if (val === "") return;
+    row = { d: d, s: sid, x: x, i: i, at: Date.now() };
+    s.rows.unshift(row);
+  }
+  if (val === "") delete row[field]; else { row[field] = val; row.at = Date.now(); }
+  if (row.w == null && row.r == null) s.rows.splice(s.rows.indexOf(row), 1);
+  slogTouch();
+}
+/** What was logged against one instance of a session, keyed exerciseId|setIndex, for prefilling. */
+function slogForSession(d, sid) {
+  const out = {};
+  slogAll().rows.forEach((r) => { if (r.d === d && r.s === sid) out[r.x + "|" + r.i] = r; });
+  return out;
+}
+/** Every set ever logged for one exercise, newest first. */
+function slogFor(x) { return slogAll().rows.filter((r) => r.x === x); }
+/** Heaviest weight ever logged for an exercise, including rows since pruned. */
+function slogBest(x) {
+  const b = slogAll().bests[x];
+  let best = b && b.w > 0 ? b.w : 0;
+  slogFor(x).forEach((r) => { const w = parseFloat(r.w); if (w > best) best = w; });
+  return best;
+}
+/**
+ * Carry v1 rows across, once.
+ *
+ * ⚠️ IT RESOLVES EACH ROW THE WAY v1's OWN READER DID — through the live plan — because that is the
+ * only handle those rows have. Anything the current plan cannot resolve was ALREADY invisible (that
+ * reader's own skip-if-unresolvable dropped it silently), so nothing on screen is lost; the count is
+ * recorded in meta.skipped rather than shrugged off, and v1 is kept.
+ * ⚠️ THE DATE IS THE SESSION'S GENERATED DAY, NOT effDay. effDay reads state.dayOverride, and this
+ * runs from adoptPlan which recompute() calls at module top level — reaching into state from here is
+ * the boot-order trap three store keys above this one already record. genDay is pure. Rows carried
+ * over are stamped m:1 precisely because their date is a planned one rather than an observed one.
+ */
+function migrateSlog() {
+  const s = slogAll();
+  if (s.meta.migratedAt) return;
+  const v1 = loadSlogV1();
+  const keys = Object.keys(v1);
+  let moved = 0, skipped = 0;
+  for (let n = 0; n < keys.length; n++) {
+    const parts = keys[n].split("|");
+    const sid = parts[0], exIdx = Number(parts[1]), setIdx = Number(parts[2]);
+    const rec = v1[keys[n]] || {};
+    if (rec.w == null && rec.r == null) continue;
+    const wk = Number((sid.match(/^w(\\d+)/) || [])[1]);
+    const week = wk && PLAN && PLAN.weeks ? PLAN.weeks.find((w) => w.index === wk) : null;
+    const raw = wk && RAW && RAW.weeks && RAW.weeks[wk - 1] ? RAW.weeks[wk - 1].sessions.find((z) => z.id === sid) : null;
+    const ex = raw && raw.exercises ? raw.exercises[exIdx] : null;
+    if (!ex || !ex.id || !week) { skipped++; continue; }
+    const row = { d: isoAdd(week.startIso, genDay(raw)).toISOString().slice(0, 10), s: sid, x: ex.id, i: setIdx, at: Date.now(), m: 1 };
+    if (rec.w != null) row.w = rec.w;
+    if (rec.r != null) row.r = rec.r;
+    s.rows.push(row);
+    moved++;
+  }
+  s.rows.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : a.i - b.i));
+  s.meta = { migratedAt: new Date().toISOString(), migrated: moved, skipped: skipped };
+  slogFlush();
 }
 // ⚠️ ONE RENDERER, TWO MODES — an exercise is prescribed as sets x reps and gets weight/reps boxes to
 // log into; a STRETCH is prescribed as a hold and has nothing to log. Everything else about the row is
 // the same (the animated demo, the name, the area, the cue), so a stretch carries a hold field and takes the
 // same path rather than getting a parallel list renderer that would drift from this one within a release.
-function exerciseBlock(sessId, ei, e) {
+function exerciseBlock(sessId, iso, e) {
   if (e.hold) {
     const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
     // A stretch row carries the anatomical id — show its hold still, not the old schematic figure.
@@ -10974,15 +11109,15 @@ function exerciseBlock(sessId, ei, e) {
       '<div class="ex-presc">' + esc(e.hold) + '</div></div></div>' +
       '<div class="ex-cue">' + esc(e.cue) + '</div>';
   }
-  const log = loadSlog();
+  const log = slogForSession(iso, sessId);
   const setRows = [];
   for (let i = 0; i < e.sets; i++) {
-    const key = sessId + "|" + ei + "|" + i;
-    const rec = log[key] || {};
+    const rec = log[e.id + "|" + i] || {};
+    const at = ' data-d="' + esc(iso) + '" data-s="' + esc(sessId) + '" data-x="' + esc(e.id) + '" data-i="' + i + '"';
     setRows.push('<div class="ex-set"><span class="setn">Set ' + (i + 1) + '</span>' +
-      '<input class="set-in" inputmode="decimal" placeholder="kg" data-slog="' + key + '" data-f="w" value="' + (rec.w || "") + '">' +
+      '<input class="set-in" inputmode="decimal" placeholder="kg"' + at + ' data-f="w" value="' + (rec.w || "") + '">' +
       '<span class="ex-x">×</span>' +
-      '<input class="set-in" inputmode="numeric" placeholder="reps" data-slog="' + key + '" data-f="r" value="' + (rec.r || "") + '"></div>');
+      '<input class="set-in" inputmode="numeric" placeholder="reps"' + at + ' data-f="r" value="' + (rec.r || "") + '"></div>');
   }
   const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
   return '<div class="ex"><div class="ex-anim">' + exVisual(e) + '</div>' +
@@ -11271,7 +11406,7 @@ function sessionSheetHtml(sess, week) {
   if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
   let body;
   if (sess.exercises && sess.exercises.length) {
-    body = '<div class="ex-list">' + sess.exercises.map((e, ei) => exerciseBlock(sess.id, ei, e)).join("") + '</div>';
+    body = '<div class="ex-list">' + sess.exercises.map((e) => exerciseBlock(sess.id, sheetSessionIso(), e)).join("") + '</div>';
   } else {
     // ⚠️ ONE WARM-UP ON SCREEN. The generated card below is the authority now, so the session's own
     // one-line warm-up step is dropped from this list rather than printed above it saying a shorter
@@ -11323,7 +11458,7 @@ function wireSheet() {
     closeSheet();
     render();
   });
-  document.querySelectorAll("#sheetBody [data-slog]").forEach((inp) => inp.oninput = () => slogSet(inp.dataset.slog, inp.dataset.f, inp.value.trim()));
+  document.querySelectorAll("#sheetBody [data-x]").forEach((inp) => inp.oninput = () => slogWrite(inp.dataset.d, inp.dataset.s, inp.dataset.x, Number(inp.dataset.i), inp.dataset.f, inp.value.trim()));
   wireExDemos();
   const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess; sdStart.onclick = () => { closeSheet(); openStartWhereSheet(ss); }; }
   const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
@@ -11342,7 +11477,7 @@ function openSessionSheet(sess, week) {
 /** ⚠️ EVERY SHEET-SCOPED FLAG IS CLEARED HERE, AND LIVE_TARGET IS THE ONE THAT WOULD BITE. Dismissed
  *  without committing, a flag left set turns the NEXT "add a session to Tuesday" into a target for a
  *  run that is no longer live — a state nobody could see and nobody could explain. */
-function closeSheet() { PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
+function closeSheet() { slogFlush(); PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -13734,28 +13869,35 @@ function viewRunDetail() {
       stretchOfferHtml() +
     '</div>';
 }
-// Aggregate all logged strength sets by exercise, in plan order (week = a session instance).
+/**
+ * Every logged set, grouped by exercise and then by the session instance it belongs to.
+ *
+ * ⚠️ IT NO LONGER ASKS THE PLAN ANYTHING. The previous version resolved each row through
+ * RAW.weeks[n].sessions.find(id).exercises[index] and dropped whatever it could not find, so a
+ * rebuilt plan silently deleted the runner's history. Rows carry the exercise id and the date, and
+ * the NAME comes from the catalogue — so an exercise that has been swapped out of the plan, or that
+ * sat at a different index last month, still has its history.
+ * ⚠️ AN UNRESOLVABLE ID IS SHOWN, NOT DROPPED. Ids are never reused or renamed, so this should not
+ * happen; if it ever does, the runner sees the id rather than losing the sets.
+ */
 function strengthHistory() {
-  const slog = loadSlog();
-  const groups = {};
-  for (const key in slog) {
-    const parts = key.split("|");
-    const g = parts[0] + "|" + parts[1];
-    (groups[g] = groups[g] || {})[parts[2]] = slog[key];
-  }
+  const tmp = {};
+  slogAll().rows.forEach((r) => {
+    if (r.w == null && r.r == null) return;
+    const k = r.d + "|" + r.s;
+    ((tmp[r.x] = tmp[r.x] || {})[k] = tmp[r.x][k] || {})[r.i] = r;
+  });
   const byEx = {};
-  for (const g in groups) {
-    const gp = g.split("|");
-    const sessId = gp[0], exIdx = Number(gp[1]);
-    const wk = Number((sessId.match(/^w(\\d+)/) || [])[1]);
-    const raw = RAW.weeks[wk - 1] && RAW.weeks[wk - 1].sessions.find((s) => s.id === sessId);
-    const ex = raw && raw.exercises && raw.exercises[exIdx];
-    if (!ex) continue;
-    const sets = Object.keys(groups[g]).sort((a, b) => a - b).map((i) => groups[g][i]).filter((s) => s.w || s.r);
-    if (!sets.length) continue;
-    (byEx[ex.name] = byEx[ex.name] || { name: ex.name, primary: ex.primary, pattern: ex.pattern, anim: ex.anim, instances: [] }).instances.push({ week: wk, sets });
+  for (const x in tmp) {
+    const def = RC.exerciseById(x);
+    const instances = Object.keys(tmp[x]).map((k) => ({
+      iso: k.slice(0, k.indexOf("|")),
+      sets: Object.keys(tmp[x][k]).sort((a, b) => a - b).map((i) => tmp[x][k][i]),
+    })).sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
+    if (!instances.length) continue;
+    byEx[x] = { id: x, name: def ? def.name : x, primary: def ? def.primary : "", pattern: def ? def.pattern : "",
+      anim: def ? def.anim : null, instances: instances };
   }
-  for (const n in byEx) byEx[n].instances.sort((a, b) => a.week - b.week);
   return byEx;
 }
 function topWeight(sets) { return sets.reduce((m, s) => Math.max(m, parseFloat(s.w) || 0), 0); }
@@ -13766,16 +13908,18 @@ function viewStrengthHistory() {
     return '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No strength logged yet</h3><p>Open a strength session, tap an exercise and record your weights and reps. Your progress on each lift will build up here.</p></div>';
   }
   // Sort by most recently logged.
-  names.sort((a, b) => hist[b].instances[hist[b].instances.length - 1].week - hist[a].instances[hist[a].instances.length - 1].week);
+  // Most recently logged first. Dates, not week numbers: a week number means nothing once the plan
+  // it referred to has been rebuilt, which is the whole reason this store was reshaped.
+  names.sort((a, b) => { const x = hist[b].instances[hist[b].instances.length - 1].iso, y = hist[a].instances[hist[a].instances.length - 1].iso; return x < y ? -1 : x > y ? 1 : 0; });
   const cards = names.map((n) => {
     const ex = hist[n];
-    const best = ex.instances.reduce((m, ins) => Math.max(m, topWeight(ins.sets)), 0);
+    const best = slogBest(ex.id);
     const tops = ex.instances.map((ins) => topWeight(ins.sets));
     const peak = Math.max(...tops, 1);
     const spark = tops.map((w) => '<i style="height:' + Math.max(8, Math.round((w / peak) * 100)) + '%"></i>').join("");
     const rows = ex.instances.slice().reverse().slice(0, 4).map((ins) => {
       const sets = ins.sets.map((s) => (s.w || "—") + (s.w ? "kg" : "") + (s.r ? " × " + s.r : "")).join("  ·  ");
-      return '<div class="sh-row"><span class="sh-wk">Week ' + ins.week + '</span><span class="sh-sets">' + sets + '</span></div>';
+      return '<div class="sh-row"><span class="sh-wk">' + esc(runDateLabelIso(ins.iso)) + '</span><span class="sh-sets">' + sets + '</span></div>';
     }).join("");
     return '<div class="card sh-card"><div class="sh-head"><div class="ex-anim sh-anim">' + exVisual(ex) + '</div>' +
       '<div class="sh-main"><div class="sh-name">' + esc(ex.name) + '</div><div class="sh-mus">' + esc(ex.primary) + '</div>' +
@@ -36984,7 +37128,7 @@ function coachPrimeWatchCueMap() {
 // the app is the one moment a reading is certain to be old, and iOS never tells a web view that
 // anything about it changed. liveStandbyGps re-checks its own guards, so a run started or
 // abandoned in the meantime restarts nothing.
-document.addEventListener("visibilitychange", () => { if (document.hidden) { liveStandbyStop(); return; } refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); coachReleaseStale(); if ($("lMapWrap")) liveStandbyGps(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) { slogFlush(); liveStandbyStop(); return; } refreshTodayNavDate(); syncTextScale(); stravaResume(); coachPrimeWatchCueMap(); coachReleaseStale(); if ($("lMapWrap")) liveStandbyGps(); });
 // A repaint that ARRIVES ON ITS OWN — a wrist run landing, a mirror going stale — rather than one the
 // runner asked for. It must never rebuild the plan-setup form: viewSetup() reads every value from the
 // saved profile, so redrawing it discards whatever is half-typed. The runner is mid-sentence; their

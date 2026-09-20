@@ -162,6 +162,21 @@ export type WorkoutStep = {
 
 /** A single strength exercise with its prescription — enables per-exercise, per-set logging. */
 export type StrengthExercise = {
+  /**
+   * Stable slug identifying the MOVEMENT, not its position in this session — "squat", "rdl", "soleus".
+   *
+   * ⚠️ THE SET LOG USED TO BE KEYED ON THE ARRAY INDEX, AND AN INDEX SURVIVES NOTHING. `interun_slog`
+   * filed a logged set under `sessionId|exerciseIndex|setIndex` and resolved it back through
+   * `RAW.weeks[n].sessions.find(id).exercises[i]` — so changing the plan (a new race date, different
+   * days, a different number of sessions a week) renumbered or removed the exercise and every row for
+   * it was silently dropped by that reader's own `if (!ex) continue;`. Measured: rebuild the plan with
+   * a different long-run day and the history was gone, with nothing on screen to say so.
+   *
+   * ⚠️ IDS ARE NEVER RENAMED AND NEVER REUSED. A row logged today must still name the same movement
+   * in five years, so a rename orphans history exactly as the index did. New library entries get new
+   * slugs; a retired one stays retired.
+   */
+  id: string;
   name: string;
   primary: string;
   secondary: string[];

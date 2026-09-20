@@ -10,7 +10,7 @@ Date: 20 September 2026. Repo at `813f63b`, tree clean, 1,533 tests passing, not
 2. An App Store Connect API key (App Manager role) saved to `~/.appstoreconnect/private_keys/` — that is what puts a build on testers' phones.
 3. Garmin form: **sent** ✓. When the approval email lands, say so — Track C starts that day.
 
-**First stages to run:** T1 (one-command verify) then A1 (strength data foundation).
+**Progress:** T1 ✅ done (`npm run verify`) · A1 ✅ done (strength log survives a plan rebuild) · **next: A2** (exercise library).
 
 ---
 

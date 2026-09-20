@@ -1897,9 +1897,27 @@ function mkEx(
   extra: { loadPercent1RM?: string; contacts?: number } = {},
 ): StrengthExercise {
   const d = EX[key]!;
-  return { name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern, anim: d.anim,
-    cue: d.cue, sets, reps, ...extra };
+  // ⚠️ THE CATALOGUE KEY *IS* THE ID. One source, so an exercise cannot be given a second name by a
+  // builder, and `exerciseById` can resolve a logged row without the plan it was logged against.
+  return { id: key, name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern,
+    anim: d.anim, cue: d.cue, sets, reps, ...extra };
 }
+
+/**
+ * Look up an exercise by its stable id, for readers holding a logged row rather than a session.
+ *
+ * ⚠️ THIS IS WHAT LETS THE SET LOG SURVIVE A PLAN REBUILD. The history screen used to re-resolve every
+ * logged set through `RAW.weeks[...].exercises[index]`, so a rebuilt plan orphaned the lot. It asks
+ * here instead, and a row for an exercise no longer in the catalogue degrades to showing its id rather
+ * than vanishing.
+ */
+export function exerciseById(id: string): { id: string; name: string; primary: string; secondary: string[]; pattern: string; anim?: string; cue: string } | null {
+  const d = EX[id];
+  return d ? { id, name: d.name, primary: d.primary, secondary: d.secondary, pattern: d.pattern, anim: d.anim, cue: d.cue } : null;
+}
+
+/** Every exercise id the catalogue defines, so a guard can sweep them rather than list them. */
+export function exerciseIds(): string[] { return Object.keys(EX); }
 
 /**
  * The plyometric dose, and why it is a table rather than the two lines it replaced.

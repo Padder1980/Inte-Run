@@ -14495,3 +14495,74 @@ title (step 5). `web/app.ts` was restored from a copy each time and checked byte
 `git checkout`.
 ⚠️ **IT NEVER RESTORES `docs/voices/`.** The same diff is an accident after a routine build and correct
 after a deliberate regeneration; the script prints the restore command and stops.
+
+## ✅ A1 — THE STRENGTH LOG SURVIVES A PLAN REBUILD (2026-09-20)
+
+The first stage of `PLAN.md`'s strength track, and a foundation rather than a feature: **nothing new
+appears on screen.** Suite 1533 → **1546**; `test/strength-log.test.ts` holds 13 guards and **9
+deliberate re-breaks were each watched failing**.
+
+⚠️⚠️ **EVERY SET A RUNNER HAD LOGGED WAS THROWN AWAY BY THE NEXT PLAN REBUILD, IN SILENCE.**
+`interun_slog` filed a set under `sessionId|exerciseIndex|setIndex` with **no date**, and
+`strengthHistory()` read it back through `RAW.weeks[n].sessions.find(id).exercises[i]` with
+`if (!ex) continue;` for anything it could not resolve. So changing the race date, the days per week or
+the long-run day renumbered or removed the exercise and the history was gone — **and the reader's own
+skip-if-unresolvable meant nothing on screen said so.** Reproduced in a real browser: log two sets,
+change days 5 → 4 and the long-run day, and the card was empty. After: 2 rows, best 45 kg, the card
+intact.
+
+⚠️ **THE FIX IS A STABLE ID ON THE MOVEMENT, AND THE CATALOGUE KEY *IS* THAT ID** (`mkEx` sets
+`id: key`). One source, so a builder cannot give an exercise a second name, and `exerciseById()` can
+resolve a logged row **without the plan it was logged against**. ⚠️ **AN ID IS NEVER RENAMED OR
+REUSED** — a rename orphans history exactly as the index did, so the sixteen ids a runner's store can
+already hold are pinned by a guard.
+
+⚠️ **THE DATE IS PART OF A ROW'S IDENTITY, NOT DECORATION.** Session ids are deterministic:
+`w3d2-strength` recurs in every rebuilt plan. Keyed on `(session, exercise, set)` alone, week 3 of the
+old plan and week 3 of the new one are the same row and overwrite each other. Identity is
+`(date, session, exercise, set)`.
+⚠️ **AND THAT IS ONLY UNIQUE WHILE AN EXERCISE APPEARS AT MOST ONCE IN A SESSION** — asserted across a
+whole real block. If a later stage adds supersets that repeat a movement, that guard fails and **that**
+stage must carry the slot index into the row.
+
+⚠️ **THE STORE IS HELD IN MEMORY AND THE DISK WRITE IS DEBOUNCED, because the weight box writes on
+every KEYSTROKE.** Re-parsing and re-stringifying the whole log per character costs most for the runner
+who has used the app longest — the reasoning `state.hist` already records — and it is the same split
+the run-note field uses. `closeSheet` and `visibilitychange` flush first, so nothing that can lose the
+page loses a set.
+
+⚠️ **PRUNING FOLDS WHAT IT DROPS INTO `bests`; KEYSTROKES DO NOT.** The heaviest lift is the one figure
+here that may only ever go up, so housekeeping at the 12,000-row cap (~4 years) folds the dropped
+maxima in first. Writing bests on every keystroke instead would make a **typo permanent** — 400 kg
+entered for 40 could never be corrected. Both directions are guarded.
+
+⚠️ **THE MIGRATION RESOLVES v1 ROWS THE WAY v1's OWN READER DID, AND KEEPS v1.** Anything the current
+plan cannot resolve was *already* invisible, so nothing on screen is lost; the count goes in
+`meta.skipped` rather than being shrugged off, and the old store is never deleted — it is the only copy
+of what could not be carried. Idempotent, guarded by `meta.migratedAt`, because `adoptPlan` runs on
+every launch.
+⚠️ **IT DATES A ROW FROM `genDay`, NOT `effDay`.** `effDay` reads `state.dayOverride`, and this runs
+from `adoptPlan` which `recompute()` calls at module top level — reaching into `state` from there is
+the boot-order trap `JOURNAL_KEY` and `CLUBPROF_KEY` already record. Carried rows are stamped `m: 1`
+precisely because their date is a planned one rather than an observed one.
+⚠️ **`SLOG2_KEY` IS DECLARED WITH THE OTHER STORE KEYS — the third time this file records that rule.**
+Declared beside its own functions five thousand lines below, it would be read in its temporal dead
+zone, throw, and be swallowed by the try/catch around it, which is how `journalSync` wrote nothing on
+any launch for weeks. Guarded by comparing its position against `adoptPlan`'s.
+
+⚠️ **THE HISTORY NOW SHOWS DATES, NOT "Week N".** A week number means nothing once the plan it referred
+to has been rebuilt — which is the whole reason the store was reshaped.
+
+⚠️ **THE BACKTICK RULE FIRED FIVE TIMES IN ONE STAGE, ALL IN MY OWN COMMENTS**, and the fifth was the
+instructive one: it was in the **store-key block**, far from the code it described, and the build
+failed pointing at a line 300 lines away. Sweep `git diff` for backticks on added lines before
+building, not after.
+
+⚠️ **AND THE ONE TEST FAILURE WAS THE FIXTURE, NOT THE CODE: `PLAN.weeks` carry `startIso` while the
+generator's weeks carry `startDateIso`.** Passing the raw plan as `PLAN` made the migration build an
+invalid date. The fixture now uses the real `buildPlanSummary`, so the two shapes cannot drift apart
+inside this test.
+
+**Still to come in this track (see `PLAN.md`):** A2 the exercise library (17 → 60+, and the Learn hub's
+duplicate catalogue deleted), A3 preferences, A4 swap, A5 the session player with rest timers, A6 e1RM
+and progression, A7 standalone programmes, A8 Strava as Weight Training, A9 the watch.

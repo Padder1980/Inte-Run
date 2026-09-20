@@ -41,7 +41,7 @@ export type { RunObservation, TrainingFlag, TrainingFlagsResult } from "../src/a
 export { assessConditions, heatPaceFactor, dewPointFrom } from "../src/environment/weather.ts";
 export { adaptSessionForHeat } from "../src/adapt/heat.ts";
 export { fuellingFor } from "../src/science/fuelling.ts";
-export { listWorkouts, buildWorkout } from "../src/plan/session-templates.ts";
+export { listWorkouts, buildWorkout, exerciseById, exerciseIds } from "../src/plan/session-templates.ts";
 export type { WorkoutOption } from "../src/plan/session-templates.ts";
 export type { FuellingPlan } from "../src/science/fuelling.ts";
 export { classifyRunner } from "../src/athlete/classification.ts";

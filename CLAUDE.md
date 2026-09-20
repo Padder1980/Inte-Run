@@ -84,11 +84,22 @@ for i,b in enumerate(re.findall(r'<script>(.*?)</script>', h, re.S)):
 ## Commands
 
 ```bash
+npm run verify         # THE recipe, as one command: build (exit code read) → docs/voices/ clean →
+                       #   node --check on every emitted <script> block → tsc (one pinned error allowed)
+                       #   → node --test under UTC, Kiritimati and Pago_Pago → the two engine audits.
+                       #   Writes .verify-ok and prints one summary line. Quote THAT line, never a memory.
+npm run verify:quick   # same, UTC only, no audits — the development loop (~2 min)
 node web/app.ts        # build web/app.html + docs/* (run after ANY edit to web/app.ts)
-npx tsc --noEmit       # typecheck (must be clean)
-node --test            # test suite (932 passing as of 2026-08-19)
+npx tsc --noEmit       # typecheck (one pre-existing error in test/onboarding-wizard.test.ts is pinned)
+node --test            # test suite (1533 passing as of 2026-09-20)
 npm run web            # builds all the standalone pages too
 ```
+
+⚠️ **`npm run verify` EXISTS BECAUSE EVERY STEP IN IT HAS BEEN SKIPPED OR MISREAD AT LEAST ONCE** —
+see `tools/verify.mjs`'s header for the list. It never restores `docs/voices/` by itself (only a
+person knows whether a voices diff is an accident or a regeneration), pins the allowed tsc error by
+file + code rather than line, parses both `ℹ fail N` and `# fail N`, treats an unparsable result as a
+failure, and requires the three timezone runs to agree on the pass count.
 
 ⚠️ **THE SUITE NOW NEEDS A HEADLESS BROWSER FOR ONE FILE, AND ITS ABSENCE FAILS RATHER THAN SKIPS.**
 `test/share-export-bytes.test.ts` is the share card's export gate: it produces real encoded bytes through
@@ -14437,3 +14448,50 @@ raw answer, so a beginner told "6 days" was quoted a goal ~6% more optimistic on
 they will never be given. **Not fixed here**: it is a projection change needing its own sweep and proof,
 and this file already records the same shape of defect being found in that function's day handling once
 before.
+
+## THE PLAN TO GO PAST RUNNA, AND THE ONE COMMAND THAT PROVES A STAGE (owner, 2026-09-20)
+
+*"I want to move towards a better app than Runna, that has all of their functionality plus more … the
+ability to plan detailed strength training programmes that has a full functionality to be able to track
+reps/sets."* The whole plan — status, a researched audit of Runna, the decisions from two interview
+rounds, and ~30 small stages in five tracks — is **`PLAN.md`** at the repo root. Read it before starting
+any stage; tick a stage there when it lands.
+
+⚠️ **THE AUDIT WAS RESEARCHED, NOT REMEMBERED, and three of its findings overturn assumptions.**
+(1) **Runna closed its in-app community on 7 September 2026** and moved it to a Strava club — so
+Inte-Club already does more in-app than Runna does, and "community parity" is a Strava club, not a
+backend. (2) Runna **does** log reps + weight and tracks "Weight Lifted" over time, has ~175 exercises,
+30/45/60-minute sessions, three levels, two goals and an equipment picker — but **cannot** build custom
+programmes, swap an exercise, run a rest timer, estimate a 1RM, suggest a load, or reach a watch. That
+is the differentiator the owner named, and it is where Runna is thinnest. (3) Strava has owned Runna
+since April 2025; the apps stay separate; they push **two weeks of runs to Garmin/COROS/Suunto/Fitbit
+every Monday**, runs only, no Connect IQ app.
+
+**The owner's decisions (binding):** full strength gym (parity + programmes, rest timers, supersets,
+e1RM, progression; watch strength as its own native stage) · **accounts/server are a SEPARATE planning
+round** after strength and launch hygiene · strength first, then launch hygiene, parity gaps interleaved
+· a Strava club now, Inte-Club kept for the accounts round · all four parity groups, with **non-race
+modes flagged COMPLEX → their own planning round** · AI briefings + insights **grounded in the debrief's
+own numbers**, free brain first, capped · yoga/pilates later in this plan · Garmin form **sent** · iOS
+only for v1.
+
+⚠️ **THREE FACTS ABOUT THE CODEBASE THE PLAN RESTS ON, all verified first-hand this session:**
+- `interun_slog` is keyed `sessId|exIdx|setIdx`, carries **no date**, and `strengthHistory()` drops every
+  row whose plan has been rebuilt (`if (!ex) continue;`). **The strength log loses data on every plan
+  rebuild.** Stage A1 fixes this before anything is built on it.
+- There are **two exercise catalogues**: the engine's `EX` (17 entries) and the Learn hub's
+  `STRENGTH_LIB` (`web/app.ts:19281`). Stage A2 deletes the second.
+- The Strava Worker **hardcodes `sport_type: "Run"`** (`alfie-proxy/src/strava.ts:272,292`), and the
+  watch's `isRunnable` mirror of `PRIMARY_TYPES` has **no test behind it**.
+
+### T1 — `npm run verify`
+
+The first stage, because six of this file's documented harness faults came from a verification step
+quoted from memory. `tools/verify.mjs` runs the recipe end to end and prints one line. It was
+**deliberately broken five ways and caught all five**: an untracked file under `docs/voices/` (step 2), a
+backtick in a runtime-JS comment (the build fails — step 1, exit code read), an emitted block that
+builds but does not parse (step 3), an unexpected type error (step 4), and a failing test named by
+title (step 5). `web/app.ts` was restored from a copy each time and checked byte-identical — never
+`git checkout`.
+⚠️ **IT NEVER RESTORES `docs/voices/`.** The same diff is an accident after a routine build and correct
+after a deliberate regeneration; the script prints the restore command and stops.

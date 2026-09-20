@@ -170,6 +170,44 @@ export function intentFor(phase: string, maintenance: boolean): StrengthIntent {
 const ACCESSORY_REPS = "8–12";
 const HOLD_REPS = "30–45s hold";
 
+/**
+ * How long a prescription asks the runner to HOLD, in seconds, or 0 when it is a rep prescription.
+ *
+ * ⚠️ THE ENGINE WRITES THESE STRINGS, SO THE ENGINE SAYS WHAT THEY MEAN. The session player needs to
+ * count a plank down rather than ask for weight and reps, and the only signal on the exercise instance
+ * is the `reps` wording — there is no `hold` field (that one belongs to stretches). A regex in the app
+ * layer would be a second definition of the engine's own vocabulary, and it would go stale silently the
+ * next time a rep string is reworded: nothing would fail, a plank would simply start asking for
+ * kilograms.
+ *
+ * ⚠️ THREE WORDINGS EXIST AND ALL THREE ARE REAL. `HOLD_REPS` ("30-45s hold") from this builder;
+ * "20-40s hold" from `BEGINNER_REPS` in session-templates.ts, which is what a runner with no strength
+ * preferences still gets; and "30s each leg" for the balance drill on that same legacy path, which is a
+ * hold whose wording never says the word. Matching only this file's own constant would have left the
+ * legacy path asking a beginner to load a barbell for a single-leg balance.
+ *
+ * ⚠️ IT ANSWERS THE TOP OF THE RANGE, AND THE REGEX IS WHAT DOES THAT — not the Math.max below it.
+ * In every live wording the `s` is attached to the UPPER bound ("30-45s", "20-40s"), so the lower one is
+ * followed by a dash and never matches at all. That is the behaviour wanted: "30-45s" completed in full
+ * is 45 seconds, so a countdown reaching zero means the prescription is met rather than merely started,
+ * and stopping at 30 is the runner's own call with the range still on the label. Answering the bottom
+ * would have a timer congratulate somebody a third of the way through what they were asked to do.
+ *
+ * ⚠️ SO Math.max IS DEFENSIVE GENERALITY WITH NO OBSERVABLE FAILURE MODE TODAY, recorded here rather
+ * than deleted so nobody "verifies" it by removing it. Measured across every live wording: each yields
+ * exactly ONE match, so max and min are identical and a re-break swapping them changes nothing. It
+ * earns its place only against a hypothetical "30s-45s" where both bounds carry the suffix.
+ */
+export function holdSecondsFor(reps: string | undefined | null): number {
+  if (!reps) return 0;
+  // Every second-valued token in the string: "30-45s hold" -> [45] (the 30 is followed by a dash, not
+  // an s); "30s each leg" -> [30]; "8-12" and "3-6 (heavy)" -> [] (no digit is followed by an s).
+  const secs = [...String(reps).matchAll(/(\d+)\s*s\b/g)].map((m) => Number(m[1]));
+  if (!secs.length) return 0;
+  const top = Math.max(...secs);
+  return Number.isFinite(top) && top > 0 ? top : 0;
+}
+
 function setCost(sets: number, work: number, rest: number): number {
   return sets * (work + rest);
 }

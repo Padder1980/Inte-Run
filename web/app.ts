@@ -2143,6 +2143,41 @@ input, select, textarea { font-size: 16px; }
 .str-vid-ic { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); }
 .str-vid-ic svg { width: 18px; height: 18px; }
+/* The guided strength player (A5). Every value here is on the design-system ladder — the two ratchets
+   count off-ladder radii and font sizes in this stylesheet, and a new screen is exactly where drift
+   starts. .set-in, .ex-anim, .ex-cue, .str-bar, .sh-card and .sd-addlink are all REUSED rather than
+   redrawn, so the player looks like the sheet it opens from. */
+.strp { display: flex; flex-direction: column; gap: var(--s3); margin-top: var(--s3); }
+.strp-head { display: flex; align-items: center; gap: var(--s3); }
+.strp-count { font-size: var(--t-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); white-space: nowrap; }
+.strp-now { display: flex; align-items: center; gap: var(--s3); }
+.strp-main { min-width: 0; flex: 1; }
+.strp-name { font-size: var(--t-section); font-weight: 700; color: var(--ink); line-height: 1.2; }
+.strp-presc { font-size: var(--t-body); color: var(--ink-soft); margin-top: var(--s1); }
+.strp-setn { font-size: var(--t-meta); color: var(--ink-faint); margin-top: var(--s1); }
+.strp-cue { margin-top: 0; }
+.strp-log { display: flex; flex-direction: column; gap: var(--s2); }
+.strp-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.strp-f { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.strp-f span { font-size: var(--t-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); }
+.strp-last { font-size: var(--t-meta); color: var(--ink-faint); }
+.strp-rest, .strp-hold { display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+  padding: var(--s5) var(--s4); border-radius: var(--r-card); background: var(--surface-2);
+  border: 1px solid var(--line); }
+.strp-restk, .strp-holdk { font-size: var(--t-label); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-faint); }
+.strp-restv { font-family: var(--fig); font-variant-numeric: tabular-nums; font-size: var(--t-display);
+  font-weight: 700; letter-spacing: -.02em; color: var(--ink); line-height: 1; }
+/* The last ten seconds. ⚠️ colour is NOT the only signal — the haptic fires at the same moment and the
+   number is still counting down in figures, so this reads the same to somebody who cannot see it. */
+.strp-rest.soon .strp-restv { color: var(--accent); }
+.strp-restn { font-size: var(--t-meta); color: var(--ink-soft); text-align: center; }
+.strp-fin { display: flex; flex-direction: column; align-items: center; gap: var(--s3);
+  padding: var(--s6) var(--s4); text-align: center; }
+.strp-fint { font-size: var(--t-hero); font-weight: 700; color: var(--ink); }
+.strp-finn { font-size: var(--t-body); color: var(--ink-soft); }
 .str-intro { margin: 10px 0 4px; font-size: 13px; }
 .str-list { display: flex; flex-direction: column; gap: 0; }
 .str-item { padding: 12px 0; border-top: 1px solid var(--line); }
@@ -6306,6 +6341,26 @@ const SLOG2_KEY = "interun_slog_v2";
  */
 const SWAP_KEY = "interun_swap_v1";
 /**
+ * Stage A5. One row per FINISHED strength session:
+ *   { d: "yyyy-mm-dd", s: sessionId, at: epochMs, sets: n, ex: n, min: n }
+ *
+ * ⚠️ (d, s) IS THE IDENTITY, FOR EXACTLY THE REASON THE SET LOG LEARNED IT. Session ids are
+ * deterministic — w3d2-strength recurs in every rebuilt plan — so the id alone says "a session of this
+ * shape", not "this session on this day". Keyed on the id alone, finishing week 3's strength day would
+ * read as having already finished week 7's.
+ *
+ * ⚠️ A FINISHED SESSION IS ITS OWN FACT, NOT SOMETHING DERIVABLE FROM THE SET LOG. A runner can log
+ * three sets and walk away, and a bodyweight session can be finished in full having written no set
+ * rows at all (holds log nothing — see strPlayItems). Counting rows would call the first finished and
+ * the second unfinished, which is both answers wrong.
+ *
+ * ⚠️ AND IT IS NOT DERIVABLE FROM state.done EITHER, WHICH IS WHY IT EXISTS. seedDone marks every
+ * non-rest session dated before today as done whether it happened or not, so state.done answers "is
+ * this in the past", not "did they do it". This store is the only thing in the app that knows a
+ * strength session was actually completed.
+ */
+const SDONE_KEY = "interun_sdone_v1";
+/**
  * ⚠️ A CAP, BECAUSE THE STORE IS localStorage AND THAT IS WHERE THE WHOLE TRAINING HISTORY LIVES.
  * A row is about 70 bytes, so 12,000 is roughly four years at three sessions a week with eight sets a
  * session, for under a megabyte. Pruning folds the dropped rows' maxima into bests first (below), so
@@ -7515,6 +7570,24 @@ function seedDone() {
     if (s.type === "rest") return;
     if (isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10) < today) state.done[doneKey(wk.index, s)] = true;
   }));
+  // ⚠️⚠️ A FINISHED STRENGTH SESSION IS RE-DERIVED FROM ITS STORE, NOT REMEMBERED IN MEMORY. state.done
+  // is rebuilt from scratch at the top of this function on every boot, so a tick set by the player and
+  // nowhere else survives exactly until the app is next launched — the runner finishes a session, closes
+  // the app, comes back and the day is unticked. The loop above already covers anything dated BEFORE
+  // today (it marks every past session done whether it happened or not); what only this store can answer
+  // is today's, which is the one the runner is looking at.
+  // ⚠️ MATCHED ON (date, session id), NEVER THE ID ALONE. Session ids are deterministic and recur across
+  // rebuilds, so an id-only match would tick week 7's strength day because week 3's was finished.
+  try {
+    const fin = {};
+    loadSdone().forEach((r) => { if (r && r.d && r.s) fin[r.d + "|" + r.s] = 1; });
+    if (Object.keys(fin).length) {
+      PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
+        const iso = isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10);
+        if (fin[iso + "|" + s.id]) state.done[doneKey(wk.index, s)] = true;
+      }));
+    }
+  } catch (e) { try { console.warn("strength completion replay skipped", e); } catch (e2) {} }
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -11298,6 +11371,315 @@ function reopenSessionSheet() {
   $("sheetBody").innerHTML = sessionSheetHtml(SHEET_CTX.sess, SHEET_CTX.week);
   wireSheet();
 }
+// ---- Finished strength sessions (A5) ----------------------------------------------------------
+function loadSdone() { try { const v = JSON.parse(localStorage.getItem(SDONE_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function saveSdone(rows) { try { rows.length ? localStorage.setItem(SDONE_KEY, JSON.stringify(rows)) : localStorage.removeItem(SDONE_KEY); } catch (e) {} }
+/**
+ * Record that one strength session was finished.
+ *
+ * ⚠️ IDEMPOTENT ON (d, s), BECAUSE FINISH IS REACHABLE MORE THAN ONCE. The player's own Finish button,
+ * a re-open of a session already completed, and a double tap all land here; a second row would double
+ * every count on the Strength tab and make "3 sessions this week" mean nothing. An existing row is
+ * UPDATED rather than skipped, so finishing again after logging two more sets records the fuller of
+ * the two attempts rather than the first one.
+ */
+function sdoneMark(iso, sessId, stats) {
+  const rows = loadSdone();
+  let row = null;
+  for (let i = 0; i < rows.length; i++) if (rows[i].d === iso && rows[i].s === sessId) { row = rows[i]; break; }
+  if (!row) { row = { d: iso, s: sessId }; rows.unshift(row); }
+  row.at = Date.now();
+  if (stats) { row.sets = stats.sets; row.ex = stats.ex; row.min = stats.min; }
+  // Same reasoning as SLOG_MAX_ROWS, one order of magnitude smaller: a row is ~60 bytes and this is
+  // one per finished session, so 2,000 is about thirteen years at three a week.
+  saveSdone(rows.slice(0, 2000));
+  return row;
+}
+function sdoneHas(iso, sessId) { return loadSdone().some((r) => r.d === iso && r.s === sessId); }
+/**
+ * The flattened play order: one entry per SET, supersets alternated.
+ *
+ * ⚠️ A SUPERSET ALTERNATES AND RESTS ONCE, which is the only reason to have one — the builder's own
+ * pairCost charges a pair at max(setsA, setsB) x (work x 2 + rest) rather than two separate rests, so
+ * playing them back to back is what makes the session fit the time it claims. Running the pair as two
+ * separate blocks would silently add a rest per round and overrun the minutes on the card.
+ *
+ * ⚠️ AND A PAIR CAN HAVE UNEQUAL SET COUNTS — measured on a real 45-minute session, group 3 is a
+ * 2-set step-up paired with a 1-set plank. Round 2 therefore has no partner, so it is a single set
+ * with its own rest after it rather than half of a pair. Zipping the two lists and assuming equal
+ * length would have dropped the step-up's second set entirely.
+ *
+ * ⚠️ NO REST AFTER THE LAST SET OF THE SESSION. A countdown that starts when there is nothing left to
+ * come is a timer asking the runner to wait for the end of their own workout.
+ */
+function strPlayItems(sess) {
+  const ex = (sess && sess.exercises) ? sess.exercises : [];
+  const out = [];
+  let i = 0;
+  while (i < ex.length) {
+    const g = ex[i].superset;
+    // A group is the run of adjacent exercises sharing a superset number; anything else is a group of one.
+    let j = i;
+    if (g != null) { while (j + 1 < ex.length && ex[j + 1].superset === g) j++; }
+    const group = ex.slice(i, j + 1);
+    const rounds = group.reduce((m, e) => Math.max(m, e.sets || 1), 0);
+    for (let r = 0; r < rounds; r++) {
+      const inRound = group.filter((e) => r < (e.sets || 1));
+      inRound.forEach((e, k) => {
+        out.push({
+          x: e.id, slotId: e.slotId || e.id, name: e.name, cue: e.cue, pattern: e.pattern,
+          set: r, ofSets: e.sets || 1, reps: e.reps, load: e.loadPercent1RM || "",
+          hold: RC.holdSecondsFor(e.reps),
+          // Rest only after the LAST exercise of a superset round — that is the alternation.
+          rest: k === inRound.length - 1 ? (e.restSeconds || 0) : 0,
+          ss: g == null ? null : g,
+        });
+      });
+    }
+    i = j + 1;
+  }
+  if (out.length) out[out.length - 1].rest = 0;
+  return out;
+}
+/** Last time's numbers for one exercise — the same set index if it was logged, else the newest row. */
+function strPrefill(x, setIdx, iso) {
+  const rows = slogFor(x).filter((r) => r.d !== iso);
+  if (!rows.length) return {};
+  const same = rows.find((r) => r.i === setIdx);
+  return same || rows[0];
+}
+/**
+ * The guided player's state. Modelled on STRETCH (one object, one interval, cleared by closeSheet),
+ * with one deliberate difference recorded below.
+ */
+let SPLAY = null;
+const STR_REST_WARN_S = 10;
+/**
+ * ⚠️⚠️ REST IS AN ABSOLUTE END TIMESTAMP, NOT A COUNTER THE INTERVAL DECREMENTS. STRETCH does
+ * one decrement per tick, so a throttled interval makes its clock run SLOW — benign for a stretch
+ * routine somebody is watching, wrong for the one timer whose whole job is to be right while the phone
+ * is face down on the floor. iOS throttles timers hard in a backgrounded web view (the same behaviour
+ * the coach schedule and the lock-screen distance both exist to work around), so the remaining time is
+ * derived from Date.now() on every repaint and the interval only decides how often the number is
+ * redrawn. Background the phone for twenty seconds mid-rest and the countdown is twenty seconds
+ * further on when it comes back, because it was never counting ticks in the first place.
+ */
+function strRestLeft() {
+  const S = SPLAY;
+  if (!S || !S.restEnd) return 0;
+  return Math.max(0, Math.ceil((S.restEnd - Date.now()) / 1000));
+}
+function strHoldLeft() {
+  const S = SPLAY;
+  if (!S || !S.holdEnd) return 0;
+  return Math.max(0, Math.ceil((S.holdEnd - Date.now()) / 1000));
+}
+/**
+ * ⚠️ SWAPS ARE RESOLVED HERE, AT THE ENTRY POINT, AND NOT AT THE CALL SITE. A4's own sweep caught this
+ * function's flattener reading .exercises with no swap applied: it was correct only because the one
+ * caller happened to pass withSwaps' output, which is a convention every future caller has to know
+ * about and one of them eventually will not. Resolving it here means SPLAY.sess IS the swapped session
+ * for the whole life of the player — the items, the finish row and anything later added all see the
+ * exercise the runner actually chose. withSwaps is idempotent (see its own comment), so a caller that
+ * still resolves them first is harmless rather than double-applied.
+ */
+function openStrengthPlayer(rawSess, iso) {
+  const sess = withSwaps(rawSess);
+  const items = strPlayItems(sess);
+  if (!items.length) return;
+  strengthStop();
+  SPLAY = { sess: sess, iso: iso, items: items, i: 0, restEnd: null, restTotal: 0, holdEnd: null,
+    warned: false, rang: false, logged: 0, timer: null, done: false };
+  $("sheetBody").innerHTML = strPlayerHtml();
+  wireStrengthPlayer();
+  strTick();
+}
+/**
+ * ⚠️ CALLED FROM closeSheet, or the interval keeps running behind a dismissed sheet and the next open
+ * runs two of them — the exact trap stretchStop's own comment records, and the reason a rest countdown
+ * would otherwise buzz in the middle of the next session.
+ */
+function strengthStop() {
+  const S = SPLAY;
+  if (S && S.timer) { clearInterval(S.timer); S.timer = null; }
+  SPLAY = null;
+}
+function strPlayerHtml() {
+  const S = SPLAY; if (!S) return "";
+  return '<button class="mini-btn pi-ghost" id="strpBack">\\u2039 Back to session</button>' +
+    '<div class="strp" id="strpBody"></div>';
+}
+function strPlayerBodyHtml() {
+  const S = SPLAY; if (!S) return "";
+  if (S.done) return strPlayerDoneHtml();
+  const it = S.items[S.i];
+  if (!it) return strPlayerDoneHtml();
+  const resting = !!S.restEnd;
+  const total = S.items.length;
+  const pct = Math.round((S.i / total) * 100);
+  const head = '<div class="strp-head"><div class="strp-count">Set ' + (S.i + 1) + ' of ' + total + '</div>' +
+    '<div class="str-bar"><i style="width:' + pct + '%"></i></div></div>';
+  if (resting) {
+    const left = strRestLeft();
+    const next = S.items[S.i];
+    return head +
+      '<div class="strp-rest' + (left <= STR_REST_WARN_S ? " soon" : "") + '">' +
+      '<div class="strp-restk">Rest</div>' +
+      '<div class="strp-restv num" id="strpRest">' + fmtPace(left) + '</div>' +
+      '<div class="strp-restn">Next: ' + esc(next.name) + ' \\u00b7 set ' + (next.set + 1) + ' of ' + next.ofSets + '</div>' +
+      '<button class="mini-btn" id="strpSkip">Skip rest</button></div>';
+  }
+  const holding = !!S.holdEnd;
+  const pre = strPrefill(it.x, it.set, S.iso);
+  const at = ' data-d="' + esc(S.iso) + '" data-s="' + esc(S.sess.id) + '" data-x="' + esc(it.x) + '" data-i="' + it.set + '"';
+  // ⚠️ A HOLD HAS NOTHING TO LOG AND IS NOT ASKED FOR ONE. A plank is not weight x reps; writing its
+  // seconds into the reps field would corrupt the one number A6's e1RM reads (Epley is defined for
+  // 1-10 reps), and strengthHistory already drops any row carrying neither weight nor reps. So a hold
+  // is PERFORMED and counted towards the session, and logged nowhere.
+  const body = it.hold
+    ? '<div class="strp-hold">' + (holding
+        ? '<div class="strp-restv num" id="strpHold">' + fmtPace(strHoldLeft()) + '</div><button class="mini-btn" id="strpHoldStop">Stop early</button>'
+        // ⚠️ THE PRESCRIPTION ALREADY ENDS IN THE WORD, so a bare "Hold for " + reps renders
+        // "Hold for 30-45s hold". Found by reading the rendered label, not the code. The other live
+        // wording ("30s each leg") does not contain it, which is why this strips rather than assumes.
+        : '<div class="strp-holdk">Hold for ' + esc(String(it.reps).replace(/\\s*hold\\s*$/i, "")) + '</div><button class="primary" id="strpHoldGo">' + ICON.play + ' Start hold</button>') +
+      '</div>'
+    : '<div class="strp-log"><div class="strp-fields">' +
+      '<label class="strp-f"><span>kg</span><input class="set-in" inputmode="decimal" id="strpW" placeholder="kg"' + at + ' data-f="w" value="' + esc(pre.w || "") + '"></label>' +
+      '<label class="strp-f"><span>reps</span><input class="set-in" inputmode="numeric" id="strpR" placeholder="' + esc(String(it.reps)) + '"' + at + ' data-f="r" value="' + esc(pre.r || "") + '"></label>' +
+      '</div>' +
+      (pre.w || pre.r ? '<div class="strp-last">Last time: ' + esc((pre.w ? pre.w + " kg" : "bodyweight")) + (pre.r ? " \\u00d7 " + esc(pre.r) : "") + '</div>' : '') +
+      '<button class="primary" id="strpLog">' + ICON.check + ' Log set</button></div>';
+  return head +
+    '<div class="strp-now"><div class="ex-anim strp-anim">' + exAnim(it.pattern) + '</div>' +
+    '<div class="strp-main"><div class="strp-name">' + esc(it.name) + '</div>' +
+    '<div class="strp-presc">' + esc(it.reps) + (it.load ? ' \\u00b7 ' + esc(it.load) : "") +
+    (it.ss != null ? ' \\u00b7 paired' : "") + '</div>' +
+    '<div class="strp-setn">Set ' + (it.set + 1) + ' of ' + it.ofSets + '</div></div></div>' +
+    '<div class="ex-cue strp-cue">' + esc(it.cue) + '</div>' +
+    body +
+    '<button class="sd-addlink" id="strpFin">Finish here</button>';
+}
+function strPlayerDoneHtml() {
+  const S = SPLAY; if (!S) return "";
+  return '<div class="strp-fin"><div class="strp-fint">Session done</div>' +
+    '<div class="strp-finn">' + S.logged + ' set' + (S.logged === 1 ? "" : "s") + ' logged \\u00b7 it is in your Logbook under Strength.</div>' +
+    '<button class="primary" id="strpClose">Done</button></div>';
+}
+function strPaintPlayer() {
+  const body = $("strpBody");
+  if (!body) return;
+  body.innerHTML = strPlayerBodyHtml();
+  wireStrengthPlayerBody();
+}
+/**
+ * The repaint loop.
+ *
+ * ⚠️ IT REPAINTS; IT DOES NOT COUNT. Every number on screen is derived from Date.now() against an
+ * absolute end, so a tick that arrives late, early or not at all cannot make the clock wrong — only
+ * less smooth. That is the whole difference between this and STRETCH.
+ *
+ * ⚠️ THE TEN-SECOND WARNING IS NOT FIRED AFTER THE REST HAS ALREADY ENDED. Wake from a throttled
+ * background at left = -5 and both thresholds are behind us; buzzing "ten seconds left" then is a
+ * statement about the time that is simply false. It is marked spent instead, and only the end buzzes.
+ */
+function strTick() {
+  const S = SPLAY; if (!S) return;
+  if (S.timer) return;
+  S.timer = setInterval(() => {
+    const T = SPLAY; if (!T) return;
+    if (T.restEnd) {
+      const left = strRestLeft();
+      if (left <= 0) {
+        if (!T.rang) { T.rang = true; haptic("lift"); }
+        // ⚠️ THE return IS WHAT SUPPRESSES A STALE TEN-SECOND WARNING, not a spent-flag. Waking from a
+        // throttle at left = -5 reaches here and leaves before the warning check below ever runs, and
+        // restEnd is nulled so this branch cannot be re-entered. A spent-flag assignment was here as
+        // well and REMOVED after a re-break proved it dead: it could not change any outcome, and a
+        // redundant assignment beside a real one is what invites the next reader to delete the wrong one.
+        T.restEnd = null;
+        strPaintPlayer();
+        return;
+      }
+      if (!T.warned && left <= STR_REST_WARN_S) { T.warned = true; haptic("tick"); }
+      const n = $("strpRest");
+      if (n) { n.textContent = fmtPace(left); const w = n.parentNode; if (w && left <= STR_REST_WARN_S) w.classList.add("soon"); }
+      else strPaintPlayer();
+      return;
+    }
+    if (T.holdEnd) {
+      const left = strHoldLeft();
+      if (left <= 0) { T.holdEnd = null; haptic("lift"); strAdvance(); return; }
+      const n = $("strpHold");
+      if (n) n.textContent = fmtPace(left); else strPaintPlayer();
+    }
+  }, 250);
+}
+/** Move past the current item, starting its rest if it has one. */
+function strAdvance() {
+  const S = SPLAY; if (!S) return;
+  const it = S.items[S.i];
+  S.i++;
+  if (S.i >= S.items.length) { strFinish(); return; }
+  if (it && it.rest > 0) {
+    S.restEnd = Date.now() + it.rest * 1000;
+    S.restTotal = it.rest;
+    S.warned = false;
+    S.rang = false;
+  }
+  strPaintPlayer();
+}
+function strLogCurrent() {
+  const S = SPLAY; if (!S) return;
+  const it = S.items[S.i]; if (!it) return;
+  const w = $("strpW"), r = $("strpR");
+  const wv = w ? w.value.trim() : "", rv = r ? r.value.trim() : "";
+  if (wv || rv) {
+    slogWrite(S.iso, S.sess.id, it.x, it.set, "w", wv);
+    slogWrite(S.iso, S.sess.id, it.x, it.set, "r", rv);
+    S.logged++;
+  }
+  haptic("tick");
+  strAdvance();
+}
+/**
+ * ⚠️ FINISH IS IDEMPOTENT AND WRITES THE STORE FIRST. sdoneMark is keyed on (date, session), so the
+ * Finish button, a second tap and re-finishing a session that was already completed all produce one
+ * row. state.done is set from that row rather than instead of it — seedDone rebuilds state.done from
+ * scratch on every boot, so a tick that lives only in memory is a tick that disappears at the next
+ * launch.
+ */
+function strFinish() {
+  const S = SPLAY; if (!S) return;
+  const sets = S.logged;
+  const ex = {};
+  S.items.forEach((it) => { ex[it.x] = 1; });
+  sdoneMark(S.iso, S.sess.id, { sets: sets, ex: Object.keys(ex).length,
+    min: Math.round((S.sess.estimatedDurationSeconds || 0) / 60) });
+  const wk = weekByNo(SHEET_CTX ? SHEET_CTX.week : state.planWeek || 1);
+  if (wk) { const m = (wk.sessions || []).find((z) => z.id === S.sess.id); if (m) state.done[doneKey(wk.index, m)] = true; }
+  slogFlush();
+  S.done = true;
+  if (S.timer) { clearInterval(S.timer); S.timer = null; }
+  haptic("success");
+  strPaintPlayer();
+}
+function wireStrengthPlayer() {
+  const back = $("strpBack");
+  if (back) back.onclick = () => { strengthStop(); reopenSessionSheet(); };
+  strPaintPlayer();
+}
+function wireStrengthPlayerBody() {
+  const log = $("strpLog"); if (log) log.onclick = () => strLogCurrent();
+  const skip = $("strpSkip"); if (skip) { skip.onclick = () => { const S = SPLAY; if (!S) return; S.restEnd = null; S.warned = true; S.rang = true; strPaintPlayer(); }; }
+  const hgo = $("strpHoldGo"); if (hgo) hgo.onclick = () => { const S = SPLAY; if (!S) return; const it = S.items[S.i]; S.holdEnd = Date.now() + (it.hold || 30) * 1000; strPaintPlayer(); };
+  const hstop = $("strpHoldStop"); if (hstop) hstop.onclick = () => { const S = SPLAY; if (!S) return; S.holdEnd = null; strAdvance(); };
+  const fin = $("strpFin"); if (fin) fin.onclick = () => strFinish();
+  const cl = $("strpClose"); if (cl) cl.onclick = () => { strengthStop(); closeSheet(); render(); };
+  // The two boxes still write through on every keystroke, exactly as the session sheet's own do, so a
+  // number typed and then not committed with Log set is not lost.
+  document.querySelectorAll("#strpBody [data-x]").forEach((inp) => inp.oninput = () => slogWrite(inp.dataset.d, inp.dataset.s, inp.dataset.x, Number(inp.dataset.i), inp.dataset.f, inp.value.trim()));
+}
 // ⚠️ ONE RENDERER, TWO MODES — an exercise is prescribed as sets x reps and gets weight/reps boxes to
 // log into; a STRETCH is prescribed as a hold and has nothing to log. Everything else about the row is
 // the same (the animated demo, the name, the area, the cue), so a stretch carries a hold field and takes the
@@ -11638,8 +12020,16 @@ function sessionSheetHtml(sess, week) {
     '<div class="sd-move"><div class="sd-move-h">Move to another day</div><div class="sd-days">' + dayPicker + '</div><div class="sd-move-n">Pick a day. If a run is already there, the two will swap.</div></div>';
   // ⚠️ PERSISTENT, NOT INLINE. The brief: "Keep Start persistent. The current top CTA scrolls away
   // while reading a long session." It keeps the id sdStart so the existing handler is untouched.
+  // ⚠️⚠️ TWO DIFFERENT STARTS, AND THE STRENGTH ONE MUST NEVER REACH THE RUNNING PATH. #sdStart opens
+  // "where shall we record this", which leads to GPS, a wake lock, the coach and a live LiveSession —
+  // every one of which is wrong for a session done standing still in a room, and the GPS one is wrong
+  // expensively (the location indicator on for forty minutes of squats). PRIMARY_TYPES is the runnable
+  // set and deliberately excludes strength, so the two ids cannot collide by accident.
   const startBtn = PRIMARY_TYPES[sess.type]
-    ? uiActionBar({ state: "start", id: "sdStart", label: "Start session" }) : "";
+    ? uiActionBar({ state: "start", id: "sdStart", label: "Start session" })
+    : (sess.type === "strength" && sess.exercises && sess.exercises.length)
+      ? uiActionBar({ state: "start", id: "sdStrength",
+          label: sdoneHas(sheetSessionIso(), sess.id) ? "Do it again" : "Start session" }) : "";
   const addLink = '<button class="sd-addlink" id="sdAdd">\\uFF0B Add a different session ' + dayPhraseIso(isoAdd(weekByNo(week).startIso, effDay(sess)).toISOString().slice(0, 10)) + '</button>';
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
@@ -11679,6 +12069,16 @@ function wireSheet() {
   // Same stopPropagation as wireExDemos' own button, inside the same .ex-main row.
   document.querySelectorAll("[data-swap]").forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); openSwapPicker(b.dataset.swap); });
   const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess; sdStart.onclick = () => { closeSheet(); openStartWhereSheet(ss); }; }
+  // ⚠️ THE PLAYER REPLACES THE SHEET BODY IN PLACE — it never opens a second .sheet-ov. Every picker in
+  // this app that has to return to something already open (the swap picker, openProfilePreview) rewrites
+  // #sheetBody and re-wires; a nested sheet needs its own back-stack and is the shape of z-order bug this
+  // project has shipped twice. It also means SHEET_CTX stays valid, so closeSheet still works unchanged.
+  // ⚠️ THE PLAIN SESSION — openStrengthPlayer resolves swaps itself, so no call site has to remember.
+  const sdStrength = $("sdStrength");
+  if (sdStrength && SHEET_CTX && SHEET_CTX.sess) {
+    const ss = SHEET_CTX.sess;
+    sdStrength.onclick = () => openStrengthPlayer(ss, sheetSessionIso());
+  }
   const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
 }
 function openSessionSheet(sess, week) {
@@ -11695,7 +12095,7 @@ function openSessionSheet(sess, week) {
 /** ⚠️ EVERY SHEET-SCOPED FLAG IS CLEARED HERE, AND LIVE_TARGET IS THE ONE THAT WOULD BITE. Dismissed
  *  without committing, a flag left set turns the NEXT "add a session to Tuesday" into a target for a
  *  run that is no longer live — a state nobody could see and nobody could explain. */
-function closeSheet() { slogFlush(); PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
+function closeSheet() { slogFlush(); PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); strengthStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -14119,11 +14519,45 @@ function strengthHistory() {
   return byEx;
 }
 function topWeight(sets) { return sets.reduce((m, s) => Math.max(m, parseFloat(s.w) || 0), 0); }
+/**
+ * Finished sessions, newest first — the answer to "have I actually been doing it", which the
+ * per-exercise cards below cannot give.
+ *
+ * ⚠️ A SESSION WITH NOTHING LOGGED STILL APPEARS. A bodyweight session can be completed in full having
+ * written no set rows at all (holds log nothing, and a press-up needs no kilograms), so a list built
+ * from the set log would quietly drop exactly the sessions a beginner does — the runner who most needs
+ * to see a row of ticks. That is the whole reason the completion store exists separately.
+ */
+function strengthSessionsHtml() {
+  const rows = loadSdone().slice().sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : (b.at || 0) - (a.at || 0)));
+  if (!rows.length) return "";
+  const shown = rows.slice(0, 8);
+  const list = shown.map((r) => {
+    const bits = [];
+    if (r.min) bits.push(r.min + " min");
+    if (r.ex) bits.push(r.ex + " exercise" + (r.ex === 1 ? "" : "s"));
+    bits.push((r.sets || 0) + " set" + (r.sets === 1 ? "" : "s") + " logged");
+    return '<div class="sh-row"><span class="sh-wk">' + esc(runDateLabelIso(r.d)) + '</span>' +
+      '<span class="sh-sets">' + esc(bits.join("  \\u00b7  ")) + '</span></div>';
+  }).join("");
+  return '<div class="card sh-card"><div class="sh-head"><div class="sh-main">' +
+    '<div class="sh-name">Sessions finished</div>' +
+    '<div class="sh-best"><b>' + rows.length + '</b> in all' + (rows.length > shown.length ? ' \\u00b7 showing the last ' + shown.length : "") + '</div>' +
+    '</div></div><div class="sh-rows">' + list + '</div></div>';
+}
 function viewStrengthHistory() {
   const hist = strengthHistory();
   const names = Object.keys(hist);
+  const sessions = strengthSessionsHtml();
   if (!names.length) {
-    return '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No strength logged yet</h3><p>Open a strength session, tap an exercise and record your weights and reps. Your progress on each lift will build up here.</p></div>';
+    // ⚠️ THE FINISHED-SESSION LIST STILL SHOWS WHEN NO LIFT HAS BEEN LOGGED, and it is the common case
+    // for a beginner on a bodyweight plan rather than an edge one. The empty state below is about the
+    // weight log specifically, so it is worded as such rather than claiming nothing has been done.
+    if (sessions) {
+      return sessions +
+        '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No weights logged yet</h3><p>Sessions you finish are listed above. Tap Log set during a session and enter a weight, and your progress on each lift will build up here.</p></div>';
+    }
+    return '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No strength logged yet</h3><p>Open a strength session, tap Start and record your weights and reps as you go. Your progress on each lift will build up here.</p></div>';
   }
   // Sort by most recently logged.
   // Most recently logged first. Dates, not week numbers: a week number means nothing once the plan
@@ -14145,7 +14579,8 @@ function viewStrengthHistory() {
       (tops.some((w) => w > 0) ? '<div class="sh-spark">' + spark + '</div>' : '') + '</div>' +
       '<div class="sh-rows">' + rows + '</div></div>';
   }).join("");
-  return '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your logged lifts — weight & reps over time.</div>' + cards;
+  return sessions +
+    '<div style="font-size:12.5px;color:var(--ink-faint);margin:0 2px 12px">Your logged lifts — weight & reps over time.</div>' + cards;
 }
 function dimLevel(vo2) { return vo2 < 40 ? 1 : vo2 < 50 ? 2 : vo2 < 60 ? 3 : 4; }
 /**

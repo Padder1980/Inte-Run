@@ -14930,6 +14930,163 @@ from the picker correctly clearing the store; a starved candidate list (push-up,
 equipment) showing the reason rather than an empty box; and mobility/rest sessions (no `exercises` at
 all) opening cleanly with zero Swap buttons.
 
-**Still to come in this track:** A5 the session player (rest timers, supersets, tap-to-log,
-completion), A6 e1RM and progression, A7 standalone programmes, A8 Strava as Weight Training, A9 the
-watch.
+**Still to come in this track:** A6 e1RM and progression, A7 standalone programmes, A8 Strava as
+Weight Training, A9 the watch. (A5's session player landed — see the chapter at the foot of this file.)
+
+## ✅ A5 — THE GUIDED STRENGTH PLAYER, AND A REST TIMER THAT IS RIGHT WITH THE PHONE FACE DOWN (2026-09-20)
+
+Tap Start on a strength day and the exercises run in order: supersets alternate, each set is logged with
+one tap against last time's numbers, rests count down and buzz, holds count down, and finishing ticks
+the day and lists the session under Logbook → Strength. Suite 1595 → **1617**;
+`test/strength-player.test.ts` holds 22 guards and **17 deliberate re-breaks were all caught**.
+
+⚠️⚠️ **THE ONE THING THIS STAGE IS ABOUT IS THAT REST IS MEASURED AGAINST AN ABSOLUTE TIMESTAMP AND NOT
+COUNTED IN TICKS.** The stretch player it is modelled on does one decrement per interval, so a throttled
+interval makes its clock run SLOW — harmless for a routine somebody is watching, wrong for the one timer
+whose whole job is to be right while the phone is on the floor. iOS throttles timers hard in a
+backgrounded web view (the same behaviour the coach schedule and the lock-screen distance both exist to
+work around). **Measured in a real browser: twenty seconds of wall clock with ZERO interval ticks left
+the countdown exactly twenty seconds further on — drift 0.0 s — where a tick-counting design would not
+have moved at all.** `strRestLeft()` derives from `Date.now()` on every repaint and the interval only
+decides how often the number is redrawn.
+
+⚠️ **THE TEN-SECOND WARNING IS NOT FIRED AFTER THE REST HAS ALREADY ENDED, AND THE `return` IS WHAT DOES
+IT.** Wake from a throttle at five seconds past the end and both thresholds are behind us; buzzing "ten
+seconds left" then is a statement about the time that is simply false. Measured: on a normal run-down the
+buzzes are `tick` at the threshold and `lift` at zero, once each; woken past the end, only `lift`.
+⚠️ **A `T.warned = true` WAS WRITTEN IN THAT BRANCH AND REMOVED AFTER A RE-BREAK PROVED IT DEAD** — the
+`return` precedes the warning check and `restEnd` is nulled, so the flag could not change any outcome.
+A redundant assignment beside a real one is what invites the next reader to delete the wrong one.
+
+### The engine says what a prescription means; the app never regexes the engine's own vocabulary
+
+⚠️⚠️ **A HOLD IS NOT A FIELD, IT IS A REP WORDING — AND THERE ARE THREE OF THEM, ACROSS TWO BUILDER
+PATHS.** `StrengthExercise` has no `hold` (that one belongs to stretches), so the only signal that a plank
+should count down rather than ask for kilograms is the `reps` string: `"30–45s hold"` from the A3 builder,
+`"20–40s hold"` from `BEGINNER_REPS`, and `"30s each leg"` for the balance drill — **a hold whose wording
+never says the word**, on the path a runner with no strength preferences still gets. `holdSecondsFor` in
+`src/strength/builder.ts` is the one definition, exported through `entry.ts`. A regex in the app layer
+would be a second copy of the engine's vocabulary that goes stale in silence: nothing fails, a plank just
+starts asking for weight.
+
+⚠️ **IT ANSWERS THE TOP OF THE RANGE, AND THE REGEX IS WHAT DOES THAT — NOT THE `Math.max`.** In every
+live wording the `s` is attached to the UPPER bound, so the lower one is followed by a dash and never
+matches. **Measured: every live wording yields exactly ONE match, so max and min are identical and a
+re-break swapping them changes nothing.** The max is defensive generality with no observable failure mode
+today, recorded at the line rather than deleted so nobody "verifies" it by removing it — and the guard was
+re-aimed at the real mechanism once the re-break exposed that it had been testing an unfalsifiable line.
+⚠️ Answering the bottom would have a countdown congratulate somebody a third of the way through.
+
+⚠️ **AND THE CLASSIFICATION IS SWEPT OVER REAL PLANS, NOT A LIST.** A hand-written list of rep strings
+goes stale the first time the builder rewords one; the guard generates plans across three levels, two
+goals and three lengths, and requires every distinct string produced to be classified correctly — plus at
+least one of each kind to have appeared, or the sweep proved nothing either way.
+
+### The play order — and a superset pair whose members have different set counts
+
+⚠️ **A SUPERSET ALTERNATES AND RESTS ONCE PER ROUND, WHICH IS THE ONLY REASON TO HAVE ONE.** The builder's
+own `pairCost` charges a pair `max(setsA, setsB)` rounds of `work × 2 + one rest` — so playing the pair as
+two separate blocks silently adds a rest per round and overruns the minutes printed on the card.
+
+⚠️⚠️ **AND A PAIR CAN HAVE UNEQUAL SET COUNTS — measured on a real 45-minute session, group 3 is a 2-set
+step-up paired with a 1-set plank.** Round 2 has no partner, so it is a single set with its own rest
+rather than half of a pair. Zipping the two lists and assuming equal length drops the step-up's second set
+entirely. Real play order for that session: `rdl#1 → pushup#1 → rdl#2`, `stepUp#1 → plank#1 → stepUp#2`.
+⚠️ **NO REST AFTER THE LAST SET OF THE SESSION** — a countdown starting when there is nothing left to come
+is a timer asking the runner to wait for the end of their own workout.
+⚠️ Guarded by sweeping every real generated strength session and requiring the player's set list to be a
+permutation of the prescribed one — every set exactly once, none invented.
+
+### A hold is performed and counted, and logged nowhere
+
+⚠️ A plank is not weight × reps. Writing its seconds into the reps field corrupts the one number A6's e1RM
+will read (Epley is defined for 1–10 reps), and `strengthHistory` drops any row carrying neither weight
+nor reps anyway — so a hold row would be written and then silently discarded. It is counted towards the
+session and the completion row; nothing else.
+⚠️ **THE LABEL SAID THE WORD TWICE** — "Hold for 30–45s hold", because the prescription already ends in
+it. Found by reading the rendered label in a browser, not the code, and stripped rather than assumed
+because the other live wording ("30s each leg") does not carry the word at all.
+
+### Finishing — a fact of its own, in its own store
+
+`SDONE_KEY = "interun_sdone_v1"`, one row per finished session: `{ d, s, at, sets, ex, min }`.
+
+⚠️ **(d, s) IS THE IDENTITY, FOR EXACTLY THE REASON THE SET LOG LEARNED IT.** Session ids are
+deterministic — `w3d2-strength` recurs in every rebuilt plan — so the id alone says "a session of this
+shape", not "this session on this day". Keyed on the id alone, finishing week 3's strength day reads as
+having already finished week 7's. Verified live: a second strength session on another day stays unticked.
+
+⚠️⚠️ **A FINISHED SESSION IS NOT DERIVABLE FROM THE SET LOG, AND NOT FROM `state.done` EITHER — WHICH IS
+WHY THE STORE EXISTS.** A runner can log three sets and walk away, and a bodyweight session can be
+finished in full having written no set rows at all (holds log nothing, a press-up needs no kilograms), so
+counting rows calls the first finished and the second unfinished — both answers wrong. And `seedDone`
+marks every non-rest session dated before today as done whether it happened or not, so `state.done`
+answers "is this in the past", not "did they do it".
+
+⚠️ **`seedDone` RE-DERIVES TODAY'S TICK FROM THE STORE, MATCHED ON DATE AND ID.** `state.done` is rebuilt
+from scratch on every boot, so a tick set by the player and nowhere else lives exactly until the app is
+next launched — the runner finishes a session, closes the app, comes back and the day is unticked.
+Verified by reloading: the tick survives, and the Start button then reads "Do it again".
+⚠️ **FINISH IS IDEMPOTENT AND UPDATES RATHER THAN SKIPS** — the Finish button, a second tap and
+re-finishing an already-completed session all produce one row, and finishing again after logging two more
+sets records the fuller attempt rather than the first.
+
+### Wiring — and the guard from the last stage that caught this one
+
+⚠️ **THE STRENGTH START MUST NEVER REACH THE RUNNING PATH.** `#sdStart` opens "where shall we record
+this", which leads to GPS, a wake lock, the coach and a live `LiveSession` — every one wrong for a session
+done standing still in a room, and the GPS one wrong expensively (the location indicator on for forty
+minutes of squats). `PRIMARY_TYPES` is the runnable set and excludes strength, so the two ids cannot
+collide by accident. Driven: **0 calls to `openStartWhereSheet`, 0 geolocation watches, `LIVE` still null.**
+
+⚠️⚠️ **A4's "EVERY CONSUMER OF `.exercises` CALLS `withSwaps`" SWEEP CAUGHT A5 ON ITS FIRST FULL RUN.** The
+player's flattener read `.exercises` with no swap applied — correct only because the one caller happened
+to pass `withSwaps`' output, which is a convention every future caller has to know and one of them
+eventually will not. **Swaps are now resolved at the player's ENTRY POINT**, so `SPLAY.sess` is the swapped
+session for the player's whole life and the flattener stays pure; it is exempted with that reason, and a
+guard proves the entry point still applies it rather than taking the exemption on trust. That is the
+derived-sweep-over-a-hand-written-list design doing exactly its job one stage later.
+
+⚠️ **`closeSheet` STOPS THE PLAYER**, or its interval runs on behind a dismissed sheet and buzzes into the
+next session — the trap `stretchStop`'s own comment records. `openStrengthPlayer` also stops any previous
+one first, so two intervals can never run together.
+⚠️ **THE PLAYER REPLACES THE SHEET BODY IN PLACE** and never opens a second `.sheet-ov`, like the swap
+picker and `openProfilePreview`: a nested sheet needs its own back-stack and is the shape of z-order bug
+this project has shipped twice.
+
+### Three measurement traps this stage paid for
+
+⚠️⚠️ **AN OPEN OVERLAY MAKES EVERY `elementFromPoint` HIT-AREA PROBE REPORT THE BARE BOX.** My tap-target
+sweep read **36.75 px** for `.mini-btn` against this app's 44 px floor and I was one edit from "fixing" it
+— when `.mini-btn` has had a 44 px `::after` since the accessibility pass and the computed `min-height`
+was 44 px the whole time. An onboarding guide (`guide-ov on`, z-index 80, above the sheet's 70) was open
+and swallowing every probe point. Dismissed, every control measures **44.25 px minimum**. **Ask what is
+on top before believing a hit-test.**
+
+⚠️⚠️ **A RE-BREAK HARNESS THAT DOES NOT CHECK ITS BASELINE BUILDS REPORTS FALSE PASSES — fifteen of them
+in one run, observed.** A backtick in one of my own comments broke the build between the edit and the
+re-break run, so every `web/app.ts` break reported "the build refused it" and the harness scored them
+caught. It now refuses to start against a tree that does not build. **A harness that cannot tell "my break
+was rejected" from "nothing built here anyway" is not a harness.**
+
+⚠️ **AND A GUARD MUST NOT SLICE ON A MARKER THE DEFECT ITSELF CAN INTRODUCE.** The hold-branch guard
+sliced from `it.hold` to where the rep-logging branch begins — and a re-break that put a rep-logging div
+INSIDE the hold branch moved that very marker, so the slice collapsed and the assertion passed against
+exactly the defect it names. It renders the two states and looks at the output now, with the rep set as
+its own control so "no weight boxes" cannot be satisfied by rendering nothing.
+
+⚠️ **THE BACKTICK RULE FIRED TWICE, BOTH IN MY OWN COMMENTS**, and the first time `build exit=0` was
+**`tail`'s** exit code, not the build's — the pipeline lied about the very thing the rule exists to catch.
+Read the build's own status.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1617 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged, and the
+progression audit **byte-for-byte identical to A4's baseline** (24 under-floor weeks of 18,216, deload
+depth 29.3%, taper 35.8/21.3/47.4%, long-run inversion 0.9% — A5 adds a pure function nothing in the
+generator calls). Driven end to end in a real browser: a 16-set session played to completion, the 20-second
+throttle test, both buzz cases, a hold started and stopped early, the completion row, the reload, the
+Strength tab, and no horizontal overflow at 430 and 320 px in both themes.
+
+**Still to come in this track:** A6 e1RM and progression, A7 standalone programmes, A8 Strava as Weight
+Training, A9 the watch.

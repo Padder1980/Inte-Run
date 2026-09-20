@@ -288,7 +288,14 @@ test("BLOCKER: every consumer of .exercises on a session-shaped object either ca
   //  - migrateSlog's read of raw.exercises[exIdx] reconstructs HISTORY from the v1 store, which
   //    predates A4 entirely — a swap made today must not rewrite what a runner logged before swaps
   //    existed.
-  const EXEMPT = new Set(["warmupCardFor", "profileImpact", "migrateSlog", "withSwaps"]);
+  //  - strPlayItems is a PURE flattener of an already-resolved session: A5's openStrengthPlayer
+  //    applies withSwaps at the ENTRY POINT, so SPLAY.sess is the swapped session for the player's
+  //    whole life. ⚠️ THIS SWEEP IS WHAT CAUGHT THAT. The first cut resolved swaps at the call site
+  //    instead, which was correct only by convention — a convention every future caller has to know,
+  //    and one of them eventually will not. Making the flattener read the store itself would make it
+  //    impure and untestable without one; the entry point covers every caller, and the test below
+  //    proves it is applied there rather than taking the exemption on trust.
+  const EXEMPT = new Set(["warmupCardFor", "profileImpact", "migrateSlog", "withSwaps", "strPlayItems"]);
   let sitesChecked = 0;
   for (const name of names) {
     if (EXEMPT.has(name)) continue;
@@ -318,6 +325,10 @@ test("the three exemptions above are genuinely length-only / historical, not swa
   assert.doesNotMatch(imp, /\.exercises\.map|\.exercises\[0\]|\.exercises\.forEach/, "profileImpact now reads exercise CONTENT, not just a count — it needs withSwaps");
   const mig = fnOf("migrateSlog");
   assert.match(mig, /raw\.exercises\[exIdx\]/, "migrateSlog's historical read moved — re-check the exemption still applies");
+  // strPlayItems is exempt above only because its ENTRY POINT resolves swaps. Move that back to the
+  // call site and the exemption is unearned — this is what says so.
+  assert.match(fnOf("openStrengthPlayer"), /const sess = withSwaps\(rawSess\)/,
+    "the strength player no longer resolves swaps at its entry point — strPlayItems' exemption is unearned");
 });
 
 // ---------------------------------------------------------------------------------------------

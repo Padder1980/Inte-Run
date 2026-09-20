@@ -44,7 +44,12 @@ export { fuellingFor } from "../src/science/fuelling.ts";
 export { listWorkouts, buildWorkout } from "../src/plan/session-templates.ts";
 export { EXERCISES, EQUIPMENT, EQUIPMENT_LABEL, PATTERNS, PATTERN_LABEL, PATTERN_WHY,
   exerciseById, exerciseIds, alternativesFor, exercisesFor, canDo, swapCandidatesFor } from "../src/strength/library.ts";
-export { STRENGTH_MINUTES, STRENGTH_LEVELS, STRENGTH_GOALS, REST_BY_INTENT } from "../src/strength/builder.ts";
+export { STRENGTH_MINUTES, STRENGTH_LEVELS, STRENGTH_GOALS, REST_BY_INTENT,
+  // ⚠️ The session player asks the ENGINE whether a prescription is a hold, rather than regexing the
+  // engine's own rep wording in the app layer. Three wordings are live across two builder paths and a
+  // second copy of that knowledge would go stale in silence — a plank would just start asking for
+  // kilograms. See the function's own comment.
+  holdSecondsFor } from "../src/strength/builder.ts";
 export { strengthSessionsFor, STRENGTH_MAX_PER_WEEK } from "../src/domain/strength-days.ts";
 export type { WorkoutOption } from "../src/plan/session-templates.ts";
 export type { FuellingPlan } from "../src/science/fuelling.ts";

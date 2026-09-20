@@ -14647,9 +14647,9 @@ scope precisely: the no-backticks rule is about `web/app.ts`'s runtime JS specif
 in the repo — checking WHICH file a backtick landed in before treating it as a defect saved chasing a
 non-issue in `session-templates.ts`.
 
-**Still to come in this track:** A4 swap (built on `alternativesFor`, already shipped here), A5 the
-session player, A6 e1RM and progression, A7 standalone programmes, A8 Strava as Weight Training,
-A9 the watch. (A3 preferences landed — see the chapter at the foot of this file.)
+**Still to come in this track:** A5 the session player, A6 e1RM and progression, A7 standalone
+programmes, A8 Strava as Weight Training, A9 the watch. (A3 preferences and A4 swap both landed —
+see the chapters at the foot of this file.)
 
 ## ✅ A3 — FIVE STRENGTH QUESTIONS, AND A SESSION BUILT TO THE TIME YOU ACTUALLY HAVE (2026-09-20)
 
@@ -14792,3 +14792,144 @@ regardless of count, and `strength` is already in `HARD_BEFORE_RACE` — but not
 the placement guard now sweeps race weeks out explicitly rather than leaving it to luck.
 ⚠️ **NOT SEEN ON A PHONE.** Everything above is a headless browser at desktop width. The equipment grid
 is nine tick-boxes and the detail block adds four questions to Training rhythm; worth the owner's eyes.
+
+## ✅ A4 — SWAP ANY EXERCISE, AND A REAL BUG THE GUARD COULDN'T SEE UNTIL THE UI WAS DRIVEN (2026-09-20)
+
+Every strength exercise now carries a "Swap" link. Suite 1576 → **1595**; `test/strength-swap.test.ts`
+holds 19 guards and **9 deliberate re-breaks were all caught** (two only after the design was made
+more robust, not just guarded — those two are below).
+
+⚠️⚠️ **THE FIRST-CUT DESIGN WAS WRONG AND A DESK CHECK OF THE CODE COULD NOT HAVE FOUND IT.** A swap is
+keyed `"sessionId|exerciseId" -> "toId"`, and the first version keyed the lookup on `e.id` — the
+CURRENTLY DISPLAYED id. That is correct for a FIRST swap and silently wrong for a second one on the
+same slot: after squat → stepUp, tapping Swap again on the displayed "Step-up" looked up
+`"w1-d1-strength|stepUp"` instead of `"w1-d1-strength|squat"`, wrote a **brand-new, unreachable key**,
+and left the original `squat → stepUp` mapping untouched underneath it. Picking "squat" from that
+second picker did **nothing at all**, because nothing ever looks that key up. This was found by
+**driving the real sheet in a browser**, not by reading the code or by the guard suite — every
+assertion I had written first still passed, because they all tested a single swap in isolation.
+
+⚠️ **THE FIX: `slotId`, STAMPED ON EVERY EXERCISE, ALWAYS, WHETHER OR NOT IT HAS EVER BEEN SWAPPED.**
+`withSwaps(sess)` resolves each exercise by `e.slotId || e.id`, then stamps the ORIGINAL id back onto
+the output as `slotId` — so the Swap button (`exerciseBlock`) reads `e.slotId` and always has the
+correct key to swap FROM, regardless of how many times this slot has already changed. `e.slotId ||
+e.id` (not `e.id` alone) is what makes a repeat application of `withSwaps` **idempotent** — applying it
+to its own output changes nothing further, which matters if a future consumer (A5's session player,
+A9's watch payload) ever re-reads an already-resolved session and calls this again.
+
+⚠️ **THE CANDIDATE LIST NEVER OFFERS THE EXERCISE ITSELF, WHICH MEANS "BACK TO ORIGINAL" NEEDS ITS OWN
+ROW.** `swapCandidatesFor` self-excludes the source id (same as A2's `alternativesFor`) — so once a
+slot has an active swap, the ranked list can never contain the way back to what it originally
+prescribed. `swapPickerHtml` checks whether a swap is currently active for this slot and, if so,
+prepends a distinct "Back to the original pick" row built from the catalogue entry directly.
+
+⚠️ **`swapCandidatesFor` IS NOT `alternativesFor` WITH AN EXTRA ARGUMENT, AND THE DIFFERENCE IS WHO IS
+CHOOSING.** `alternativesFor` is the plan BUILDER's own fallback when an exercise is unreachable — it
+has no level parameter, because the builder already decided the level for that slot. A runner tapping
+Swap is choosing for THEMSELVES, and offering something above their own stated level (A3's "how much
+lifting have you done") would undo that question one tap after it was answered — a beginner swapping
+away from a kettlebell deadlift must never be offered a barbell one. `canDo` already folds equipment
+and level into one check, so `swapCandidatesFor` reuses it rather than repeating `alternativesFor`'s
+bare equipment test. Measured: at bodyweight+beginner with no equipment ticked, **13 of 62** catalogue
+exercises reach a genuinely empty candidate list (push and carry each have only one or zero
+bodyweight-eligible members) — real and reachable at the DEFAULT answer, not an unusually tight tick,
+so the picker names the reason rather than showing a dead box.
+
+⚠️ **ONLY IDENTITY MOVES.** `sets`, `reps`, `restSeconds`, `loadPercent1RM`, `contacts` and `superset`
+all stay on the exercise instance untouched — a slot prescribed heavy triples off three minutes' rest
+is still heavy triples off three minutes' rest; only which movement fills it changes. Driven through
+the real function with every prescription field populated, not just asserted on paper.
+
+⚠️ **THE PICKER RENDERS THE SCHEMATIC FIGURE, NEVER `exVisual`.** `exVisual` can return an interactive
+`<button data-exdemo>` when a still or animation exists, and nesting a button inside the row's own
+`<button data-swapto>` is invalid HTML and an unpredictable tap target. A2's own `libCard` sidesteps
+this by not wrapping its card in a button at all; here the row itself has to be tappable, so the
+thumbnail is `exAnim(cand.pattern)` — always a plain, non-interactive `<svg>`.
+
+⚠️ **NO NEW CSS AT ALL.** The picker reuses `.sw-row`/`.sw-b`/`.sw-n`/`.sw-d`/`.arr` (the exact shell
+`startWhereHtml` already uses for "where shall we record this"), `.ex-anim` for the thumbnail slot, and
+`.mini-btn.pi-ghost` for the back button — the same "Go back" class `openProfilePreview` uses. The
+per-exercise Swap trigger reuses `.pf-edit`, the app's own "Edit"/"Filter"/"View all" micro-link, with
+no inline style override so it inherits the on-ladder `--t-body` token rather than adding a literal px
+value the design-system ratchet would have to count.
+
+⚠️ **THE PICKER REPLACES THE SHEET BODY IN PLACE — IT NEVER OPENS A SECOND `.sheet-ov`.** Every picker
+in this app that needs to return to something already open (`openProfilePreview`, `wireHeatControls`'
+clear-adaptation handler) rewrites `#sheetBody` and re-wires rather than stacking a second overlay — a
+nested sheet needs its own back-stack and is exactly the shape of z-order bug this project has shipped
+before (the Inte-Club share ask opening behind the card it was asking about).
+
+⚠️ **PRUNING SPLITS THE KEY BEFORE CHECKING IT.** `dayOverride` and `heatAdapt` prune by comparing a
+WHOLE key against a live session id; a swap key is `"sessionId|exerciseId"`, so comparing the whole
+thing would call every swap stale on every boot — no session is literally named `"w3d2-strength|squat"`.
+`seedDone` splits on the first `"|"` before checking `alive`. Confirmed live: turning strength off
+entirely (which removes every strength session) correctly empties the swap store; changing days-per-
+week alone did not, because the session id `w1-d1-strength` happened to survive at both 3 and 5 days —
+worth knowing before trusting a single manual test as proof either way.
+
+⚠️ **`SWAP_KEY` SITS WITH THE OTHER STORE KEYS FOR DISCOVERABILITY, NOT BECAUSE IT NEEDS TO.** Unlike
+`JOURNAL_KEY`/`CLUBPROF_KEY`/`SLOG2_KEY`, nothing reads it from inside `adoptPlan`'s own call chain —
+`withSwaps` only runs when a session sheet is actually rendered, well after boot — so there is no real
+temporal-dead-zone risk here. Said plainly in the comment rather than borrowing the neighbours' urgency
+for a risk that does not apply.
+
+### Three guard weaknesses found by the re-breaks, all mine
+
+⚠️⚠️ **A LIFTED HARNESS THAT OMITS ONE CONSTANT MEASURES A STRICTLY EASIER PROGRAM, AND EVERY GUARD
+STILL PASSED.** `loadSwaps`/`saveSwaps` both read/write `localStorage` under `SWAP_KEY`, inside a
+`try/catch`. My first lift concatenated the five functions but never declared `SWAP_KEY` in scope — so
+every call threw `ReferenceError`, the catch swallowed it, `loadSwaps()` always answered `{}`, and
+`saveSwaps` always wrote nothing. **Three tests calling `setSwap` then reading the result all failed**,
+which is what caught it — but it is worth naming as the exact trap this file records for the engine's
+own distance tables: a probe supplying its own (incomplete) dependencies proves nothing about the
+shipped code. Fixed by extracting the real `const SWAP_KEY = "...";` line via regex rather than
+retyping it, so the lift cannot drift from the constant it depends on.
+
+⚠️ **A DEFENSIVE COMMENT WAS TESTED FOR THE FIRST TIME BY A RE-BREAK, AND THE COMMENT WAS WRONG.**
+`withSwaps` originally read `const slotId = e.id;` with a comment claiming this was "safe only because
+the input is always pristine" — true for every call site that exists TODAY, but untested and, on
+inspection, an unnecessary constraint: `e.slotId || e.id` costs nothing and makes the function
+genuinely idempotent under chaining, which is strictly more robust for a future caller. Re-broken back
+to `e.id` alone, it passed every existing guard — so a new one was added that drives the actual chain
+(`withSwaps(withSwaps(sess))` must equal `withSwaps(sess)`), and the code was changed to the more
+robust form rather than leaving the weaker one merely documented as fragile.
+
+⚠️ **A LOOKUP WITH A FALLBACK KEY IS A CROSS-SESSION LEAK WAITING FOR A DAY IT IS POPULATED.** Re-broke
+the lookup to `m[sess.id + "|" + slotId] || m[slotId]` — a bare-exercise-id fallback. Nothing the real
+app ever WRITES could populate that fallback today, so no existing guard could tell the difference; but
+the safety property `withSwaps` exists to guarantee is that a decision made for one session can never
+affect another, and a fallback lookup breaks that the day anything (a future bug, a hand-edited
+`localStorage`, a colliding backup restore) ever writes a bare key. Pinned the exact scoped lookup
+expression rather than leaving the property merely true-by-luck.
+
+### The reachability sweep, and the two exemptions it found for free
+
+`test/strength-swap.test.ts` derives every top-level function in the built page and requires each one
+reading `.exercises` on a session-shaped object to call `withSwaps` first — a hand-written list is
+exactly what let the days question and the strength toggle each ship a screen that silently disagreed
+with the plan (this file records both). Three exemptions, each justified rather than assumed:
+- `warmupCardFor` gates on **length only** (`sess.exercises && sess.exercises.length`) — a swap never
+  changes how many exercises a session has.
+- `profileImpact`'s own `strengthShape` row reports a **count and a duration** ("45 min · 7
+  exercises") — found by this very sweep, not assumed safe in advance, and correct for the same
+  length-only reason.
+- `migrateSlog`'s read of `raw.exercises[exIdx]` reconstructs **history** from the pre-A1 v1 store,
+  which predates swaps entirely — a swap made today must not rewrite what a runner logged before A4
+  existed.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc
+clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1595 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, the progression audit
+byte-for-byte unchanged from A3's baseline (24 under-floor weeks of 18,216, deload depth 29.3%, taper
+35.8/21.3/47.4%, long-run inversion 0.9% — A4 touches only render-time exercise identity, never plan
+generation), both design ratchets unchanged, and 9 deliberate re-breaks all caught with the tree
+restored byte-identical. Driven end to end in a real browser: a squat swapped to a step-up, a set
+logged against the swapped-in exercise, both surviving a sheet close/reopen; a second swap on the same
+slot correctly overwriting the first key rather than adding a dead one; picking "back to the original"
+from the picker correctly clearing the store; a starved candidate list (push-up, beginner, no
+equipment) showing the reason rather than an empty box; and mobility/rest sessions (no `exercises` at
+all) opening cleanly with zero Swap buttons.
+
+**Still to come in this track:** A5 the session player (rest timers, supersets, tap-to-log,
+completion), A6 e1RM and progression, A7 standalone programmes, A8 Strava as Weight Training, A9 the
+watch.

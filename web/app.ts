@@ -6294,6 +6294,18 @@ const CLUBPROF_KEY = "interun_clubprofile_v1";
  */
 const SLOG2_KEY = "interun_slog_v2";
 /**
+ * Stage A4. "sessionId|fromExerciseId" -> "toExerciseId" — a runner's own choice to swap one
+ * movement for another, persisting across renders and plan rebuilds until the session it names no
+ * longer exists in the live plan (seedDone prunes it, the same way as dayOverride and heatAdapt).
+ *
+ * ⚠️ DECLARED WITH THE STORE KEYS FOR DISCOVERABILITY, NOT BECAUSE IT NEEDS TO BE. Unlike
+ * JOURNAL_KEY/CLUBPROF_KEY/SLOG2_KEY above, nothing reads this key from inside adoptPlan's own call
+ * chain — withSwaps is applied only when a session sheet is actually rendered, well after boot — so
+ * there is no real temporal-dead-zone risk here. It sits beside its siblings because "a store key
+ * belongs where the store keys are" (CLUBPROF_KEY's own words) is where the next reader will look.
+ */
+const SWAP_KEY = "interun_swap_v1";
+/**
  * ⚠️ A CAP, BECAUSE THE STORE IS localStorage AND THAT IS WHERE THE WHOLE TRAINING HISTORY LIVES.
  * A row is about 70 bytes, so 12,000 is roughly four years at three sessions a week with eight sets a
  * session, for under a megabyte. Pruning folds the dropped rows' maxima into bests first (below), so
@@ -7486,6 +7498,18 @@ function seedDone() {
     Object.keys(state.heatAdapt).forEach((k) => { if (!alive[k]) { delete state.heatAdapt[k]; heatChanged = true; } });
   } catch (e) { try { console.warn("heat prune skipped", e); } catch (e2) {} }
   if (heatChanged) saveHeatAdapt();
+  // ⚠️ SWAPS ARE KEYED "sessionId|fromExerciseId", NOT BARE session ids — dayOverride and heatAdapt
+  // prune by comparing a whole key against alive; a swap key must be split first, or every row is
+  // "stale" (no session is literally named "w3d2-strength|squat") and the store empties on every boot.
+  let swapChanged = false;
+  try {
+    const alive = {};
+    PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => { alive[s.id] = 1; }));
+    EXTRA.forEach((e) => { alive[e.id] = 1; });
+    const sw = loadSwaps();
+    Object.keys(sw).forEach((k) => { if (!alive[k.slice(0, k.indexOf("|"))]) { delete sw[k]; swapChanged = true; } });
+    if (swapChanged) saveSwaps(sw);
+  } catch (e) { try { console.warn("swap prune skipped", e); } catch (e2) {} }
   const today = todayIso();
   PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => {
     if (s.type === "rest") return;
@@ -11151,6 +11175,129 @@ function migrateSlog() {
   s.meta = { migratedAt: new Date().toISOString(), migrated: moved, skipped: skipped };
   slogFlush();
 }
+// ---- Swap an exercise (A4) --------------------------------------------------------------------
+function loadSwaps() { try { return JSON.parse(localStorage.getItem(SWAP_KEY) || "{}") || {}; } catch (e) { return {}; } }
+function saveSwaps(m) { try { Object.keys(m).length ? localStorage.setItem(SWAP_KEY, JSON.stringify(m)) : localStorage.removeItem(SWAP_KEY); } catch (e) {} }
+function swapKey(sessId, fromId) { return sessId + "|" + fromId; }
+function setSwap(sessId, fromId, toId) {
+  const m = loadSwaps();
+  // A swap back to the exercise the slot already prescribes is not a swap — clearing the key rather
+  // than storing an identity mapping keeps the store free of no-op rows nobody would ever write by hand.
+  if (toId === fromId) delete m[swapKey(sessId, fromId)];
+  else m[swapKey(sessId, fromId)] = toId;
+  saveSwaps(m);
+}
+/**
+ * The session as the runner should actually see it — every swapped exercise resolved, the log-eligible
+ * fields untouched.
+ *
+ * ⚠️⚠️ EVERY EXERCISE CARRIES slotId, WHICH IS THE ORIGINAL id AND NEVER THE DISPLAYED ONE. A swap is
+ * keyed and looked up by the SLOT's own identity — squat, rdl, whatever the session library originally
+ * prescribed — not by whatever happens to be showing on screen. Reading e.id for a second swap breaks
+ * the moment a first one has already happened: after squat -> stepUp, tapping Swap again on the
+ * displayed "Step-up" would look up "sessionId|stepUp" instead of "sessionId|squat", write a brand-new
+ * key, and leave the ORIGINAL squat -> stepUp mapping untouched underneath it — so picking "squat"
+ * again from that second picker silently did nothing at all, because nothing ever looks that key up.
+ * Driving the real UI (not just the guard) is what caught this. exerciseBlock reads e.slotId for the
+ * button; withSwaps is the only place that ever sets it, and it always sets it — even on an exercise
+ * with no swap applied — so the button has one consistent field to read either way.
+ *
+ * ⚠️ e.slotId OR e.id, NOT e.id ALONE — this is what keeps the function idempotent if it is ever
+ * called on its own output. Every caller today happens to pass a session straight off RAW or off
+ * SHEET_CTX.sess, never the result of a previous withSwaps call, so e.id alone would work for every
+ * real call site that exists right now — but a FUTURE consumer (A5's session player, A9's watch
+ * payload) re-reading an already-resolved session and calling this again would otherwise re-key off
+ * the DISPLAYED id and get exactly the second-swap defect this file's header describes, one layer
+ * further out. Reading the stamped slotId first when it exists makes a repeat application a no-op
+ * rather than a second, wrong lookup.
+ *
+ * ⚠️ ONLY IDENTITY MOVES. sets, reps, restSeconds, loadPercent1RM, contacts and superset all stay on
+ * the exercise instance untouched — that is what "the swap sticks, the prescription doesn't move"
+ * means. A slot prescribed heavy triples off three minutes' rest is still heavy triples off three
+ * minutes' rest; only which movement fills it changes.
+ */
+function withSwaps(sess) {
+  if (!sess || !sess.exercises || !sess.exercises.length) return sess;
+  const m = loadSwaps();
+  const exercises = sess.exercises.map((e) => {
+    const slotId = e.slotId || e.id;
+    const to = m[swapKey(sess.id, slotId)];
+    const d = (to && to !== slotId) ? RC.exerciseById(to) : null;
+    // An id the catalogue no longer resolves — never invent a stand-in, just show the original.
+    if (!d) return Object.assign({}, e, { slotId: slotId });
+    return Object.assign({}, e, { id: d.id, name: d.name, primary: d.primary, secondary: d.secondary,
+      pattern: d.pattern, equipment: d.equipment, anim: d.anim, cue: d.cue, slotId: slotId });
+  });
+  return Object.assign({}, sess, { exercises: exercises });
+}
+/**
+ * Alternatives for one exercise, gated by the runner's own level and equipment (never the level the
+ * plan built the slot at — see swapCandidatesFor's own comment for why that distinction matters).
+ */
+function swapCandidatesForRunner(fromId) {
+  return RC.swapCandidatesFor(fromId, strengthKitOf(profile), strLevelVal(profile));
+}
+// ⚠️ .sw-row / .sw-b / .sw-n / .sw-d / .arr, NOT NEW CLASSES — the same tappable-row shell
+// startWhereHtml already uses for "where shall we record this", reused rather than duplicated. The
+// thumbnail borrows .ex-anim's 92x100 slot from the exercise block above it.
+function swapCandidateRow(cand, note) {
+  // ⚠️ THE SCHEMATIC FIGURE, NEVER exVisual — exVisual can return an interactive
+  // <button data-exdemo> (when a still/animation exists), and nesting a button inside this row's own
+  // <button data-swapto> is invalid HTML and an unpredictable tap target. A2's own libCard sidesteps
+  // this by not wrapping its card in a button at all; here the row itself must be tappable, so the
+  // thumbnail stays the plain, non-interactive <svg> instead. The demo is one tap away anyway, once
+  // this candidate is picked and shown in the session sheet with its own exVisual.
+  return '<button class="sw-row" data-swapto="' + esc(cand.id) + '">' +
+    '<div class="ex-anim">' + exAnim(cand.pattern) + '</div>' +
+    '<span class="sw-b"><span class="sw-n">' + esc(cand.name) + '</span>' +
+    '<span class="sw-d">' + esc(note || cand.primary) + '</span></span>' +
+    '<span class="arr">\\u203a</span></button>';
+}
+function swapPickerHtml(fromId) {
+  const sessId = SHEET_CTX && SHEET_CTX.sess ? SHEET_CTX.sess.id : null;
+  const from = RC.exerciseById(fromId);
+  // ⚠️ swapCandidatesFor NEVER OFFERS fromId BACK — it is the thing being swapped away FROM, excluded
+  // by its own id === id check. So a runner who has already swapped this slot has no way back to what
+  // it originally prescribed unless that original is offered as its own row, separately from the
+  // ranked alternatives below it.
+  const active = sessId ? loadSwaps()[swapKey(sessId, fromId)] : null;
+  const original = (active && from) ? swapCandidateRow(from, "Back to the original pick") : "";
+  const cands = swapCandidatesForRunner(fromId);
+  const list = (original || cands.length)
+    ? '<div class="sw-list">' + original + cands.map((c) => swapCandidateRow(c)).join("") + '</div>'
+    // ⚠️ A REASON, NOT A DEAD LIST, AND MEASURED RATHER THAN ASSUMED REACHABLE. Swept every catalogue
+    // id at Beginner with no equipment ticked (the DEFAULT, not an unusually tight answer): 13 of 62
+    // reach this branch, because "push" and "carry" each have only one or zero bodyweight-eligible
+    // members — swapping away from a push-up with nothing ticked genuinely has nowhere else to go.
+    : '<div class="q-hint" style="margin:10px 2px">Nothing at your level fits what you\\u2019ve ticked in Training rhythm. Add equipment there, or keep this one.</div>';
+  return '<button class="mini-btn pi-ghost" id="swapBack">\\u2039 Back to session</button>' +
+    '<div class="sheet-h" style="margin-top:14px">Swap ' + esc(from ? from.name : fromId) + '</div>' +
+    '<p class="q-hint" style="margin:4px 2px 14px">Same movement family and muscle, using what you have. Your sets and rest stay the same \\u2014 only the exercise changes.</p>' +
+    list;
+}
+function openSwapPicker(fromId) {
+  if (!SHEET_CTX || !SHEET_CTX.sess) return;
+  $("sheetBody").innerHTML = swapPickerHtml(fromId);
+  wireSwapPicker(fromId);
+}
+function wireSwapPicker(fromId) {
+  const back = $("swapBack");
+  if (back) back.onclick = () => reopenSessionSheet();
+  document.querySelectorAll("[data-swapto]").forEach((b) => b.onclick = () => {
+    if (!SHEET_CTX || !SHEET_CTX.sess) return;
+    setSwap(SHEET_CTX.sess.id, fromId, b.dataset.swapto);
+    reopenSessionSheet();
+  });
+}
+// ⚠️ REPLACES THE SHEET BODY IN PLACE, RATHER THAN OPENING A SECOND SHEET. Every picker in this app
+// that needs to return to something already open (openProfilePreview, wireHeatControls' clear-adapt
+// handler) rewrites #sheetBody and re-wires, never stacks a second .sheet-ov — a nested sheet would
+// need its own back-stack and is exactly the shape of z-order bug this project has shipped before.
+function reopenSessionSheet() {
+  if (!SHEET_CTX || !SHEET_CTX.sess) return;
+  $("sheetBody").innerHTML = sessionSheetHtml(SHEET_CTX.sess, SHEET_CTX.week);
+  wireSheet();
+}
 // ⚠️ ONE RENDERER, TWO MODES — an exercise is prescribed as sets x reps and gets weight/reps boxes to
 // log into; a STRETCH is prescribed as a hold and has nothing to log. Everything else about the row is
 // the same (the animated demo, the name, the area, the cue), so a stretch carries a hold field and takes the
@@ -11178,7 +11325,14 @@ function exerciseBlock(sessId, iso, e) {
   }
   const sec = e.secondary && e.secondary.length ? ' <span class="ex-sec">· ' + e.secondary.map(esc).join(", ") + '</span>' : "";
   return '<div class="ex"><div class="ex-anim">' + exVisual(e) + '</div>' +
-    '<div class="ex-main"><div class="ex-name">' + esc(e.name) + '</div>' +
+    '<div class="ex-main"><div class="ex-name">' + esc(e.name) +
+    // ⚠️ REUSES .pf-edit, THE APP'S OWN "Edit"/"Filter"/"View all" MICRO-LINK — not a new class, and
+    // no inline size override, so it inherits the same on-ladder --t-body token those already use
+    // rather than adding a literal px value the design-system ratchet would have to count. The id
+    // lives on data-swap and nowhere else, so wireSheet's click handler resolves it the usual way.
+    // ⚠️ e.slotId, NEVER e.id — see withSwaps' own comment. e.id is whatever is CURRENTLY DISPLAYED,
+    // which after one swap is no longer the key any mapping is stored or looked up under.
+    '<button class="pf-edit" type="button" data-swap="' + esc(e.slotId || e.id) + '" aria-label="Swap ' + esc(e.name) + '">Swap</button></div>' +
     '<div class="ex-mus"><b>' + esc(e.primary) + '</b>' + sec + '</div>' +
     '<div class="ex-presc">' + e.sets + ' × ' + esc(e.reps) + '</div></div></div>' +
     '<div class="ex-cue">' + esc(e.cue) + '</div>' +
@@ -11431,6 +11585,11 @@ function whyThisSession(sess) {
     '<div class="sd-whyb">' + esc(sess.description) + '</div></details>';
 }
 function sessionSheetHtml(sess, week) {
+  // ⚠️ THE ONE CHOKE POINT — every current and future consumer of this sheet reads sess.exercises
+  // through here, so a swap cannot be applied in one caller and forgotten in the other. Same reasoning
+  // as heatApplied at openSessionSheet: the decision is stored, the adapted object never is, and it is
+  // re-derived on every single render rather than baked into anything persisted.
+  sess = withSwaps(sess);
   const sc = "var(--eff-" + effortOf(sess) + ")";
   // ⚠️ THE TIME ON THE CARD MUST INCLUDE THE WARM-UP WE ACTUALLY PRESCRIBE. Generating longer,
   // more specific warm-ups without telling the clock made every number here wrong: measured, an
@@ -11517,6 +11676,8 @@ function wireSheet() {
   });
   document.querySelectorAll("#sheetBody [data-x]").forEach((inp) => inp.oninput = () => slogWrite(inp.dataset.d, inp.dataset.s, inp.dataset.x, Number(inp.dataset.i), inp.dataset.f, inp.value.trim()));
   wireExDemos();
+  // Same stopPropagation as wireExDemos' own button, inside the same .ex-main row.
+  document.querySelectorAll("[data-swap]").forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); openSwapPicker(b.dataset.swap); });
   const sdStart = $("sdStart"); if (sdStart && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess; sdStart.onclick = () => { closeSheet(); openStartWhereSheet(ss); }; }
   const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
 }

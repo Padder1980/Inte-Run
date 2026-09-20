@@ -10,7 +10,7 @@ Date: 20 September 2026. Repo at `813f63b`, tree clean, 1,533 tests passing, not
 2. An App Store Connect API key (App Manager role) saved to `~/.appstoreconnect/private_keys/` — that is what puts a build on testers' phones.
 3. Garmin form: **sent** ✓. When the approval email lands, say so — Track C starts that day.
 
-**Progress:** T1 ✅ done · A1 ✅ done (log survives a plan rebuild) · A2 ✅ done (17→62 exercises, one catalogue, equipment filter) · A3 ✅ done (five questions; sessions built to the time you have, placed on safe days; a plan with none of it answered is byte-identical) · **next: A4** (swap an exercise for a like-for-like alternative that persists).
+**Progress:** T1 ✅ done · A1 ✅ done (log survives a plan rebuild) · A2 ✅ done (17→62 exercises, one catalogue, equipment filter) · A3 ✅ done (five questions; sessions built to the time you have) · A4 ✅ done (swap any exercise for a like-for-like alternative; it sticks; found and fixed a real bug where swapping the same slot twice silently broke) · **next: A5** (session player — rest timers, supersets, tap-to-log, completion).
 
 **Resuming after a `/clear`?** Read this file and `CLAUDE.md` (its "Write down…" chapters record what each finished stage actually did, in detail this file doesn't repeat), `git pull`, then start the stage named in Progress above using the model below. Do not re-plan or re-research — the plan is done; the job now is executing stages one at a time.
 
@@ -24,8 +24,8 @@ Rule: **Opus** where a mistake would be silent — engine guardrails, data migra
 | A1 data foundation ✅ | Opus | D1 privacy policy | Opus | B9 plan queue | Sonnet |
 | A2 exercise library ✅ | Sonnet | D2 testers · D4 submit | Sonnet | B10 fact packs | Sonnet |
 | A3 preferences + builder ✅ | Opus | S Strava club row | Sonnet | B11 AI via Worker | Opus |
-| **A4 swap** | **Sonnet** | B1 manual/link/PRs | Opus | B12 yoga/pilates | Sonnet |
-| A5 session player | Opus | B2 skip · B3 time of day | Sonnet | C1/C2 Garmin | Opus |
+| A4 swap ✅ | Sonnet | B1 manual/link/PRs | Opus | B12 yoga/pilates | Sonnet |
+| **A5 session player** | **Opus** | B2 skip · B3 time of day | Sonnet | C1/C2 Garmin | Opus |
 | A6 e1RM/progression | Sonnet | B4 move ±1 week | Opus | C3 hardware test | (you) |
 | A7 standalone programmes | Opus | B5 return speed · B6 realignment | Opus | | |
 | A8 Strava WeightTraining | Sonnet | | | | |

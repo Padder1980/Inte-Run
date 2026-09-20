@@ -43,7 +43,7 @@ export { adaptSessionForHeat } from "../src/adapt/heat.ts";
 export { fuellingFor } from "../src/science/fuelling.ts";
 export { listWorkouts, buildWorkout } from "../src/plan/session-templates.ts";
 export { EXERCISES, EQUIPMENT, EQUIPMENT_LABEL, PATTERNS, PATTERN_LABEL, PATTERN_WHY,
-  exerciseById, exerciseIds, alternativesFor, exercisesFor, canDo } from "../src/strength/library.ts";
+  exerciseById, exerciseIds, alternativesFor, exercisesFor, canDo, swapCandidatesFor } from "../src/strength/library.ts";
 export { STRENGTH_MINUTES, STRENGTH_LEVELS, STRENGTH_GOALS, REST_BY_INTENT } from "../src/strength/builder.ts";
 export { strengthSessionsFor, STRENGTH_MAX_PER_WEEK } from "../src/domain/strength-days.ts";
 export type { WorkoutOption } from "../src/plan/session-templates.ts";

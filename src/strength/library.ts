@@ -238,3 +238,39 @@ export function alternativesFor(id: string, owned: Equipment[]): (ExerciseDef & 
   out.sort((a, b) => b.score - a.score);
   return out.map(({ score, ...rest }) => rest);
 }
+
+/**
+ * Candidates to SWAP an exercise for, from Stage A4 — gated by pattern, owned equipment AND LEVEL.
+ *
+ * ⚠️ THIS IS NOT `alternativesFor` WITH AN EXTRA ARGUMENT, AND THE DIFFERENCE IS WHO IS CHOOSING.
+ * `alternativesFor` is the plan BUILDER'S fallback when an exercise is unreachable — the builder has
+ * already decided the level for that slot, so there is nothing left to gate. A runner tapping Swap is
+ * choosing for THEMSELVES, and offering something above their own stated level would undo the A3
+ * question ("how much lifting have you done") one tap after it was answered — a beginner swapping out
+ * a kettlebell deadlift must never be offered a barbell one. `canDo` already folds equipment and level
+ * into one check, so this reuses it rather than repeating `alternativesFor`'s bare equipment test.
+ *
+ * Ranking is identical to `alternativesFor`: same pattern is the hard filter, same primary muscle is
+ * a ranking bonus (not a requirement — "fallback same pattern" in the stage's own words), then
+ * secondary-muscle overlap breaks ties.
+ */
+export function swapCandidatesFor(
+  id: string,
+  owned: Equipment[],
+  level: ExerciseLevel,
+): (ExerciseDef & { id: string })[] {
+  const from = EXERCISES[id];
+  if (!from) return [];
+  const out: (ExerciseDef & { id: string; score: number })[] = [];
+  for (const cand in EXERCISES) {
+    if (cand === id) continue;
+    const d = EXERCISES[cand]!;
+    if (d.pattern !== from.pattern) continue;
+    if (!canDo(d, owned, level)) continue;
+    const overlap = d.secondary.filter((m) => from.secondary.includes(m) || m === from.primary).length +
+      (d.primary === from.primary ? 2 : 0);
+    out.push({ id: cand, ...d, score: overlap });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out.map(({ score, ...rest }) => rest);
+}

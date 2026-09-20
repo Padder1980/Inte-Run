@@ -51,6 +51,13 @@ export { STRENGTH_MINUTES, STRENGTH_LEVELS, STRENGTH_GOALS, REST_BY_INTENT,
   // kilograms. See the function's own comment.
   holdSecondsFor } from "../src/strength/builder.ts";
 export { strengthSessionsFor, STRENGTH_MAX_PER_WEEK } from "../src/domain/strength-days.ts";
+// A6 — turning the set log into coaching: estimated 1RM, a suggested next load with a reason, and
+// new-best detection. Pure over the log the app already holds; nothing new to store or migrate.
+export { epley1RM, bestE1RMKg, suggestLoad, sumVolumeKg,
+  LOAD_STEP_KG, LOAD_STEP_KG_BARBELL, LOAD_STEP_THRESHOLD_KG, RPE_HOLD_FLOOR } from "../src/strength/progression.ts";
+export type { LoggedSet, LoadSuggestion } from "../src/strength/progression.ts";
+export { detectStrengthRecords } from "../src/strength/records.ts";
+export type { StrengthRecordHit, StrengthRecordKind } from "../src/strength/records.ts";
 export type { WorkoutOption } from "../src/plan/session-templates.ts";
 export type { FuellingPlan } from "../src/science/fuelling.ts";
 export { classifyRunner } from "../src/athlete/classification.ts";

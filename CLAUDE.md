@@ -15090,3 +15090,122 @@ Strength tab, and no horizontal overflow at 430 and 320 px in both themes.
 
 **Still to come in this track:** A6 e1RM and progression, A7 standalone programmes, A8 Strava as Weight
 Training, A9 the watch.
+
+## ✅ A6 — TURNING THE SET LOG INTO COACHING: e1RM, A SUGGESTED LOAD, AND A NEW-RECORD TOAST (2026-09-20)
+
+Every lift now shows an estimated one-rep max, how much you lifted this week, and a trend arrow. The kg
+box suggests your next load and says why. Beating your own best — heaviest set, best e1RM, most volume
+— gets a toast. `src/strength/progression.ts` and `src/strength/records.ts` are the two new pure engine
+files; nothing new is stored, so there is no migration risk here at all — A6 reads the log A1 built and
+never writes to it.
+
+⚠️⚠️ **A BARE DIGIT-DASH-DIGIT REGEX CANNOT TELL A REP RANGE FROM A HOLD, AND MY OWN TESTS CAUGHT IT
+BEFORE IT SHIPPED.** `repRange("30–45s hold")` happily extracted `[30, 45]` and offered a load suggestion
+for a plank — the same shape trap `holdSecondsFor`'s own comment already records for three live rep
+wordings. Fixed by asking `holdSecondsFor` itself (imported from `builder.ts`) rather than inventing a
+second, disagreeing test for the same fact — one definition of what counts as a hold, read by both the
+session player's countdown and now the suggestion engine.
+
+⚠️ **THE SUGGESTION IS A VALUE THE ENGINE RETURNS AND A PLACEHOLDER THE APP MUST NEVER WRITE AS A VALUE.**
+"Suggests" and "logs" are different verbs: a runner who never touches the kg box must never have a
+computed guess recorded as if they had typed it. `strpW`'s `placeholder=` carries `sugg.kg`; its
+`value=` carries only `strPrefill`'s answer — what the runner actually did last time. Driven, not
+grepped: the guard renders the real `strPlayerBodyHtml` with a store seeded so the two numbers are
+provably different (20 kg prefilled, 22.5 kg suggested) and asserts the suggested figure never appears
+inside a `value="..."` attribute anywhere in the output. Re-broken by moving the suggestion into `value`
+— caught.
+
+⚠️⚠️ **A RECORD NEEDS SOMETHING TO BEAT, AND THE FIRST VERSION OF THAT RULE WAS PROVED TWICE OVER.**
+`detectStrengthRecords` refuses outright when `priorInstances.length === 0` — without it, a runner's
+very first-ever log of any exercise would toast "New best!" on every single one, which cheapens the ones
+that mean something. Re-broken by commenting out the early return: **both** the pure-engine test and the
+driven app-layer test caught it independently, which is exactly the kind of double coverage this project
+keeps recommending and rarely gets for free — here it fell out of testing the same invariant from two
+different entry points (the raw function, and the app's `strNewRecordMessage` wrapper around it).
+
+⚠️ **STRICTLY GREATER, ON ALL THREE — A TIE IS NOT A RECORD.** Heaviest single set, best estimated 1RM,
+most total volume in one session, each compared independently so a heavier single doesn't silently also
+claim the volume record it didn't earn (and vice versa). Measured: a heavier single at fewer reps sets
+"heaviest" alone; more reps at the same weight can set "e1rm" alone (though constructing that case by
+hand turned out to need the PRIOR instance to carry enough volume of its own to absorb the extra reps —
+epley1RM rewards reps far more gently than volume does, so isolating an e1RM-only win from a single
+low-weight set is often mathematically impossible against a single-set prior); more total sets set
+"volume" alone. All three can fire together.
+
+⚠️ **THE "NO HISTORY" FALLBACK IS NOT THE SAME QUESTION AS "FIRST TIME EVER."** `suggestLoad` falls back
+to `loadPercent1RM × best e1RM on record` whenever the most recent PRIOR INSTANCE has no complete
+weight+reps set to double-progress from — which covers a genuine first-ever log, but also a return to an
+exercise after a gap, or a swap back to something logged only partially last time. The fallback reads
+`bestE1RMKg` over **every** prior instance, not just the most recent, so a runner with real history
+still gets a seeded number even when there's nothing recent enough to judge "top of range" against.
+Where NEITHER ingredient exists — no `loadPercent1RM` on the exercise (an accessory movement) or no
+e1RM anywhere on record — it stays honestly blank rather than inventing one.
+
+⚠️⚠️ **THE HISTORY CARD'S "TREND" ANSWERS A DIFFERENT QUESTION FROM THE LIVE PLAYER'S SUGGESTION, ON
+PURPOSE, AND THAT IS NOT AN INCONSISTENCY.** `suggestLoad` needs the CURRENT prescription (a rep range, a
+load%) to judge "at the top of the range" — the right question mid-session, where that context exists.
+The set log stores no prescription against a past row, only what was actually lifted, so reusing
+`suggestLoad` for the history card would mean inventing a fake current prescription for an exercise that
+might not even be in this week's plan. The honest question there is simpler — is the most recent
+session's best e1RM higher than the one before it — and `instanceE1RM` (a small new helper, distinct
+from `RC.bestE1RMKg` which looks across every instance ever) answers exactly that, using nothing but
+`RC.epley1RM` per set so the arithmetic still has one definition.
+
+⚠️ **DIAGNOSED A "MISSING FEATURE" THAT WAS CORRECT BEHAVIOUR, IN A REAL BROWSER, BEFORE TRUSTING IT.**
+Driving the app end to end, the first seeded exercise showed no e1RM/volume/trend line at all — looked
+exactly like a bug. It was my own test data: every logged set used 12 reps, one past Epley's 1–10 domain
+by design (`epley1RM` refuses reps outside it, on purpose — "the formula's error grows too fast past
+ten"), and both instances were dated outside the real current ISO week (`logWeekStartIso()` reads the
+actual wall clock, not a simulated date). Re-seeded with 5-rep sets inside the real current week: the
+card correctly rendered `↑ ~53 kg estimated 1RM · 450 kg this week`. Read the live function's own source
+out of the running page (`window.viewStrengthHistory.toString()`) before concluding a rendered card is
+wrong — it was the fresh build the whole time, just fed data outside its honest bounds.
+
+⚠️ **A COLOUR TOKEN FOR THE TREND ARROW HAD TO BE PICKED CAREFULLY.** The first draft used
+`var(--eff-hard)` for the "up" glyph — reusing ruling 7's ONE session-effort vocabulary for an unrelated
+fact about a weight trend, which is exactly the "second colour vocabulary" violation this file records
+the Manage Plan screen paying for once already. Caught before it shipped; `var(--accent)` instead,
+matching `.sh-best b`'s own existing treatment of the best-weight figure.
+
+⚠️⚠️ **`strPlayerBodyHtml` GAINED A NEW DEPENDENCY AND A5's OWN TEST HARNESS FOR IT WENT STALE — the
+acceptable kind, failing loudly (`ReferenceError: strSuggestFor is not defined`) rather than quietly
+measuring less.** `test/strength-player.test.ts`'s hand-lifted `loadBodyHtml()` didn't know about
+`strParseSet`/`strPriorInstances`/`strSuggestFor`, so every test driving `strPlayerBodyHtml` broke the
+moment A6 touched that function. Fixed by extending the lift list and supplying a real (not stubbed) `RC`
+— the same "a probe that supplies its own dependency measures a strictly easier program" principle that
+file's own comment already states for `holdSecondsFor`.
+
+⚠️ **EVERY A6 ENGINE EXPORT IS CHECKED AGAINST THE ACTUAL BUNDLED `RC`, NOT JUST `entry.ts`'s CLAIM TO
+EXPORT IT.** `web/entry.ts` saying an export exists is a source-level promise; esbuild actually carrying
+it into the IIFE's property map is a fact about the built artifact. A one-line guard greps `web/app.html`
+for `name:()=>` for each of the five new names — cheap, and it is exactly the class of gap that has
+shipped a "fully wired, fully tested and completely dead" feature in this codebase before (the coach
+audio bug this file already records at length).
+
+**Toast wording, by kind:** "New best: {name} {weight} kg" (heaviest), "New estimated 1RM: {name} ~{weight}
+kg" (e1rm), "New best volume: {name}" (volume) — the first genuine hit, in the order the runner met the
+exercises, since `toast()` shows one message at a time and firing several back to back would just
+flash-overwrite each other. ⚠️ Not HTML-escaped: `toast()` sets `.textContent`, which never interprets
+markup, so running `esc()` on the exercise name would turn a literal `&` into the visible text `&amp;` —
+the opposite mistake from what `esc()` exists to prevent, caught before it shipped by checking which DOM
+property `toast()` actually writes to.
+
+**Five deliberate re-breaks, all caught, tree restored byte-identical each time (never `git checkout` —
+copied aside, copied back):** the suggestion moved from `placeholder=` into `value=`; the "all sets at
+top of range" rule flipped from up to down (caught by 6 of the pure-engine tests at once — every rule
+that shares that code path); `detectStrengthRecords`'s no-prior-instances guard commented out (caught by
+both the pure-engine and the driven app-layer test independently); the word "estimated" dropped from the
+history card's copy; and `strFinish`'s `sets > 0` gate removed from the record check.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks, tsc clean
+apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1652 pass / 0 fail under
+UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both design ratchets unchanged (143 radii, 322
+font sizes — the new CSS reads `var(--t-*)`/`var(--r-*)`/`var(--s*)` throughout, nothing off-ladder), and
+the progression audit **byte-for-byte identical to A5's baseline** — A6 touches no generator code, only
+render-time reads of the already-existing log. Driven end to end in a real browser against the served
+`docs/`: a real session played through the guided player with a genuine top-of-range suggestion shown as
+a placeholder distinct from the prefilled value, a heavier set logged and the "New best" toast firing on
+the real Session-done screen, and the Logbook → Strength card showing the estimated 1RM, this week's
+volume and an upward trend arrow once fed data inside Epley's valid domain and the real current week.
+
+**Still to come in this track:** A7 standalone programmes, A8 Strava as Weight Training, A9 the watch.

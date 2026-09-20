@@ -432,6 +432,16 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .sh-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
 .sh-mus { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
 .sh-best { font-size: 12px; color: var(--ink-faint); margin-top: 5px; } .sh-best b { color: var(--accent); font-weight: 700; }
+/* A6 -- estimated 1RM and this week's volume, plus a small trend glyph. On-ladder tokens: this is new
+   rather than a migration of the surrounding (pre-existing, off-ladder) .sh-* rules, so it does not
+   need to lower the ceiling those already sit under -- see design-system.test.ts's own note on that. */
+.sh-e1rm { font-size: var(--t-label); color: var(--ink-faint); margin-top: 3px; display: flex; align-items: center; gap: var(--s1); }
+.sh-trend { font-weight: 700; }
+/* ⚠️ --accent, NEVER --eff-*. Those four tokens are ruling 7's one session-effort vocabulary; a
+   weight trend is a different fact about a different thing and must not borrow their colour. */
+.sh-trend-up { color: var(--accent); }
+.sh-trend-down { color: var(--ink-faint); }
+.sh-trend-flat { color: var(--ink-faint); }
 .sh-spark { display: flex; align-items: flex-end; gap: 3px; height: 40px; width: 74px; flex: none; }
 .sh-spark i { flex: 1; background: color-mix(in srgb, var(--accent) 55%, var(--surface-2)); border-radius: 2px 2px 0 0; }
 .sh-spark i:last-child { background: var(--accent); }
@@ -2163,6 +2173,9 @@ input, select, textarea { font-size: 16px; }
 .strp-f span { font-size: var(--t-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: var(--ink-faint); }
 .strp-last { font-size: var(--t-meta); color: var(--ink-faint); }
+/* A6 -- the suggested next load and why. Accent, not the neutral --ink-faint .strp-last sits in below
+   it, because this is a coaching suggestion rather than a plain fact about what happened last time. */
+.strp-sugg { font-size: var(--t-meta); font-weight: 600; color: var(--accent); }
 .strp-rest, .strp-hold { display: flex; flex-direction: column; align-items: center; gap: var(--s2);
   padding: var(--s5) var(--s4); border-radius: var(--r-card); background: var(--surface-2);
   border: 1px solid var(--line); }
@@ -11449,6 +11462,52 @@ function strPrefill(x, setIdx, iso) {
   return same || rows[0];
 }
 /**
+ * A stored row turned into the {w, r, rpe} shape the progression/records engine wants. A blank or
+ * garbage field becomes null, never NaN, so a mistyped row cannot silently poison a comparison --
+ * shared by strPriorInstances and the new-record check below rather than parsed twice.
+ */
+function strParseSet(r) {
+  const w = r.w != null ? parseFloat(r.w) : NaN;
+  const rr = r.r != null ? parseFloat(r.r) : NaN;
+  const rpe = r.rpe != null ? parseFloat(r.rpe) : NaN;
+  return { w: Number.isFinite(w) ? w : null, r: Number.isFinite(rr) ? rr : null,
+    rpe: Number.isFinite(rpe) ? rpe : null };
+}
+/**
+ * Every PRIOR instance of one exercise, oldest first, excluding today's own in-progress session --
+ * the shape RC.suggestLoad and RC.detectStrengthRecords both want (A6).
+ */
+function strPriorInstances(x, excludeIso) {
+  const byDate = {};
+  slogFor(x).forEach((r) => {
+    if (r.d === excludeIso) return;
+    const s = strParseSet(r);
+    if (s.w == null && s.r == null) return;
+    (byDate[r.d] = byDate[r.d] || []).push(s);
+  });
+  return Object.keys(byDate).sort().map((d) => byDate[d]);
+}
+/**
+ * The suggested next load for one exercise instance, or null when there is nothing honest to offer --
+ * a hold, an accessory movement with no history, or the runner's first-ever log of it.
+ *
+ * ⚠️ THE PATTERN AND EQUIPMENT COME FROM THE CATALOGUE, NOT FROM THE PLANNED EXERCISE INSTANCE. A
+ * legacy session (no strength preferences answered) never copies equipment onto its exercises --
+ * only the A3 preference-driven builder does -- so reading it off the instance would leave the
+ * barbell-squat/hinge load-step bonus unreachable for every runner who has not answered the new
+ * questions. RC.exerciseById is always authoritative and never stale, whichever path built the
+ * session.
+ */
+function strSuggestFor(x, prescribedReps, loadPercent1RM, iso) {
+  const def = RC.exerciseById(x);
+  if (!def) return null;
+  return RC.suggestLoad({
+    prescribedReps: prescribedReps, loadPercent1RM: loadPercent1RM || null,
+    pattern: def.pattern, equipment: def.equipment || [],
+    priorInstances: strPriorInstances(x, iso),
+  });
+}
+/**
  * The guided player's state. Modelled on STRETCH (one object, one interval, cleared by closeSheet),
  * with one deliberate difference recorded below.
  */
@@ -11531,6 +11590,11 @@ function strPlayerBodyHtml() {
   }
   const holding = !!S.holdEnd;
   const pre = strPrefill(it.x, it.set, S.iso);
+  // ⚠️ A6 -- THE SUGGESTION GOES IN THE PLACEHOLDER, NEVER THE VALUE. value is what a runner is
+  // told they logged if they tap Log set without typing anything, so it can only ever come from
+  // pre (what they actually did last time). sugg.kg is a computed GUESS about what to try next --
+  // writing it into value would silently record a number the runner never entered.
+  const sugg = it.hold ? null : strSuggestFor(it.x, it.reps, it.load, S.iso);
   const at = ' data-d="' + esc(S.iso) + '" data-s="' + esc(S.sess.id) + '" data-x="' + esc(it.x) + '" data-i="' + it.set + '"';
   // ⚠️ A HOLD HAS NOTHING TO LOG AND IS NOT ASKED FOR ONE. A plank is not weight x reps; writing its
   // seconds into the reps field would corrupt the one number A6's e1RM reads (Epley is defined for
@@ -11545,9 +11609,10 @@ function strPlayerBodyHtml() {
         : '<div class="strp-holdk">Hold for ' + esc(String(it.reps).replace(/\\s*hold\\s*$/i, "")) + '</div><button class="primary" id="strpHoldGo">' + ICON.play + ' Start hold</button>') +
       '</div>'
     : '<div class="strp-log"><div class="strp-fields">' +
-      '<label class="strp-f"><span>kg</span><input class="set-in" inputmode="decimal" id="strpW" placeholder="kg"' + at + ' data-f="w" value="' + esc(pre.w || "") + '"></label>' +
+      '<label class="strp-f"><span>kg</span><input class="set-in" inputmode="decimal" id="strpW" placeholder="' + (sugg ? esc(String(sugg.kg)) : "kg") + '"' + at + ' data-f="w" value="' + esc(pre.w || "") + '"></label>' +
       '<label class="strp-f"><span>reps</span><input class="set-in" inputmode="numeric" id="strpR" placeholder="' + esc(String(it.reps)) + '"' + at + ' data-f="r" value="' + esc(pre.r || "") + '"></label>' +
       '</div>' +
+      (sugg ? '<div class="strp-sugg">' + esc(sugg.reason) + '</div>' : '') +
       (pre.w || pre.r ? '<div class="strp-last">Last time: ' + esc((pre.w ? pre.w + " kg" : "bodyweight")) + (pre.r ? " \\u00d7 " + esc(pre.r) : "") + '</div>' : '') +
       '<button class="primary" id="strpLog">' + ICON.check + ' Log set</button></div>';
   return head +
@@ -11643,6 +11708,36 @@ function strLogCurrent() {
   strAdvance();
 }
 /**
+ * A6 -- did finishing this session set a record on any exercise it touched? The heaviest set, the
+ * best estimated 1RM, or the most volume in one session, whichever comes first in the order the
+ * runner met the exercises.
+ *
+ * ⚠️ ONE TOAST, NOT ONE PER EXERCISE. toast() replaces its own message rather than queueing, so
+ * firing several back to back would just flash-overwrite each other -- the first genuine hit is
+ * reported and the rest stay quiet, which is honest (they are still recorded, just not announced).
+ */
+function strNewRecordMessage(sess, items) {
+  const order = [];
+  const seen = {};
+  items.forEach((it) => { if (!seen[it.x]) { seen[it.x] = 1; order.push(it.x); } });
+  for (const x of order) {
+    const thisInstance = slogFor(x).filter((r) => r.d === sess.iso).map(strParseSet);
+    const priorInstances = strPriorInstances(x, sess.iso);
+    const hits = RC.detectStrengthRecords({ priorInstances: priorInstances, thisInstance: thisInstance });
+    if (!hits.length) continue;
+    const it = items.find((z) => z.x === x);
+    const name = it ? it.name : x;
+    const hit = hits[0];
+    // ⚠️ NOT ESCAPED. toast() sets .textContent, which never interprets markup, so running esc()
+    // here would turn a literal "&" in an exercise name into the visible text "&amp;" on screen --
+    // the opposite mistake from the one esc() exists to prevent.
+    if (hit.kind === "heaviest") return "New best: " + name + " " + Math.round(hit.value) + " kg";
+    if (hit.kind === "e1rm") return "New estimated 1RM: " + name + " ~" + Math.round(hit.value) + " kg";
+    return "New best volume: " + name;
+  }
+  return null;
+}
+/**
  * ⚠️ FINISH IS IDEMPOTENT AND WRITES THE STORE FIRST. sdoneMark is keyed on (date, session), so the
  * Finish button, a second tap and re-finishing a session that was already completed all produce one
  * row. state.done is set from that row rather than instead of it — seedDone rebuilds state.done from
@@ -11658,11 +11753,15 @@ function strFinish() {
     min: Math.round((S.sess.estimatedDurationSeconds || 0) / 60) });
   const wk = weekByNo(SHEET_CTX ? SHEET_CTX.week : state.planWeek || 1);
   if (wk) { const m = (wk.sessions || []).find((z) => z.id === S.sess.id); if (m) state.done[doneKey(wk.index, m)] = true; }
+  // ⚠️ CHECKED BEFORE slogFlush, NOT AFTER -- detectStrengthRecords reads slogFor, which reads the
+  // in-memory SLOG object, so nothing here depends on the debounced disk write having happened yet.
+  const rec = sets > 0 ? strNewRecordMessage(S, S.items) : null;
   slogFlush();
   S.done = true;
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
   haptic("success");
   strPaintPlayer();
+  if (rec) toast(rec);
 }
 function wireStrengthPlayer() {
   const back = $("strpBack");
@@ -14519,6 +14618,14 @@ function strengthHistory() {
   return byEx;
 }
 function topWeight(sets) { return sets.reduce((m, s) => Math.max(m, parseFloat(s.w) || 0), 0); }
+/** The best estimated 1RM among ONE instance's sets -- distinct from RC.bestE1RMKg, which looks
+ *  across every instance ever. Used only to compare session N against session N-1 for the trend
+ *  glyph, so it needs no engine function of its own beyond RC.epley1RM, which it calls per set. */
+function instanceE1RM(sets) {
+  let best = 0;
+  sets.forEach((s) => { const e = s.w != null && s.r != null ? RC.epley1RM(s.w, s.r) : null; if (e != null && e > best) best = e; });
+  return best;
+}
 /**
  * Finished sessions, newest first — the answer to "have I actually been doing it", which the
  * per-exercise cards below cannot give.
@@ -14573,9 +14680,37 @@ function viewStrengthHistory() {
       const sets = ins.sets.map((s) => (s.w || "—") + (s.w ? "kg" : "") + (s.r ? " × " + s.r : "")).join("  ·  ");
       return '<div class="sh-row"><span class="sh-wk">' + esc(runDateLabelIso(ins.iso)) + '</span><span class="sh-sets">' + sets + '</span></div>';
     }).join("");
+    // ⚠️ A6 -- e1RM, this week's volume, a trend. parsed reuses strParseSet rather than repeating
+    // the string-to-number conversion topWeight already does its own way -- ONE place turns a stored
+    // row into {w,r,rpe}, which is what strPriorInstances and strNewRecordMessage read too.
+    const parsed = ex.instances.map((ins) => ins.sets.map(strParseSet));
+    const e1rm = RC.bestE1RMKg(parsed);
+    const weekStart = logWeekStartIso();
+    const weekSets = [];
+    ex.instances.forEach((ins, idx) => { if (ins.iso >= weekStart) weekSets.push.apply(weekSets, parsed[idx]); });
+    const weekVol = RC.sumVolumeKg(weekSets);
+    // ⚠️ A DIFFERENT QUESTION FROM THE LIVE PLAYER'S suggestLoad, ANSWERED A DIFFERENT WAY, ON
+    // PURPOSE. suggestLoad needs the CURRENT prescription (a rep range, a load%) to judge "at the top
+    // of the range" -- the right question mid-session, where that context exists. The set log stores
+    // no prescription against a past row, only what was actually lifted, so here the honest question
+    // is simpler: is the most recent session's best estimated 1RM higher than the one before it.
+    let trend = null;
+    if (parsed.length >= 2) {
+      const lastE = instanceE1RM(parsed[parsed.length - 1]);
+      const prevE = instanceE1RM(parsed[parsed.length - 2]);
+      if (lastE > 0 && prevE > 0) trend = lastE > prevE ? "up" : lastE < prevE ? "down" : "flat";
+    }
+    const bits = [];
+    if (e1rm) bits.push("~" + Math.round(e1rm) + " kg estimated 1RM");
+    if (weekVol > 0) bits.push(Math.round(weekVol) + " kg this week");
+    const trendGlyph = trend
+      ? '<span class="sh-trend sh-trend-' + trend + '">' + (trend === "up" ? "\\u2191" : trend === "down" ? "\\u2193" : "\\u2192") + '</span>'
+      : "";
+    const metaLine = bits.length ? '<div class="sh-e1rm">' + trendGlyph + esc(bits.join(" \\u00b7 ")) + '</div>' : "";
     return '<div class="card sh-card"><div class="sh-head"><div class="ex-anim sh-anim">' + exVisual(ex) + '</div>' +
       '<div class="sh-main"><div class="sh-name">' + esc(ex.name) + '</div><div class="sh-mus">' + esc(ex.primary) + '</div>' +
-      '<div class="sh-best">Best <b>' + (best ? best + " kg" : "—") + '</b> · ' + ex.instances.length + ' session' + (ex.instances.length > 1 ? "s" : "") + '</div></div>' +
+      '<div class="sh-best">Best <b>' + (best ? best + " kg" : "—") + '</b> · ' + ex.instances.length + ' session' + (ex.instances.length > 1 ? "s" : "") + '</div>' +
+      metaLine + '</div>' +
       (tops.some((w) => w > 0) ? '<div class="sh-spark">' + spark + '</div>' : '') + '</div>' +
       '<div class="sh-rows">' + rows + '</div></div>';
   }).join("");

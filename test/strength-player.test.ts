@@ -21,6 +21,8 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { generatePlan } from "../src/plan/generate-plan.ts";
 import { holdSecondsFor } from "../src/strength/builder.ts";
+import { exerciseById } from "../src/strength/library.ts";
+import { suggestLoad } from "../src/strength/progression.ts";
 
 const APP = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 /**
@@ -409,12 +411,22 @@ test("BLOCKER: closeSheet stops the player, or its interval runs on behind a dis
  * passed against exactly the defect it names. A marker the defect itself can introduce is not a boundary.
  * Rendering the thing and looking at the output cannot be fooled that way.
  */
+/**
+ * ⚠️ A6 ADDED strSuggestFor AS A DEPENDENCY OF strPlayerBodyHtml, AND THIS HARNESS WENT STALE THE
+ * MOMENT IT DID — the acceptable kind: it failed loudly with a ReferenceError rather than quietly
+ * measuring less. strParseSet/strPriorInstances/strSuggestFor and a real RC (exerciseById,
+ * suggestLoad — not stubbed, same reasoning as holdSecondsFor's own comment above) are lifted
+ * alongside the functions this file already exercised.
+ */
 function loadBodyHtml() {
   const body = [
     constOf("STR_REST_WARN_S"),
     fnOf("strRestLeft"),
     fnOf("strHoldLeft"),
     fnOf("strPrefill"),
+    fnOf("strParseSet"),
+    fnOf("strPriorInstances"),
+    fnOf("strSuggestFor"),
     fnOf("strPlayerBodyHtml"),
     fnOf("strPlayerDoneHtml"),
   ].join("\n");
@@ -425,11 +437,12 @@ function loadBodyHtml() {
     ICON: { play: "<svg/>", check: "<svg/>" },
     fmtPace: (n: number) => String(n),
     slogFor: () => [],
+    RC: { exerciseById, suggestLoad },
   };
   // eslint-disable-next-line no-new-func
   const factory = new Function("ctx",
     "let SPLAY = ctx.SPLAY;" +
-    "const esc = ctx.esc, exAnim = ctx.exAnim, ICON = ctx.ICON, fmtPace = ctx.fmtPace, slogFor = ctx.slogFor;" +
+    "const esc = ctx.esc, exAnim = ctx.exAnim, ICON = ctx.ICON, fmtPace = ctx.fmtPace, slogFor = ctx.slogFor, RC = ctx.RC;" +
     body +
     "\nreturn (s) => { SPLAY = s; return strPlayerBodyHtml(); };");
   return factory(ctx);

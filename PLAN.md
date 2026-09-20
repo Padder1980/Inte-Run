@@ -10,7 +10,7 @@ Date: 20 September 2026. Repo at `813f63b`, tree clean, 1,533 tests passing, not
 2. An App Store Connect API key (App Manager role) saved to `~/.appstoreconnect/private_keys/` — that is what puts a build on testers' phones.
 3. Garmin form: **sent** ✓. When the approval email lands, say so — Track C starts that day.
 
-**Progress:** T1 ✅ done · A1 ✅ done (log survives a plan rebuild) · A2 ✅ done (17→62 exercises, one catalogue, equipment filter) · A3 ✅ done (five questions; sessions built to the time you have) · A4 ✅ done (swap any exercise; it sticks) · A5 ✅ done (guided player: supersets alternate, one-tap logging, holds count down, and a rest timer measured against the clock so it stays right when the phone is backgrounded — measured 20 s away, 0 s drift) · **next: A6** (progress — e1RM, suggested load, records).
+**Progress:** T1 ✅ done · A1 ✅ done (log survives a plan rebuild) · A2 ✅ done (17→62 exercises, one catalogue, equipment filter) · A3 ✅ done (five questions; sessions built to the time you have) · A4 ✅ done (swap any exercise; it sticks) · A5 ✅ done (guided player: supersets alternate, one-tap logging, holds count down, and a rest timer measured against the clock so it stays right when the phone is backgrounded — measured 20 s away, 0 s drift) · A6 ✅ done (estimated 1RM, this week's volume and a trend arrow on every lift; the kg box suggests a next load as a placeholder — never written into a row as if typed — and says why; a toast on a genuine new best) · **next: A7** (standalone programmes + plan integration).
 
 **Resuming after a `/clear`?** Read this file and `CLAUDE.md` (its "Write down…" chapters record what each finished stage actually did, in detail this file doesn't repeat), `git pull`, then start the stage named in Progress above using the model below. Do not re-plan or re-research — the plan is done; the job now is executing stages one at a time.
 
@@ -26,8 +26,8 @@ Rule: **Opus** where a mistake would be silent — engine guardrails, data migra
 | A3 preferences + builder ✅ | Opus | S Strava club row | Sonnet | B11 AI via Worker | Opus |
 | A4 swap ✅ | Sonnet | B1 manual/link/PRs | Opus | B12 yoga/pilates | Sonnet |
 | A5 session player ✅ | Opus | B2 skip · B3 time of day | Sonnet | C1/C2 Garmin | Opus |
-| **A6 e1RM/progression** | **Sonnet** | B4 move ±1 week | Opus | C3 hardware test | (you) |
-| A7 standalone programmes | Opus | B5 return speed · B6 realignment | Opus | | |
+| A6 e1RM/progression ✅ | Sonnet | B4 move ±1 week | Opus | C3 hardware test | (you) |
+| **A7 standalone programmes** | **Opus** | B5 return speed · B6 realignment | Opus | | |
 | A8 Strava WeightTraining | Sonnet | | | | |
 
 Non-race modes and the accounts/sync/network/Android round are each a **separate planning round** — do not start them from inside a stage; flag it and stop.

@@ -2806,10 +2806,15 @@ function buildNotes(
       "Returning from injury: the early weeks stay deliberately conservative (single quality session, gentle long-run progression). Add the second quality session only once weekly running and the long run feel stable.",
     );
   }
+  // ⚠️ THREE-WAY, NOT TWO PLUS AN EXTRA LINE. With a programme running the plan schedules no strength
+  // at all, so the "2×/week through base and build" sentence is simply false — and a false note sitting
+  // beside a true one is worse than either, because the runner cannot tell which describes their plan.
   notes.push(
-    athlete.includeStrength
-      ? "Strength: 2×/week through base and build (heavy, low volume), easing to 1× maintenance near the race. Plyometrics only once faster running is tolerated without a delayed reaction."
-      : "Strength is off. The research supports heavy strength 2×/week for economy and durability — consider enabling it.",
+    athlete.strengthProgramme && athlete.strengthProgramme.active
+      ? "Your strength programme is running, so this plan schedules no strength sessions of its own — you would otherwise be asked to lift twice. The programme's sessions are placed around your running: never on your long-run day, and heavy leg work never the evening before your long run or your first hard session."
+      : athlete.includeStrength
+        ? "Strength: 2×/week through base and build (heavy, low volume), easing to 1× maintenance near the race. Plyometrics only once faster running is tolerated without a delayed reaction."
+        : "Strength is off. The research supports heavy strength 2×/week for economy and durability — consider enabling it.",
   );
   notes.push(
     "Variety: quality sessions rotate across formats — tempo, cruise intervals, threshold and Mona fartlek, VO₂ intervals, pyramids and hill reps — so the stimulus stays fresh week to week while the training intent stays the same.",

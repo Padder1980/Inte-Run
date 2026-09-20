@@ -6374,6 +6374,32 @@ const SWAP_KEY = "interun_swap_v1";
  */
 const SDONE_KEY = "interun_sdone_v1";
 /**
+ * Stage A7. The one standalone strength programme a runner may have running:
+ *   { id, name, startIso, weeks, sessionsPerWeek, minutes, level, goal, equipment[], moved{}, status }
+ *
+ * ⚠️ DECLARED HERE FOR THE REASON JOURNAL_KEY RECORDS, AND THIS ONE GENUINELY NEEDS IT: placeProgramme
+ * runs from inside adoptPlan, which recompute() calls at module top level. A key declared beside its
+ * own functions would be read in its temporal dead zone, throw, and be swallowed by the try/catch
+ * around it — the fault that had journalSync writing nothing on any launch for weeks.
+ *
+ * ⚠️ IT STORES THE ANSWERS, NEVER THE SESSIONS. Every session is rebuilt from (week, slot, prefs) by
+ * the engine at render time, exactly as an EXTRA stores a format id rather than baked steps — so a
+ * programme started in September still reflects a catalogue fix shipped in October, and a runner who
+ * buys a kettlebell mid-programme sees it in next week's sessions. A template[] field was in the design and
+ * is deliberately absent: it would be a cache of something four lines of arithmetic already answer.
+ *
+ * ⚠️ moved IS A PROMISE, NOT A CACHE: sessionId -> the date the RUNNER dragged it to. Re-placement
+ * skips anything in it, so the app never overrules a decision the runner has already made — the same
+ * contract state.dayOverride has with the running plan.
+ */
+const PROG_KEY = "interun_prog_v1";
+/**
+ * Whether EXTRA has been initialised yet. Declared up here with the store keys because that is the
+ * only place it can be: it exists to tell adoptPlan, which runs at module top level, that EXTRA is
+ * still in its temporal dead zone five thousand lines below. See refreshProgExtras.
+ */
+let EXTRA_READY = false;
+/**
  * ⚠️ A CAP, BECAUSE THE STORE IS localStorage AND THAT IS WHERE THE WHOLE TRAINING HISTORY LIVES.
  * A row is about 70 bytes, so 12,000 is roughly four years at three sessions a week with eight sets a
  * session, for under a megabyte. Pruning folds the dropped rows' maxima into bests first (below), so
@@ -6638,6 +6664,12 @@ function applyProfile(pf) {
   // test/running-days.test.ts pins for days per week.
   const sPrefs = strengthPrefsOf(pf);
   if (sPrefs) ath.strength = sPrefs;
+  // ⚠️ A7 -- A RUNNING PROGRAMME SUPPRESSES THE PLAN'S OWN STRENGTH, and the engine is told rather
+  // than the app quietly filtering afterwards. strengthSessionsFor returns 0 and buildNotes says so,
+  // so the plan the runner reads and the plan the watch is sent agree about it. Read from the store
+  // rather than a profile field: the programme IS the record, and a second copy of "is one running"
+  // on the profile would be the one that goes stale.
+  try { if (progActive()) ath.strengthProgramme = { active: true }; } catch (e) {}
   // ⚠️ The runner's actual weekly mileage. weeklyVolumeKmCurrent has existed on Athlete since the
   // beginning and was read NOWHERE, so 40 km/week and 140 km/week produced identical plans — which
   // is what an elite coach meant by "mileage for a competitive runner looks a little on the low
@@ -7260,6 +7292,10 @@ function adoptPlan(out) {
   // ⚠️ BEFORE THE TWO SYNCS, DELIBERATELY. Run after them, iOS would hold reminders for sessions the
   // runner has just told us they will not be doing, and the wrist would hold them too.
   try { applyAdjustments(); } catch (e) {}
+  // ⚠️ BEFORE THE TWO SYNCS, for the same reason applyAdjustments is: the wrist and the OS are about
+  // to be told what this week holds, and a programme session placed after they were told is a
+  // session neither of them knows about until something else happens to rebuild.
+  try { refreshProgExtras(); } catch (e) {}
   try { syncNativeReminders(); } catch (e) {}
   try { syncWatch(); } catch (e) {}
   // ⚠️ THE BLOCK IS RECORDED HERE, INSIDE adoptPlan, for the reason this function's own note gives about
@@ -10123,6 +10159,31 @@ function calSessionRow(wIdx, s) {
     '<button class="cal-open" data-open="1" data-oweek="' + wIdx + '" data-oid="' + s.id + '"><span class="cal-t">' + s.title + '</span><span class="cal-sub">' + bits.join(" • ") + '</span></button>' +
     '<button class="cal-check" data-done="' + key + '" aria-label="Mark done">' + (done ? ICON.check : "") + '</button></div>';
 }
+/**
+ * An added session on the month calendar.
+ *
+ * ⚠⚠ THE CALENDAR HAS NEVER SHOWN AN EXTRA, AND A7 IS WHAT MAKES THAT A DEFECT RATHER THAN A GAP.
+ * viewCalendar maps PLAN.weeks[].sessions, so a session the runner ADDED to a day has only ever
+ * appeared on Today. One added run is a thing you remember; sixteen programme sessions spread over
+ * eight weeks is a schedule, and a schedule you cannot see is not one. So extras render here too --
+ * every extra, not only a programme's, because a rule that showed one kind and not the other would be
+ * two answers to "what am I doing on the 24th".
+ *
+ * ⚠ NO TICK BOX, AND THAT MATCHES TODAY RATHER THAN THE PLAN ROW BESIDE IT. state.done is keyed
+ * doneKey(weekIndex, session) = week|day|title, which an extra has no week index for; Today's own
+ * extras card has no tick for the same reason. A strength session is marked done by FINISHING it in
+ * the player, not by tapping a box, and a box that looked like the plan's and did nothing is the
+ * looks-live-does-nothing class this file records shipping three times.
+ */
+function calExtraRow(e) {
+  const s = extraSession(e); if (!s) return "";
+  const dur = Math.round(s.estimatedDurationSeconds / 60);
+  const dist = s.estimatedDistanceMeters ? " • " + (Math.round(s.estimatedDistanceMeters / 100) / 10) + " km" : "";
+  return '<div class="cal-sess">' +
+    '<span class="cal-bar" style="background:var(--eff-' + effortOf(s) + ')"></span>' +
+    '<button class="cal-open" data-addopen="' + e.id + '"><span class="cal-t">' + esc(s.title) +
+    '</span><span class="cal-sub">' + dur + '′' + dist + '</span></button></div>';
+}
 function calTrialRow() {
   return '<div class="cal-sess">' +
     '<span class="cal-bar" style="background:var(--eff-hard)"></span>' +
@@ -10573,8 +10634,10 @@ function viewCalendar() {
       const daySessions = w.sessions.filter((s) => s.type !== "rest" && effDay(s) === i);
       const disoStr = dt.toISOString().slice(0, 10);
       const hasTrial = scheduledTrialOn(disoStr);
-      const cells = (daySessions.length || hasTrial)
-        ? daySessions.map((s) => calSessionRow(w.index, s)).join("") + (hasTrial ? calTrialRow() : "")
+      const dayExtras = extrasOn(disoStr);
+      const cells = (daySessions.length || hasTrial || dayExtras.length)
+        ? daySessions.map((s) => calSessionRow(w.index, s)).join("") +
+          dayExtras.map(calExtraRow).join("") + (hasTrial ? calTrialRow() : "")
         : (disoStr < todayIsoStr ? '<div class="cal-empty">Rest</div>'
           : '<button class="cal-empty rest-add cal" data-addday="' + disoStr + '">Rest<span class="rest-plus">\\uFF0B Add</span></button>');
       return '<div class="cal-day' + (isToday ? " is-today" : "") + '" data-w="' + w.index + '" data-di="' + i + '"><div class="cal-dcol"><div class="cal-dn">' + dn.toUpperCase() + '</div><div class="cal-dd">' + dt.getUTCDate() + '</div></div><div class="cal-scol">' + cells + '</div></div>';
@@ -12159,6 +12222,18 @@ function wireSheet() {
   wireHeatControls();
   document.querySelectorAll("[data-moveto]").forEach((b) => b.onclick = () => {
     if (!SHEET_CTX) return;
+    // ⚠⚠ A PROGRAMME SESSION IS DATED, NOT WEEK-AND-DAY, SO moveSession CANNOT MOVE IT -- AND
+    // BEFORE THIS IT DID NOT REFUSE, IT WROTE A dayOverride NOBODY READS. Measured: tapping a day
+    // rescheduled nothing, left a dead override in the store, and the sheet closed as though it had
+    // worked. The looks-live-does-nothing class, on a screen carrying sixteen of them.
+    const ex = progExtraOf(SHEET_CTX.sess);
+    if (ex) {
+      progMove(ex.id, isoAdd(weekMondayOf(ex.date), Number(b.dataset.moveto)).toISOString().slice(0, 10));
+      refreshProgExtras();
+      closeSheet();
+      render();
+      return;
+    }
     moveSession(SHEET_CTX.week, SHEET_CTX.sess, Number(b.dataset.moveto));
     closeSheet();
     render();
@@ -12299,10 +12374,30 @@ function sessionLibrary() {
   return order.filter((t) => byType[t]).map((t) => byType[t]);
 }
 function extraRep(type) { return sessionLibrary().find((s) => s.type === type) || null; }
-function loadExtra() { try { const a = JSON.parse(localStorage.getItem("interun_extra_v1") || "[]"); const t = todayIso(); return Array.isArray(a) ? a.filter((e) => e && e.date >= t) : []; } catch (e) { return []; } }
+/**
+ * The runner's own added sessions, plus the active strength programme's derived ones (A7).
+ *
+ * ⚠️ ONLY THE MANUAL ONES ARE STORED. A programme session is derived from (week, slot, answers)
+ * every time, so it is always placed around the plan as it stands today rather than as it stood
+ * when somebody pressed Start. saveExtra strips them back out on the way to disk.
+ */
+function loadExtra() {
+  let stored = [];
+  try {
+    const a = JSON.parse(localStorage.getItem("interun_extra_v1") || "[]");
+    const t = todayIso();
+    stored = Array.isArray(a) ? a.filter((e) => e && e.date >= t && !e.prog) : [];
+  } catch (e) { stored = []; }
+  try { return stored.concat(progExtras()); } catch (e) { return stored; }
+}
 let EXTRA = loadExtra();
+// ⚠️ SET ONLY AFTER THE FIRST DERIVATION, so refreshProgExtras cannot run against a half-built
+// EXTRA. Everything from here on is post-boot.
+EXTRA_READY = true;
 let EXTRA_SEQ = 0;
-function saveExtra() { try { localStorage.setItem("interun_extra_v1", JSON.stringify(EXTRA)); } catch (e) {} }
+// ⚠️ THE PROGRAMME'S OWN SESSIONS ARE STRIPPED ON THE WAY TO DISK. They are derived (see
+// loadExtra); a derived row written back becomes a stored row that outlives the programme.
+function saveExtra() { try { localStorage.setItem("interun_extra_v1", JSON.stringify(EXTRA.filter((e) => !e.prog))); } catch (e) {} }
 // Sessions are added to the day you're LOOKING AT, not blindly to today: the selected day on Today,
 // or the day of the session whose sheet you opened (which may be weeks away, on Plan or the calendar).
 let ADD_TARGET = null;
@@ -12337,7 +12432,15 @@ function addExtra(params) {
   try { syncWatch(); } catch (e) {}
   try { syncNativeReminders(); } catch (e) {}
 }
-function removeExtra(id) { EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra(); try { syncWatch(); } catch (e) {} try { syncNativeReminders(); } catch (e) {} }
+// ⚠️ REMOVING A PROGRAMME SESSION HAS TO BE REMEMBERED, not just dropped from the list. Its rows are
+// derived, so one merely filtered out of memory is back the next time anything rebuilds them -- a
+// remove button that visibly does nothing on the next launch.
+function removeExtra(id) {
+  const row = EXTRA.find((e) => e.id === id);
+  if (row && row.prog) progSkip(id);
+  EXTRA = EXTRA.filter((e) => e.id !== id); saveExtra();
+  try { syncWatch(); } catch (e) {} try { syncNativeReminders(); } catch (e) {}
+}
 function extrasOn(iso) { return EXTRA.filter((e) => e.date === iso); }
 function isQualityType(t) { return t === "threshold" || t === "vo2" || t === "race-specific"; }
 // A step's planned seconds: its duration, or — for distance-based reps like 6 x 800m — the time its
@@ -12510,8 +12613,253 @@ function buildCustomSession(e) {
     steps: steps.length ? steps : rep.steps,
   });
 }
+/* ------------------------------------------------------------------------------------------------
+ * A7 — A STANDALONE STRENGTH PROGRAMME, ALONGSIDE THE RUNNING PLAN.
+ *
+ * Four to twelve weeks that progress (technique, loading, heavy, easing off every fourth week),
+ * placed on days that do not fight the running, with the plan's own strength sessions stepping
+ * aside so nobody is asked to lift twice.
+ *
+ * ⚠️⚠️ THE SESSIONS ARE DERIVED, NOT MATERIALISED AND RE-PLACED. The stage design said to write them
+ * into the EXTRA store and re-place the future unmoved ones on every rebuild. Deriving them instead,
+ * at the moment EXTRA is built and again whenever the plan changes, removes that whole class of
+ * staleness: there is nothing stored to go out of date with the plan it was placed around, nothing
+ * to prune, and no second copy of a placement decision to disagree with the first. They still take
+ * the EXTRA shape, which is the point of the design -- Today, the calendar, the reminders and the
+ * watch payload all read extras and none of them needed a line changing.
+ *
+ * ⚠️ SO saveExtra MUST NEVER PERSIST THEM. A derived row written back to localStorage becomes a
+ * stored row that outlives the programme that produced it.
+ *
+ * ⚠️ AND THE PROGRAMME STORES ITS ANSWERS, NEVER ITS SESSIONS -- see PROG_KEY. Every session is
+ * rebuilt from (week, slot, prefs) at render time, so a catalogue fix or a kettlebell bought in
+ * week three reaches week four.
+ * --------------------------------------------------------------------------------------------- */
+
+/** Programme lengths offered. Four is the shortest block that can carry a deload; twelve is the cap. */
+const PROG_WEEK_CHOICES = [4, 6, 8, 12];
+const PROG_DEFAULT_WEEKS = 8;
+
+function loadProg() {
+  try { const v = JSON.parse(localStorage.getItem(PROG_KEY) || "null"); return v && v.id ? v : null; } catch (e) { return null; }
+}
+function saveProg(p) {
+  try { p ? localStorage.setItem(PROG_KEY, JSON.stringify(p)) : localStorage.removeItem(PROG_KEY); } catch (e) {}
+}
+/** The last day of a programme. */
+function progEndIso(p) { return isoAdd(p.startIso, p.weeks * 7 - 1).toISOString().slice(0, 10); }
+/**
+ * The programme that is running right now, or null.
+ *
+ * ⚠️ A FINISHED PROGRAMME STOPS BEING ACTIVE BY ITSELF, rather than waiting for something to notice.
+ * Nothing runs on a schedule in this app, so a status that only changes when a screen is opened
+ * would leave the plan's own strength suppressed for months after the last session.
+ */
+function progActive() {
+  const p = loadProg();
+  if (!p || p.status !== "active") return null;
+  return progEndIso(p) >= todayIso() ? p : null;
+}
+/** 1-based programme week containing a date, or 0 when the date is outside the programme. */
+function progWeekOf(p, iso) {
+  if (!p || iso < p.startIso) return 0;
+  const days = Math.round((isoAdd(iso, 0) - isoAdd(p.startIso, 0)) / 86400000);
+  const w = Math.floor(days / 7) + 1;
+  return w >= 1 && w <= p.weeks ? w : 0;
+}
+/** The engine's preference object for a programme. */
+function progPrefs(p) {
+  return { sessionsPerWeek: p.sessionsPerWeek, minutes: p.minutes, level: p.level,
+    goal: p.goal, equipment: p.equipment || [] };
+}
+/** A session the runner removed from a day stays removed -- see removeExtra. */
+function progSkip(id) {
+  const p = loadProg(); if (!p) return;
+  p.skipped = p.skipped || {};
+  p.skipped[id] = 1;
+  saveProg(p);
+}
+/**
+ * What the RUNNING plan has on one date, for placement.
+ *
+ * ⚠️ genDay, NOT effDay, AND THE REASON IS THE BOOT ORDER. effDay reads state.dayOverride, and state
+ * is a const declared BELOW the top-level recompute() -- the temporal dead zone four store keys above
+ * already record paying for. This runs from loadExtra and from adoptPlan, so it must not depend on
+ * state existing. The cost is stated rather than hidden: a running session the runner has dragged to
+ * another day is seen where the PLAN put it, not where they moved it to, so a programme session can
+ * land beside a moved run. Rare, visible, and recoverable with the same drag.
+ */
+function progDayInfo(iso) {
+  const out = { long: false, race: false, quality: false, run: false, strength: false };
+  if (!PLAN || !PLAN.weeks) return out;
+  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+    const wk = PLAN.weeks[wi];
+    for (let i = 0; i < 7; i++) {
+      if (isoAdd(wk.startIso, i).toISOString().slice(0, 10) !== iso) continue;
+      wk.sessions.forEach((s) => {
+        if (s.type === "rest" || genDay(s) !== i) return;
+        if (s.type === "long") out.long = true;
+        if (s.type === "race") out.race = true;
+        if (isQualityType(s.type)) out.quality = true;
+        if (PRIMARY_TYPES[s.type]) out.run = true;
+        if (s.type === "strength") out.strength = true;
+      });
+      return out;
+    }
+  }
+  return out;
+}
+/**
+ * How good a day is for a programme session. Lower is better; null means never.
+ *
+ * ⚠️ TWO TIERS, AND THE SPLIT IS WHAT MAKES FOUR SESSIONS A WEEK POSSIBLE AT ALL. The HARD bans can
+ * never be broken: the long-run day, race day, race eve, and a day already carrying a strength
+ * session. The SOFT ones -- the eve of the long run, the eve of a quality day -- are scored rather
+ * than banned, because a seven-day week with four sessions in it cannot honour all of them at once.
+ * That is the identical arithmetic the plan's own strengthDaysFor records: "banning the long-run day
+ * and all three eves leaves three placeable days, and the runner may ask for four".
+ *
+ * ⚠️ AND THE TWO SOFT BANS ARE NOT EQUAL. The long run is the biggest session of the week, so its eve
+ * costs twice what a quality eve does -- when something has to give, it gives on the smaller session.
+ */
+function progDayScore(iso, heavy, used) {
+  if (used.indexOf(iso) >= 0) return null;
+  const here = progDayInfo(iso);
+  const next = progDayInfo(isoAdd(iso, 1).toISOString().slice(0, 10));
+  if (here.long || here.race || here.strength) return null;
+  if (next.race) return null;
+  let score = 0;
+  if (heavy && next.long) score += 100;
+  if (heavy && next.quality) score += 50;
+  // Free days first, then a day already carrying an easy run, then a quality day -- the same order,
+  // and the same reasoning, as the plan's own strengthDaysFor: hard days hard, easy days easy.
+  if (here.quality) score += 8; else if (here.run) score += 4;
+  // Spread them out. Small enough that it only ever breaks a tie between equally legal days.
+  let near = 9;
+  for (let k = 0; k < used.length; k++) {
+    const d = Math.abs(Math.round((isoAdd(iso, 0) - isoAdd(used[k], 0)) / 86400000));
+    if (d < near) near = d;
+  }
+  score += Math.max(0, 4 - near);
+  return score;
+}
+/** The dates one programme week's sessions land on, one per slot (null where no day is legal). */
+function progPlaceWeek(p, week, wkStartIso) {
+  const n = Math.max(1, Math.min(RC.PROGRAMME_SESSIONS_MAX, p.sessionsPerWeek || 1));
+  const heavy = RC.programmeWeek(week, p.level).block === "heavy";
+  const used = [];
+  const out = [];
+  for (let slot = 0; slot < n; slot++) {
+    let best = null, bestScore = Infinity;
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAdd(wkStartIso, d).toISOString().slice(0, 10);
+      const sc = progDayScore(iso, heavy, used);
+      if (sc == null || sc >= bestScore) continue;
+      bestScore = sc; best = iso;
+    }
+    out.push(best);
+    if (best) used.push(best);
+  }
+  return out;
+}
+/**
+ * The runner moved one of the programme's sessions to a day of their own choosing.
+ *
+ * ⚠⚠ THE AUTOMATIC PLACER PROPOSES AND THE RUNNER DISPOSES, WHICH IS THIS APP'S STANDING RULE.
+ * progDayScore refuses the days that would fight the running and prefers the rest; a runner who
+ * cannot do Thursday is entitled to say so, and the only alternative on offer before this was to
+ * delete the session. It is deliberately NOT re-scored -- a choice that was then overruled by our own
+ * preference would be the app deciding, which is the thing the weekly review's own note forbids.
+ *
+ * ⚠ IT STAYS INSIDE ITS OWN WEEK, and that is a structural claim rather than a nicety. The whole
+ * programme is blocks of weeks: a session dragged into the next week would be a week with three
+ * sessions and a week with one, both at the wrong block's prescription.
+ */
+function progMove(id, iso) {
+  const p = loadProg(); if (!p) return;
+  p.moved = p.moved || {};
+  p.moved[id] = iso;
+  saveProg(p);
+}
+/** Every future programme session, in EXTRA's own shape. */
+function progExtras() {
+  const p = progActive();
+  if (!p) return [];
+  const today = todayIso();
+  const skipped = p.skipped || {};
+  const moved = p.moved || {};
+  const out = [];
+  for (let w = 1; w <= p.weeks; w++) {
+    const wkStart = isoAdd(p.startIso, (w - 1) * 7).toISOString().slice(0, 10);
+    if (isoAdd(wkStart, 6).toISOString().slice(0, 10) < today) continue;
+    const dates = progPlaceWeek(p, w, wkStart);
+    const wkEnd = isoAdd(wkStart, 6).toISOString().slice(0, 10);
+    const rows = [];
+    for (let slot = 0; slot < dates.length; slot++) {
+      const iso = dates[slot];
+      if (!iso || iso < today) continue;
+      const id = "p" + p.id + "-w" + w + "-s" + slot;
+      if (skipped[id]) continue;
+      // ⚠ A MOVE IS HONOURED ONLY WITHIN ITS OWN WEEK AND ONLY IF IT IS STILL AHEAD. A stored date
+      // outside the week would put a session at the wrong block's prescription; one in the past would
+      // resurrect a session on a day that has been and gone.
+      const mv = moved[id];
+      const kept = !!(mv && mv >= wkStart && mv <= wkEnd && mv >= today);
+      rows.push({ id: id, prog: p.id, pw: w, ps: slot, type: "strength", date: kept ? mv : iso, was: iso, mv: kept });
+    }
+    // ⚠ A MOVE ONTO A DAY THIS PROGRAMME ALREADY USES SWAPS, WHICH IS WHAT THE SHEET'S OWN COPY
+    // PROMISES ("if a run is already there, the two will swap") and what moveSession does for a plan
+    // session. Without it a runner who moved Thursday onto Saturday would have both of that week's
+    // sessions on Saturday -- two strength sessions in a day, which the placer's own one-a-day rule
+    // exists to prevent. The session that did NOT move is the one that gives way.
+    rows.forEach((r) => {
+      if (!r.mv) return;
+      rows.forEach((o) => { if (o !== r && !o.mv && o.date === r.date) o.date = r.was; });
+    });
+    rows.forEach((r) => out.push({ id: r.id, prog: r.prog, pw: r.pw, ps: r.ps, type: r.type, date: r.date }));
+  }
+  return out;
+}
+/**
+ * Re-derive the programme's sessions into EXTRA after the plan has changed.
+ *
+ * ⚠️ THE FLAG IS NOT DEFENSIVE, IT IS THE BOOT ORDER. EXTRA is a let declared five thousand lines
+ * below the top-level recompute(), so on the first pass through adoptPlan it is in its temporal dead
+ * zone and touching it throws. That first derivation is loadExtra's own job, a few lines below where
+ * EXTRA is finally initialised; this covers every rebuild AFTER boot. Without the flag the boot call
+ * would throw into adoptPlan's catch and the whole thing would work by luck.
+ */
+function refreshProgExtras() {
+  if (!EXTRA_READY) return;
+  EXTRA = EXTRA.filter((e) => !e.prog).concat(progExtras());
+}
+/** One programme session, built from its week and slot at the runner's current answers. */
+/** The programme row a rendered session came from, or null for anything else. */
+function progExtraOf(sess) {
+  if (!sess || !sess.id) return null;
+  return EXTRA.find((e) => e.prog && e.id === sess.id) || null;
+}
+/** The Monday of the week an ISO date falls in. Weeks here start Monday, as the plan's do. */
+function weekMondayOf(iso) {
+  const d = isoAdd(iso, 0);
+  return isoAdd(iso, -(((d.getUTCDay() + 6) % 7))).toISOString().slice(0, 10);
+}
+function progSession(e) {
+  const p = loadProg();
+  if (!p || String(p.id) !== String(e.prog)) return null;
+  try {
+    const s = RC.programmeSession(e.pw, e.ps, progPrefs(p));
+    return Object.assign({}, s, { id: e.id, source: "programme",
+      dayOfWeek: e.date ? (isoAdd(e.date, 0).getUTCDay() + 6) % 7 : TODAY_DOW });
+  } catch (err) { return null; }
+}
 function extraSession(e) {
   if (!e) return null;
+  // ⚠️ FIRST, because a programme row carries type "strength" and would otherwise fall through to
+  // buildCustomSession, which resolves a type to THE PLAN'S representative session of it -- so every
+  // week of a twelve-week programme would render as the plan's own strength session, with none of
+  // the block progression that is the entire point.
+  if (e.prog) return progSession(e);
   if (e.workoutId) {
     try {
       const w = RC.buildWorkout(e.workoutId, RAW.paces, workoutCtx());
@@ -13635,8 +13983,12 @@ function viewPlan() {
   // under-delivery note, AND is inside the no-recovery-weeks band. With .find the second one was
   // silently dropped, so the runner was told their plan could not reach their mileage and never told
   // it also had no easier weeks in it.
+  // ⚠️ THE PROGRAMME NOTE IS IN THIS FILTER OR IT IS NOT RENDERED AT ALL. buildNotes writes eight,
+  // and this screen deliberately shows only the ones answering a question the runner asked -- so a
+  // note added upstream without being named here is the computed-and-discarded trap, which is
+  // exactly how PLAN.notes came to be written and read by nothing for months.
   const volNotes = (PLAN.notes || []).filter((n) =>
-    /second run in the day|Adding a day|this block opens at|No scheduled easier weeks/.test(n));
+    /second run in the day|Adding a day|this block opens at|No scheduled easier weeks|strength programme is running/.test(n));
   const mileageNote = volNotes.length
     ? volNotes.map((n) => '<div class="plan-note" style="border-left-color:var(--peak)">' + n + '</div>').join("")
     : "";
@@ -14652,10 +15004,177 @@ function strengthSessionsHtml() {
     '<div class="sh-best"><b>' + rows.length + '</b> in all' + (rows.length > shown.length ? ' \\u00b7 showing the last ' + shown.length : "") + '</div>' +
     '</div></div><div class="sh-rows">' + list + '</div></div>';
 }
+/* ---- A7: the programme card and its create sheet ------------------------------------------------
+ * ⚠️ NO NEW CSS. Every class here already exists: .po-opt/.po-t/.po-b are the option rows the Manage
+ * plan sheets use, .act-pair/.ap-yes/.ap-no the confirm pair the owner asked for once already, and
+ * .sh-card/.sh-name/.sh-best the strength cards this sits above. A screen that invents its own
+ * vocabulary for controls the app already has is how two buttons come to look like two products.
+ */
+let PROG_DRAFT = null;
+
+/** The strength answers a new programme starts from — the runner's own, or the app's defaults. */
+function progDefaultPrefs() {
+  const p = strengthPrefsOf(profile);
+  return {
+    sessionsPerWeek: p && p.sessionsPerWeek > 0 ? p.sessionsPerWeek : 2,
+    minutes: p ? p.minutes : STR_DEFAULT_MIN,
+    level: p ? p.level : STR_DEFAULT_LEVEL,
+    goal: p ? p.goal : STR_DEFAULT_GOAL,
+    equipment: p ? p.equipment : [],
+  };
+}
+function progBlockLabel(b) {
+  return b === "technique" ? "Technique" : b === "loading" ? "Loading" : "Heavy";
+}
+/**
+ * The card at the top of Logbook > Strength: what is running, or an invitation to start one.
+ */
+function progCardHtml() {
+  const p = progActive();
+  if (!p) {
+    return '<div class="card sh-card"><div class="sh-head"><div class="sh-main">' +
+      '<div class="sh-name">Strength programme</div>' +
+      '<div class="sh-best">Four to twelve weeks that build — technique, then load, then heavy, easing off every fourth week. Sessions go on days that do not clash with your running.</div>' +
+      '</div></div>' +
+      '<button class="primary" id="progStart" style="margin-top:var(--s3)">Start a programme</button></div>';
+  }
+  const wk = Math.max(1, progWeekOf(p, todayIso()) || 1);
+  // ⚠ programmeWeekFor, NOT programmeWeek: the block proposes a set count and this runner's own
+  // minutes dispose, and the card is a promise about the session they are about to do.
+  const plan = RC.programmeWeekFor(wk, progPrefs(p));
+  const next = EXTRA.filter((e) => e.prog === p.id).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+  const done = loadSdone().filter((r) => String(r.s || "").indexOf("p" + p.id + "-") === 0).length;
+  const total = p.weeks * p.sessionsPerWeek;
+  return '<div class="card sh-card"><div class="sh-head"><div class="sh-main">' +
+    '<div class="sh-name">' + esc(p.name) + '</div>' +
+    '<div class="sh-mus">Week ' + wk + ' of ' + p.weeks + ' · ' + esc(progBlockLabel(plan.block)) +
+      (plan.isDeload ? " · ease-off week" : "") + '</div>' +
+    '<div class="sh-best"><b>' + done + '</b> of ' + total + ' sessions done</div>' +
+    '</div></div>' +
+    '<div class="sh-rows"><div class="sh-row"><span class="sh-wk">This week</span>' +
+      '<span class="sh-sets">' + plan.sets + ' × ' + esc(plan.reps) + (plan.load ? " at " + esc(plan.load) : "") + '</span></div>' +
+    (next ? '<div class="sh-row"><span class="sh-wk">Next session</span><span class="sh-sets">' +
+      esc(runDateLabelIso(next.date)) + '</span></div>' : "") +
+    '</div>' +
+    '<p class="mp-note" style="margin-top:var(--s3)">' + esc(plan.focus) + '</p>' +
+    '<button class="mini-btn" id="progEnd">End programme</button></div>';
+}
+function openProgSheet() {
+  const d = progDefaultPrefs();
+  PROG_DRAFT = { weeks: PROG_DEFAULT_WEEKS, sessionsPerWeek: d.sessionsPerWeek };
+  renderProgSheet();
+}
+function renderProgSheet() {
+  const d = PROG_DRAFT; if (!d) return;
+  const base = progDefaultPrefs();
+  const weekOpt = (w) => '<button class="po-opt' + (d.weeks === w ? " rec" : "") + '" data-progw="' + w + '">' +
+    (d.weeks === w ? '<span class="po-rec">Chosen</span>' : "") +
+    '<span class="po-t">' + w + ' weeks</span><span class="po-b">' +
+    (w <= 4 ? "One block of loading, with an ease-off week at the end."
+      : w <= 6 ? "Technique, loading, and the start of the heavy work."
+      : w <= 8 ? "The full shape — technique, loading and a real heavy block." 
+      : "The longest block, with three ease-off weeks along the way.") +
+    '</span></button>';
+  const sessOpt = (n) => '<button class="po-opt' + (d.sessionsPerWeek === n ? " rec" : "") + '" data-progs="' + n + '">' +
+    (d.sessionsPerWeek === n ? '<span class="po-rec">Chosen</span>' : "") +
+    '<span class="po-t">' + n + (n === 1 ? " session" : " sessions") + ' a week</span>' +
+    '<span class="po-b">' + (n === 1 ? "One session, alternating between two different ones week to week."
+      : n === 2 ? "Two different sessions, A and B."
+      : "Three different sessions, A, B and C.") + '</span></button>';
+  const weeks = RC.programmeWeeksFor(d.weeks, {
+    sessionsPerWeek: d.sessionsPerWeek, minutes: base.minutes, level: base.level,
+    goal: base.goal, equipment: base.equipment,
+  });
+  const shape = weeks.map((w) =>
+    '<div class="sh-row"><span class="sh-wk">Week ' + w.week + '</span><span class="sh-sets">' +
+    esc(progBlockLabel(w.block)) + (w.isDeload ? " (ease off)" : "") + ' · ' + w.sets + ' × ' +
+    esc(w.reps) + (w.load ? " at " + esc(w.load) : "") + '</span></div>').join("");
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="eyebrow">Strength programme</div>' +
+    '<h3 class="sheet-h">How long?</h3>' +
+    PROG_WEEK_CHOICES.map(weekOpt).join("") +
+    '<h3 class="sheet-h">How often?</h3>' +
+    [1, 2, 3].map(sessOpt).join("") +
+    '<div class="po-verdict"><b>' + (d.weeks * d.sessionsPerWeek) + ' sessions</b><span>' +
+      esc(base.minutes) + ' minutes each, ' + esc(base.level) + ' level, ' +
+      esc(base.goal === "allRound" ? "all-round" : "running focus") + ' — the answers from Training rhythm ' +
+      'in your profile. Change them there and this follows.</span></div>' +
+    '<h3 class="sheet-h">The shape of it</h3>' +
+    '<div class="card sh-card"><div class="sh-rows">' + shape + '</div></div>' +
+    '<div class="act-pair"><button class="ap-no" id="progCancel">Cancel</button>' +
+    '<button class="ap-yes" id="progGo">Start it</button></div>' +
+    '<p class="mp-note">While a programme is running your plan schedules no strength of its own, so ' +
+    'you are never asked to lift twice. Sessions land on days that do not clash with your running — ' +
+    'never your long-run day, and heavy weeks avoid the evening before your long run.</p>';
+  // ⚠️ ensureSheet() ONLY BUILDS THE NODE -- every opener in this app adds .on itself, and this
+  // function is both the opener and the re-render, so it does it here. Written without this the sheet
+  // filled in perfectly and stayed invisible: the option buttons existed, were wired, and could never
+  // be reached. Found by driving the button, not by reading the code.
+  $("sheetOv").classList.add("on");
+  $("progCancel").onclick = () => { PROG_DRAFT = null; closeSheet(); };
+  $("progGo").onclick = startProgramme;
+  document.querySelectorAll("[data-progw]").forEach((b) => {
+    b.onclick = () => { PROG_DRAFT.weeks = Number(b.dataset.progw); renderProgSheet(); };
+  });
+  document.querySelectorAll("[data-progs]").forEach((b) => {
+    b.onclick = () => { PROG_DRAFT.sessionsPerWeek = Number(b.dataset.progs); renderProgSheet(); };
+  });
+}
+/**
+ * ⚠️ IT GOES THROUGH recompute(), NOT A HAND-ASSIGNMENT. Starting a programme changes what the ENGINE
+ * builds -- strengthSessionsFor returns 0 and the plan gains its note -- so the plan has to be rebuilt,
+ * with the ticks carried across it, exactly as every other plan-changing path in this app does. Writing
+ * the store and re-rendering would leave the plan's own strength sessions sitting there beside the
+ * programme's until something else happened to rebuild.
+ */
+function startProgramme() {
+  const d = PROG_DRAFT; if (!d) return;
+  const base = progDefaultPrefs();
+  const p = {
+    id: String(Date.now()),
+    name: d.weeks + "-week strength programme",
+    startIso: todayIso(),
+    weeks: d.weeks,
+    sessionsPerWeek: d.sessionsPerWeek,
+    minutes: base.minutes, level: base.level, goal: base.goal, equipment: base.equipment,
+    skipped: {}, status: "active", createdAt: Date.now(),
+  };
+  const ticks = todayTicks();
+  saveProg(p);
+  try { recompute(); } catch (e) { saveProg(null); toast("That did not work — your plan is unchanged."); return; }
+  computeToday(); seedDone(); restoreTicks(ticks);
+  PROG_DRAFT = null;
+  closeSheet();
+  render();
+  toast("Programme started — week 1 of " + p.weeks + ".");
+}
+function endProgramme() {
+  const p = loadProg(); if (!p) return;
+  confirmSheet(
+    "End this programme?",
+    "Your logged sets and finished sessions stay exactly where they are — this only stops the " +
+        "remaining sessions being scheduled, and gives your plan its own strength sessions back.",
+    "End it",
+    () => {
+      const ticks = todayTicks();
+      p.status = "ended";
+      p.endedAt = Date.now();
+      saveProg(p);
+      try { recompute(); } catch (e) {}
+      computeToday(); seedDone(); restoreTicks(ticks);
+      render();
+    },
+  );
+}
 function viewStrengthHistory() {
   const hist = strengthHistory();
   const names = Object.keys(hist);
-  const sessions = strengthSessionsHtml();
+  // ⚠️ THE PROGRAMME CARD IS FIRST ON EVERY PATH, INCLUDING BOTH EMPTY STATES. A runner who has just
+  // started a programme has logged nothing yet -- that IS the empty state -- so a card rendered only
+  // beside a populated history would be invisible at exactly the moment it matters most.
+  const prog = progCardHtml();
+  const sessions = prog + strengthSessionsHtml();
   if (!names.length) {
     // ⚠️ THE FINISHED-SESSION LIST STILL SHOWS WHEN NO LIFT HAS BEEN LOGGED, and it is the common case
     // for a beginner on a bodyweight plan rather than an edge one. The empty state below is about the
@@ -14664,7 +15183,7 @@ function viewStrengthHistory() {
       return sessions +
         '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No weights logged yet</h3><p>Sessions you finish are listed above. Tap Log set during a session and enter a weight, and your progress on each lift will build up here.</p></div>';
     }
-    return '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No strength logged yet</h3><p>Open a strength session, tap Start and record your weights and reps as you go. Your progress on each lift will build up here.</p></div>';
+    return prog + '<div class="empty-state"><div class="ic">' + ICON.dumbbell + '</div><h3>No strength logged yet</h3><p>Open a strength session, tap Start and record your weights and reps as you go. Your progress on each lift will build up here.</p></div>';
   }
   // Sort by most recently logged.
   // Most recently logged first. Dates, not week numbers: a week number means nothing once the plan
@@ -38577,6 +39096,11 @@ function wire() {
   wireWeekList();
   centerPlanWeek();
   document.querySelectorAll("[data-at]").forEach((b) => b.onclick = () => { state.actTab = b.dataset.at; render(); });
+  // A7 -- the strength programme card. Wired here rather than inside progCardHtml because this app
+  // wires after render, once, from wire(): a handler attached inside a builder is attached again on
+  // every repaint, and a builder that touches the DOM is a builder that cannot be tested by calling it.
+  if ($("progStart")) $("progStart").onclick = openProgSheet;
+  if ($("progEnd")) $("progEnd").onclick = endProgramme;
   // ⚠️ BY ID, NOT BY POSITION. The index was already "not a handle" because state.logged is
   // unshifted whenever a watch run arrives; filtering the list breaks it a second way, because
   // position in the RENDERED list stopped matching position in the array the moment a filter existed.

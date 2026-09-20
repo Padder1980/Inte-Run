@@ -251,11 +251,39 @@ export function plyoFor(competitive: boolean, budgetSeconds: number): { pogoSets
  * Pick the exercise for a slot: the preferred movement when it is available, otherwise the first
  * catalogue entry of the same pattern the runner can perform and has not already been given.
  */
-function pickForSlot(s: Slot, owned: Equipment[], level: StrengthPrefs["level"], used: Set<string>): string | null {
+function pickForSlot(
+  s: Slot,
+  owned: Equipment[],
+  level: StrengthPrefs["level"],
+  used: Set<string>,
+  /**
+   * How far to rotate through this pattern's candidates before picking — the A/B(/C) rotation a
+   * standalone programme needs so two sessions in the same week are not the same lifts.
+   *
+   * ⚠️ ZERO IS THE SHIPPED BEHAVIOUR, BYTE FOR BYTE: the preferred movement first, then catalogue
+   * order, skipping anything already used. The plan's own sessions never pass anything else, so a
+   * plan built with no programme is unchanged — which is the same guarantee A3's two-path split
+   * exists to hold, and `test/strength-prefs.test.ts` hashes whole plans to keep it.
+   */
+  rotate = 0,
+): string | null {
+  const all: string[] = [];
   const pref = EXERCISES[s.prefer];
-  if (pref && !used.has(s.prefer) && canDo(pref, owned, level)) return s.prefer;
-  for (const c of exercisesFor(s.pattern, owned, level)) {
-    if (!used.has(c.id)) return c.id;
+  if (pref && canDo(pref, owned, level)) all.push(s.prefer);
+  for (const c of exercisesFor(s.pattern, owned, level)) if (all.indexOf(c.id) < 0) all.push(c.id);
+  if (!all.length) return null;
+  // ⚠⚠ A NON-FINITE ROTATION MUST FALL BACK TO ZERO, AND THE FAILURE IT PREVENTS IS TOTAL AND SILENT.
+  // `all[(NaN + i) % n]` is `undefined` for every i, so every slot comes back empty and the builder
+  // returns a session with NO EXERCISES AT ALL -- a card promising 45 minutes of lifting with nothing
+  // on it, and nothing thrown to say so. One caller supplies this from a stored record
+  // (`rotationIndex(week, slot, prefs.sessionsPerWeek)`), so a record written before that field
+  // existed, or restored from an older backup, is exactly how NaN gets here. Same lesson as the
+  // engine's `qualityRefFor`: a gate written `!= null` lets NaN through, and one non-finite value
+  // silently rewrote a whole plan. The wrong rotation is a different session; no rotation is no session.
+  const rot = Number.isFinite(rotate) ? Math.max(0, Math.round(rotate)) : 0;
+  for (let i = 0; i < all.length; i++) {
+    const id = all[(rot + i) % all.length]!;
+    if (!used.has(id)) return id;
   }
   return null;
 }
@@ -267,6 +295,20 @@ export function buildStrength(opts: {
   competitive: boolean;
   /** Whether this session carries the plyometric dose — the caller decides, see addStrength. */
   plyo: boolean;
+  /**
+   * The prescription to fill the session with, when the caller has one of its own. A standalone
+   * strength programme (A7) works in BLOCKS rather than plan phases — technique, then loading, then
+   * heavy — so its week decides the reps, the rest and the load, not `intentFor(phase)`.
+   *
+   * ⚠️ AN INJECTED INTENT'S `sets` IS FINAL; A PHASE DEFAULT'S IS PERSONALISED BY LEVEL. That split
+   * is the rule rather than a special case: `intentFor` answers "what does this PHASE ask of a
+   * runner", which the level then adjusts, while a programme block has already resolved the level
+   * when it chose its own set band. Applying `SETS_BY_LEVEL` twice would push a beginner's heavy
+   * block below the three sets the block is defined as.
+   */
+  intent?: StrengthIntent;
+  /** Rotate each pattern's candidate list — the A/B(/C) rotation. See pickForSlot. */
+  rotate?: number;
 }): BuiltStrength {
   const { prefs } = opts;
   const level = prefs.level;
@@ -280,7 +322,7 @@ export function buildStrength(opts: {
     : prefs.minutes;
   const budget = Math.max(600, Math.round(minutes * 60));
 
-  const base = intentFor(opts.phase, opts.maintenance);
+  const base = opts.intent ?? intentFor(opts.phase, opts.maintenance);
 
   // ⚠️ THE JUMPS COME OUT OF THE BUDGET BEFORE THE LIFTS GO IN, so the dose can never be squeezed out
   // by a filler that ran out of room. It is a prescription, not padding.
@@ -303,7 +345,8 @@ export function buildStrength(opts: {
    * set until the three lifts that must be there fit, floored at two.
    */
   const MIN_SPINE = 3;
-  const levelSets = Math.max(SETS_MIN, Math.min(SETS_MAX, base.sets + SETS_BY_LEVEL[level]));
+  const levelSets = Math.max(SETS_MIN, Math.min(SETS_MAX,
+    base.sets + (opts.intent ? 0 : SETS_BY_LEVEL[level])));
   let mainSets = levelSets;
   while (mainSets > SETS_MIN
     && MIN_SPINE * setCost(mainSets, WORK_SEC, REST_BY_INTENT[base.intent]) > liftBudget) mainSets--;
@@ -331,7 +374,7 @@ export function buildStrength(opts: {
   let group = 0;
 
   for (const s of spine) {
-    const id = pickForSlot(s, owned, level, used);
+    const id = pickForSlot(s, owned, level, used, opts.rotate ?? 0);
     if (!id) continue;
     const ex: BuiltExercise = s.role === "hold"
       ? { id, sets: accSets, reps: HOLD_REPS, restSeconds: REST_BY_INTENT.hold }

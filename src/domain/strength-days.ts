@@ -33,9 +33,15 @@ export const STRENGTH_MAX_PER_WEEK = 4;
 const PEAK_MAX = 2;
 
 export function strengthSessionsFor(
-  a: Pick<Athlete, "includeStrength" | "strength" | "experience" | "daysPerWeek">,
+  a: Pick<Athlete, "includeStrength" | "strength" | "experience" | "daysPerWeek" | "strengthProgramme">,
   wp: StrengthWeek,
 ): number {
+  // ⚠️ A RUNNING PROGRAMME OWNS THE STRENGTH, AND IT OWNS ALL OF IT. Checked FIRST, above
+  // includeStrength, because the two answers are about different things: includeStrength is "do you
+  // want the plan to prescribe strength", and a programme is "I am already doing my own". Leaving
+  // the plan's sessions in beside a programme's is how a runner asked for two sessions a week ends
+  // up with four, placed by two rule sets that cannot see each other.
+  if (a.strengthProgramme && a.strengthProgramme.active) return 0;
   if (!a.includeStrength) return 0;
   const beginner = a.experience === "beginner";
   const prefs = a.strength;

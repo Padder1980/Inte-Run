@@ -15209,3 +15209,167 @@ the real Session-done screen, and the Logbook → Strength card showing the esti
 volume and an upward trend arrow once fed data inside Epley's valid domain and the real current week.
 
 **Still to come in this track:** A7 standalone programmes, A8 Strava as Weight Training, A9 the watch.
+
+## ✅ A7 — STANDALONE STRENGTH PROGRAMMES, AND THE PLAN STEPS ASIDE (2026-09-20)
+
+Start a 4–12 week programme from the same questions the plan already asks. Its sessions land on days
+that do not fight the running, the plan schedules no strength of its own while one is running, and
+the blocks progress — technique, then loading, then heavy, easing off every fourth week — with an
+A/B(/C) rotation so two sessions in a week are not the same lifts. Suite 1652 → **1675**;
+`test/strength-programme.test.ts` holds 23 guards and **32 deliberate re-breaks were all caught**
+(three only after a guard was strengthened — those three are the useful half).
+
+⚠️ **THE PROGRESSION AUDIT IS BYTE-IDENTICAL TO HEAD**, proved by running it in a stashed worktree
+rather than argued: `strengthProgramme` is absent from every existing profile, `pickForSlot`'s new
+`rotate` argument defaults to 0 (the shipped order), and `buildStrength`'s level bump is suppressed
+only when an `intent` is injected, which nothing but a programme does.
+
+### ⚠️⚠️ THE SESSIONS ARE DERIVED INTO `EXTRA`, NEVER STORED THERE
+
+The obvious build materialises them into the extras store and re-places the future ones on every
+rebuild. That hits **three temporal dead zones at boot**: `adoptPlan` is reached from a top-level
+`recompute()` at `web/app.ts:7420`, while `const state` is at 7464, `const PRIMARY_TYPES` at 7509 and
+`let EXTRA` at ~12354 — all below it. Deriving instead, at the moment `EXTRA` is built and again
+whenever the plan changes, removes the whole class.
+
+- `loadExtra()` returns `stored.filter(!prog).concat(progExtras())`; `saveExtra()` strips `prog` rows.
+  ⚠️ **WITHOUT BOTH HALVES A PROGRAMME DOUBLES ON EVERY REBUILD** — a stored copy of a derived row is
+  a second copy of every session, and it outlives the programme that produced it, un-removable.
+- `refreshProgExtras()` runs from `adoptPlan`, **gated on `EXTRA_READY`** and **before the two syncs**
+  — after them, iOS holds reminders and the wrist holds a schedule for sessions that have just moved.
+  An ORDERING claim, guarded as one.
+- ⚠️ **`extraSession` ROUTES A PROGRAMME ROW FIRST.** It carries `type: "strength"` and would
+  otherwise fall through to `buildCustomSession`, which resolves a type to **the plan's representative
+  session of it** — so every week of a twelve-week programme would render as the plan's own strength
+  session with none of the block progression that is the entire point.
+- ⚠️ **`removeExtra` RECORDS A SKIP** (`p.skipped[id]`), because deleting a derived row is undone by
+  the next rebuild. The ids are deterministic (`p<pid>-w<k>-s<j>`), which is what makes a skip and a
+  move survive one; a guard asserts two derivations of one record agree exactly.
+
+⚠️ **AND THE CALENDAR HAD NEVER SHOWN AN EXTRA AT ALL, WHICH A7 TURNS FROM A GAP INTO A DEFECT.**
+`viewCalendar` maps `PLAN.weeks[].sessions`, so a session the runner ADDED to a day has only ever
+appeared on Today. One added run is a thing you remember; sixteen programme sessions over eight weeks
+is a schedule, and a schedule you cannot see is not one. `calExtraRow` renders **every** extra, not
+only a programme's — measured at 3 ms for 16 builds on a full calendar render.
+⚠️ **NO TICK BOX ON IT.** `state.done` is keyed `doneKey(weekIndex, session)` = week|day|title, which
+an extra has no week index for; Today's own extras card has no tick for the same reason.
+
+### ⚠️⚠️ THE BLOCK PROPOSES THE SET COUNT AND THE RUNNER'S MINUTES DISPOSE — SO THE CARD ASKS THE BUILDER
+
+`programmeWeek(week, level)` is the block table. `programmeWeekFor(week, prefs)` is what this runner
+will actually be given, and the two **disagree in both directions**: a 20-minute advanced heavy week
+is prescribed 3 sets and delivered **2** (the spine has to fit), a 60-minute intermediate technique
+week is prescribed 2 and delivered **3** (an hour has to buy something). A card reading "3 × 3–6" over
+a session giving two sets is a title promising what a session does not contain, which this repo has
+shipped twice.
+⚠️ **THE FIX IS IN THE CARD, NOT THE BUILDER.** Making the block authoritative would undo A3's own
+measured rule — the sets give way before the movements do, or a 30-minute advanced session is one
+exercise. Both the card and the create sheet's overview read the delivered shape; a guard forbids
+either reaching `programmeWeek`/`programmeWeeks` at all, because those are the numbers that can lie.
+
+### ⚠️⚠️ A SWEEP THAT MEASURED NOTHING AND REPORTED CLEAN — THE MOST VALUABLE FINDING HERE
+
+A probe comparing the card's set count against the built session's said **"0 mismatches" across 288
+cases**. Every one of those sessions had **zero exercises**: the probe's fixture omitted
+`sessionsPerWeek`, `rotationIndex` answered NaN, and `all[(NaN + i) % n]` is `undefined` for every
+slot — so the comparison was skipped 288 times and the zero read as a pass. **A `.mjs` probe has no
+typechecking, so it can feed the engine a shape no caller can produce**, which this file already
+records twice.
+- The guard now asserts it was **not vacuous** (≥1000 comparisons genuinely made) before believing
+  its own zero. Swept properly: **5184 cases, 0 mismatches, 0 empty sessions.**
+- ⚠️ **AND IT EXPOSED A REAL SILENT-TOTAL-FAILURE HOLE.** `pickForSlot` now refuses a non-finite
+  rotation and falls back to 0. The rotation comes off a **stored record**, so a record written before
+  that field existed, or restored from an older backup, is exactly how NaN gets there — and the
+  failure is a card promising forty-five minutes of lifting with **nothing on it** and nothing thrown.
+  Same lesson as the engine's `qualityRefFor`: a gate written `!= null` lets NaN through.
+- ⚠️ **`rotationIndex` IS TOTAL TOO, AND THAT HID THE FIRST GUARD.** Belt and braces hides the brace
+  you are testing: removing `pickForSlot`'s guard changed nothing measurable through
+  `buildProgrammeSession` — watched escaping. The guard drives `buildStrength` directly now.
+
+### PLACEMENT: TWO TIERS, AND THE SPLIT IS WHAT MAKES FOUR SESSIONS A WEEK POSSIBLE
+
+**HARD** (never): the long-run day, race day, race eve, a day already carrying a strength session.
+**SOFT** (scored): the eve of the long run (+100), the eve of a quality day (+50). Banning all of them
+leaves fewer than four placeable days in a seven-day week and the runner may ask for four — the
+identical arithmetic `strengthDaysFor` already records.
+
+⚠️⚠️ **MEASURED AGAINST A CONTROL WITH THE SCORE DELETED, BECAUSE A BARE PERCENTAGE CANNOT TELL A RULE
+THAT IS WORKING FROM A RULE THAT NEVER HAD ANYTHING TO DECIDE:**
+
+| sessions/week | shipped eve-of-long | control (rule removed) |
+|---|---|---|
+| 1 | **0.0%** | 23.2% |
+| 2 | **0.0%** | 25.0% |
+| 3 | **0.0%** | 16.7% |
+| 4 | **12.5%** | 12.5% |
+
+At one, two and three a week the eve of the long run is **never** used; at four it is unavoidable and
+the rule changes nothing. **My first bound was 6% picked by taste and it failed at 8.3%** — an
+aggregate that would have hidden both halves. The quality eve is what pays for it: at three a week the
+shipped placer uses one 16.7% of the time and the control never does, which is the stated trade (when
+something gives, it gives on the smaller session).
+
+⚠️ **AND THE RACE-EVE BAN WAS UNTESTABLE UNTIL THE LAST WEEK JOINED THE SWEEP.** Weeks 1 and 6 of a
+four-month block contain neither race day nor its eve, so deleting the ban outright **passed every
+assertion** — the fixture-too-kind trap, in the one test whose subject is race day. The sweep now
+counts how often a race eve was even a candidate and fails if it never was.
+
+### THE RUNNER MAY MOVE A SESSION, AND BEFORE THIS THE CONTROL LOOKED LIVE AND DID NOTHING
+
+⚠️⚠️ **A PROGRAMME SESSION IS DATED, NOT WEEK-AND-DAY, SO `moveSession` CANNOT MOVE IT — AND IT DID
+NOT REFUSE, IT WROTE A `dayOverride` NOTHING READS.** Measured by driving the session sheet: tapping a
+day rescheduled nothing, left a dead override in the store, and closed the sheet as though it had
+worked. Sixteen of them on one screen. **Found by driving the control, not by reading the code.**
+`progMove(id, iso)` records it and `progExtras` honours it.
+- ⚠️ **INSIDE ITS OWN WEEK ONLY**, and that is structural: the programme is blocks of weeks, so a
+  session dragged into the next one leaves a week with three sessions and a week with one, both at the
+  wrong block's prescription.
+- ⚠️ **A MOVE ONTO A DAY THE PROGRAMME ALREADY USES SWAPS**, which is what the sheet's own copy
+  promises ("if a run is already there, the two will swap"). Without it both of that week's sessions
+  land on one day, against the placer's own one-a-day rule. The session that did **not** move gives way.
+- ⚠️ **NOT RE-SCORED.** A choice then overruled by our own preference is the app deciding, which the
+  weekly review's standing instruction forbids.
+
+### The rest of the decisions
+
+⚠️ **`Athlete.strengthProgramme` IS READ BY THE ENGINE, NOT FILTERED BY THE APP AFTERWARDS.**
+`strengthSessionsFor` returns 0 **above** the `includeStrength` check — the two answers are about
+different things — and `buildNotes` says so, so the plan the runner reads and the plan the watch is
+sent agree about it. ⚠️ **`viewPlan`'s note filter had to admit the new wording**, or the note is
+written and never shown: the computed-and-discarded trap, which this repo has now recorded seven times.
+⚠️ **AND IT IS READ FROM THE STORE, NOT A PROFILE FIELD** — the programme IS the record, and a second
+copy of "is one running" on the profile is the one that goes stale.
+
+⚠️ **`progActive` REFUSES AN ENDED *OR* AN EXPIRED PROGRAMME, AND ONLY THE SUPPRESSION CAN FAIL.**
+`progExtras` skips any past week on its own, so deleting the expiry check changes nothing it produces
+— watched escaping. What the check holds is `applyProfile`: without it a programme that finished in
+March keeps the plan's own strength suppressed for ever. **The guard was restated to the claim with
+teeth rather than the one that was easy to write.**
+
+⚠️ **NO PLYOMETRICS IN A PROGRAMME SESSION.** The contacts are prescribed against the running week's
+tolerance for them; a standalone programme has no running week to hang that judgement off.
+
+⚠️ **STARTING AND ENDING GO THROUGH `recompute()`, NOT A HAND-ASSIGNMENT.** Both change what the
+ENGINE builds, so the plan has to be rebuilt with the ticks carried across it — `todayTicks()` /
+`seedDone()` / `restoreTicks()`, the pairing `doSaveProfile` is the one path that ever missed.
+
+⚠️ **NO NEW CSS.** The card reuses `.sh-card`/`.sh-rows`/`.sh-row`, the sheet reuses
+`.po-opt`/`.po-t`/`.po-b`/`.po-verdict` and `.act-pair`/`.ap-yes`/`.ap-no`. Both design ratchets and
+`CSS_DUP_CEILING` are unchanged.
+
+### Traps this stage paid for again
+
+⚠️ **`ensureSheet()` ONLY BUILDS THE NODE — every opener adds `.on` itself.** Written without it the
+sheet filled in perfectly and stayed **invisible**: the option buttons existed, were wired, and could
+never be reached. Found by driving the button.
+⚠️ **`confirmSheet` IS POSITIONAL** `(title, body, confirmLabel, onConfirm)`, not an options object,
+and it closes the sheet itself before calling back.
+⚠️ **THE BACKTICK RULE FIRED THREE TIMES**, all in my own comments; the build failed outright each
+time, which is the good outcome. Sweep `git diff | grep '^+' | grep -F '\`'` before building.
+⚠️ **`buildPlanSummary(athlete, goal)` TAKES TWO ARGUMENTS** — the start date rides on the `Goal`
+(`options.startDateIso ?? goal.startDateIso ?? today`), which CLAUDE.md already records.
+⚠️ **`profile.strength` IS THE BOOLEAN THE ENGINE READS**, not `includeStrength`; a seeded fixture
+setting the latter builds a plan with no strength in it and the "plan steps aside" claim then proves
+nothing. Every claim in this chapter's browser drive was re-taken after that was fixed.
+
+**Still to come in this track:** A8 Strava as Weight Training, A9 the watch.

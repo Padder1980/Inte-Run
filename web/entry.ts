@@ -41,7 +41,7 @@ export type { RunObservation, TrainingFlag, TrainingFlagsResult } from "../src/a
 export { assessConditions, heatPaceFactor, dewPointFrom } from "../src/environment/weather.ts";
 export { adaptSessionForHeat } from "../src/adapt/heat.ts";
 export { fuellingFor } from "../src/science/fuelling.ts";
-export { listWorkouts, buildWorkout } from "../src/plan/session-templates.ts";
+export { listWorkouts, buildWorkout, programmeSession } from "../src/plan/session-templates.ts";
 export { EXERCISES, EQUIPMENT, EQUIPMENT_LABEL, PATTERNS, PATTERN_LABEL, PATTERN_WHY,
   exerciseById, exerciseIds, alternativesFor, exercisesFor, canDo, swapCandidatesFor } from "../src/strength/library.ts";
 export { STRENGTH_MINUTES, STRENGTH_LEVELS, STRENGTH_GOALS, REST_BY_INTENT,
@@ -58,6 +58,12 @@ export { epley1RM, bestE1RMKg, suggestLoad, sumVolumeKg,
 export type { LoggedSet, LoadSuggestion } from "../src/strength/progression.ts";
 export { detectStrengthRecords } from "../src/strength/records.ts";
 export type { StrengthRecordHit, StrengthRecordKind } from "../src/strength/records.ts";
+// A7 — standalone strength programmes: blocks that progress, a deload every fourth week, and an
+// A/B(/C) rotation so two sessions in one week are not the same lifts.
+export { buildProgrammeSession, programmeWeek, programmeWeeks, programmeWeekFor, programmeWeeksFor, isDeloadWeek,
+  rotationIndex, rotationLabel, rotationSize,
+  PROGRAMME_WEEKS_MIN, PROGRAMME_WEEKS_MAX, PROGRAMME_SESSIONS_MAX, DELOAD_EVERY } from "../src/strength/programme.ts";
+export type { ProgrammeWeek, ProgrammeBlockName, ProgrammePrefs } from "../src/strength/programme.ts";
 export type { WorkoutOption } from "../src/plan/session-templates.ts";
 export type { FuellingPlan } from "../src/science/fuelling.ts";
 export { classifyRunner } from "../src/athlete/classification.ts";

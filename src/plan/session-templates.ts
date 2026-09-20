@@ -1875,6 +1875,7 @@ export function raceSpecificSession(paces: TrainingPaces, variant = 0, ctx: Form
  */
 import { EXERCISES, exerciseById, exerciseIds } from "../strength/library.ts";
 import { buildStrength } from "../strength/builder.ts";
+import { buildProgrammeSession, type ProgrammePrefs } from "../strength/programme.ts";
 export { exerciseById, exerciseIds };
 
 function mkEx(
@@ -2047,6 +2048,44 @@ function builtStrengthSession(
     desc,
     "none",
     [{ kind: "steady", label: "Runner-focused resistance session", durationSeconds: mins * 60, targetRpe: RPE.threshold }],
+  );
+  return { ...content, exercises };
+}
+
+/**
+ * ONE SESSION OF A STANDALONE STRENGTH PROGRAMME (A7), as a full SessionContent.
+ *
+ * ⚠️ IT LIVES HERE RATHER THAN IN programme.ts BECAUSE ITS TWO DEPENDENCIES DO. `mkEx` is what stamps
+ * the catalogue id and copies the equipment onto each exercise (so a logged set files correctly and
+ * the swap picker works), and `assemble` is what derives the duration and — load-bearing — widens the
+ * session's RPE band to span its hardest step. Rebuilding either here would be a second copy of the
+ * one thing this file's own comment says no builder may be allowed to forget. programme.ts stays pure
+ * arithmetic over blocks and rotations; turning that into a session is session-building, and this is
+ * where session-building lives.
+ */
+export function programmeSession(week: number, slot: number, prefs: ProgrammePrefs): SessionContent {
+  const built = buildProgrammeSession({ week, slot, prefs });
+  const exercises = built.exercises.map((e) => mkEx(e.id, e.sets, e.reps, {
+    loadPercent1RM: e.loadPercent1RM,
+    restSeconds: e.restSeconds,
+    equipment: EXERCISES[e.id]!.equipment.slice(),
+    superset: e.superset,
+  }));
+  const mins = Math.max(1, Math.round(built.seconds / 60));
+  const pw = built.plan;
+  const label = String.fromCharCode(65 + built.rotation);
+  const supersets = exercises.some((e) => e.superset != null);
+  const desc = pw.focus
+    + " Week " + week + ", session " + label + " — " + pw.sets + " sets of " + pw.reps
+    + (pw.load ? " at " + pw.load : "") + ", " + Math.round(pw.restSeconds / 30) / 2 + " minutes between sets."
+    + (supersets ? " Exercises marked with the same pairing are alternated, which is what keeps it inside the time." : "")
+    + " Tap an exercise for how to do it and to log your weights.";
+  const content = assemble(
+    "strength",
+    "Strength " + label + " · week " + week + (pw.isDeload ? " (ease off)" : ""),
+    desc,
+    "none",
+    [{ kind: "steady", label: "Strength programme session", durationSeconds: mins * 60, targetRpe: RPE.threshold }],
   );
   return { ...content, exercises };
 }

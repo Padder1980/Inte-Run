@@ -58,6 +58,16 @@ export type Athlete = {
    * `sessionsPerWeek: 0` and `includeStrength: false` must mean the same thing, and both do.
    */
   strength?: StrengthPrefs;
+  /**
+   * A standalone strength programme (A7) is running alongside this plan.
+   *
+   * ⚠️ WHEN ACTIVE, THE PLAN SCHEDULES NO STRENGTH OF ITS OWN, AND THAT IS THE WHOLE POINT. A
+   * programme materialises its own sessions on real dates; leaving the plan's two in as well would
+   * ask a runner to lift four times in a week they asked to lift twice, on days chosen by two
+   * different sets of rules that have never heard of each other. The plan says so in a note rather
+   * than silently going quiet — see buildNotes.
+   */
+  strengthProgramme?: { active: boolean };
   /** When true the plan starts conservatively (single quality session, gentle volume ramp). */
   /**
    * Coming back from an INJURY — the constraint is tissue tolerance, not aerobic capacity.

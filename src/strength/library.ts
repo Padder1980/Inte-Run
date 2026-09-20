@@ -163,6 +163,50 @@ export const EXERCISES: Record<string, ExerciseDef> = {
 /** Every exercise id the catalogue defines, so a guard can sweep them rather than list them. */
 export function exerciseIds(): string[] { return Object.keys(EXERCISES); }
 
+/** Rank of each level, so "at most this level" is a comparison rather than three if-statements. */
+const LEVEL_RANK: Record<ExerciseLevel, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+
+/**
+ * True when a runner at `level` owning `owned` can perform this exercise.
+ *
+ * ⚠️ AN EMPTY LIST IS BODYWEIGHT, NOT "ANYTHING GOES". A runner who ticked nothing has nothing, so
+ * reading empty as unrestricted would prescribe a barbell to somebody standing in a hotel room.
+ *
+ * ⚠️⚠️ AND BODYWEIGHT IS NEVER SOMETHING YOU OWN — IT IS ALWAYS TRUE. The first cut built the owned
+ * set from the ticks alone, so a runner who ticked "a resistance band" and nothing else was refused
+ * every bodyweight exercise in the catalogue: no plank, no calf raise, no pogo hops. Ticking a piece
+ * of kit can only ever ADD to what somebody can do. Caught by the guard sweeping a band-only kit.
+ */
+export function canDo(d: ExerciseDef, owned: Equipment[], level: ExerciseLevel): boolean {
+  if (LEVEL_RANK[d.minLevel] > LEVEL_RANK[level]) return false;
+  const has = new Set<string>(owned);
+  has.add("bodyweight");
+  return d.equipment.some((e) => has.has(e));
+}
+
+/**
+ * Every exercise of one movement pattern this runner can actually perform, in catalogue order.
+ *
+ * ⚠️ CATALOGUE ORDER, NOT A SCORE, AND NOT SHUFFLED. A plan must be reproducible — the same answers
+ * must build the same block today and after a rebuild — so the only ordering here is the one written
+ * down in EXERCISES, easiest first within each pattern group. `alternativesFor` ranks by muscle
+ * overlap because a SWAP is a comparison against one exercise; this is a pick with no incumbent.
+ */
+export function exercisesFor(
+  pattern: MovementPattern,
+  owned: Equipment[],
+  level: ExerciseLevel,
+): (ExerciseDef & { id: string })[] {
+  const out: (ExerciseDef & { id: string })[] = [];
+  for (const id in EXERCISES) {
+    const d = EXERCISES[id]!;
+    if (d.pattern !== pattern) continue;
+    if (!canDo(d, owned, level)) continue;
+    out.push({ id, ...d });
+  }
+  return out;
+}
+
 /** Look up an exercise by its stable id. */
 export function exerciseById(id: string): (ExerciseDef & { id: string }) | null {
   const d = EXERCISES[id];

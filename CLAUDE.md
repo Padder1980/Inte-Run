@@ -14647,7 +14647,148 @@ scope precisely: the no-backticks rule is about `web/app.ts`'s runtime JS specif
 in the repo — checking WHICH file a backtick landed in before treating it as a defect saved chasing a
 non-issue in `session-templates.ts`.
 
-**Still to come in this track:** A3 preferences (sessions/week, minutes, level, equipment owned —
-reads what A2 now exposes) and the engine builder that respects them, A4 swap (built on
-`alternativesFor`, already shipped here), A5 the session player, A6 e1RM and progression, A7
-standalone programmes, A8 Strava as Weight Training, A9 the watch.
+**Still to come in this track:** A4 swap (built on `alternativesFor`, already shipped here), A5 the
+session player, A6 e1RM and progression, A7 standalone programmes, A8 Strava as Weight Training,
+A9 the watch. (A3 preferences landed — see the chapter at the foot of this file.)
+
+## ✅ A3 — FIVE STRENGTH QUESTIONS, AND A SESSION BUILT TO THE TIME YOU ACTUALLY HAVE (2026-09-20)
+
+Runna asks for a number of sessions, a length, a level, a focus and an equipment list. This app asked
+**one Yes/No** and built two fixed sessions of seven fixed exercises. Suite 1561 → **1576**;
+`test/strength-prefs.test.ts` holds 15 guards and **23 deliberate re-breaks were all caught**
+(two only after the guard was restated — those two are below).
+
+⚠️⚠️ **THE SHIPPED "45 MINUTE" SESSION TAKES ABOUT SIXTY-SEVEN, AND ONLY COUNTING THE RESTS SHOWED IT.**
+`strengthSession` carried a literal `minutes = maintenance ? 30 : 45` sitting beside a fixed list, and
+the two had nothing to do with each other: three sets of three heavy lifts off three minutes' rest,
+plus two calf raises, a step-up, a plank and the plyometric dose, is 67 minutes of work. The label was
+a decoration. So the new builder takes a budget and fills it — a set costs `WORK_SEC + rest`, the
+spine is walked in order, and the session's stated duration is the DERIVED total. Measured across
+1,800 reachable combinations: worst overshoot **1.83 minutes**, lowest fill **55.4%**.
+
+### ⚠️⚠️ THE ONE PROPERTY EVERYTHING ELSE HANGS OFF: ABSENT MEANS UNCHANGED
+
+`Athlete.strength` absent → the **frozen legacy path**, in both `strengthSession` and `addStrength`.
+Not a generalised builder reproducing the old output through a default — that is one edit away from
+moving every existing block silently, which is the `weeklyVolumeKm: 30` failure. Proved by the audits
+being **byte-identical** before and after A3 (`tools/audit-progression.mjs`: 24 under-floor weeks of
+18,216, deload depth 29.3%, taper 35.8/21.3/47.4%, long-run inversion 0.9% — every figure unmoved),
+because that tool sweeps runners with no prefs.
+
+⚠️ **AND THE GUARD FOR IT WAS NEARLY VACUOUS ON ITS FIRST WRITING.** It built the same athlete twice,
+once with `strength: undefined` — which the code handles on the *same branch*, so it proved only that
+`undefined` equals absent. Restated as the shipped session written out: the nine ids in order, the
+sets, the reps, which two exercises carry a load, and the two placement days. **A golden hash was
+rejected** for the reason this file already records for the share card: its failures mean "something
+moved" rather than "something is wrong", and a baseline like that gets re-blessed without being read.
+
+⚠️ **THE PEAK RULE IS `min(2, max(1, req - 1))`, NOT `min(req, 2)`, AND THAT IS WHAT MAKES MIGRATION
+SAFE.** The old control was a boolean and the plan it builds carries two sessions in base and build
+and **one** in peak. A flat cap at two would have quietly added a peak session to every runner whose
+Yes became a 2. Peak drops one relative to base and build — the coaching reason the old literal
+encoded — and the arithmetic falls out of it: at `req = 2` the prefs path equals the legacy path in
+every phase, so `strength: true` → 2 sessions moves nobody's count.
+
+### THE BUILDER'S DECISIONS, EACH WITH THE MEASUREMENT BEHIND IT
+
+⚠️ **THE ANSWER IS A CEILING, SO THE TWO DIRECTIONS ARE JUDGED DIFFERENTLY.** Over is a session the
+runner cannot finish; under is a session that ended. Closest-fit alone overshot a 30-minute advanced
+session by **six minutes**, so an addition may cross the line by at most `OVER_SLACK` (2 min). Coming
+in under is allowed and sometimes unavoidable — a beginner's whole spine at two sets is 33 minutes,
+and padding it to reach a 45-minute answer would be inventing work to match a number.
+
+⚠️⚠️ **THE SETS GIVE WAY BEFORE THE MOVEMENTS DO, AND WITHOUT THAT RULE A 30-MINUTE ADVANCED SESSION IS
+ONE EXERCISE.** Measured: `squat x4` plus the jumps, 23 minutes. The set count is capped down until the
+three lifts the spine opens with (squat, single-leg, hinge) fit. Measured floor across the grid:
+**3 lifts**; without the cap, **1**.
+
+⚠️ **AND THE SAME ADJUSTMENT UPWARDS, OR AN HOUR BUYS NOTHING.** A 60-minute intermediate base session
+ran the WHOLE spine at two sets and finished in **30** — the same session a half-hour answer gets.
+The clock raises the set count **by at most one**, so the level question still decides something at
+every length. ⚠️ The grid minimum barely separates the two (3.3 min against 1.2), so the guard names
+the **discriminating case found by sweeping** — intermediate / running / base — where 30 gives 2 sets
+and 60 gives 3 and 49 minutes.
+
+⚠️ **ALL-ROUND'S PUSH AND PULL ARE ACCESSORY WORK, AND THE FIRST CUT PRINTED ITS OWN MISTAKE:** a
+push-up prescribed at **"3–6 (heavy)" off three minutes' rest**, which nobody can do. The heavy 80%+
+prescription is what the evidence supports for the LEGS. Charging them as main lifts also cost them
+their place — at 60 minutes the pull slot was priced out and All-Round delivered a push and no pull.
+
+⚠️ **AT MOST TWO SESSIONS A WEEK CARRY THE JUMPS, WHATEVER IS ASKED FOR.** Four sessions each carrying
+the shipped dose is 180 contacts against evidenced bands of 60–100 / 100–150. Capping the number of
+SESSIONS rather than scaling the dose keeps each one a real plyometric session instead of four token
+ones. A **beginner level gets hops and not box jumps** (an intermediate movement), so their weekly
+total sits below the band — what choosing that level costs, said rather than hidden.
+
+⚠️ **PLACEMENT IS THE APP'S OWN PUBLISHED RULE.** Ask Alfie has told runners for a year: *"Put it on a
+quality day or after an easy run, not the day before a hard session."* So: never the long-run day, and
+heavy legs never the eve of the long run or the eve of the week's first quality session. ⚠️ **Two eves
+and not every eve, and the reason is arithmetic**: a week holds three hard days, and banning all three
+eves plus the long-run day leaves three placeable days against a possible answer of four.
+
+⚠️ **A REAL DEFECT THE EQUIPMENT GUARD FOUND: BODYWEIGHT IS NOT SOMETHING YOU OWN.** `canDo` built the
+owned set from the ticks alone, so a runner who ticked "a resistance band" was refused **every
+bodyweight exercise in the catalogue** — no plank, no calf raise, no pogo hops. Ticking kit can only
+ever ADD. And nothing ticked costs a default runner nothing: all seven shipped exercises list
+bodyweight, so an empty kit picks exactly the same seven.
+
+### ⚠️⚠️ THE PLAN-vs-RAW TRAP, SEVENTH FIRING — IN MY OWN NEW PREVIEW ROW
+
+`profileImpact` gained an "Each strength session" row precisely because this screen has shipped
+"Your plan comes out the same either way" **twice** while the plan changed (the days question, then
+the strength toggle). It read `PLAN.weeks` — the **display summary**, whose sessions carry no
+`exercises` — so it compared 0 against 0, found them equal, and stayed silent. Measured on a legacy
+runner saving an untouched form: **9 exercises became 7 and the row said nothing.** It reads `RAW` and
+`out.raw` now. ⚠️ **My guard passed the whole time**, because it measured the right computation on a
+source the screen does not use; only driving the screen found it. The guard now also asserts the
+summary genuinely lacks exercises, so the claim about which source is read has teeth.
+
+### THE FORM
+
+⚠️ **THE DRAFT KEY CHANGED FROM A FLAG TO A COUNT, AND BOTH ENDS HAD TO MOVE IN THE SAME BREATH.**
+`draft.strength` was `"0"/"1"` and is now `"0".."4"`; the seeder still said `profile.strength ? "1" :
+"0"`, which would have silently given every wizard runner **one** session a week instead of Yes.
+⚠️ **The four detail questions are hidden where their answers reach nothing** — no sessions asked for,
+or a beginner track whose strength session is a fixed 20-minute bodyweight routine — with a line
+saying why. That is the volume question's own ruling applied again, and `syncStrength` is called from
+**both** `syncStatus` (the track changes) and `bindSegButtons` (the count changes): a control revealed
+by one and not the other is the looks-live-does-nothing class this project has shipped three times.
+⚠️ **`includeStrength` is DERIVED from the count and stays**, because it is read all over the engine
+and the app and none of those readers wants a number.
+⚠️ **The equipment ticks write a hidden `s_strkit` field**, so `captureSetupFields` carries them
+through a trip to another tab like every other `s_` field; `"-"` is an explicit empty answer, because
+`restoreSetupFields` deliberately refuses to restore `""` over a rendered default.
+
+### Two guards restated, both scoped to a place rather than a fact
+
+⚠️ **`test/running-days.test.ts` SWEPT ONE FILE.** Its "the five raw reads stay raw" guard read
+`src/plan/generate-plan.ts` alone, so moving the beginner strength count into
+`src/domain/strength-days.ts` — one definition of how many strength sessions a week gets — failed a
+guard whose invariant was completely intact. It walks the whole `src/` tree now.
+⚠️ **`test/silent-defects.test.ts`'s `fnSrc` WAS A CHARACTER WINDOW** with a 9,000-character ceiling;
+`draftFromForm` grew past it. **Fourteenth firing of that trap here** — brace-matched now, like the
+three other test files that already carry the remedy.
+
+### Traps this stage paid for again
+
+⚠️ **THE BACKTICK RULE FIRED ONCE**, in seven of my own comments at once, and the build failed
+outright — which is the good outcome. Sweep `git diff` for backticks on added lines before building.
+⚠️ **A PROBE THAT ASSUMES A RESET THE CODE DELIBERATELY DOES NOT DO MEASURES SOMETHING ELSE.**
+`seedSetupDraft` opens with `if (draft.__live) return;` — once per session, by design — so my
+"untouched form" check re-used a draft I had been clicking through and reported a change that was
+mine. Reload, do not re-seed.
+⚠️ **`buildPlanSummary` IS IN `src/view/plan-summary.ts`, NOT `generate-plan.ts`.**
+
+### Named, measured, NOT done
+
+⚠️ **THE TWO SESSIONS IN A WEEK ARE IDENTICAL TO EACH OTHER.** A/B rotation is A7's job (standalone
+programmes), where the block structure already needs it; doing it here would have meant the
+byte-identity comparison carrying a rotation as well.
+⚠️ **A BEGINNER TRACK HONOURS ONLY THE COUNT.** `buildBeginnerWeek` builds `generalStrengthSession`, a
+fixed 20-minute bodyweight routine, and has two placement slots — so an answer of 3 or 4 delivers 2.
+The form says so rather than offering four answers that collapse to two.
+⚠️ **`applyRaceDay` NEEDED NO CHANGE FOR FOUR SESSIONS** — it filters everything on and after race day
+regardless of count, and `strength` is already in `HARD_BEFORE_RACE` — but nothing had asserted it, so
+the placement guard now sweeps race weeks out explicitly rather than leaving it to luck.
+⚠️ **NOT SEEN ON A PHONE.** Everything above is a headless browser at desktop width. The equipment grid
+is nine tick-boxes and the detail block adds four questions to Training rhythm; worth the owner's eyes.

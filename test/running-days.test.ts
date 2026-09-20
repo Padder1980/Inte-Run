@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { generatePlan } from "../src/plan/generate-plan.ts";
 import { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "../src/domain/running-days.ts";
 import type { Athlete, RaceDistanceKey } from "../src/domain/types.ts";
@@ -19,7 +19,24 @@ import type { Athlete, RaceDistanceKey } from "../src/domain/types.ts";
  * away is worse than no question." Days per week never got the same treatment.
  */
 
-const SRC = readFileSync(new URL("../src/plan/generate-plan.ts", import.meta.url), "utf8");
+/**
+ * ⚠️ THE WHOLE ENGINE, NOT ONE FILE — and that is a restatement, not a loosening. This read
+ * `src/plan/generate-plan.ts` alone, so when the beginner strength count moved into
+ * `src/domain/strength-days.ts` (one definition of how many strength sessions a week gets) the guard
+ * failed on a change that left its invariant completely intact. The invariant is "these five reads of
+ * the ANSWER stay raw", which is a fact about the engine and not about which file holds them; scoping
+ * it to a file is the guard-scoped-to-a-HOW pattern this repo has now paid for more than a dozen
+ * times. Derived by walking the tree, so moving a read again cannot break it either.
+ */
+function engineSource(dir = new URL("../src/", import.meta.url)): string {
+  let out = "";
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory()) out += engineSource(new URL(e.name + "/", dir));
+    else if (e.name.endsWith(".ts")) out += readFileSync(new URL(e.name, dir), "utf8") + "\n";
+  }
+  return out;
+}
+const SRC = engineSource();
 const APP = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 /**
  * ⚠️ THE BLOCK-COMMENT SWEEP IS ANCHORED TO THE START OF A LINE, AND IT HAS TO BE. The app markup

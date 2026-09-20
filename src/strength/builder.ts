@@ -1,0 +1,343 @@
+import type { StrengthPrefs } from "../domain/types.ts";
+import type { Equipment, MovementPattern } from "./library.ts";
+import { EXERCISES, canDo, exercisesFor } from "./library.ts";
+
+/**
+ * BUILDING ONE STRENGTH SESSION FROM WHAT THE RUNNER ANSWERED.
+ *
+ * ⚠️⚠️ THE LENGTH IS COMPUTED, NEVER TYPED, AND THAT IS THE WHOLE POINT OF THIS FILE. The session
+ * this replaces carried a literal `minutes = maintenance ? 30 : 45` next to a fixed list of seven
+ * exercises — and the two had nothing to do with each other. Measured against the rests that session
+ * genuinely prescribes (three minutes between heavy triples), its seven exercises plus the plyometric
+ * dose take about SIXTY-SEVEN minutes, under a label reading 45. A runner who has been told they can
+ * spare thirty minutes cannot be handed a session whose length is a decoration.
+ *
+ * So the runner gives a budget and the builder fills it: cost a set at `WORK_SEC + rest`, walk an
+ * ordered spine of movement patterns, and stop at whichever count lands closest to what was asked.
+ *
+ * ⚠️ THE SPINE IS ORDERED BY WHAT A RUNNER NEEDS MOST, so a short session is the top of the same
+ * session rather than a different one. Squat, single leg, hinge, calves, then trunk — a thirty-minute
+ * session is the first few of those, not a random subset.
+ *
+ * ⚠️ AND IT IS DETERMINISTIC. The same answers must build the same block today and after every
+ * rebuild, because a logged set is filed against the exercise id it was performed under. Nothing here
+ * reads a clock or a random number; within a pattern the pick is catalogue order.
+ */
+
+/** Seconds a single working set takes, including getting into position. */
+export const WORK_SEC = 40;
+/** A plyometric set is over in seconds; almost all of its cost is the recovery. */
+export const PLYO_WORK_SEC = 15;
+
+/**
+ * Rest between sets, by what the set is for.
+ *
+ * ⚠️ REST IS PART OF THE PRESCRIPTION, NOT A CONVENIENCE. Heavy triples off ninety seconds are a
+ * different (and worse) session from heavy triples off three minutes; the whole reason heavy lifting
+ * improves running economy is that each set is performed fresh. These are the conventional
+ * strength-and-conditioning figures for each rep range, and they are what makes the duration honest.
+ */
+export const REST_BY_INTENT = { heavy: 150, moderate: 120, light: 90, hold: 45, plyo: 90 } as const;
+export type RestIntent = keyof typeof REST_BY_INTENT;
+
+/** A maintenance week is deliberately shorter. 2/3 reproduces the old pair exactly: 45 -> 30. */
+export const MAINTENANCE_MIN_FRAC = 2 / 3;
+
+/** Most of a session that may go on jumping. Past this there is no session left around the dose. */
+const PLYO_BUDGET_FRAC = 0.4;
+
+/** Supersets are offered only where there is room to alternate and the runner is past the basics. */
+const SUPERSET_MIN_MINUTES = 45;
+
+/** The most a session may run past the time the runner said they had. See the filler. */
+const OVER_SLACK = 120;
+
+/**
+ * The answers a picker may offer, and their words — in the engine so the form cannot invent a fifth
+ * length or rename a level and have the plan quietly ignore it. The running-days question learned
+ * this the hard way: the form offered a beginner 5, 6 and 7 while the plan built 4.
+ */
+export const STRENGTH_MINUTES = [30, 45, 60] as const;
+export const STRENGTH_LEVELS: { id: StrengthPrefs["level"]; label: string; hint: string }[] = [
+  { id: "beginner", label: "Beginner", hint: "New to lifting, or coming back to it. Fewer sets, simpler movements." },
+  { id: "intermediate", label: "Intermediate", hint: "Comfortable with squats, deadlifts and step-ups." },
+  { id: "advanced", label: "Advanced", hint: "Confident under a bar. More sets, and the harder variations." },
+];
+export const STRENGTH_GOALS: { id: StrengthPrefs["goal"]; label: string; hint: string }[] = [
+  { id: "running", label: "Running focus", hint: "Legs, calves and trunk — the work that protects a runner." },
+  { id: "allRound", label: "All-round", hint: "Adds an upper-body push and pull to the same session." },
+];
+
+type Role = "main" | "accessory" | "hold";
+
+type Slot = {
+  pattern: MovementPattern;
+  /**
+   * The exercise this slot wants when the runner can perform it. Not a tie-break: these are the
+   * movements the evidence-cited session has always prescribed, and the picker only looks past one
+   * when equipment or level rules it out.
+   */
+  prefer: string;
+  role: Role;
+  /** True where a percentage-of-1RM load is genuinely prescribed. Claimed nowhere else. */
+  load?: boolean;
+};
+
+/**
+ * ⚠️ THE FIRST SEVEN SLOTS ARE THE SHIPPED SESSION, IN ITS ORDER. squat, split squat, RDL, both calf
+ * raises, step-up, plank — so a runner on the default answers meets the session they already know,
+ * and any difference is one they asked for. The three after it are what a longer session buys.
+ */
+const RUNNING_SPINE: Slot[] = [
+  { pattern: "squat", prefer: "squat", role: "main", load: true },
+  { pattern: "lunge", prefer: "splitSquat", role: "main", load: true },
+  { pattern: "hinge", prefer: "rdl", role: "main", load: true },
+  { pattern: "calf", prefer: "calf", role: "accessory" },
+  { pattern: "calf", prefer: "soleus", role: "accessory" },
+  { pattern: "squat", prefer: "stepUp", role: "main" },
+  { pattern: "plank", prefer: "plank", role: "hold" },
+  { pattern: "bridge", prefer: "gluteBridge", role: "accessory" },
+  { pattern: "core", prefer: "deadbug", role: "accessory" },
+  { pattern: "balance", prefer: "balance", role: "hold" },
+];
+
+/**
+ * All-Round adds an upper-body push and pull, and they go straight after the three big lower lifts so
+ * a 45-minute session actually reaches them — putting them last would make the choice cosmetic.
+ *
+ * ⚠️ THEY ARE ACCESSORY WORK, NOT MAIN LIFTS, AND THE FIRST CUT GOT THIS WRONG IN A WAY THAT PRINTED
+ * ITSELF: a push-up came out prescribed at "3-6 (heavy)" off three minutes' rest, which is not a
+ * thing anybody can do. The heavy, 80%-plus prescription is what the evidence supports for the LEGS;
+ * the upper body here is posture and arm drive, which is a set of eight to twelve. Charging them as
+ * main lifts also cost them their place: at sixty minutes the pull slot was priced out and All-Round
+ * delivered a push and no pull.
+ */
+const ALL_ROUND_AT = 3;
+const ALL_ROUND_SLOTS: Slot[] = [
+  { pattern: "push", prefer: "pushup", role: "accessory" },
+  { pattern: "pull", prefer: "bentOverRow", role: "accessory" },
+];
+
+/** Sets, relative to what the phase asks for. A beginner does less of the same thing, not something else. */
+const SETS_BY_LEVEL = { beginner: -1, intermediate: 0, advanced: 1 } as const;
+const SETS_MIN = 2;
+const SETS_MAX = 5;
+
+export type BuiltExercise = {
+  id: string;
+  sets: number;
+  reps: string;
+  restSeconds: number;
+  loadPercent1RM?: string;
+  contacts?: number;
+  superset?: number;
+};
+
+export type BuiltStrength = {
+  exercises: BuiltExercise[];
+  /** What the session actually takes at the rests it prescribes. */
+  seconds: number;
+  /** The budget it was filling, so a caller can report how close it landed. */
+  budgetSeconds: number;
+};
+
+/**
+ * ⚠️ A `spineExhausted` FLAG WAS BUILT HERE AND REMOVED, AND THE REASON IS WORTH KEEPING. It was meant
+ * to let a guard say "short only because there was nothing left to prescribe" without picking a
+ * percentage out of the air — but the OTHER reason a session stops short is that the next exercise
+ * would have overshot the ceiling, which is simply the filler's own condition written twice. A guard
+ * built on it would have restated the loop rather than constrained it, and the field would have been
+ * read by nothing else. Measured instead, and quoted in the guard: the lowest fill across every
+ * length, level, focus, phase and kit is 55% of the ceiling.
+ */
+
+/** The prescription a phase asks for, independent of who is doing it. */
+export type StrengthIntent = {
+  reps: string;
+  intent: RestIntent;
+  load?: string;
+  /** Base set count before the level adjustment. */
+  sets: number;
+};
+
+export function intentFor(phase: string, maintenance: boolean): StrengthIntent {
+  const heavy = !maintenance && (phase === "build" || phase === "peak");
+  if (maintenance) return { reps: "4–6", intent: "heavy", load: "80%+", sets: 2 };
+  if (heavy) return { reps: "3–6 (heavy)", intent: "heavy", load: "80%+", sets: 3 };
+  return { reps: "6–8", intent: "moderate", load: "70–75%", sets: 2 };
+}
+
+const ACCESSORY_REPS = "8–12";
+const HOLD_REPS = "30–45s hold";
+
+function setCost(sets: number, work: number, rest: number): number {
+  return sets * (work + rest);
+}
+
+/** Two exercises alternated cost one rest, not two — which is the only reason to superset at all. */
+function pairCost(a: BuiltExercise, b: BuiltExercise): number {
+  return Math.max(a.sets, b.sets) * (WORK_SEC * 2 + Math.max(a.restSeconds, b.restSeconds));
+}
+
+function soloCost(e: BuiltExercise): number {
+  return setCost(e.sets, e.contacts != null ? PLYO_WORK_SEC : WORK_SEC, e.restSeconds);
+}
+
+/**
+ * The plyometric dose for one session, trimmed to fit when the runner has asked for a short one.
+ *
+ * ⚠️ TRIMMED RATHER THAN DROPPED OR ALLOWED TO SWALLOW THE SESSION. The combined heavy-plus-plyometric
+ * arm is the best-evidenced intervention in the strength literature for runners (ES -1.04 against
+ * -0.47 for lifting alone), so a thirty-minute session keeping none of it is a real loss — and one
+ * keeping all of it has room for a single lift, which is not a session either.
+ */
+export function plyoFor(competitive: boolean, budgetSeconds: number): { pogoSets: number; jumpSets: number; pogoReps: string; jumpReps: string; pogoEach: number; jumpEach: number } | null {
+  const d = competitive
+    ? { pogoSets: 4, pogoReps: "12", pogoEach: 12, jumpSets: 4, jumpReps: "6", jumpEach: 6 }
+    : { pogoSets: 3, pogoReps: "10", pogoEach: 10, jumpSets: 3, jumpReps: "5", jumpEach: 5 };
+  const per = PLYO_WORK_SEC + REST_BY_INTENT.plyo;
+  const cap = budgetSeconds * PLYO_BUDGET_FRAC;
+  let pogo = d.pogoSets, jump = d.jumpSets;
+  // Trim a set at a time, alternating, never below two of each — two sets is the floor at which the
+  // exercise is still an exercise rather than a gesture.
+  while ((pogo + jump) * per > cap && (pogo > 2 || jump > 2)) {
+    if (pogo >= jump && pogo > 2) pogo--;
+    else if (jump > 2) jump--;
+    else pogo--;
+  }
+  if ((pogo + jump) * per > cap) return null;
+  return { ...d, pogoSets: pogo, jumpSets: jump };
+}
+
+/**
+ * Pick the exercise for a slot: the preferred movement when it is available, otherwise the first
+ * catalogue entry of the same pattern the runner can perform and has not already been given.
+ */
+function pickForSlot(s: Slot, owned: Equipment[], level: StrengthPrefs["level"], used: Set<string>): string | null {
+  const pref = EXERCISES[s.prefer];
+  if (pref && !used.has(s.prefer) && canDo(pref, owned, level)) return s.prefer;
+  for (const c of exercisesFor(s.pattern, owned, level)) {
+    if (!used.has(c.id)) return c.id;
+  }
+  return null;
+}
+
+export function buildStrength(opts: {
+  phase: string;
+  maintenance: boolean;
+  prefs: StrengthPrefs;
+  competitive: boolean;
+  /** Whether this session carries the plyometric dose — the caller decides, see addStrength. */
+  plyo: boolean;
+}): BuiltStrength {
+  const { prefs } = opts;
+  const level = prefs.level;
+  const owned = prefs.equipment ?? [];
+  const spine = prefs.goal === "allRound"
+    ? [...RUNNING_SPINE.slice(0, ALL_ROUND_AT), ...ALL_ROUND_SLOTS, ...RUNNING_SPINE.slice(ALL_ROUND_AT)]
+    : RUNNING_SPINE;
+
+  const minutes = opts.maintenance
+    ? Math.round(prefs.minutes * MAINTENANCE_MIN_FRAC)
+    : prefs.minutes;
+  const budget = Math.max(600, Math.round(minutes * 60));
+
+  const base = intentFor(opts.phase, opts.maintenance);
+
+  // ⚠️ THE JUMPS COME OUT OF THE BUDGET BEFORE THE LIFTS GO IN, so the dose can never be squeezed out
+  // by a filler that ran out of room. It is a prescription, not padding.
+  // ⚠️ AND WHAT IS RESERVED IS WHAT IS SPENT. The first cut reserved both jump exercises and then
+  // dropped the box jump for a beginner-level runner, leaving five minutes of a thirty-minute session
+  // paid for and unused — a session measurably shorter than the one asked for, for a reason nothing
+  // on screen could explain.
+  const ply = opts.plyo ? plyoFor(opts.competitive, budget) : null;
+  const jumps = ply != null && canDo(EXERCISES.boxjump!, owned, level);
+  const plyoSets = ply ? ply.pogoSets + (jumps ? ply.jumpSets : 0) : 0;
+  const plyoSeconds = plyoSets * (PLYO_WORK_SEC + REST_BY_INTENT.plyo);
+  const liftBudget = Math.max(0, budget - plyoSeconds);
+
+  /**
+   * ⚠️⚠️ THE LEVEL SETS THE SETS AND THE CLOCK CAPS THEM, and without the cap the answer to "how long
+   * have you got" stops being honoured at the short end. Measured: a thirty-minute ADVANCED build
+   * session reserves ten minutes for jumps and then costs nearly thirteen per four-set heavy lift, so
+   * the filler could only land on 23 or 36 minutes — six over, on a question whose whole point is the
+   * number. The honest coaching answer is that half an hour is not four sets of everything; drop a
+   * set until the three lifts that must be there fit, floored at two.
+   */
+  const MIN_SPINE = 3;
+  const levelSets = Math.max(SETS_MIN, Math.min(SETS_MAX, base.sets + SETS_BY_LEVEL[level]));
+  let mainSets = levelSets;
+  while (mainSets > SETS_MIN
+    && MIN_SPINE * setCost(mainSets, WORK_SEC, REST_BY_INTENT[base.intent]) > liftBudget) mainSets--;
+  /**
+   * ⚠️ AND THE SAME ADJUSTMENT UPWARDS, OR AN HOUR BUYS NOTHING. Measured before this: a
+   * sixty-minute intermediate base session ran the WHOLE spine at two sets and finished in thirty —
+   * half the time the runner said they had, with nothing left to add. The level picks a starting set
+   * count; the clock is the constraint, and where the clock has room the sets grow into it.
+   * ⚠️ BY AT MOST ONE, so the answer to "how much lifting have you done" still decides something at
+   * every length rather than being washed out by a long session.
+   * ⚠️ The estimate prices every spine slot, including any this runner's kit cannot fill, so it is
+   * conservative: it raises the set count only when there is certainly room.
+   */
+  const spineCost = (n: number) => spine.reduce((t, s) => t + (s.role === "main"
+    ? setCost(n, WORK_SEC, REST_BY_INTENT[base.intent])
+    : setCost(Math.max(1, n - 1), WORK_SEC, REST_BY_INTENT[s.role === "hold" ? "hold" : "light"])), 0);
+  while (mainSets < Math.min(SETS_MAX, levelSets + 1) && spineCost(mainSets + 1) <= liftBudget) mainSets++;
+  // The shipped session's own relationship: the trunk work carries one set fewer than the lifts.
+  const accSets = Math.max(1, mainSets - 1);
+
+  const superset = prefs.minutes >= SUPERSET_MIN_MINUTES && level !== "beginner";
+  const used = new Set<string>();
+  const out: BuiltExercise[] = [];
+  let total = 0;
+  let group = 0;
+
+  for (const s of spine) {
+    const id = pickForSlot(s, owned, level, used);
+    if (!id) continue;
+    const ex: BuiltExercise = s.role === "hold"
+      ? { id, sets: accSets, reps: HOLD_REPS, restSeconds: REST_BY_INTENT.hold }
+      : s.role === "accessory"
+        ? { id, sets: accSets, reps: ACCESSORY_REPS, restSeconds: REST_BY_INTENT.light }
+        : { id, sets: mainSets, reps: base.reps, restSeconds: REST_BY_INTENT[base.intent] };
+    if (s.role === "main" && s.load && base.load) ex.loadPercent1RM = base.load;
+
+    // What adding it costs, taking into account that it may ride alongside the previous exercise.
+    const prev = out[out.length - 1];
+    const canPair = superset && s.role !== "main" && prev != null && prev.superset == null
+      && !(prev.contacts != null);
+    const cost = canPair ? pairCost(prev!, ex) - soloCost(prev!) : soloCost(ex);
+
+    // ⚠️ CLOSEST FIT, NOT "WHILE IT FITS". Stopping at the last exercise that fits under the budget
+    // leaves a session up to one exercise short of what was asked for; a runner who said forty-five
+    // minutes and got thirty-one has been told the question does not matter.
+    // ⚠️⚠️ BUT THE ANSWER IS A CEILING, SO THE OVERSHOOT IS BOUNDED AND THE UNDERSHOOT IS NOT.
+    // "How long have you got" is a statement about the runner's day: two minutes over is a rounding
+    // error, ten minutes over is a session they cannot finish. Closest fit on its own can overshoot by
+    // half an exercise — measured at six minutes on a thirty-minute advanced session — so it may only
+    // cross the line by OVER_SLACK. Coming in under is fine and sometimes unavoidable: a beginner's
+    // whole spine at two sets is thirty-three minutes, and padding it to fill a forty-five-minute
+    // answer would be inventing work to match a number.
+    const after = total + cost;
+    if (after > liftBudget && (after - liftBudget > OVER_SLACK
+      || Math.abs(after - liftBudget) >= Math.abs(total - liftBudget))) break;
+
+    if (canPair) { group++; prev!.superset = group; ex.superset = group; }
+    out.push(ex);
+    used.add(id);
+    total = after;
+  }
+
+  if (ply) {
+    out.push({ id: "pogo", sets: ply.pogoSets, reps: ply.pogoReps, restSeconds: REST_BY_INTENT.plyo, contacts: ply.pogoSets * ply.pogoEach });
+    // ⚠️ A BEGINNER GETS HOPS AND NOT JUMPS, and the contacts fall with it rather than being made up
+    // elsewhere. Box jumps are an intermediate movement in the catalogue; handing them to somebody who
+    // told us they are starting out is the one place in this builder where honouring the dose would
+    // mean ignoring the answer. Their weekly total sits below the evidenced band, which is what
+    // choosing that level costs and is said rather than hidden.
+    if (jumps) out.push({ id: "boxjump", sets: ply.jumpSets, reps: ply.jumpReps, restSeconds: REST_BY_INTENT.plyo, contacts: ply.jumpSets * ply.jumpEach });
+    total += plyoSeconds;
+  }
+
+  return { exercises: out, seconds: Math.round(total), budgetSeconds: budget };
+}

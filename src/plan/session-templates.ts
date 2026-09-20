@@ -15,6 +15,7 @@ import type {
   Session,
   SessionType,
   StrengthExercise,
+  StrengthPrefs,
   TrainingPaces,
   WorkoutStep,
 } from "../domain/types.ts";
@@ -1873,13 +1874,14 @@ export function raceSpecificSession(paces: TrainingPaces, variant = 0, ctx: Form
  * both read. `mkEx` below is unchanged in shape; it just resolves against the shared library.
  */
 import { EXERCISES, exerciseById, exerciseIds } from "../strength/library.ts";
+import { buildStrength } from "../strength/builder.ts";
 export { exerciseById, exerciseIds };
 
 function mkEx(
   key: string,
   sets: number,
   reps: string,
-  extra: { loadPercent1RM?: string; contacts?: number } = {},
+  extra: { loadPercent1RM?: string; contacts?: number; restSeconds?: number; equipment?: string[]; superset?: number } = {},
 ): StrengthExercise {
   const d = EXERCISES[key]!;
   // ⚠️ THE CATALOGUE KEY *IS* THE ID. One source, so an exercise cannot be given a second name by a
@@ -1945,8 +1947,15 @@ export function generalStrengthSession(theme = 0): SessionContent {
 export function strengthSession(
   phase: Phase,
   maintenance: boolean,
-  opts: { competitive?: boolean } = {},
+  opts: { competitive?: boolean; prefs?: StrengthPrefs; plyo?: boolean } = {},
 ): SessionContent {
+  // ⚠️⚠️ TWO PATHS, AND THE SPLIT IS THE SAFETY PROPERTY RATHER THAN A DUPLICATE BUILDER. Everything
+  // below this branch is the session as it shipped, untouched, and it is what an athlete with no
+  // strength preferences still receives — which is every runner who has not answered the new
+  // questions. A shared builder "generalised" to reproduce the old output through a default would be
+  // one edit away from moving every existing block silently, which is the `weeklyVolumeKm: 30`
+  // failure. `test/strength-prefs.test.ts` hashes a whole plan built both ways to hold this.
+  if (opts.prefs) return builtStrengthSession(phase, maintenance, opts.prefs, opts);
   const heavy = !maintenance && (phase === "build" || phase === "peak");
   const sets = maintenance ? 2 : heavy ? 3 : 2;
   const reps = maintenance ? "4–6" : heavy ? "3–6 (heavy)" : "6–8";
@@ -1987,6 +1996,57 @@ export function strengthSession(
     desc,
     "none",
     [{ kind: "steady", label: "Runner-focused resistance session", durationSeconds: minutes * 60, targetRpe: RPE.threshold }],
+  );
+  return { ...content, exercises };
+}
+
+/**
+ * The preference-driven session: the runner's own length, level, equipment and focus.
+ *
+ * ⚠️ THE STEP'S DURATION IS THE DERIVED TOTAL, NOT THE NUMBER THEY PICKED. `assemble` sums the steps,
+ * so this is what the duration chip, the reminder and the weekly accounting all read — and it is the
+ * only version of the figure that is true at the rests the session prescribes. It lands within a few
+ * minutes of what was asked because `buildStrength` fills to a closest fit; where it cannot (a level
+ * and an equipment list that between them leave almost nothing to prescribe) the honest answer is a
+ * short session rather than a padded one.
+ */
+function builtStrengthSession(
+  phase: Phase,
+  maintenance: boolean,
+  prefs: StrengthPrefs,
+  opts: { competitive?: boolean; plyo?: boolean },
+): SessionContent {
+  const heavy = !maintenance && (phase === "build" || phase === "peak");
+  const built = buildStrength({
+    phase, maintenance, prefs,
+    competitive: opts.competitive === true,
+    // Jumps belong to the hard end of the block and to a session that is not itself a taper-week
+    // trim. The caller decides WHICH of the week's sessions carries them; this decides whether any can.
+    plyo: heavy && opts.plyo === true,
+  });
+  const exercises = built.exercises.map((e) => mkEx(e.id, e.sets, e.reps, {
+    loadPercent1RM: e.loadPercent1RM,
+    contacts: e.contacts,
+    restSeconds: e.restSeconds,
+    equipment: EXERCISES[e.id]!.equipment.slice(),
+    superset: e.superset,
+  }));
+  const mins = Math.max(1, Math.round(built.seconds / 60));
+  const supersets = exercises.some((e) => e.superset != null);
+  const desc = (maintenance
+    ? "Maintenance strength near your race — keep the movements, drop the volume."
+    : heavy
+      ? "Heavy but controlled (~80%+ 1RM), low reps — the best-evidenced way to build economy and durability. Keep total volume low; running already supplies fatigue."
+      : "Technique-focused strength to build a base. Moderate load, clean form.")
+    + " Built to the " + prefs.minutes + " minutes you asked for, with the rests it needs."
+    + (supersets ? " Exercises marked with the same pairing are alternated, which is what keeps it inside the time." : "")
+    + " Tap an exercise for how to do it and to log your weights.";
+  const content = assemble(
+    "strength",
+    maintenance ? "Strength (maintenance)" : heavy ? "Strength (heavy)" : "Strength (technique)",
+    desc,
+    "none",
+    [{ kind: "steady", label: "Runner-focused resistance session", durationSeconds: mins * 60, targetRpe: RPE.threshold }],
   );
   return { ...content, exercises };
 }

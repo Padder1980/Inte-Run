@@ -32,6 +32,7 @@ import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
 import { sessionVolumeMeters } from "../domain/steps.ts";
 import { runningDaysFor, runningDayChoices } from "../domain/running-days.ts";
+import { strengthSessionsFor } from "../domain/strength-days.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
 import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
@@ -1927,8 +1928,11 @@ function buildBeginnerWeek(
   });
 
   // General, gentle strength (no heavy lifting for a brand-new runner) — themed variants rotate.
-  if (ctx.athlete.includeStrength) {
-    const strengthCount = ctx.athlete.daysPerWeek >= 4 && !ease ? 2 : 1;
+  // ⚠️ THE COUNT COMES FROM THE ONE DEFINITION NOW, and the beginner branch inside it reproduces the
+  // literal that used to live here. `BEG_STRENGTH_REL` supplies two slots, so a request for three or
+  // four is honoured up to what the track can place — exactly how running days already behave.
+  {
+    const strengthCount = strengthSessionsFor(ctx.athlete, wp);
     BEG_STRENGTH_REL.map((r) => dayRel(longDay, r)).slice(0, strengthCount).forEach((d, si) => {
       if (!dayOf.includes(d)) {
         sessions.push(generalStrengthSession(index + si));
@@ -2492,26 +2496,92 @@ function addStrength(
   sessions: SessionContent[],
   dayOf: number[],
 ): void {
-  if (!ctx.athlete.includeStrength) return;
-  let count: number;
-  if (wp.phase === "taper") count = wp.ordinalInPhase === 1 ? 1 : 0;
-  else if (wp.phase === "peak" || wp.isDeload) count = 1;
-  else count = 2; // base, build
+  const count = strengthSessionsFor(ctx.athlete, wp);
+  if (count <= 0) return;
 
   const maintenance = wp.phase === "peak" || wp.phase === "taper";
+  const heavy = !maintenance && (wp.phase === "build" || wp.phase === "peak");
   const longDay = longRunDayOf(ctx.athlete);
-  // Pair strength with a quality day and an easy day (so lifting doesn't fall on the long run day).
-  const strengthDays = [dayRel(longDay, QUALITY_REL[0]!), dayRel(longDay, EASY_REL[0]!)];
-  for (let i = 0; i < count; i++) {
-    // ⚠️ EXPERIENCE REACHES THE PLYOMETRIC DOSE, and it is the only thing it reaches here. A trained
-    // runner gets the 100-150 ground contacts the combined-methods evidence used; a developing one
-    // gets the lower 60-100 band, because tissue tolerance rather than the training effect is what
-    // binds for them. See PLYO_DOSE.
-    sessions.push(strengthSession(wp.phase, maintenance, {
-      competitive: ctx.athlete.experience === "competitive",
-    }));
-    dayOf.push(strengthDays[i] ?? strengthDays[0]!);
+  const competitive = ctx.athlete.experience === "competitive";
+  const prefs = ctx.athlete.strength;
+
+  // ⚠️ THE LEGACY PLACEMENT IS FROZEN, NOT GENERALISED. Two days, hardcoded, exactly as they have
+  // always been — because the placement rules below move sessions, and moving them for a runner who
+  // has answered no new question is a plan change they did not ask for. See strengthSession's own
+  // two-path note; the same reasoning and the same test hold both.
+  if (!prefs) {
+    // Pair strength with a quality day and an easy day (so lifting doesn't fall on the long run day).
+    const strengthDays = [dayRel(longDay, QUALITY_REL[0]!), dayRel(longDay, EASY_REL[0]!)];
+    for (let i = 0; i < count; i++) {
+      // ⚠️ EXPERIENCE REACHES THE PLYOMETRIC DOSE, and it is the only thing it reaches here. A trained
+      // runner gets the 100-150 ground contacts the combined-methods evidence used; a developing one
+      // gets the lower 60-100 band, because tissue tolerance rather than the training effect is what
+      // binds for them. See PLYO_DOSE.
+      sessions.push(strengthSession(wp.phase, maintenance, { competitive }));
+      dayOf.push(strengthDays[i] ?? strengthDays[0]!);
+    }
+    return;
   }
+
+  const days = strengthDaysFor(longDay, count, heavy, new Set(dayOf));
+  days.forEach((d, i) => {
+    // ⚠️ AT MOST TWO SESSIONS A WEEK CARRY THE JUMPS, WHATEVER THE RUNNER ASKED FOR, and that is what
+    // keeps the weekly ground-contact total inside the evidenced band once four sessions a week are
+    // possible. The shipped plan delivers the dose on both of its two sessions (90 contacts a week
+    // developing, 144 trained, against bands of 60-100 and 100-150); four sessions each carrying it
+    // would be 180. Capping the number of SESSIONS rather than scaling the dose down keeps each one a
+    // real plyometric session instead of four token ones.
+    sessions.push(strengthSession(wp.phase, maintenance, { competitive, prefs, plyo: i < PLYO_MAX_SESSIONS }));
+    dayOf.push(d);
+  });
+}
+
+/** The most sessions in a week that may carry the plyometric dose. See addStrength. */
+const PLYO_MAX_SESSIONS = 2;
+
+/**
+ * Which days this week's strength sessions land on.
+ *
+ * ⚠️ FREE DAYS FIRST, AND ONLY THEN DOUBLED UP WITH A RUN. Four sessions a week cannot all share a
+ * quality day, and a runner who told us they have four days for the gym has told us something about
+ * their week that the plan should use.
+ *
+ * ⚠️⚠️ NEVER THE LONG-RUN DAY, AND HEAVY LEGS NEVER THE DAY BEFORE THE LONG RUN OR THE DAY BEFORE THE
+ * WEEK'S FIRST QUALITY SESSION. This is the app's own published advice, which Ask Alfie has been
+ * giving for a year: "Put it on a quality day or after an easy run, NOT THE DAY BEFORE A HARD
+ * SESSION." Sharing a hard day is the point — hard days hard, easy days easy — and squatting to 80%
+ * the evening before is what spends the same legs twice. `HARD_BEFORE_RACE` encodes the identical
+ * idea for race eve.
+ *
+ * ⚠️ TWO EVES AND NOT EVERY EVE, AND THE REASON IS ARITHMETIC RATHER THAN TASTE. A week can hold
+ * three hard days (long plus two quality). Banning the long-run day and all three eves leaves three
+ * placeable days, and the runner may ask for four sessions — the strict rule is unsatisfiable at the
+ * top of the range. Protecting the two biggest sessions of the week leaves at least four days free,
+ * so the answer can always be honoured.
+ */
+function strengthDaysFor(longDay: number, count: number, heavy: boolean, taken: Set<number>): number[] {
+  const banned = new Set<number>([longDay]);
+  if (heavy) {
+    banned.add(dayRel(longDay, 6));                 // the eve of the long run
+    banned.add(dayRel(longDay, QUALITY_REL[0]! - 1)); // the eve of the first quality session
+  }
+  // Preference order: the easy/free slots as the rest of the week uses them, then the quality days.
+  const order: number[] = [];
+  for (const r of [...EASY_REL, ...QUALITY_REL, 6]) {
+    const d = dayRel(longDay, r);
+    if (!banned.has(d) && !order.includes(d)) order.push(d);
+  }
+  const out: number[] = [];
+  // Two passes: days with nothing on them at all, then days already carrying a run.
+  for (const pass of [0, 1]) {
+    for (const d of order) {
+      if (out.length >= count) break;
+      if (out.includes(d)) continue;
+      if (pass === 0 && taken.has(d)) continue;
+      out.push(d);
+    }
+  }
+  return out;
 }
 
 // ---- long-run progression -------------------------------------------------

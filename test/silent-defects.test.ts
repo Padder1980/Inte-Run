@@ -58,10 +58,19 @@ function fnSrc(name: string): string {
   const html = page();
   const at = html.indexOf("function " + name + "(");
   assert.ok(at > 0, "no function " + name + " in the built page");
-  const end = html.indexOf("\nfunction ", at + 10);
-  const src = html.slice(at, end > at ? end : at + 8000);
-  assert.ok(src.length < 9000, name + " sliced to " + src.length + " characters — the window is wrong");
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // ⚠️⚠️ BRACE-MATCHED, NOT A CHARACTER WINDOW — and that is a restatement, not a loosening. This
+  // sliced to the next top-level function and then refused any window over 9,000 characters as a
+  // sanity check. draftFromForm grew past it when the strength preferences were added, so a guard
+  // about answers nobody gave failed on a change that left every one of its claims true — a guard
+  // failing on correct code, which is how the next person to meet it relaxes a real assertion.
+  // Fourteenth firing of this trap here; first-run.test.ts and two others already carry the remedy.
+  let d = 0, end = -1;
+  for (let i = html.indexOf("{", at); i < html.length; i++) {
+    if (html[i] === "{") d++;
+    else if (html[i] === "}") { d--; if (!d) { end = i + 1; break; } }
+  }
+  assert.ok(end > at, name + " has no matching close brace");
+  return html.slice(at, end).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 /**

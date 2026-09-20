@@ -3,8 +3,36 @@
 // the plan can be adapted along any one axis without disturbing the others.
 
 import type { RaceDistanceKey } from "./units.ts";
+import type { Equipment, ExerciseLevel } from "../strength/library.ts";
 
 export type { RaceDistanceKey };
+
+/**
+ * What the runner has told us about the strength half of their week — Runna's own five questions.
+ *
+ * ⚠️ ABSENT MEANS UNANSWERED, AND THE ENGINE MUST KEEP BEHAVING EXACTLY AS IT DID. This is the
+ * `weeklyVolumeKm: 30` lesson: a brand-new key cannot be pre-filled from history, because a number
+ * nobody chose that reshapes the plan rebuilds every existing runner's block on the first boot after
+ * an update, with no tap. `strengthSessionsFor` and `strengthSession` both branch on presence and
+ * reproduce today's behaviour byte-for-byte when this is missing; test/strength-prefs.test.ts hashes
+ * a whole plan both ways to prove it.
+ *
+ * ⚠️ AND NOTHING CLAMPS IT ON ITS WAY IN. This carries the runner's ANSWER, exactly as
+ * `Athlete.daysPerWeek` does; what the plan can honour is `strengthSessionsFor`'s job. The two were
+ * conflated once for running days and the app ended up offering answers it then threw away.
+ */
+export type StrengthPrefs = {
+  /** 0-4 sessions a week. 0 means none — the honest replacement for the old Yes/No. */
+  sessionsPerWeek: number;
+  /** How long one session may take, in minutes. The exercise count is DERIVED from it. */
+  minutes: number;
+  /** Which exercises the runner is ready for — gates the catalogue, and scales the set count. */
+  level: ExerciseLevel;
+  /** Running Focus (legs, calves, trunk) or All-Round (adds an upper-body push and pull). */
+  goal: "running" | "allRound";
+  /** What they have to train with. Empty is read as bodyweight only. */
+  equipment: Equipment[];
+};
 
 export type UnitSystem = "metric" | "imperial";
 
@@ -23,6 +51,13 @@ export type Athlete = {
   recent: RecentPerformance;
   experience: ExperienceLevel;
   includeStrength: boolean;
+  /**
+   * The strength answers, when the runner has given them. See `StrengthPrefs` — absent is a real,
+   * load-bearing state and means "keep doing exactly what you did before".
+   * ⚠️ `includeStrength` is still the on/off switch and is still read first: prefs with
+   * `sessionsPerWeek: 0` and `includeStrength: false` must mean the same thing, and both do.
+   */
+  strength?: StrengthPrefs;
   /** When true the plan starts conservatively (single quality session, gentle volume ramp). */
   /**
    * Coming back from an INJURY — the constraint is tissue tolerance, not aerobic capacity.
@@ -199,6 +234,26 @@ export type StrengthExercise = {
    * auditable rather than implied. Absent for everything that is not a jump.
    */
   contacts?: number;
+  /**
+   * Seconds of rest prescribed between sets. Present only on a session the preference-driven builder
+   * produced, because that is the only builder whose duration is DERIVED from it — a legacy session
+   * carries no rest figure and must not gain one, or its 45-minute label would change under runners
+   * who never answered a question.
+   * ⚠️ IT IS PART OF THE PRESCRIPTION, NOT A TIMER SETTING. Three minutes between heavy triples and
+   * ninety seconds between sets of twelve are different sessions, and the rest is what makes them so.
+   */
+  restSeconds?: number;
+  /**
+   * Equipment this exercise was picked for, copied from the catalogue entry so the session stands on
+   * its own — the watch payload, a logged snapshot and the swap picker all read it without needing
+   * the library.
+   */
+  equipment?: string[];
+  /**
+   * Superset group. Two exercises sharing a number are alternated, so the pair costs one rest rather
+   * than two. Absent means the exercise is performed on its own.
+   */
+  superset?: number;
   /** Movement family the UI uses to pick a schematic demonstration figure. */
   pattern: string;
   /** Slug of a looping demonstration animation (assets/exercise-animations/<slug>.webp),

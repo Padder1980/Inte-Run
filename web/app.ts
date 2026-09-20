@@ -6551,6 +6551,13 @@ function applyProfile(pf) {
   const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength,
     returningFromInjury: rk === "injury", returningFromBreak: rk === "break",
     runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
+  // ⚠️ UNCLAMPED, AND ONLY WHEN THEY HAVE ACTUALLY ANSWERED. Athlete carries the runner's ANSWER —
+  // what a week can honour is strengthSessionsFor's job, exactly as runningDaysFor owns the running
+  // one — and a profile with no strengthDays sends nothing at all, which is what keeps every existing
+  // block byte-identical until its owner opens the question. Clamping here would be the same defect
+  // test/running-days.test.ts pins for days per week.
+  const sPrefs = strengthPrefsOf(pf);
+  if (sPrefs) ath.strength = sPrefs;
   // ⚠️ The runner's actual weekly mileage. weeklyVolumeKmCurrent has existed on Athlete since the
   // beginning and was read NOWHERE, so 40 km/week and 140 km/week produced identical plans — which
   // is what an elite coach meant by "mileage for a competitive runner looks a little on the low
@@ -6648,6 +6655,26 @@ function profileImpact(pf) {
   const otherDays = (plan) => { const w = midWeek(plan); return w ? w.sessions.filter((x) => !PRIMARY_TYPES[x.type] && x.type !== "rest").length : null; };
   cmp("Runs in a typical week", PLAN ? runDays(PLAN) : null, runDays(out.plan), (v) => String(Math.round(v)));
   cmp("Strength & mobility sessions", PLAN ? otherDays(PLAN) : null, otherDays(out.plan), (v) => String(Math.round(v)));
+  // ⚠️⚠️ A COUNT CANNOT SEE A SESSION CHANGING SHAPE, AND THIS SCREEN HAS SHIPPED THAT FALSEHOOD
+  // TWICE ALREADY (the days question, then the strength toggle). Answering the new length, level or
+  // equipment questions can leave the number of sessions exactly where it was while replacing what is
+  // in them and how long they take — so the row reports the session rather than the tally.
+  // ⚠️⚠️ AND IT READS RAW, NOT PLAN — the seventh firing of that trap here, caught by driving the
+  // screen rather than the function. PLAN.weeks is a DISPLAY SUMMARY whose sessions carry no
+  // exercises, so a row counting them off PLAN compares nothing to nothing, finds them equal, and
+  // reports "Your plan comes out the same either way" — the exact falsehood this row exists to stop.
+  // Measured on a legacy runner saving an untouched form: 9 exercises became 7 and the row was silent.
+  const strengthShape = (weeks) => {
+    const w = weeks && weeks[Math.min(weeks.length - 1, Math.floor(weeks.length / 2))];
+    if (!w) return null;
+    const s = w.sessions.find((x) => x.type === "strength");
+    if (!s) return null;
+    const n = (s.exercises || []).length;
+    return Math.round(s.estimatedDurationSeconds / 60) + " min \\u00B7 " + n + (n === 1 ? " exercise" : " exercises");
+  };
+  const wasS = (typeof RAW !== "undefined" && RAW) ? strengthShape(RAW.weeks) : null;
+  const nowS = strengthShape(out.raw && out.raw.weeks);
+  if (wasS && nowS && wasS !== nowS) rows.push({ label: "Each strength session", was: wasS, now: nowS, up: false });
   // ⚠️ THE ONE NOBODY WOULD THINK TO WARN ABOUT, and the reason this screen needed an undo at
   // all. seedDone() prunes state.dayOverride of every session id the new plan does not contain, and
   // PERSISTS the prune. Those are the runner's OWN reschedules, made on a different screen entirely
@@ -18158,7 +18185,8 @@ function clubPbFromWheels(k) {
 /** The plan-determining fields, and nothing else. See journalSync for why not the plan itself. */
 const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
   "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
-  "daysPerWeek", "volKm", "strength", "returning", "age", "sex", "autoPace"];
+  "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
+  "strengthKit", "returning", "age", "sex", "autoPace"];
 function planListSub() {
   const n = loadJournals().length;
   // ⚠️ IT SAYS WHAT IS THERE. A row reading "look back at your plans" over an empty list is the app
@@ -19018,7 +19046,7 @@ function profContext() {
 function seedSetupDraft() {
   if (draft.__live) return;
   const first = !profile.personalized;
-  draft = { days: first ? "" : profile.daysPerWeek, strength: profile.strength ? "1" : "0", returning: returnKind(profile), status: first ? "" : (profile.status || (profile.noRecent ? "new" : "regular")), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
+  draft = { days: first ? "" : profile.daysPerWeek, strength: String(strengthDaysOf(profile)), returning: returnKind(profile), status: first ? "" : (profile.status || (profile.noRecent ? "new" : "regular")), fitsrc: (profile.fitSrc === "predicted" ? "predicted" : "recent"), avatar: profile.avatar || "", __live: true, __f: {} };
 }
 let PROFILE_EDIT_OPEN = false;
 /**
@@ -21858,6 +21886,132 @@ function dayCapNote(pf) {
     ' once you can run comfortably several times a week.</div>';
 }
 function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '">' + opts.map((o) => '<button data-v="' + o[0] + '"' + (String(o[0]) === String(val) ? ' class="on"' : '') + '>' + o[1] + '</button>').join("") + '</div>'; }
+// ---- Strength preferences -------------------------------------------------
+/**
+ * WHAT THE RUNNER TOLD US ABOUT THE GYM HALF OF THEIR WEEK, and — just as important — whether they
+ * have told us anything at all.
+ *
+ * ⚠️⚠️ strengthDays ABSENT MEANS UNANSWERED, AND EVERY READER BELOW DEPENDS ON IT. The engine keeps
+ * building exactly the session it always did until a real answer exists, which is the
+ * weeklyVolumeKm: 30 rule: a brand-new key cannot be pre-filled from history, because a number
+ * nobody chose that reshapes the plan rebuilds every stored runner's block on the first boot after an
+ * update, with no tap. See StrengthPrefs and strengthSessionsFor, which both branch on presence.
+ *
+ * ⚠️ AND THE LEGACY Yes MAPS TO TWO, NOT TO ONE. The old control was a boolean and the plan it built
+ * carries two sessions in base and build; seeding the new picker from strength-as-a-flag would have
+ * halved a wizard runner's strength week because the same draft key changed meaning from a flag to a
+ * count. strengthSessionsFor's phase rules are written so that an answer of two reproduces the old
+ * counts in every phase.
+ */
+const STR_DEFAULT_MIN = 45;
+// ⚠️ INTERMEDIATE IS THE NEUTRAL DEFAULT BECAUSE IT REPRODUCES TODAY'S SET COUNTS (2 technique,
+// 3 heavy, 2 maintenance). Beginner would quietly take a set off every session of a runner who never
+// saw the question; advanced would add one.
+const STR_DEFAULT_LEVEL = "intermediate";
+const STR_DEFAULT_GOAL = "running";
+function strengthDaysOf(p) {
+  if (p && p.strengthDays != null) return Math.max(0, Math.min(RC.STRENGTH_MAX_PER_WEEK, Number(p.strengthDays) || 0));
+  return (p && p.strength) ? 2 : 0;
+}
+/**
+ * ⚠️ NOTHING TICKED MEANS BODYWEIGHT, AND IT COSTS A DEFAULT RUNNER NOTHING. All seven exercises the
+ * shipped session prescribes list bodyweight among their options, so an empty kit picks exactly the
+ * same seven — equipment only ever ADDS choices. That is why the honest reading ("I have nothing")
+ * can be the default rather than a list of things we assume they own.
+ */
+function strengthKitOf(p) {
+  const k = p && p.strengthKit;
+  return Array.isArray(k) ? k.filter((x) => RC.EQUIPMENT.indexOf(x) >= 0) : [];
+}
+/** The engine's preference object, or null when the runner has never answered. */
+function strengthPrefsOf(p) {
+  if (!p || p.strengthDays == null) return null;
+  const min = Number(p.strengthMin);
+  return {
+    sessionsPerWeek: strengthDaysOf(p),
+    minutes: RC.STRENGTH_MINUTES.indexOf(min) >= 0 ? min : STR_DEFAULT_MIN,
+    level: RC.STRENGTH_LEVELS.some((l) => l.id === p.strengthLevel) ? p.strengthLevel : STR_DEFAULT_LEVEL,
+    goal: RC.STRENGTH_GOALS.some((g) => g.id === p.strengthGoal) ? p.strengthGoal : STR_DEFAULT_GOAL,
+    equipment: strengthKitOf(p),
+  };
+}
+/**
+ * What each picker should show as selected: the draft if the runner has touched it, else the stored
+ * profile, else the default.
+ * ⚠️ ONE RESOLVER PER ANSWER, READ BY THE MARKUP AND BY syncStrength. Resolving it twice is how the
+ * hint under a control comes to describe a different option from the one lit up.
+ */
+function strengthSegVal(p) { return String(draft.strength != null ? draft.strength : strengthDaysOf(p)); }
+function strMinVal(p) {
+  if (draft.strmin != null) return String(draft.strmin);
+  return String(RC.STRENGTH_MINUTES.indexOf(Number(p && p.strengthMin)) >= 0 ? p.strengthMin : STR_DEFAULT_MIN);
+}
+function strLevelVal(p) {
+  if (draft.strlevel != null) return String(draft.strlevel);
+  return RC.STRENGTH_LEVELS.some((l) => l.id === (p && p.strengthLevel)) ? p.strengthLevel : STR_DEFAULT_LEVEL;
+}
+function strGoalVal(p) {
+  if (draft.strgoal != null) return String(draft.strgoal);
+  return RC.STRENGTH_GOALS.some((g) => g.id === (p && p.strengthGoal)) ? p.strengthGoal : STR_DEFAULT_GOAL;
+}
+function strengthHintOf(list, id, fallback) {
+  const f = list.find((x) => x.id === id) || list.find((x) => x.id === fallback);
+  return f ? f.hint : "";
+}
+/**
+ * The strength half of Training rhythm: how many, how long, how hard, what for, and with what.
+ *
+ * ⚠️ THE FOUR DETAIL QUESTIONS ARE HIDDEN WHERE THEY CHANGE NOTHING — no sessions asked for, or a
+ * beginner track whose strength session is a fixed twenty-minute bodyweight routine the length, level
+ * and equipment answers never reach. That is this app's own ruling on the volume question, applied
+ * again: a question whose answer is thrown away is worse than no question.
+ */
+function strengthQHtml(p) {
+  const days = strengthSegVal(p);
+  const opts = [["0", "None"]];
+  for (let i = 1; i <= RC.STRENGTH_MAX_PER_WEEK; i++) opts.push([String(i), String(i)]);
+  const kit = draft.__f && draft.__f.s_strkit != null ? kitFromField(draft.__f.s_strkit) : strengthKitOf(p);
+  const min = strMinVal(p), lvl = strLevelVal(p), gl = strGoalVal(p);
+  return '<div class="q" id="strQ"><label>Strength sessions a week? <span class="q-hint">the best-evidenced thing a runner can add</span></label>' +
+    seg("strength", opts, days) + '</div>' +
+    '<div class="q-hint" id="strBegNote" style="display:none;margin:-6px 2px 14px">At this level your strength session is a gentle twenty-minute bodyweight routine, so there is nothing to set about its length or equipment yet.</div>' +
+    '<div id="strDetail" style="display:none">' +
+    '<div class="q"><label>How long have you got? <span class="q-hint">we build the session to fit, rests included</span></label>' +
+      seg("strmin", RC.STRENGTH_MINUTES.map((m) => [String(m), m + " min"]), min) + '</div>' +
+    '<div class="q"><label>How much lifting have you done?</label>' +
+      seg("strlevel", RC.STRENGTH_LEVELS.map((l) => [l.id, l.label]), lvl) +
+      '<div class="q-hint" id="strLevelHint" style="margin-top:6px">' + esc(strengthHintOf(RC.STRENGTH_LEVELS, lvl, STR_DEFAULT_LEVEL)) + '</div></div>' +
+    '<div class="q"><label>What should it focus on?</label>' +
+      seg("strgoal", RC.STRENGTH_GOALS.map((g) => [g.id, g.label]), gl) +
+      '<div class="q-hint" id="strGoalHint" style="margin-top:6px">' + esc(strengthHintOf(RC.STRENGTH_GOALS, gl, STR_DEFAULT_GOAL)) + '</div></div>' +
+    '<div class="subhead">What have you got to train with?</div>' +
+    '<div class="q-hint" style="margin:-4px 2px 8px">Tick anything you can use. Leave it blank and we will keep to bodyweight \\u2014 every exercise in the standard session works without kit.</div>' +
+    '<div class="opts" role="group" aria-label="Equipment you can use">' +
+      RC.EQUIPMENT.map((k) => '<label class="opt"><input type="checkbox" data-kit="' + k + '"' + (kit.indexOf(k) >= 0 ? ' checked' : '') + '><span>' + esc(RC.EQUIPMENT_LABEL[k]) + '</span></label>').join("") +
+    '</div>' +
+    // ⚠️ THE HIDDEN FIELD IS WHAT SURVIVES A TRIP TO ANOTHER TAB. captureSetupFields sweeps every
+    // [id^="s_"] with a string value, so the tick state rides out with the rest of the form for free;
+    // a set of checkboxes on their own would come back cleared. "-" is an explicit empty answer,
+    // because restoreSetupFields deliberately refuses to restore "" over a rendered default.
+    '<input type="hidden" id="s_strkit" value="' + esc(kitToField(kit)) + '">' +
+    '</div>';
+}
+function kitToField(list) { return list && list.length ? list.join(",") : "-"; }
+function kitFromField(v) {
+  if (v == null || v === "" || v === "-") return [];
+  return String(v).split(",").filter((x) => RC.EQUIPMENT.indexOf(x) >= 0);
+}
+/** Show or hide the detail block, and keep the two hints matched to what is selected. */
+function syncStrength() {
+  const n = Number(draft.strength != null ? draft.strength : 0);
+  const beginner = isBeginnerStatus(draft.status || profile.status);
+  const d = $("strDetail"); if (d) d.style.display = (n > 0 && !beginner) ? "" : "none";
+  const bn = $("strBegNote"); if (bn) bn.style.display = (n > 0 && beginner) ? "" : "none";
+  const lh = $("strLevelHint");
+  if (lh) lh.textContent = strengthHintOf(RC.STRENGTH_LEVELS, strLevelVal(profile), STR_DEFAULT_LEVEL);
+  const gh = $("strGoalHint");
+  if (gh) gh.textContent = strengthHintOf(RC.STRENGTH_GOALS, strGoalVal(profile), STR_DEFAULT_GOAL);
+}
 // ---- Name & profile picture ----------------------------------------------
 // ⚠️ QUOTES TOO. This escaped only & < > while user-controlled text already reached HTML
 // ATTRIBUTE position through it: the four "your why" answers (120 characters of free text each), the
@@ -22131,7 +22285,12 @@ function viewSetup() {
     '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \— so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \— we\\u2019ll use a sensible default for your goal.</div></div>' +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
-    '<div class="q"><label>Include strength &amp; conditioning?</label>' + seg("strength", [["1","Yes"],["0","No"]], p.strength?"1":"0") + '</div>';
+    // ⚠️ A COUNT, NOT A Yes/No, AND THE SAME DRAFT KEY. Runna asks for a number up to four and the
+    // engine has always built two, so the old flag could not express either end. Keeping the key
+    // means every existing reader of the segment keeps working — and it is also the trap: the key
+    // now holds "0".."4" rather than "0"/"1", so the seeder below had to change in the same breath or
+    // a wizard runner's seeded "1" would silently become one session a week instead of Yes.
+    strengthQHtml(p);
 
     // ⚠️ ONE QUESTION FOR TWO DIFFERENT THINGS, and the wording gave it away: "Returning from injury
     // or a long break?" as a single Yes/No. Both answers were treated as an injury and both got the
@@ -22197,7 +22356,7 @@ const SETUP_TOPICS = {
   you: ["s_name", "s_avatar_file"],
   why: ["su_why_inspire", "su_why_reason", "su_why_goal", "su_why_anchor"],
   goal: ["s_dist", "s_target", "s_date"],
-  rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength"],
+  rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength", "strmin", "strlevel", "strgoal", "s_strkit"],
   context: ["returning", "s_age", "s_sex"],
   voice: ["coachSel"],
 };
@@ -22371,6 +22530,7 @@ function draftFromForm() {
   if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time === true ? "race" : "target") + " date needs to be in the future.");
   const _ld = wizFieldVal("s_longday");
   const longRunDay = _ld !== "" ? Number(_ld) : (profile.longRunDay != null ? profile.longRunDay : 6);
+  const strengthDays = Math.max(0, Math.min(RC.STRENGTH_MAX_PER_WEEK, Number(draft.strength) || 0));
   let startDateIso = wizFieldVal("s_startdate") || (profile.startDateIso || "");
   if (startDateIso && startDateIso < todayIso()) startDateIso = todayIso();
   if (startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
@@ -22393,7 +22553,18 @@ function draftFromForm() {
     // the question was recorded as a masters athlete AND had their heart-rate ceiling computed from
     // an age nobody gave. Absent means absent; assessMasters and maxHrEstimate() both handle it.
     age: Number(wizFieldVal("s_age")) || 0, sex: wizFieldVal("s_sex"),
-    strength: draft.strength === "1",
+    // ⚠️ THE BOOLEAN IS DERIVED AND STAYS, because includeStrength is read all over the engine and
+    // the app and none of those readers wants a count. Zero sessions and "No" are the same answer and
+    // must stay the same answer.
+    strength: strengthDays > 0,
+    strengthDays,
+    // ⚠️ THE WIZARD NEVER SHOWS THESE FOUR, so wizFieldVal returns "" there and each falls back to
+    // the stored profile and then to the default that reproduces today's session. A brand-new runner
+    // therefore gets the session they would have got, with an honest length on it.
+    strengthMin: Number(strMinVal(profile)),
+    strengthLevel: strLevelVal(profile),
+    strengthGoal: strGoalVal(profile),
+    strengthKit: kitFromField(wizFieldVal("s_strkit") || kitToField(strengthKitOf(profile))),
     // ⚠️ THE SEGMENT NOW HAS THREE VALUES, SO A BOOLEAN CANNOT HOLD ITS ANSWER. This read
     // draft.returning === "1" — the old Yes value — so once the control became
     // 0 / break / injury, every one of the three saved as FALSE and the verdict never moved
@@ -22768,6 +22939,10 @@ function syncStatus() {
   // whose answer is thrown away is worse than no question, and "new"/"building" runners are the
   // least likely of anyone to have a weekly figure to give.
   const vq = $("volQ"); if (vq) vq.style.display = beginner ? "none" : "";
+  // ⚠️ AND THE STRENGTH DETAIL BLOCK FOR THE SAME REASON. The beginner tracks build a fixed
+  // twenty-minute bodyweight routine, so length, level and equipment reach nothing — leaving those
+  // four questions on screen after a status change would be the volume question's defect again.
+  syncStrength();
   // ⚠️ THE DAYS CONTROL HAS TO BE REBUILT, and it was the one question on this form that changes
   // MEANING with the status and never got told. Switching Regular runner -> Building the habit left
   // the picker showing 3-7 with a stale 6 selected; and because seg() has no fallback, once the list
@@ -38101,6 +38276,16 @@ function wire() {
   // looks-live-does-nothing class this project has shipped three times. One definition, two callers;
   // a hand copy is the fix-one-builder-not-the-other trap.
   document.querySelectorAll("[data-set]").forEach(bindSegButtons);
+  // The equipment tick-boxes write straight into the hidden field, which is the only thing
+  // draftFromForm and captureSetupFields ever read — so the tick state cannot get out of step with
+  // what is saved, and it survives a trip to another tab like every other s_ field.
+  syncStrength();
+  document.querySelectorAll("[data-kit]").forEach((c) => c.onchange = () => {
+    const f = $("s_strkit"); if (!f) return;
+    const on = [];
+    document.querySelectorAll("[data-kit]").forEach((x) => { if (x.checked) on.push(x.dataset.kit); });
+    f.value = kitToField(on);
+  });
   wireCoachSettings();
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
   // ---- Manage plan ----------------------------------------------------------------------
@@ -38491,6 +38676,9 @@ function bindSegButtons(s) {
   s.querySelectorAll("button").forEach((b) => b.onclick = () => {
     draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
     if (s.dataset.set === "status") syncStatus();
+    // The sessions-a-week answer reveals or hides the four questions that only mean something once
+    // there is a session to describe; the other two keep their own hint matched to what is lit up.
+    if (s.dataset.set === "strength" || s.dataset.set === "strlevel" || s.dataset.set === "strgoal") syncStrength();
     if (s.dataset.set === "fitsrc") syncFitSrc();
     if (s.dataset.set === "coach_on") {
       COACH.cfg.enabled = b.dataset.v === "1"; saveCoachCfg();

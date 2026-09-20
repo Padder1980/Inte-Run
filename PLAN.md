@@ -12,6 +12,26 @@ Date: 20 September 2026. Repo at `813f63b`, tree clean, 1,533 tests passing, not
 
 **Progress:** T1 ✅ done · A1 ✅ done (log survives a plan rebuild) · A2 ✅ done (17→62 exercises, one catalogue, equipment filter) · **next: A3** (preferences: sessions/week, duration, level, equipment — the engine builder that reads them).
 
+**Resuming after a `/clear`?** Read this file and `CLAUDE.md` (its "Write down…" chapters record what each finished stage actually did, in detail this file doesn't repeat), `git pull`, then start the stage named in Progress above using the model below. Do not re-plan or re-research — the plan is done; the job now is executing stages one at a time.
+
+### Which model for which stage
+Rule: **Opus** where a mistake would be silent — engine guardrails, data migrations, the commit points this repo has broken six times before, credentials, native Swift. **Sonnet** where the spec is concrete and mechanical — content, UI built from an existing pattern, tooling, checklists.
+
+| Stage | Model | Stage | Model | Stage | Model |
+|---|---|---|---|---|---|
+| T1 verify ✅ | Opus | A9 watch (native) | Opus | B7 B-race | Opus |
+| T2–T6 tooling | Sonnet | D3a/b/c safety/youth/wellbeing | Opus | B8 preference dials | Opus |
+| A1 data foundation ✅ | Opus | D1 privacy policy | Opus | B9 plan queue | Sonnet |
+| A2 exercise library ✅ | Sonnet | D2 testers · D4 submit | Sonnet | B10 fact packs | Sonnet |
+| **A3 preferences + builder** | **Opus** | S Strava club row | Sonnet | B11 AI via Worker | Opus |
+| A4 swap | Sonnet | B1 manual/link/PRs | Opus | B12 yoga/pilates | Sonnet |
+| A5 session player | Opus | B2 skip · B3 time of day | Sonnet | C1/C2 Garmin | Opus |
+| A6 e1RM/progression | Sonnet | B4 move ±1 week | Opus | C3 hardware test | (you) |
+| A7 standalone programmes | Opus | B5 return speed · B6 realignment | Opus | | |
+| A8 Strava WeightTraining | Sonnet | | | | |
+
+Non-race modes and the accounts/sync/network/Android round are each a **separate planning round** — do not start them from inside a stage; flag it and stop.
+
 ---
 
 ## Part 1 — Where we are

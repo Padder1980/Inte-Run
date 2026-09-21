@@ -46,6 +46,25 @@ const API = "https://www.strava.com/api/v3";
  */
 const SCOPE = "activity:write";
 
+/**
+ * ⚠️ ONE LIST, READ BY BOTH UPLOAD SHAPES, SO AN UNRECOGNISED VALUE IS REFUSED RATHER THAN SILENTLY
+ * FILED AS A RUN. Every run this Worker has ever uploaded left this field unset, so "absent means
+ * Run" is not a new default, it is the behaviour every existing caller already gets. What changes is
+ * that a value which IS present but not on the list is refused (400) rather than quietly written as
+ * a Run — which is exactly what an OLDER, already-deployed Worker would do if a NEWER client ever
+ * sent it "WeightTraining": file a strength session into somebody's running log with nothing
+ * anywhere, on either side, to say it happened. Exported so a test can drive the resolution directly,
+ * with no KV and no network.
+ */
+export const SPORT_TYPES = ["Run", "WeightTraining"] as const;
+export type SportType = (typeof SPORT_TYPES)[number];
+
+/** The sport_type to send Strava for one upload. null means "refuse this request" — see above. */
+export function resolveSportType(v: unknown): SportType | null {
+  if (v == null || v === "") return "Run";
+  return (SPORT_TYPES as readonly string[]).includes(String(v)) ? (v as SportType) : null;
+}
+
 type Stored = {
   access: string;
   refresh: string;
@@ -255,11 +274,19 @@ async function upload(request: Request, env: StravaEnv, headers: Record<string, 
   if (!rec) return Response.json({ error: "not connected" }, { status: 401, headers });
 
   const run = body.run || {};
+  // ⚠️ REFUSED BEFORE ANYTHING ELSE IS BUILT. Neither shape below can honestly send an activity whose
+  // type this Worker does not recognise, and the two hardcoded "Run" literals this replaced were what
+  // let that go unnoticed for as long as only runs ever reached here.
+  const sportType = resolveSportType(run.sportType);
+  if (!sportType) return Response.json({ error: "unknown activity type" }, { status: 400, headers });
   const name = String(run.name || "Run").slice(0, 120);
   const auth = { authorization: "Bearer " + rec.access };
   // Every activity says where it came from. Strava shows it on the activity, and it is how the owner
-  // can tell an Inte-Run upload from one his watch sent independently.
-  const description = "Recorded with Inte-Run.";
+  // can tell an Inte-Run upload from one his watch sent independently. A client-supplied line (a
+  // distance, a sets-and-volume count) goes in front of it, so the activity carries more than that on
+  // its own -- but the attribution itself is never something a client can drop or replace.
+  const extra = String(run.description || "").trim().slice(0, 300);
+  const description = extra ? extra + " Recorded with Inte-Run." : "Recorded with Inte-Run.";
 
   if (run.kind === "gpx") {
     const gpx = String(run.gpx || "");
@@ -269,7 +296,7 @@ async function upload(request: Request, env: StravaEnv, headers: Record<string, 
     const form = new FormData();
     form.append("file", new Blob([gpx], { type: "application/gpx+xml" }), "interun.gpx");
     form.append("data_type", "gpx");
-    form.append("sport_type", "Run");
+    form.append("sport_type", sportType);
     form.append("name", name);
     form.append("description", description);
     // ⚠️ external_id is Strava's own dedupe handle. With the run's id on it, the same run sent twice
@@ -289,7 +316,7 @@ async function upload(request: Request, env: StravaEnv, headers: Record<string, 
   // sends its own — a server has no way to know which timezone the runner ran in.
   const form = new URLSearchParams({
     name,
-    sport_type: "Run",
+    sport_type: sportType,
     start_date_local: String(run.startLocal || new Date(Number(run.startMs) || Date.now()).toISOString().replace(/\.\d{3}Z$/, "Z")),
     elapsed_time: String(Math.max(1, Math.round(Number(run.elapsedSec) || 0))),
     description,
@@ -360,20 +387,29 @@ async function uploadStatus(url: URL, env: StravaEnv, headers: Record<string, st
   return Response.json({ ok: true, pending: true }, { headers });
 }
 
-/** Is this device connected, and to whom? Never returns a token. */
+/**
+ * Is this device connected, and to whom? Never returns a token.
+ *
+ * ⚠️ sportTypes RIDES ON EVERY REPLY, CONNECTED OR NOT, BECAUSE IT IS A FACT ABOUT THE DEPLOYED CODE
+ * ON THIS WORKER, NOT ABOUT ANY ONE RUNNER'S CONNECTION. It is the handshake a client reads before
+ * ever sending a strength session: an old, already-deployed Worker answers with no sportTypes field
+ * at all (or one without "WeightTraining"), and a client that checks for it before sending fails
+ * SAFE — nothing goes across rather than a strength session landing on Strava mislabelled as a Run.
+ */
 async function status(url: URL, env: StravaEnv, headers: Record<string, string>): Promise<Response> {
-  if (!configured(env)) return Response.json({ connected: false, configured: false }, { headers });
+  if (!configured(env)) return Response.json({ connected: false, configured: false, sportTypes: SPORT_TYPES }, { headers });
   const dk = url.searchParams.get("dk");
-  if (!validDeviceKey(dk)) return Response.json({ connected: false, configured: true }, { headers });
+  if (!validDeviceKey(dk)) return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES }, { headers });
   const raw = await env.STRAVA!.get("tok:" + (await keyHash(dk)));
-  if (!raw) return Response.json({ connected: false, configured: true }, { headers });
+  if (!raw) return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES }, { headers });
   let rec: Stored;
-  try { rec = JSON.parse(raw) as Stored; } catch { return Response.json({ connected: false, configured: true }, { headers }); }
+  try { rec = JSON.parse(raw) as Stored; } catch { return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES }, { headers }); }
   return Response.json({
     connected: true,
     configured: true,
     name: rec.athleteName,
     canWrite: /activity:write/.test(rec.scope || ""),
+    sportTypes: SPORT_TYPES,
   }, { headers });
 }
 

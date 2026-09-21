@@ -15373,3 +15373,131 @@ setting the latter builds a plan with no strength in it and the "plan steps asid
 nothing. Every claim in this chapter's browser drive was re-taken after that was fixed.
 
 **Still to come in this track:** A8 Strava as Weight Training, A9 the watch.
+
+## ✅ A8 — STRENGTH REACHES STRAVA AS "WEIGHT TRAINING" (2026-09-21)
+
+A finished strength session can now reach Strava, using the exact same device-key connection and the
+exact same auto-send switch a run already uses. It shows up as Weight Training — never a Run — with a
+duration and a sets/volume line, whether it was sent by hand or automatically.
+
+⚠️⚠️ **THE OLD WORKER HARDCODED `sport_type: "Run"` IN BOTH UPLOAD SHAPES, SO SENDING A STRENGTH
+SESSION WITHOUT FIRST FIXING THE SERVER WOULD HAVE FILED IT AS A RUN WITH NOTHING ANYWHERE TO SAY SO.**
+That is the whole reason this stage is two halves that have to agree, deployed independently — the
+Worker by hand (`wrangler deploy`, the owner's manual step), the client over the air on the next
+launch — and it is why the FIRST thing built was a handshake rather than the payload.
+
+### THE HANDSHAKE: `sportTypes` ON EVERY `/strava/status` REPLY, CONNECTED OR NOT
+
+`SPORT_TYPES = ["Run", "WeightTraining"] as const` and `resolveSportType(v)` are exported from
+`alfie-proxy/src/strava.ts` for exactly the reason `src/strength/progression.ts`'s pure functions are —
+so a test can drive the real resolution with no KV and no network. Absent means `"Run"`, unchanged for
+every run this Worker has ever uploaded (none of which has ever sent the field); present-but-unknown is
+refused (400) rather than silently defaulted, which is the new behaviour and the whole point.
+
+⚠️ **`sportTypes` RIDES ON EVERY REPLY FROM `status()`, INCLUDING "NOT CONFIGURED" AND "NOT LINKED",
+BECAUSE IT IS A FACT ABOUT THE DEPLOYED CODE, NOT ABOUT ANY ONE RUNNER'S CONNECTION.** A client has to
+learn what a Worker understands before it has necessarily connected to Strava through it. `stravaRefresh()`
+copies it straight onto `stravaCfg()` (`c.sportTypes = Array.isArray(r.json.sportTypes) ? … : []`), and
+`stravaCanWeightTraining()` is the one gate: connected **and** the cached list contains
+`"WeightTraining"`. Everything that could ever send a strength session — the auto-send hook and the
+manual button — asks this gate first and **fails closed**: an old Worker, or a client that has simply
+never refreshed yet, sends nothing rather than sending it wrong. Re-broken four ways (old Worker, partial
+rollout, not connected, the real upgraded case) and all four land where they should.
+
+### THE PAYLOAD IS ALWAYS MANUAL, NEVER GPX
+
+`strengthStravaPayload(row)` reads a finished-session row from `SDONE_KEY` (A5's completion store) and
+builds `{ kind: "manual", sportType: "WeightTraining", trainer: true, distanceM: 0, … }`. A squat has no
+route, so there is nothing to draw and nothing to fabricate one from — the same rule `runStravaPayload`
+already states for a run with no trace, applied to a kind of session that never has one.
+
+⚠️ **THE DESCRIPTION IS BUILT FROM THE SESSION'S OWN NUMBERS, AND THE SERVER LEARNED TO ACCEPT ONE
+WITHOUT DROPPING ITS OWN ATTRIBUTION.** `description` used to be a hardcoded `"Recorded with
+Inte-Run."`; it now reads an optional `run.description` from the client and prefixes it —
+`extra + " Recorded with Inte-Run."` — so "45 min · 3 exercises · 9 sets · 600 kg lifted" appears on
+the activity ahead of the app's own line, and a run (which sends no `description` at all) is
+byte-for-byte unaffected.
+
+⚠️ **VOLUME IS SUMMED ACROSS THE WHOLE SESSION, NOT ONE EXERCISE.** `strSessionVolumeKg(iso, sessId)`
+finally gives `slogForSession` — A5's own per-instance lookup, written for the older card renderer and
+called nowhere else — a second caller, and reuses `strParseSet` (the one definition of a stored row's
+`{w, r, rpe}`) and `RC.sumVolumeKg` (A6) rather than rolling a third walk of the log. A bodyweight-only
+session correctly omits the kg line rather than printing "0 kg lifted".
+
+⚠️ **THE START IS DERIVED FROM WHEN FINISH WAS TAPPED, MINUS THE SESSION'S OWN NAMED LENGTH — THE BEST
+HONEST FIGURE AVAILABLE, BECAUSE A5 NEVER BUILT A LIVE ELAPSED CLOCK.** `row.at` is the real moment
+Finish was pressed; there is no wall-clock start recorded anywhere in the player, so `startMs = row.at -
+minutes * 60000` is an estimate rather than a measurement, and is treated as one. `elapsedSec` and
+`startMs` both clamp `minutes` to at least 1, matching the Worker's own `elapsed_time` floor.
+
+⚠️ **THE DEDUPE HANDLE IS THE ROW'S OWN `(d, s)` IDENTITY** — `"strength-" + row.d + "-" + row.s`,
+stable across a retry, exactly the reasoning `runStravaPayload`'s `externalId` already documents.
+
+### THE SEND PATH IS THE RUN'S OWN, TWICE
+
+`strengthSendSession(row, onDone)` and `strengthMaybeAutoSend(row)` are the strength twins of
+`stravaSendRun`/`stravaMaybeAutoSend`, deliberately reusing `stravaCfg().auto` rather than inventing a
+second switch — CLAUDE.md already records that exact mistake once for Strava's own auto-send setting,
+and a second store for one preference is how the two come to disagree about what the runner actually
+chose. `strengthMaybeAutoSend` is called from `strFinish()`, **after** the row is marked done and
+**before** the screen repaints, so "Sending to Strava…" is what the runner sees land rather than
+something that changes state invisibly.
+
+⚠️ **NEVER "PENDING".** A GPX upload is asynchronous and `stravaSendRun` polls it; a manual activity —
+which a strength session always is — settles inside the one HTTP request, so `strengthSendSession` has
+no pending branch at all. Adding one would be dead code implying machinery that does not exist for this
+shape.
+
+⚠️ **WHAT HAPPENED IS RECORDED ON THE ROW ITSELF (`row.strava`), AND PERSISTING IT NEEDED A NEW
+HELPER.** `loadSdone()` has no in-memory cache the way `SLOG` does — every call is a fresh
+`JSON.parse` — so a row held onto after `sdoneMark` returns is not automatically "live". `sdoneSave(row)`
+re-reads the store, finds the same row by its `(d, s)` identity, and writes the mutated object back over
+it. `sdoneMark` also now stamps `t` (the session's title, from `S.sess.title`) once and keeps it across
+a re-finish that names none, because that is what `strengthStravaPayload` reads for the activity's name.
+
+### THE "SESSION DONE" SCREEN, NOT A HISTORY ROW
+
+`strengthStravaControlHtml(row)` is `stravaRunButtonHtml`'s strength twin, rendered on
+`strPlayerDoneHtml()` — the moment a runner is actually looking, right after Finish — because strength
+has no run-detail screen to reopen a past session on and carry a button there. **Absent, not disabled**,
+when the handshake has not confirmed Weight Training, matching the rule `stravaRunButtonHtml` already
+states for the reason it states it: a greyed-out button on the one screen a runner just finished
+something on advertises a feature that is not there. `#strStvSend` is wired with the identical
+`if (stvSend && !stvSend.disabled)` pattern the run's own `#stvSend` uses.
+
+### ⚠️⚠️ A FIXTURE THAT PASSED BY LUCK OF ARRAY POSITION, NOT BY TESTING THE THING IT CLAIMED TO
+
+Re-breaking `sdoneSave` to match on date alone (dropping the session-id half of the comparison) did not
+fail the first version of its guard. The fixture used two rows on **different dates**, so a date-only
+match still found the right row by accident — the bug only bites when two sessions share a date, which
+is realistic (a programme session alongside the plan's own, or a run-walk day carrying an ad-hoc extra)
+and the fixture never constructed it. Rewritten with both rows on the **same** date, marked in the order
+that puts the wrong one first in the array (`sdoneMark` unshifts), the re-break then failed exactly as
+it should. Filed here because it is this project's own repeated lesson in a new place: a fixture that
+cannot discriminate the failure mode proves nothing about it, whatever the assertion says.
+
+⚠️ **A SECOND INSTANCE OF THIS PROJECT'S OWN TIMEZONE LESSON, CAUGHT BY `npm run verify` ITSELF.** A
+first version of the "start is derived from Finish minus the named length" test asserted `startLocal`
+against a hardcoded `"2026-09-08T…"` — which is wrong under `TZ=Pacific/Kiritimati` (UTC+14), where an
+18:30 UTC moment is already the next **local** day. `verify`'s three-timezone sweep caught it before
+anything was committed. Fixed by computing the expected string from local getters on the same `startMs`
+the code itself uses, so the claim holds under whichever timezone the suite happens to run in.
+
+**Verified:** build exit 0, `docs/voices/` clean, `node --check` OK on all three emitted blocks,
+`npx tsc --noEmit` clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload
+(and `alfie-proxy/src/strava.ts` clean under its own by-hand command, per its README), **1700 pass / 0
+fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, both engine audits unchanged (A8
+touches no plan generation — only the strength-completion and Strava layers). **8 deliberate re-breaks,
+all 8 caught** — the worker's sport-type refusal, the `/strava/status` handshake, the client-side gate
+inside `strengthMaybeAutoSend`, the payload's own `sportType`, the ordering of `strFinish`'s auto-send
+call, `sdoneMark`'s title persistence, and `sdoneSave`'s row-matching (twice, after its fixture was
+strengthened). New test files: `test/strength-strava.test.ts`; `test/strength-player.test.ts` gained
+two guards for the store additions.
+
+⚠️ **DEPLOYMENT IS THE OWNER'S MANUAL STEP, AND NOTHING SENDS UNTIL IT HAPPENS.** The client change
+reaches his phone over the air on the next launch; the Worker change needs `wrangler deploy` from
+`alfie-proxy/`. Until then `stravaCanWeightTraining()` correctly answers false for everyone, because the
+currently-deployed Worker's `/strava/status` carries no `sportTypes` field at all — the handshake this
+stage exists to build is also what makes that safe to leave sitting unsent.
+
+**Still to come in this track:** A9 the watch (native, Xcode-beta).

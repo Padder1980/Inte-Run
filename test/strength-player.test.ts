@@ -300,7 +300,9 @@ test("BLOCKER: advancing past the final set finishes the session rather than sta
 // ------------------------------------------------------------------------------------------------
 
 function loadSdoneApi() {
-  const body = [constOf("SDONE_KEY"), fnOf("loadSdone"), fnOf("saveSdone"), fnOf("sdoneMark"), fnOf("sdoneHas")].join("\n");
+  // sdoneSave (A8) is lifted alongside the others -- it is the counterpart to sdoneMark that persists
+  // a mutation made on a row AFTER it was returned, which is what a Strava send result needs.
+  const body = [constOf("SDONE_KEY"), fnOf("loadSdone"), fnOf("saveSdone"), fnOf("sdoneMark"), fnOf("sdoneHas"), fnOf("sdoneSave")].join("\n");
   const store: Record<string, string> = {};
   const localStorage = {
     getItem: (k: string) => (k in store ? store[k]! : null),
@@ -308,7 +310,7 @@ function loadSdoneApi() {
     removeItem: (k: string) => { delete store[k]; },
   };
   // eslint-disable-next-line no-new-func
-  const factory = new Function("localStorage", body + "\nreturn { loadSdone, sdoneMark, sdoneHas };");
+  const factory = new Function("localStorage", body + "\nreturn { loadSdone, sdoneMark, sdoneHas, sdoneSave };");
   return { ...factory(localStorage), raw: store };
 }
 
@@ -351,6 +353,42 @@ test("BLOCKER: the completion store is discovered by backup export through the i
   assert.match(m![1]!, /^interun_/, "the completion store would not travel in a backup export");
   assert.match(fnOf("loadSdone"), /SDONE_KEY/);
   assert.match(fnOf("saveSdone"), /SDONE_KEY/);
+});
+
+test("BLOCKER: sdoneMark stamps the session's title once, and a re-finish naming none does not blank it (A8)", () => {
+  // t is what strengthStravaPayload reads for the activity's name -- a re-finish (Finish tapped twice,
+  // or the same session reopened) passes no title at all, and must not erase the one already recorded.
+  const S = loadSdoneApi();
+  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 4, ex: 8, min: 45, t: "Push day" });
+  assert.equal(S.loadSdone()[0].t, "Push day");
+  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 9, ex: 8, min: 45 });
+  assert.equal(S.loadSdone()[0].t, "Push day", "a re-finish with no title blanked the one already stored");
+});
+
+test("BLOCKER: sdoneSave persists a mutation made on a row returned earlier by sdoneMark, and touches no other row (A8)", () => {
+  // ⚠️ loadSdone() has no in-memory cache the way SLOG does, so a row held onto after sdoneMark returns
+  // is not automatically "live" -- this is what makes it so, by finding the SAME row again on (d, s)
+  // and writing the mutated object back over it.
+  //
+  // ⚠️ SAME DATE, DIFFERENT SESSION, MARKED IN THE ORDER THAT DEFEATS A d-ONLY MATCH RATHER THAN
+  // PASSING IT BY LUCK. sdoneMark unshifts a new row to the FRONT of the array, so marking the row
+  // under test FIRST puts "other" in front of it — a match on date alone then finds "other" first and
+  // clobbers ITS identity instead. A first version of this fixture marked "other" first, which put the
+  // row under test at index 0: a date-only match found the right row purely by array position, and a
+  // real re-break of this exact fault (dropping the session-id half of the comparison) did not fail.
+  const S = loadSdoneApi();
+  const row = S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 4, ex: 8, min: 45 });
+  const other = S.sdoneMark("2026-10-01", "other-session", { sets: 1, ex: 1, min: 10 });
+  row.strava = { state: "done", id: "999" };
+  S.sdoneSave(row);
+  const rows = S.loadSdone();
+  assert.equal(rows.length, 2, "sdoneSave changed the number of rows in the store");
+  const mine = rows.filter((r: any) => r.s === "w1-d3-strength");
+  const others = rows.filter((r: any) => r.s === "other-session");
+  assert.equal(mine.length, 1, "the target row's own identity did not survive the save");
+  assert.equal(others.length, 1, "a same-date row lost its identity -- sdoneSave overwrote the wrong row");
+  assert.deepEqual(mine[0]!.strava, { state: "done", id: "999" }, "the mutation on the row was not persisted");
+  assert.equal(others[0]!.strava, undefined, "a mutation on one row leaked onto a different one sharing its date");
 });
 
 // ------------------------------------------------------------------------------------------------

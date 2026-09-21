@@ -11465,13 +11465,29 @@ function sdoneMark(iso, sessId, stats) {
   for (let i = 0; i < rows.length; i++) if (rows[i].d === iso && rows[i].s === sessId) { row = rows[i]; break; }
   if (!row) { row = { d: iso, s: sessId }; rows.unshift(row); }
   row.at = Date.now();
-  if (stats) { row.sets = stats.sets; row.ex = stats.ex; row.min = stats.min; }
+  // t (the session's title, A8) is set once and kept -- a re-finish carries no title of its own to
+  // overwrite it with, and Strava's own send reads it straight off this row.
+  if (stats) { row.sets = stats.sets; row.ex = stats.ex; row.min = stats.min; if (stats.t) row.t = stats.t; }
   // Same reasoning as SLOG_MAX_ROWS, one order of magnitude smaller: a row is ~60 bytes and this is
   // one per finished session, so 2,000 is about thirteen years at three a week.
   saveSdone(rows.slice(0, 2000));
   return row;
 }
 function sdoneHas(iso, sessId) { return loadSdone().some((r) => r.d === iso && r.s === sessId); }
+/**
+ * Persist a mutation made to a row returned earlier by sdoneMark. loadSdone() parses localStorage
+ * fresh on every call -- there is no in-memory cache the way SLOG has one -- so a row held onto after
+ * that call is not automatically "live"; this re-reads the store, finds the same row by its (d, s)
+ * identity, and writes the mutated object back over it. Used by A8 to record how a Strava send ended.
+ */
+function sdoneSave(row) {
+  if (!row) return;
+  const rows = loadSdone();
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].d === row.d && rows[i].s === row.s) { rows[i] = row; break; }
+  }
+  saveSdone(rows);
+}
 /**
  * The flattened play order: one entry per SET, supersets alternated.
  *
@@ -11569,6 +11585,52 @@ function strSuggestFor(x, prescribedReps, loadPercent1RM, iso) {
     pattern: def.pattern, equipment: def.equipment || [],
     priorInstances: strPriorInstances(x, iso),
   });
+}
+/**
+ * Total kg lifted across one finished session -- every exercise, not just one -- for the sets/volume
+ * line A8 sends to Strava. Reuses slogForSession (A5's own per-instance lookup, written for the older
+ * card renderer and otherwise called nowhere else) and strParseSet, the one definition of a stored
+ * row's {w, r, rpe}, rather than rolling a second walk of the log.
+ */
+function strSessionVolumeKg(iso, sessId) {
+  const log = slogForSession(iso, sessId);
+  const sets = Object.keys(log).map((k) => strParseSet(log[k]));
+  return RC.sumVolumeKg(sets);
+}
+/**
+ * A finished strength session as Strava will accept it (A8).
+ *
+ * ⚠️ ALWAYS MANUAL, NEVER GPX -- a squat has no route, so there is nothing to draw and nothing to
+ * fabricate one from. Same rule runStravaPayload states for a run with no trace: the honest shape is a
+ * manual activity carrying the real totals, never an invented one.
+ *
+ * ⚠️ trainer: true AND distanceM: 0 -- there is no distance, and "trainer" is what Strava calls an
+ * indoor effort, which every strength session is.
+ *
+ * ⚠️ sportType RIDES ON THE PAYLOAD; IT IS NEVER ASSUMED SERVER-SIDE. Sending this to a Worker that
+ * predates the Weight Training handshake would silently file it as a Run -- exactly the failure
+ * stravaCanWeightTraining() exists to refuse before this is ever built, at both call sites.
+ */
+function strengthStravaPayload(row) {
+  const name = String((row && row.t) || "Strength training").slice(0, 120);
+  const minutes = Math.max(1, Math.round(Number(row && row.min) || 0));
+  const vol = strSessionVolumeKg(row.d, row.s);
+  const bits = [minutes + " min"];
+  if (row.ex) bits.push(row.ex + " exercise" + (row.ex === 1 ? "" : "s"));
+  bits.push((row.sets || 0) + " set" + (row.sets === 1 ? "" : "s"));
+  if (vol > 0) bits.push(Math.round(vol) + " kg lifted");
+  // ⚠️ row.at IS WHEN FINISH WAS TAPPED -- the real end, not a guess -- so the start is that minus the
+  // session's own named length. There is no live elapsed clock in the player to read a truer figure
+  // from (A5 never built one), so this is the best honest estimate available.
+  const endMs = Math.round(Number(row && row.at) || Date.now());
+  const startMs = endMs - minutes * 60000;
+  const p2 = (n) => (n < 10 ? "0" + n : String(n));
+  const ld = new Date(startMs);
+  const startLocal = ld.getFullYear() + "-" + p2(ld.getMonth() + 1) + "-" + p2(ld.getDate()) +
+    "T" + p2(ld.getHours()) + ":" + p2(ld.getMinutes()) + ":" + p2(ld.getSeconds());
+  return { kind: "manual", sportType: "WeightTraining", name: name, description: bits.join(" \\u00b7 "),
+           startMs: startMs, startLocal: startLocal, elapsedSec: minutes * 60, distanceM: 0, trainer: true,
+           externalId: "strength-" + row.d + "-" + row.s };
 }
 /**
  * The guided player's state. Modelled on STRETCH (one object, one interval, cleared by closeSheet),
@@ -11692,6 +11754,7 @@ function strPlayerDoneHtml() {
   const S = SPLAY; if (!S) return "";
   return '<div class="strp-fin"><div class="strp-fint">Session done</div>' +
     '<div class="strp-finn">' + S.logged + ' set' + (S.logged === 1 ? "" : "s") + ' logged \\u00b7 it is in your Logbook under Strength.</div>' +
+    strengthStravaControlHtml(S.sdoneRow) +
     '<button class="primary" id="strpClose">Done</button></div>';
 }
 function strPaintPlayer() {
@@ -11812,8 +11875,9 @@ function strFinish() {
   const sets = S.logged;
   const ex = {};
   S.items.forEach((it) => { ex[it.x] = 1; });
-  sdoneMark(S.iso, S.sess.id, { sets: sets, ex: Object.keys(ex).length,
-    min: Math.round((S.sess.estimatedDurationSeconds || 0) / 60) });
+  const row = sdoneMark(S.iso, S.sess.id, { sets: sets, ex: Object.keys(ex).length,
+    min: Math.round((S.sess.estimatedDurationSeconds || 0) / 60), t: S.sess.title });
+  S.sdoneRow = row;
   const wk = weekByNo(SHEET_CTX ? SHEET_CTX.week : state.planWeek || 1);
   if (wk) { const m = (wk.sessions || []).find((z) => z.id === S.sess.id); if (m) state.done[doneKey(wk.index, m)] = true; }
   // ⚠️ CHECKED BEFORE slogFlush, NOT AFTER -- detectStrengthRecords reads slogFor, which reads the
@@ -11823,6 +11887,9 @@ function strFinish() {
   S.done = true;
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
   haptic("success");
+  // A8 -- only when the runner turned the switch on, and only once the Worker has confirmed it
+  // understands Weight Training. strPaintPlayer() below is what shows "Sending to Strava..." landing.
+  strengthMaybeAutoSend(row);
   strPaintPlayer();
   if (rec) toast(rec);
 }
@@ -11838,6 +11905,14 @@ function wireStrengthPlayerBody() {
   const hstop = $("strpHoldStop"); if (hstop) hstop.onclick = () => { const S = SPLAY; if (!S) return; S.holdEnd = null; strAdvance(); };
   const fin = $("strpFin"); if (fin) fin.onclick = () => strFinish();
   const cl = $("strpClose"); if (cl) cl.onclick = () => { strengthStop(); closeSheet(); render(); };
+  // A8 -- the manual retry/send button on the "Session done" screen. Doubles as the only way to send
+  // when the auto-send switch is off, and as the recovery from an error state the automatic path
+  // cannot retry on its own (strengthMaybeAutoSend only ever tries a session once).
+  const stvSend = $("strStvSend");
+  if (stvSend && !stvSend.disabled) stvSend.onclick = () => {
+    const S = SPLAY; if (!S || !S.sdoneRow) return;
+    strengthSendSession(S.sdoneRow, () => strPaintPlayer());
+  };
   // The two boxes still write through on every keystroke, exactly as the session sheet's own do, so a
   // number typed and then not committed with Log set is not lost.
   document.querySelectorAll("#strpBody [data-x]").forEach((inp) => inp.oninput = () => slogWrite(inp.dataset.d, inp.dataset.s, inp.dataset.x, Number(inp.dataset.i), inp.dataset.f, inp.value.trim()));
@@ -21147,6 +21222,17 @@ function stravaDeviceKey() {
   return String(cfg.key);
 }
 function stravaConnected() { const c = stravaCfg(); return !!(c.connected && c.key); }
+/**
+ * ⚠️ A8's HANDSHAKE. sportTypes is only ever populated from a real /strava/status reply (stravaRefresh,
+ * below), so a Worker deployed before this feature existed -- or one this app has simply not talked to
+ * yet -- answers false here, which is the safe default: nothing about a strength session is ever sent
+ * to a server that has not said it understands "WeightTraining". Deploy skew is mitigated by failing
+ * closed, never by guessing.
+ */
+function stravaCanWeightTraining() {
+  const c = stravaCfg();
+  return stravaConnected() && Array.isArray(c.sportTypes) && c.sportTypes.indexOf("WeightTraining") !== -1;
+}
 /** Is this someone who is expected to configure a server by hand? Same gate as the Mapbox field:
  *  a TestFlight tester must never be shown a box asking for a URL they have never heard of. */
 /**
@@ -21181,6 +21267,9 @@ function stravaRefresh() {
     const was = !!c.connected;
     c.connected = !!(r.json && r.json.connected && r.json.canWrite !== false);
     c.name = String((r.json && r.json.name) || "");
+    // A8 -- what this Worker understands, straight off its own reply. Absent (an old deployment) or
+    // malformed both read as "nothing", which is what stravaCanWeightTraining() treats as "not yet".
+    c.sportTypes = (r.json && Array.isArray(r.json.sportTypes)) ? r.json.sportTypes : [];
     // The pending flag only exists to explain the gap while the runner is away in Safari. It clears
     // when they come back connected, and it times out either way so it can never stick.
     if (c.connected || !c.pending || Date.now() - Number(c.pending) > 600000) c.pending = 0;
@@ -21323,6 +21412,82 @@ function stravaRunButtonHtml(run) {
   }
   const err = s.state === "error" ? '<div class="stv-err">' + esc(s.msg || "") + '</div>' : "";
   return '<button class="primary share-btn" id="stvSend">' + ICON.share + ' ' +
+    (s.state === "error" ? "Try Strava again" : "Send to Strava") + '</button>' + err;
+}
+/**
+ * Send one finished strength session to Strava (A8).
+ *
+ * ⚠️ WHAT HAPPENED IS RECORDED ON THE ROW ITSELF (row.strava), same reasoning as stravaSendRun: without
+ * it the only way to know a session is already on Strava is to send it again and read the duplicate
+ * error back. sdoneSave persists the mutation, because loadSdone() has no in-memory cache to keep it in
+ * step with.
+ *
+ * ⚠️ NEVER "pending". A strength session is always the manual-activity shape, which Strava's own API
+ * answers synchronously -- the async poll-until-settled dance stravaSendRun does for a GPX upload has
+ * nothing to wait for here.
+ */
+function strengthSendSession(row, onDone) {
+  if (!row || !stravaConnected()) return;
+  const key = stravaCfg().key;
+  const payload = strengthStravaPayload(row);
+  const finish = () => { sdoneSave(row); if (onDone) onDone(); };
+  row.strava = { state: "sending" };
+  if (onDone) onDone();
+  stravaCall("/strava/upload", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dk: key, run: payload }),
+  }).then((r) => {
+    const j = r.json || {};
+    // ⚠️ A 401 means the connection is gone at Strava’s end, same as a run’s own check.
+    if (r.status === 401) { const c = stravaCfg(); c.connected = false; stravaSaveCfg(c); }
+    if (j.ok && j.activityId) row.strava = { state: "done", id: String(j.activityId), duplicate: !!j.duplicate };
+    else row.strava = { state: "error", msg: String(j.error || "Strava could not be reached.") };
+    finish();
+  }).catch(() => {
+    row.strava = { state: "error", msg: "No connection \— try again when you are back online." };
+    finish();
+  });
+}
+/**
+ * Send a just-finished strength session without being asked -- the strength twin of
+ * stravaMaybeAutoSend, gated on the SAME switch (stravaCfg().auto) so there is one setting for both,
+ * not a second one to discover.
+ *
+ * ⚠️ AND GATED ON stravaCanWeightTraining() AS WELL. Sending WeightTraining to a Worker that has not
+ * confirmed it understands the sport type would file the session as a Run with nothing anywhere to
+ * say so -- the exact deploy-skew failure the handshake exists to refuse.
+ *
+ * ⚠️ ONLY A SESSION THAT HAS NEVER BEEN TRIED, same rule and same reason as stravaMaybeAutoSend’s own
+ * comment: without the row.strava check, this project’s own idempotent-Finish behaviour would try
+ * sending the same session again on every later re-finish.
+ */
+function strengthMaybeAutoSend(row) {
+  if (!row || row.strava) return;
+  if (!stravaAutoSend() || !stravaCanWeightTraining()) return;
+  strengthSendSession(row, () => strPaintPlayer());
+}
+/**
+ * The Strava control on the "Session done" screen -- the strength equivalent of stravaRunButtonHtml,
+ * placed where a runner is actually looking right after finishing, because strength has no run-detail
+ * screen to reopen a past session on and carry the button there.
+ *
+ * ⚠️ ABSENT, NOT DISABLED, WHEN NOT CONNECTED OR THE WORKER HAS NOT CONFIRMED WEIGHT TRAINING -- same
+ * rule stravaRunButtonHtml states for the reason it states it there.
+ */
+function strengthStravaControlHtml(row) {
+  if (!row || !stravaCanWeightTraining()) return "";
+  const s = row.strava || {};
+  if (s.state === "done") {
+    return '<a class="card stv-done" href="https://www.strava.com/activities/' + esc(s.id) + '" target="_blank" rel="noopener">' +
+      '<span class="stv-ic">' + ICON.share + '</span>' +
+      '<span class="stv-b"><span class="stv-t">' + (s.duplicate ? "Already on Strava" : "On Strava") + '</span>' +
+      '<span class="stv-d">Open the activity</span></span><span class="arr">\\u203a</span></a>';
+  }
+  if (s.state === "sending") {
+    return '<button class="primary share-btn" id="strStvSend" disabled>Sending to Strava\\u2026</button>';
+  }
+  const err = s.state === "error" ? '<div class="stv-err">' + esc(s.msg || "") + '</div>' : "";
+  return '<button class="primary share-btn" id="strStvSend">' + ICON.share + ' ' +
     (s.state === "error" ? "Try Strava again" : "Send to Strava") + '</button>' + err;
 }
 /**

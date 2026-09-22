@@ -912,7 +912,13 @@ test("BLOCKER: Start a new plan opens the wizard, and only a runner who has a na
     "a runner who already has a name is asked for it again when starting a new plan");
   assert.ok(mkIds(false, "regular").includes("you"),
     "a genuine first run no longer asks for a name at all");
-  assert.equal(mkIds(true, "regular")[0], "level", "the new-plan wizard does not open on the level step");
+  // ⚠️ RESTATED, NOT DELETED. This asserted `[0] === "level"` — a proxy for "the name step is skipped"
+  // that only held while level HAPPENED to be first, so D3a putting the safety question in front of it
+  // failed a guard whose invariant was untouched. Scoped to a HOW rather than a WHAT, for the
+  // sixteenth time in this project. The claim is stronger stated properly: the personalised list is
+  // the first-run list MINUS EXACTLY the name step, which pins the removal and that nothing else moved.
+  assert.deepEqual(mkIds(true, "regular"), mkIds(false, "regular").filter((x) => x !== "you"),
+    "skipping the name step changed the wizard by more than removing it");
   // Every step a personalised runner sees is a step a first-run runner sees: skipping must only REMOVE.
   const extra = mkIds(true, "regular").filter((x) => !mkIds(false, "regular").includes(x));
   assert.deepEqual(extra, [], "skipping the name step invented steps: " + extra.join(", "));

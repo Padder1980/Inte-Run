@@ -24477,13 +24477,16 @@ function wizStepIds() {
   // false on a genuine first run, true by the time a second plan is ever started. And every later step
   // already falls back to the stored profile (wizFieldVal("s_dist") || p.goalDist and friends), so a
   // second plan opens pre-filled with the answers they gave last time rather than blank.
-  const ids = profile.personalized ? ["level", "goal"] : ["you", "level", "goal"];
+  // The safety step is FIRST in both branches: we ask before the runner has invested anything in
+  // the flow, and before a plan can be built on top of a symptom that needs a human.
+  const ids = profile.personalized ? ["safety", "level", "goal"] : ["safety", "you", "level", "goal"];
   if (st === "building" || (st && !beginner)) ids.push("fitness");
   if (st && !beginner) ids.push("volume");
   ids.push("details", "plan", "schedule", "summary");
   return ids;
 }
 function wizMeta(id, st) {
+  if (id === "safety") return { eyebrow: "BEFORE WE START", title: "One health question" };
   if (id === "you") return { eyebrow: "CREATE YOUR PLAN", title: "First, about you" };
   if (id === "level") return { eyebrow: "CREATE YOUR PLAN", title: "Where are you at?" };
   if (id === "goal") return { eyebrow: "YOUR GOAL", title: "Choose your goal", badge: true };
@@ -24575,7 +24578,107 @@ function wizTrialOfferHtml() {
     (on ? '<div class="q"><label>Which day?</label><input class="sel" id="s_trialday" type="date" style="max-width:200px" value="' + sel + '" min="' + todayIso() + '" max="' + trialMaxIso() + '"></div>' : "");
 }
 
+/**
+ * D3a - the safety step, first in the wizard.
+ *
+ * Six symptoms that must not be trained through, screened by the engine before a plan is built.
+ *
+ * WARNING: THIS STEP KEEPS NOTHING, AND THAT IS WHAT MAKES checkinConsent() TRUE HERE. The ticks live
+ * in the DOM and nowhere else: they are not s_-prefixed, so captureSetupFields cannot see them; they
+ * are never written to the draft; and a step change re-renders the list empty. The consent line
+ * promises "nothing is kept - leave this screen and they are gone", and CLAUDE.md records that
+ * sentence being the work twice over. Do not "improve" this by remembering the answers across a Back.
+ *
+ * WARNING: THE CHECKBOX GROUP IS NOT NAMED "rf". wire() binds every [data-chk="rf"] to runRf, which
+ * reads $("rfRes") unguarded - dead code on its own route, and a TypeError on this screen.
+ *
+ * WARNING: THE GATE IS ON THE WIZARD, WHICH IS THE ONLY FIRST-RUN ROUTE TO A PLAN. A runner who
+ * already has one can still edit their profile through the old setup form; this does not claim to
+ * screen that, and should not be described as if it did.
+ */
+const WIZ_SAFETY_CHK = "wizsafety";
+function wizSafetyHtml() {
+  return EMERGENCY_BANNER() +
+    '<p class="wz-lead">One health question before we build anything. Tick anything you have had recently, or while running.</p>' +
+    '<div class="opts">' + checks(FLAGS_PHYS, WIZ_SAFETY_CHK) +
+    '<label class="opt"><input type="checkbox" id="wizSafetyNone"><span>None of these</span></label></div>' +
+    checkinConsent() +
+    '<div class="result" id="wizSafetyRes" role="status" aria-live="polite" aria-atomic="true"></div>' +
+    '<div id="wizSafetyAck"></div>';
+}
+/**
+ * The flags ticked right now, filtered to ids the engine knows.
+ *
+ * WARNING: screenRedFlags READS FLAGS[flag] UNGUARDED AND THROWS ON AN ID IT DOES NOT KNOW - measured,
+ * screenRedFlags(["none"]) is a TypeError. This runs from an onchange handler, so a throw leaves the
+ * runner on a step whose answer panel never updates again. Every key of FLAGS_PHYS is screenable today
+ * (a test drives all six), so what this filter guards is the next non-flag checkbox joining the group -
+ * which "None of these" nearly was. Derived from the map, never a list.
+ */
+function wizSafetyPicks() {
+  return chkValues(WIZ_SAFETY_CHK).filter((v) => Object.prototype.hasOwnProperty.call(FLAGS_PHYS, v));
+}
+function wizSafetyAnswered() {
+  const none = $("wizSafetyNone");
+  return wizSafetyPicks().length > 0 || !!(none && none.checked);
+}
+/**
+ * Paint the screener's answer under the questions, and return what it means for Next.
+ *
+ * WARNING: THE THREE OUTCOMES ARE emergency / FLAGGED-BUT-NOT / nothing, and the middle one is
+ * deliberately not a list of urgencies. From FLAGS_PHYS only two are reachable - measured: chest pain,
+ * fainting, severe breathlessness and the neurological group are "emergency"; pinpoint bone pain and
+ * rapidly worsening pain are "urgent". A branch naming "professional" would be unreachable from this
+ * step today and any guard exercising it through the wizard would be vacuous. Written as "flagged but
+ * not an emergency" it stays correct the day FLAGS_WELL joins this step.
+ *
+ * Painted live on every tick as well as on Next, because the three Support screeners already work that
+ * way and because making somebody tap Next before they are told to call an ambulance is indefensible.
+ */
+function wizSafetyPaint() {
+  const res = $("wizSafetyRes"), ack = $("wizSafetyAck");
+  if (!res) return "none";
+  // The "tell us either way" error goes the moment they answer - removed from the DOM rather than by
+  // a re-render, because a re-render would wipe the ticks, which are the only copy of the answer.
+  if (state.wizErr) { state.wizErr = null; const e = document.querySelector(".wz-err"); if (e) e.remove(); }
+  const picks = wizSafetyPicks();
+  if (ack) ack.innerHTML = "";
+  if (!picks.length) { res.classList.remove("show"); res.innerHTML = ""; return "none"; }
+  const r = RC.screenRedFlags(picks);
+  renderResult("wizSafetyRes", r.urgency, r.headline,
+    r.flags.map((f) => ({ title: f.label, guidance: f.guidance, refer: f.refer })), r.disclaimer);
+  if (!ack) return r.urgency === "emergency" ? "emergency" : "flagged";
+  if (r.urgency === "emergency") {
+    ack.innerHTML = '<div class="ci-consent" style="margin-top:var(--s2)"><b>Get help first.</b> We are not going to build a training plan on top of this. Come back when you have been seen.</div>';
+    return "emergency";
+  }
+  ack.innerHTML = '<button class="mini-btn" id="wizSafetyOk" type="button" style="margin-top:var(--s2)">I understand, continue</button>';
+  const ok = $("wizSafetyOk"); if (ok) ok.onclick = wizAdvance;
+  return "flagged";
+}
+/**
+ * WARNING: THE ONLY WAY PAST A FLAGGED ANSWER IS THE EXPLICIT BUTTON. Next re-paints and refuses, so it
+ * is idempotent here; nothing is remembered between the two, which is why there is no acknowledgement
+ * flag to clear and no way for a stale one to wave a later answer through. An emergency answer offers
+ * no button at all - the way on is to change the answer, which is the honest escape from a mis-tap and
+ * the only one that does not brick onboarding for somebody who ticked the wrong box.
+ */
+function wizSafetyGate() {
+  const verdict = wizSafetyPaint();
+  if (verdict === "none") return true;
+  // ⚠️ A REFUSAL HAS TO DO SOMETHING VISIBLE, AND ONLY LOOKING AT THE SCREEN SHOWED THIS. Next stays
+  // full-width and green while the gate is refusing, so on an emergency it was a control that looked
+  // live and did nothing -- this project's most-repeated defect class. The answer panel is usually
+  // below the fold when Next is tapped, so scrolling to it makes the tap land on the reason. Next is
+  // deliberately NOT disabled: it is idempotent here, and a disabled primary on step 0 is how a
+  // mis-tap would brick onboarding for somebody who ticked the wrong box.
+  const res = $("wizSafetyRes");
+  if (res && res.scrollIntoView) res.scrollIntoView({ block: "nearest", inline: "nearest" });
+  return false;
+}
+
 function wizBody(id, p, st) {
+  if (id === "safety") return wizSafetyHtml();
   if (id === "you") {
     // ⚠️ Reuses the SAME field ids the edit form uses (s_avatar_file, s_name, avatarPic, avatarBtn) so
     // the existing wire() bindings pick them up unchanged — the avatar cropper, the file input, and
@@ -24674,6 +24777,9 @@ function wizBody(id, p, st) {
 function wizStepError(id) {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   const st = draft.status || "";
+  // An explicit answer either way. The only error here fires when NOTHING is ticked, so the
+  // re-render it causes has no answer to lose.
+  if (id === "safety") return wizSafetyAnswered() ? null : "Tick anything that applies, or \\u2018None of these\\u2019.";
   if (id === "level") return st ? null : "Tap the option that fits you best.";
   if (id === "goal") {
     const cfg = GOAL_BY_STATUS[st] || GOAL_BY_STATUS.regular;
@@ -24717,7 +24823,16 @@ function wizNext() {
   const err = wizStepError(id);
   if (err) { state.wizErr = err; render(); return; }
   state.wizErr = null;
+  // The safety gate refuses in place rather than through state.wizErr, because clearing the error
+  // means a render and a render means the ticks are gone.
+  if (id === "safety" && !wizSafetyGate()) return;
   if (id === "summary") { wizardFinish(); return; }
+  wizAdvance();
+}
+// One step forward. Extracted so the safety step's "I understand, continue" advances by exactly the
+// same route as Next rather than by a second copy of it.
+function wizAdvance() {
+  state.wizErr = null;
   state.wizStep = Math.min((state.wizStep || 0) + 1, wizStepIds().length - 1);
   render();
 }
@@ -24868,6 +24983,12 @@ function wizardFinish() {
 function wireWizard() {
   const next = $("wizNext"); if (next) next.onclick = wizNext;
   const back = $("wizBack"); if (back) back.onclick = wizBack;
+  // The safety step. Ticking a symptom clears "None of these" and the other way round, so the two can
+  // never both be true; every change repaints the screener's answer under the questions.
+  const safeBoxes = document.querySelectorAll('[data-chk="' + WIZ_SAFETY_CHK + '"]');
+  const safeNone = $("wizSafetyNone");
+  safeBoxes.forEach((c) => c.onchange = () => { if (c.checked && safeNone) safeNone.checked = false; wizSafetyPaint(); });
+  if (safeNone) safeNone.onchange = () => { if (safeNone.checked) safeBoxes.forEach((c) => c.checked = false); wizSafetyPaint(); };
   document.querySelectorAll("[data-wizdays]").forEach((b) => b.onclick = () => { draft.days = b.dataset.wizdays; state.wizErr = null; render(); });
   // The trial-day picker is a native date input: capture its value into the draft so wizardFinish can
   // commit it. Not an s_-prefixed field (those flow through wizFieldVal); the trial is its own store.

@@ -15501,3 +15501,136 @@ currently-deployed Worker's `/strava/status` carries no `sportTypes` field at al
 stage exists to build is also what makes that safe to leave sitting unsent.
 
 **Still to come in this track:** A9 the watch (native, Xcode-beta).
+
+## ✅ D3a — THE SAFETY QUESTION COMES BEFORE THE PLAN (2026-09-21)
+
+The wizard now opens on one health question. Six symptoms that must not be trained through, screened
+by the engine, with the answer deciding whether a plan gets built at all. Suite 1700 → **1712**;
+`test/wizard-safety.test.ts` holds 12 guards and **17 deliberate re-breaks were all caught**.
+
+⚠️⚠️ **`FLAGS_PHYS` WAS DEFINED AND RENDERED NOWHERE — a computed-and-discarded constant, and the
+eighth in this file.** CLAUDE.md already recorded that removing the wellbeing tick-boxes "removed the
+only tickable route to a crisis escalation"; measured, `grep FLAGS_PHYS web/app.ts` returned **one
+line, its own definition**. So the app had a good screener, a good engine and no way for a new runner
+to reach either before being handed a training plan. D3a makes the constant live again.
+
+### ⚠️⚠️ THE STEP KEEPS NOTHING, AND THAT IS WHAT MAKES `checkinConsent()` TRUE HERE
+
+That sentence — *"nothing is kept — leave this screen and they are gone"* — is one this file records
+being the work **twice over**, and `test/silent-defects.test.ts` **discovers** every builder that
+calls `checks(` and demands `checkinConsent()` in the same body. So the wording is not optional and
+the wording has to be true.
+
+The ticks live in the DOM and nowhere else: they are not `s_`-prefixed, so `captureSetupFields` cannot
+sweep them into the draft; nothing writes them to `draft`, to `localStorage` or to `state`; and a step
+change re-renders the list empty. **Measured in a real browser after answering "pinpoint bone pain"
+and advancing: the draft holds no trace, no `localStorage` key mentions it, and Back re-renders the
+step with nothing ticked and the panel hidden.** The guard derives the state writes and asserts the
+only one is `wizErr`.
+⚠️ **THE COST IS DELIBERATE AND IS THE RIGHT TRADE:** a runner who goes Back has to answer again. The
+alternative is a consent line that understates what is kept, on the one screen a worried runner reads
+most carefully. **Do not "improve" this by remembering the answers across a Back.**
+
+### ⚠️⚠️ `professional` IS STRUCTURALLY UNREACHABLE FROM THIS STEP, SO THE BRANCH IS NOT NAMED AFTER IT
+
+Measured through the real engine, every key of `FLAGS_PHYS`: **chest pain, fainting, severe
+breathlessness and the neurological group are `emergency`; pinpoint bone pain and rapidly worsening
+pain are `urgent`.** Nothing here can produce `professional` — that comes from `FLAGS_WELL`, which is
+D3c's. A branch written `urgency === "urgent" || urgency === "professional"` would therefore name an
+outcome this step cannot reach, and any guard exercising it through the wizard would be **vacuous**.
+
+The three outcomes are **emergency / flagged-but-not / nothing**, which is correct today and stays
+correct the day FLAGS_WELL joins the step.
+- **Emergency** → the engine's panel, plus *"Get help first. We are not going to build a training plan
+  on top of this."* **No continue button at all.** The way on is to change the answer, which is the
+  honest escape from a mis-tap and the only one that does not brick onboarding.
+- **Flagged** → the panel plus an explicit **"I understand, continue"**, which is the only way past.
+- **Nothing** → Next advances.
+
+⚠️ **NOTHING IS REMEMBERED BETWEEN A REFUSAL AND THE ACKNOWLEDGEMENT, which is why there is no
+acknowledgement flag to clear and no way for a stale one to wave a later answer through.** Next is
+idempotent here: it re-paints and refuses.
+
+### The three traps the implementation had to route around
+
+⚠️ **THE CHECKBOX GROUP IS NOT NAMED `rf`.** `wire()` binds every `[data-chk="rf"]` to `runRf`, which
+reads `$("rfRes")` **unguarded** — dead code on its own route (this file records it) and a TypeError
+on this screen. `WIZ_SAFETY_CHK` is one constant read by the builder, the wiring and `chkValues`, and
+the guard derives every bound name from the page so a future collision fails.
+
+⚠️ **`screenRedFlags` READS `FLAGS[flag]` UNGUARDED AND THROWS ON AN ID IT DOES NOT KNOW** — measured,
+`screenRedFlags(["none"])` is a TypeError — and this runs from an `onchange`, where a throw leaves the
+panel dead for the rest of the step. `wizSafetyPicks` filters to keys of `FLAGS_PHYS`, **derived from
+the map rather than a list**. ⚠️ And the filter's own throw is made unreachable by a guard rather than
+by a try/catch: every key of `FLAGS_PHYS` is driven through the real engine, so a seventh symptom the
+engine has never heard of fails there instead. **A fail-open catch on a safety gate would have waved
+somebody through; a fail-closed one would have bricked onboarding. Neither was needed.**
+
+⚠️⚠️ **THE STALE ERROR IS REMOVED FROM THE DOM, NOT CLEARED BY A RENDER — because a render would wipe
+the ticks, which are the only copy of the answer.** `wizStepError`'s "tell us either way" only fires
+when NOTHING is ticked, so the render it causes has no answer to lose; but once something IS ticked,
+that line has to come out by hand or it sits under a panel that has already answered it.
+
+### ⚠️⚠️ A DEFECT ONLY RENDERING THE SCREEN COULD SHOW: NEXT LOOKED LIVE AND DID NOTHING
+
+The gate refuses in place, so on an emergency the runner tapped a full-width green **Next** and the
+screen did not visibly respond — this project's most-repeated defect class, freshly introduced by me
+and invisible in the code. A refusal now scrolls the answer panel into view (**measured: `scrollTop`
+0 → 90.5, panel top 656 → 566, and `docX` 0, so nothing moves sideways**), which is both a visible
+response and the right one: the panel is usually below the fold when Next is tapped.
+⚠️ **NEXT IS DELIBERATELY NOT DISABLED.** It is idempotent here, and a disabled primary on step 0 is
+how a mis-tap would trap somebody who ticked the wrong box.
+
+⚠️ **THE GATE IS ON THE WIZARD, WHICH IS THE ONLY FIRST-RUN ROUTE TO A PLAN — and the claim stops
+there.** A runner who already has a plan edits it through the old setup form, which is not screened,
+and **starting a run is not gated either**. The Road Map step's own wording was corrected to say so
+rather than being ticked against a promise D3a does not keep.
+
+### Two measurement faults, both mine, both in the test rather than the code
+
+⚠️ **A LIFT THAT OMITS A CONSTANT MEASURES A STRICTLY EASIER PROGRAM.** Every lifted function reads
+`WIZ_SAFETY_CHK` and I supplied it only to the fake `chkValues` — six guards threw `ReferenceError`.
+Loudly, which is the acceptable kind; the fix is to **extract the real `const` line from the built
+page** rather than retype the value, so the test and the page cannot disagree about the group's name.
+
+⚠️⚠️ **AND THE FAKE DOM WAS WRONG, NOT THE CODE — FIX THE RULER.** My `document.querySelector(".wz-err")`
+returned the node only `if (state.wizErr)`, and `wizSafetyPaint` nulls `state.wizErr` **before** it
+queries — so the fake could never hand it back, and a guard failed against behaviour the browser had
+already shown working. In the real DOM the node exists until something removes it.
+
+### ⚠️ ONE EXISTING GUARD FAILED, AND IT WAS A POSITIONAL PROXY — RESTATED, NOT DELETED
+
+`test/manage-plan.test.ts`'s *"Start a new plan opens the wizard, and only a runner who has a name
+skips that step"* asserted `wizStepIds()[0] === "level"`. Its three real claims — the name step is
+skipped for a personalised runner, present for a first run, and skipping only ever REMOVES — all
+still passed; the broken line was a **proxy** for "the name step is skipped" that held only while
+`level` happened to be first. **Sixteenth firing of guard-scoped-to-a-HOW in this file.** Restated as
+`personalised === first-run minus exactly "you"`, which is stronger than the original because it pins
+both the removal and that nothing else moved, and re-broken (making the skip also drop `level`) to
+prove it still bites.
+⚠️ **MY OWN RE-BREAK HARNESS COULD NOT HAVE FOUND IT** — it ran three files, and this is in a fourth.
+The full `npm run verify` is what caught it, which is the whole argument for running the recipe rather
+than the tests you were thinking about.
+
+### ⚠️ THE ANSWER PANEL ANNOUNCES ITSELF, AND THAT PART IS UNVERIFIED
+
+`#wizSafetyRes` carries `role="status"` with `aria-live="polite"` and `aria-atomic` spelled out. The
+three Support screeners do not, and that is defensible for an opt-in page somebody navigated to on
+purpose; this one is **mandatory for every new runner**, so a screen-reader user ticking "chest pain"
+and hearing nothing at all is the defect rather than the inconsistency. ⚠️ **NOT TESTED WITH A REAL
+SCREEN READER** — it cannot make anything worse, and it is stated as best-effort rather than as done.
+
+### Verification
+
+Build exit 0 (read directly, not through a pipe — the backtick rule's own lesson), `docs/voices/`
+clean, `node --check` OK on all three emitted blocks, **17 of 17 re-breaks caught with the tree
+restored byte-identical**, and every path driven end to end in a real browser on the served `docs/`:
+the step first with six boxes plus "None of these", the banner and the consent line; nothing ticked →
+error, no advance; chest pain → live emergency panel with no way on, Next refuses; bone pain → urgent
+panel, referral line, Next refuses, the explicit button advances; "None of these" → advances; the two
+tick groups mutually exclusive both ways; and **0 horizontal overflow on the document, body and
+`#view` at 375×812 and 320×568 at `--tscale` 1.0 and 1.3**, with the acknowledgement clearing the
+sticky footer at every size and its hit area bisecting to **44.49px** against the 44px floor.
+
+**Still to come in this track:** D3b the under-18 gate (**explicitly the owner's call**), D3c the
+wellbeing tick-boxes, then D1 the privacy policy and D2 testers.

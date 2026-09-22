@@ -58,6 +58,9 @@ const MAX_RUN_DAYS: Readonly<Record<number, number>> = { 12: 3, 13: 3, 14: 3, 15
  */
 const WEEKLY_MULTIPLE = 2;
 
+/** The youngest age the plan will rehearse a race pace at. See `YouthLimits.allowRacePaceWork`. */
+const RACE_PACE_MIN_AGE = 15;
+
 export interface YouthLimits {
   /** The age these limits were resolved for, after clamping. */
   age: number;
@@ -67,6 +70,22 @@ export interface YouthLimits {
   maxWeeklyKm: number;
   /** Most days a week the plan may schedule a run. */
   maxRunDays: number;
+  /**
+   * May the plan prescribe goal-race-pace work (8 x 1 km at 5k pace and its relatives)?
+   *
+   * WARNING: FALSE UNDER 15, AND IT IS THE RESEARCH RATHER THAN THE ARITHMETIC THAT SETS THIS.
+   * Hudson's Freshman plan -- the most conservative thing in the book, written for a runner brand new
+   * to structured training -- carries hill sprints and fartlek and nothing else: no intervals, no
+   * threshold, no goal-pace work. The youth running consensus statement is evidence-based for 13-18
+   * and explicitly opinion below that. Measured, a 12-year-old was otherwise handed a peak-phase
+   * race-specific session covering 8.6 km against a 6 km whole-session ceiling.
+   *
+   * WARNING: IT DOES NOT MEAN "NO HARD RUNNING". They still get a quality session every week -- a
+   * VO2 or threshold one, which at this age the app's own beginner track already builds as fartlek
+   * and hill work. What goes is rehearsing a race pace, which is the piece the sources agree is for
+   * older runners.
+   */
+  allowRacePaceWork: boolean;
 }
 
 /**
@@ -95,7 +114,13 @@ export function youthLimitsFor(age: number | null | undefined): YouthLimits | nu
   if (!isYouthAge(age)) return null;
   const a = Math.max(YOUTH_MIN_AGE, Math.min(YOUTH_MAX_AGE, Math.floor(age as number)));
   const km = RULE_MAX_KM[a]!;
-  return { age: a, maxSessionKm: km, maxWeeklyKm: km * WEEKLY_MULTIPLE, maxRunDays: MAX_RUN_DAYS[a]! };
+  return {
+    age: a,
+    maxSessionKm: km,
+    maxWeeklyKm: km * WEEKLY_MULTIPLE,
+    maxRunDays: MAX_RUN_DAYS[a]!,
+    allowRacePaceWork: a >= RACE_PACE_MIN_AGE,
+  };
 }
 
 /**

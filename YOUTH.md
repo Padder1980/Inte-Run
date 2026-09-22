@@ -307,6 +307,70 @@ answer to "what will the plan schedule as runs". Five other reads of the raw `da
 rules and must stay raw -- `test/running-days.test.ts` pins that and will catch a clamp put in the
 wrong place.
 
+## 5.7 Y2 as built, and what it measures at
+
+✅ **DONE 2026-09-22.** Four levers, all folded into decisions the engine already makes, none of them
+a fork of the generator. Every one is a `Math.min` against a ceiling that is Infinity for an adult, or
+a branch gated on a null -- so an absent age changes nothing, which is what makes it safe to ship to
+every profile ever stored. **Proved, not asserted: both engine audits are byte-identical before and
+after, and a test compares every derived field of an adult plan built with and without an age.**
+
+| lever | what it does |
+|---|---|
+| `longCapMin`, `beginnerLongPeakMin` | the long run may not exceed what that age may race |
+| `longFloorMin` | the adult event floor does **not** apply -- see below |
+| the ceiling pass | a shrink-only volume fit against the weekly limit, run after the adult one |
+| `runningDaysFor` | the owner's day column |
+| `qualitySessionsThisWeek` | one key day a week |
+| `allowRacePaceWork` | no goal-pace rehearsal under 15 on the main track |
+
+⚠⚠ **FOUR THINGS WERE MEASURED WRONG FIRST, AND EACH WOULD HAVE SHIPPED A WORSE PLAN.**
+1. **A ceiling is not a target.** Returning the weekly limit from `targetPeakWeeklyKm` made things
+   worse, not better: that fit aims AT its target in both directions, so a 17-year-old who had stated
+   no mileage was scaled UP from a natural 48.5 km peak to 54.8 km. Weeks over the limit went 18 to 42.
+   The ceiling now has its own shrink-only pass.
+2. **The wrong ruler.** `fittedPeakKm` measures `plannedDistanceMeters`, which excludes warm-ups
+   because this engine treats preparation as not-load. Right for a coaching model, wrong for a safety
+   ceiling -- weeks that were 38.7 km of actual running reported as inside a 32 km cap. The youth pass
+   measures total outing distance.
+3. **A floor equal to a ceiling pins the long run.** Capping `LONG_FLOOR_KM` at the youth ceiling
+   left a floor EQUAL to it at 15 for a 10k (both 12 km), so the long run could not move and the week
+   could not shrink. The adult event floor does not apply to a youth plan at all.
+4. **Shortening the quality sessions is the wrong lever; having fewer is the right one.** A tighter
+   work budget moved the total by 0.6 km across 81 plans, because a quality session's WORK is already
+   small -- the warm-up, recoveries and cool-down are what make it long. One key day a week took a
+   16-year-old's worst week from 36.4 km to 32.0.
+
+**Measured over 162 reachable plans (age x goal x track x 3/5/7 days asked x with and without a stated
+mileage), race week excluded because UKA's limit is on the race distance and Y1 gates that at the goal:**
+
+| | |
+|---|---|
+| running days over the cap | **0** |
+| long run over the ceiling | **0** |
+| any session over the ceiling | 12 (7.4%), worst **+9.3%** |
+| any week over the ceiling | 31 (19%), worst **+13.6%** |
+| 16- and 17-year-olds | **fully inside both ceilings** |
+
+⚠⚠ **THE TWO RESIDUALS ARE STRUCTURAL AND ARE NOT TUNING PROBLEMS. Do not "fix" them by
+loosening a bound.**
+- **A 13-year-old on the MAIN track draws a threshold session of 6.6 km against a 6 km ceiling.** The
+  library's smallest threshold format is still that big once its warm-up and cool-down are counted.
+  The fix is a shorter format in the library, not a cap.
+- **A 15-year-old at five running days peaks near 27 km against 24.** The easy runs are already at the
+  engine's 20-minute minimum, so the week cannot shrink further without going below that floor or
+  dropping a day -- and the day count is the owner's own column. Lowering the floor for youth is a
+  real option and is not taken here.
+- ⚠️ **And the weekly number is the weakest in this file** (section 3's provenance flag), so a
+  residual there is more tolerable than one on the session ceiling, which is UKA's own rule.
+
+⚠️ **THREE DEFENSIVE LINES ARE UNREACHABLE TODAY AND ARE RECORDED AT THE LINE** so nobody
+verifies one by deleting it: the beginner long-run cap (the beginner endpoints are already under every
+ceiling -- measured 5.0 km at every age 12-15), the `Math.min(1, ...)` in the ceiling pass (the break
+above guarantees the ratio is below 1), and the build-phase race-pace arm (two independent gates stop
+it). Each was re-broken and watched NOT failing, which is why the code says so rather than claiming a
+guard it does not have.
+
 ## 6. The legal consequence of saying yes - and it is real
 
 ⚠️⚠️ **DELIBERATELY SERVING 12-17s MAKES THE APP "LIKELY TO BE ACCESSED BY CHILDREN", SO THE ICO's

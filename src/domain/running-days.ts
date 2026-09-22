@@ -1,4 +1,5 @@
 import type { Athlete } from "./types.ts";
+import { youthLimitsFor } from "./youth.ts";
 
 /**
  * How many days a week the plan will actually schedule a run, and which answers a picker may
@@ -57,10 +58,22 @@ const CHOICE_MAX = { main: 7, beginner: 4 };
 const isBeginner = (t: Track) => t.experience === "beginner";
 
 /** What the generator will schedule as runs for this answer. */
-export function runningDaysFor(a: Pick<Athlete, "daysPerWeek" | "experience" | "runWalk">): number {
+export function runningDaysFor(a: Pick<Athlete, "daysPerWeek" | "experience" | "runWalk" | "age">): number {
   const beg = isBeginner(a);
   const slots = beg ? (a.runWalk ? RUN_DAY_SLOTS.runWalk : RUN_DAY_SLOTS.beginner) : RUN_DAY_SLOTS.main;
-  return Math.min(slots, Math.max(beg ? RUN_DAY_FLOOR.beginner : RUN_DAY_FLOOR.main, a.daysPerWeek));
+  const days = Math.min(slots, Math.max(beg ? RUN_DAY_FLOOR.beginner : RUN_DAY_FLOOR.main, a.daysPerWeek));
+  /**
+   * ⚠️ AND A 12-17 RUNNER'S OWN CEILING — three runs a week to 14, five from 15. The owner's column,
+   * adopted unchanged on 21 September 2026; see `src/domain/youth.ts` and YOUTH.md.
+   *
+   * ⚠️ IT BELONGS HERE RATHER THAN AT THE FIVE RAW READS OF `daysPerWeek`, and the header above says
+   * why: this function is the single answer to "what will the plan schedule as RUNS", while those
+   * five ask different questions of the same field (the recovery-week gate, the beginner strength
+   * count, two rotation seeds and the long-run dose gate). Clamping the field on its way into the
+   * engine would silently change all five — the mistake that note exists to prevent.
+   */
+  const youth = youthLimitsFor(a.age);
+  return youth ? Math.min(days, youth.maxRunDays) : days;
 }
 
 /** Every answer a picker may offer this runner — ascending, never empty. */

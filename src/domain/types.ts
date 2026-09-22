@@ -68,6 +68,20 @@ export type Athlete = {
    * than silently going quiet — see buildNotes.
    */
   strengthProgramme?: { active: boolean };
+  /**
+   * Age in years, when the runner has given one. Absent is a real state and means ADULT.
+   *
+   * ⚠️ THE ENGINE READS THIS ONLY TO APPLY THE 12-17 CEILINGS, and they are UK Athletics' own
+   * competition rule rather than a coaching preference — see `src/domain/youth.ts` and YOUTH.md.
+   * Nothing else in the generator may branch on it: a 40-year-old and a 19-year-old get the same
+   * plan, and the masters advice is a separate module that takes its own age.
+   *
+   * ⚠️ ABSENT MUST KEEP MEANING ADULT, and that is what makes this change safe to ship: every
+   * existing profile has no age here, so every existing plan is byte-identical. `DEFAULT_PROFILE`
+   * carries no age for the same reason — a default in every stored profile is an answer nobody gave,
+   * which is the `weeklyVolumeKm: 30` disaster this file records at length.
+   */
+  age?: number;
   /** When true the plan starts conservatively (single quality session, gentle volume ramp). */
   /**
    * Coming back from an INJURY — the constraint is tissue tolerance, not aerobic capacity.

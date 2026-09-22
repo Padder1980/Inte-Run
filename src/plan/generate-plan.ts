@@ -32,6 +32,7 @@ import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
 import { sessionVolumeMeters } from "../domain/steps.ts";
 import { runningDaysFor, runningDayChoices } from "../domain/running-days.ts";
+import { youthLimitsFor } from "../domain/youth.ts";
 import { strengthSessionsFor } from "../domain/strength-days.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
@@ -217,6 +218,14 @@ const LONG_FLOOR_KM: Record<Goal["distance"], { recreational: number; competitiv
  * (measured at 0.45 / 0.35 / 0.25: identical anchoring, identical worst case).
  */
 const MIN_VOLUME_SCALE = 0.45;
+/**
+ * How much of a 12-17 runner's whole-session ceiling a quality session's WORK may take up.
+ * The rest is the warm-up, the recoveries and the cool-down. Tuned by measurement -- see
+ * youthQualityWorkCapSec and the sweep in test/youth-plan-limits.test.ts.
+ */
+const YOUTH_QUALITY_WORK_FRACTION = 0.5;
+/** Aim this far under a 12-17 runner's weekly ceiling, so the fixed point lands inside it. */
+const YOUTH_CAP_AIM = 0.97;
 
 /**
  * How many weeks of this plan fall under the intensity model's easy floor?
@@ -308,6 +317,38 @@ function targetPeakWeeklyKm(athlete: Athlete): number | null {
   const stated = athlete.weeklyVolumeKmCurrent;
   if (!stated || !Number.isFinite(stated) || stated <= 0) return null;
   return stated * PEAK_VOLUME_MULTIPLIER;
+}
+
+/**
+ * The weekly ceiling for a 12-17 runner, or null for an adult. See `src/domain/youth.ts`.
+ *
+ * WARNING: THIS IS A CEILING AND `targetPeakWeeklyKm` IS A TARGET, AND CONFLATING THEM MAKES THINGS
+ * WORSE RATHER THAN BETTER. The volume fit aims AT its target in both directions -- it scales a plan
+ * UP to reach a stated mileage. Returning the youth cap from that function was measured: a
+ * 17-year-old who had stated no mileage went from a natural 48.5 km peak to 54.8 km, because the fit
+ * dutifully grew the plan toward a 50 km "target" and overshot it. Weeks over the limit went 18 to 42.
+ * A ceiling may only ever shrink a plan, so it gets its own pass below rather than a shared one.
+ */
+/**
+ * The work-seconds budget for a 12-17 runner's quality session, or null for an adult.
+ *
+ * WARNING: DERIVED FROM THE SESSION CEILING AT THE RUNNER'S OWN EASY PACE, not a constant. A 12-year-
+ * old and a 17-year-old differ by a factor of four in what they may cover, and a fast 17-year-old
+ * covers a given distance in far less time than a slow one -- a fixed number of minutes would be a
+ * different distance for each of them, which is the mistake `PACE_RATIOS` exists to record.
+ *
+ * WARNING: YOUTH_QUALITY_WORK_FRACTION IS A PROXY AND IS MEASURED, NOT ARGUED. See the call site.
+ */
+function youthQualityWorkCapSec(ctx: WeekContext): number | null {
+  const youth = youthLimitsFor(ctx.athlete.age);
+  if (!youth) return null;
+  const easySecPerKm = (ctx.paces.easy.minSecPerKm + ctx.paces.easy.maxSecPerKm) / 2;
+  return youth.maxSessionKm * easySecPerKm * YOUTH_QUALITY_WORK_FRACTION;
+}
+
+function youthPeakCapKm(athlete: Athlete): number | null {
+  const youth = youthLimitsFor(athlete.age);
+  return youth ? youth.maxWeeklyKm : null;
 }
 
 /**
@@ -674,11 +715,44 @@ export function generatePlan(
   const easySecPerKm = (paces.easy.minSecPerKm + paces.easy.maxSecPerKm) / 2;
   const minutesFor = (km: number) => Math.round((km * easySecPerKm) / 60);
   const abilityKey = athlete.experience === "competitive" ? "competitive" : "recreational";
-  const longFloorMin = minutesFor(LONG_FLOOR_KM[goal.distance][abilityKey]);
+  /**
+   * The 12-17 ceilings, or null for an adult. UK Athletics' competition rule (TR3 S4) -- see
+   * `src/domain/youth.ts` and YOUTH.md. Resolved once, here, because every length decision below has
+   * to respect it and a second resolution is a second answer.
+   *
+   * WARNING: NULL FOR EVERY ADULT AND FOR AN UNANSWERED AGE, so `youthLongCapMin` is Infinity and
+   * every Math.min below is the identity. That is what makes this byte-identical for every plan this
+   * engine has ever built, and the audits prove it rather than this comment asserting it.
+   */
+  const youth = youthLimitsFor(athlete.age);
+  const youthLongCapMin = youth ? minutesFor(youth.maxSessionKm) : Infinity;
+  /**
+   * WARNING: THE ADULT DISTANCE FLOOR DOES NOT APPLY TO A 12-17 RUNNER AT ALL, and merely capping it
+   * at the ceiling was measured to be not enough. LONG_FLOOR_KM is an EVENT endpoint -- 12-16 km for
+   * a 10k, 16-20 for a half -- applied as a floor under peakLong so a slow adult still builds toward
+   * their race. Capped at the youth ceiling it becomes a floor EQUAL to the ceiling: at 15 the 10k
+   * floor is 12 km and the ceiling is 12 km, so the long run was pinned at exactly 12 and the volume
+   * fit could not shrink it by a metre. Measured, that alone left a 15-year-old's week at 28.6 km
+   * against a 24 km limit with no lever able to move it.
+   *
+   * WARNING: THE RAMP STILL CLIMBS -- this removes a FLOOR, not the progression. The long run still
+   * grows week on week toward `peakLong`; what it no longer does is refuse to go below an adult
+   * event's endpoint. A youth runner's long run answers their own ceiling, not the race's.
+   */
+  const longFloorMin = youth ? 0 : minutesFor(LONG_FLOOR_KM[goal.distance][abilityKey]);
   // The beginner track's own endpoint, on the same easy-pace conversion.
   const beginnerLongPeakMin = Math.min(
     BEGINNER_LONG_CEILING_MIN,
     minutesFor(BEGINNER_LONG_KM[goal.distance]),
+    // WARNING: AND THE YOUTH CEILING -- WHICH IS DEFENSIVE TODAY, AND SAYING SO IS THE POINT. The
+    // beginner track builds its own ladder from this endpoint rather than through longCapMin below,
+    // so a cap applied only to the main track would leave it unguarded. But measured with this line
+    // removed, a beginner's longest long run is 5.0 km at every age from 12 to 15 -- BEGINNER_LONG_KM
+    // is already under every youth ceiling for every goal Y1 offers that age, so it never binds.
+    // It is kept because the two tables are independent: the day BEGINNER_LONG_KM grows, or a goal is
+    // offered younger, this is the only thing standing between a beginner and an over-ceiling long run.
+    // Re-broken and watched NOT failing, which is why it is recorded rather than claimed as guarded.
+    youthLongCapMin,
   );
   // The last week that actually trains hard — where the beginner ramp should arrive.
   const lastHardWeek = schedule.reduce(
@@ -699,7 +773,10 @@ export function generatePlan(
     schedule,
     BEG_LONG_STEP_MAX,
   );
-  const longCapMin = minutesFor(LONG_CAP_KM[goal.distance][abilityKey]);
+  // WARNING: FOLDED IN HERE RATHER THAN CHECKED AFTERWARDS, so the plan is BUILT correctly rather
+  // than repaired. enforceLongRunIsLongest then trims every easy run down to the long run it finds,
+  // so capping the long run caps the whole aerobic week without a second clamp.
+  const longCapMin = Math.min(minutesFor(LONG_CAP_KM[goal.distance][abilityKey]), youthLongCapMin);
 
   const buildAll = (vScale: number, qRefMin?: number): PlannedWeek[] => {
     // ⚠️ THE LONG RUN GROWS WITH MILEAGE BUT IS NEVER CUT BY IT — note the `Math.max(1, vScale)`,
@@ -872,9 +949,35 @@ export function generatePlan(
     const full = ws.filter((w, i) => i > 0 && !w.sessions.some((s) => s.type === "race"));
     return full.length ? Math.max(...full.map((w) => w.plannedDistanceMeters)) / 1000 : 0;
   };
+  /**
+   * The biggest week a 12-17 runner is asked to COVER, in km. Deliberately a different ruler from
+   * `fittedPeakKm` above, and the difference is the whole point.
+   *
+   * WARNING: TOTAL OUTING DISTANCE, NOT `plannedDistanceMeters`. That field is TRAINING volume, which
+   * this engine excludes warm-ups and cool-downs from on purpose -- the owner's own reframing, that
+   * preparation is not load. That is the right ruler for a coaching model and the wrong one for a
+   * safety ceiling: a 15-year-old jogging a warm-up is still running, and UK Athletics' limit is on
+   * ground covered. Measured with the training ruler, weeks that were 38.7 km of actual running
+   * reported as inside a 32 km cap.
+   *
+   * WARNING: AND EVERY WEEK COUNTS, INCLUDING THE FIRST AND RACE WEEK. `fittedPeakKm` skips both --
+   * correct for fitting a volume curve, where a partial first week and a week containing the race
+   * are not representative. A ceiling is not a curve: the week a 17-year-old runs a half marathon is
+   * exactly the week most worth checking.
+   */
+  const youthPeakWeekKm = (ws: PlannedWeek[]): number => {
+    let peak = 0;
+    for (const w of ws) {
+      let km = 0;
+      for (const ss of w.sessions) km += (ss.estimatedDistanceMeters ?? 0) / 1000;
+      if (km > peak) peak = km;
+    }
+    return peak;
+  };
 
   const natural = buildFull(1);
   let weeks = natural;
+  let volScale = 1;
   if (targetPeakKm && !beginner) {
     let scale = 1;
     for (let pass = 0; pass < 5; pass++) {
@@ -904,7 +1007,31 @@ export function generatePlan(
     // 32% SMALLER plan than answering 29, and on the form's own 5 km spinner one click up shrank the
     // first week by more than 10% in 20 of 96 configurations. A runner who says they run more must
     // never be handed less; a proper search on [scale, 1] restores that.
-    if (scale < 1) {
+    /**
+     * WARNING: THE WALK-BACK IS DISABLED FOR A 12-17 RUNNER, AND THIS IS THE ONE PLACE Y2 COULD HAVE
+     * SILENTLY UNDONE ITSELF. Below, a down-scaled plan that breaches the pyramidal easy floor is
+     * bisected back toward scale 1 -- correct for an adult, whose stated mileage is a preference we
+     * may trade against intensity quality. A youth ceiling is UK Athletics' competition rule, not a
+     * preference, so trading it away for a better easy fraction is the wrong trade in the wrong
+     * direction: it would hand a 15-year-old the 41 km week the cap exists to prevent, in exchange
+     * for a number no runner ever sees.
+     *
+     * WARNING: SO THE INTENSITY COST IS REAL AND IS ACCEPTED RATHER THAN HIDDEN. A youth plan held
+     * down to its ceiling can sit below the easy floor, because shrinking a week removes easy running
+     * while the quality sessions keep their library length -- the mechanism this file documents at
+     * length for `vScale`. It is measured in test/youth-plan-limits.test.ts rather than left to be
+     * discovered.
+     *
+     * WARNING: AND WHAT IT ACTUALLY PREVENTS IS AN INCONSISTENCY, NOT A BIGGER PLAN -- re-broken and
+     * watched NOT failing, so the reason is recorded rather than claimed. The youth ceiling pass below
+     * runs AFTER this and would simply re-shrink anything the bisection lifted, which is why no
+     * measured plan moves. What does not survive the bisection is the pairing of `scale` and `weeks`:
+     * the loop assigns to `weeks` and never updates `scale`, so afterwards `volScale` describes a plan
+     * that is no longer the one in hand, and the pass below would start its own search from a scale
+     * that does not match what it is measuring. Keeping youth out of the bisection is what keeps those
+     * two in step.
+     */
+    if (scale < 1 && !youth) {
       const base = intensityProfile(natural, model);
       const floor = easyFloorFor(model, base);
       const ok = (ws: PlannedWeek[]) => noWorse(intensityProfile(ws, model), base, floor);
@@ -919,6 +1046,47 @@ export function generatePlan(
         }
         weeks = best ?? natural;
       }
+    }
+    volScale = scale;
+  }
+
+  /**
+   * THE 12-17 WEEKLY CEILING. A POST-CONDITION, AND IT MAY ONLY EVER SHRINK.
+   *
+   * WARNING: ITS OWN PASS RATHER THAN THE FIT ABOVE, for the reason youthPeakCapKm records -- that
+   * fit aims AT its target and will grow a plan to reach one. This starts from whatever scale the
+   * adult fit settled on and walks DOWN only; `Math.min(1, ...)` is what makes that true, and without
+   * it a 17-year-old whose natural peak is under the ceiling is scaled UP into it.
+   *
+   * WARNING: AND IT RUNS FOR BEGINNERS TOO, unlike the fit above. The 12-14 band is exactly where the
+   * beginner track lives, so a pass gated on `!beginner` would skip the runners the ceiling matters
+   * most for. vScale reaches less of a beginner week, so the loop may converge without reaching the
+   * cap -- which is why this is measured rather than assumed, and why the residual is reported.
+   */
+  const youthCapKm = youthPeakCapKm(athlete);
+  if (youthCapKm) {
+    /**
+     * WARNING: IT AIMS A LITTLE UNDER THE CEILING, AND WITHOUT THAT MARGIN IT SETTLES JUST OVER IT.
+     * The adult fit breaks once the scale stops moving by 1%, because it is chasing a runner's stated
+     * mileage and being 3% out is closer than the input is accurate. A ceiling is not an estimate:
+     * aiming exactly at it leaves the fixed point a percent or two above, which measured as
+     * 32.9 km against a 32 km limit. Aiming at 97% of it puts the same fixed point underneath.
+     */
+    let scale = volScale;
+    for (let pass = 0; pass < 8; pass++) {
+      const peakKm = youthPeakWeekKm(weeks);
+      if (peakKm <= 0 || peakKm <= youthCapKm) break;
+      // WARNING: THE Math.min(1, ...) CANNOT FIRE AND IS KEPT ANYWAY. The break above guarantees
+      // peakKm > youthCapKm by the time this runs, so the ratio is already below 1 and YOUTH_CAP_AIM
+      // makes it smaller still -- re-broken by removing it, and no plan in a 162-plan sweep moved.
+      // It states the rule this pass exists for ("a ceiling may only ever shrink") at the line that
+      // would otherwise be the one place a future edit could turn it back into a target, which is the
+      // mistake this file already records making once: aiming AT the ceiling grew a 17-year-old's week
+      // from 48.5 km to 54.8 km.
+      const next = Math.max(MIN_VOLUME_SCALE, scale * Math.min(1, (youthCapKm * YOUTH_CAP_AIM) / peakKm));
+      if (Math.abs(next - scale) < 0.004) break;   // the per-session floors are binding
+      scale = next;
+      weeks = buildFull(scale);
     }
   }
 
@@ -1226,7 +1394,7 @@ function buildWeek(
   const longCarriesWork = long.steps.some(
     (st) => (st.targetRpe?.min ?? 0) >= 4 && (st.durationSeconds ?? 0) >= 10 * 60,
   );
-  const baseQuality = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1);
+  const baseQuality = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1, youthLimitsFor(ctx.athlete.age) != null);
   const qualityCount = runningDays <= 4 && longCarriesWork ? Math.min(baseQuality, 1) : baseQuality;
   const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
 
@@ -1980,7 +2148,27 @@ function qualitySessionsThisWeek(
   runningDays: number,
   returning: boolean,
   vScale = 1,
+  youth = false,
 ): number {
+  /**
+   * WARNING: ONE KEY DAY A WEEK FOR A 12-17 RUNNER, AND THIS IS A LOAD DECISION RATHER THAN AN
+   * ARITHMETIC ONE. Measured on a 16-year-old's 10k block at five days: the week held a
+   * race-specific session of 11.9 km and a VO2 session of 6.9 km beside a 13.1 km long run, with the
+   * two remaining easy runs already squeezed to the 20-minute floor at 2.7 and 1.8 km. Two quality
+   * sessions were 52% of the week's distance and three of the five days were hard -- an adult week
+   * handed to a sixteen-year-old.
+   *
+   * WARNING: SHORTENING THEM INSTEAD WAS TRIED AND IT IS THE WRONG LEVER. A tighter work budget moved
+   * the total by 0.6 km across 81 plans, because a quality session's WORK is already small -- what
+   * makes it long is the warm-up, the recoveries and the cool-down around it. The count is what
+   * carries the load, which is the same conclusion the volume lever above reached for a small week.
+   *
+   * WARNING: AND IT AGREES WITH THE EVIDENCE RATHER THAN ONLY WITH THE ARITHMETIC. Running-related
+   * injury incidence in competitive adolescent distance runners is 68% and overwhelmingly overuse,
+   * and injured runners run more than uninjured ones at the same age (YOUTH.md section 3). Hudson's
+   * own most conservative plan carries one quality session a week.
+   */
+  if (youth) return 1;
   if (runningDays < 4) return 1; // low frequency → protect easy volume, one quality
   if (wp.isDeload) return 1;
   // ⚠️ A SMALL WEEK CANNOT CARRY TWO KEY DAYS — the same rule as the four-day cap below, measured in
@@ -2071,6 +2259,21 @@ function qualityContentsFor(
     // ⚠️ IT ONLY EVER REMOVES THE BIGGEST FORMATS, never adds anything, and `narrow` drops the filter
     // rather than emptying the pool — so a runner whose only eligible formats are big still gets one.
     avoidBig: runningDaysFor(ctx.athlete) <= 3,
+    /**
+     * WARNING: A 12-17 RUNNER'S QUALITY SESSION IS BUDGETED TOO, and without this the whole weekly
+     * ceiling is unreachable rather than merely tight. Measured: with the long run capped and the easy
+     * runs already at their 20-minute floor, a 16-year-old's week still came out 36.4 km against a
+     * 32 km limit, because the quality sessions keep their full adult library length and vScale does
+     * not reach them at all. The cap was not slightly missed; it was structurally unattainable.
+     *
+     * WARNING: HALF THE SESSION BUDGET, BECAUSE A QUALITY SESSION IS NOT ALL WORK. The ceiling is a
+     * whole-outing distance; a quality session spends roughly half of it on the warm-up, the
+     * recoveries and the cool-down. This is a PROXY -- work seconds standing in for total distance --
+     * chosen because selectFormat already filters on work seconds and a second filter would be a
+     * second answer. It is validated by measurement rather than by argument: the post-condition sweep
+     * asserts the REAL constraint in kilometres, so a proxy that drifts fails there.
+     */
+    ...(youthQualityWorkCapSec(ctx) != null ? { maxWorkSec: youthQualityWorkCapSec(ctx)! } : {}),
   };
 
   if (wp.phase === "taper") {
@@ -2131,8 +2334,21 @@ function qualityContentsFor(
     const sRot = rot + 5;
     const supportBig = isShortEvent ? vo2IsBig(sRot, fctx) : thresholdIsBig(sRot, fctx);
     const support = count >= 2 && raceIsBig(rot, fctx) && supportBig ? { ...fctx, avoidBig: true } : fctx;
-    out.push(raceSpecificSession(p, rot, fctx));
-    out.push(isShortEvent ? vo2Session(p, sRot, support) : thresholdSession(p, sRot, support));
+    /**
+     * WARNING: UNDER 15 THE SUPPORTING SESSION GOES FIRST, SO IT IS THE ONE THAT SURVIVES THE SLICE.
+     * A youth week carries one quality session, and this branch pushes the race-pace one first -- so a
+     * 12-year-old's single hard session was "8 x 1 km at goal race pace", 8.6 km against a 6 km
+     * whole-session ceiling. See YouthLimits.allowRacePaceWork for why the research puts race-pace
+     * rehearsal at 15 rather than 12: it is Hudson's own most conservative plan, which carries hill
+     * sprints and fartlek and nothing else.
+     * WARNING: ORDER, NOT OMISSION. Both are still pushed, so a 15-year-old or an adult with room for
+     * two gets both exactly as before -- only which one the slice keeps changes.
+     */
+    const racePaceOk = youthLimitsFor(ctx.athlete.age)?.allowRacePaceWork ?? true;
+    const racePace = () => raceSpecificSession(p, rot, fctx);
+    const supporting = () => (isShortEvent ? vo2Session(p, sRot, support) : thresholdSession(p, sRot, support));
+    if (racePaceOk) { out.push(racePace()); out.push(supporting()); }
+    else { out.push(supporting()); out.push(racePace()); }
     return out.slice(0, count);
   }
   if (wp.phase === "build") {
@@ -2157,8 +2373,23 @@ function qualityContentsFor(
       // off the end of `slice(0, count)` — so the runners with the fewest quality sessions, who most
       // need the one they get to be specific, were the only ones this never reached. Measured: half /
       // 3 days had goal pace on the long run and nowhere else.
-      if (count >= 2) out.push(thresholdSession(p, rot, fctx));
-      out.push(raceSpecificSession(p, rot, fctx));
+      /**
+       * WARNING: UNDER 15 THE THRESHOLD SESSION TAKES THE SLOT INSTEAD, and the comment above is
+       * exactly why this branch needed its own fix rather than only the peak one: on a one-quality
+       * week the race-pace session "takes that slot outright", and a 12-17 week is always a
+       * one-quality week. See YouthLimits.allowRacePaceWork.
+       */
+      // WARNING: THE !racePaceOk ARM IS UNREACHABLE TODAY, BEHIND TWO INDEPENDENT GATES, and it is
+      // kept deliberately. This whole branch needs `introRace`, which requires `!isShortEvent`; and
+      // allowRacePaceWork is false only under 15, where Y1 offers a 5k and nothing else. So it would
+      // take a half or marathon goal at 14 to reach it, which the goal filter forbids. Re-broken and
+      // watched NOT failing. It is kept because the peak branch's identical rule DOES fire: a reader
+      // who found the rule applied in one sibling and not the other would reasonably assume the peak
+      // one was the mistake, and removing a safety line because it is currently unreachable is how the
+      // next change quietly reopens the hole.
+      const racePaceOk = youthLimitsFor(ctx.athlete.age)?.allowRacePaceWork ?? true;
+      if (count >= 2 || !racePaceOk) out.push(thresholdSession(p, rot, fctx));
+      if (racePaceOk) out.push(raceSpecificSession(p, rot, fctx));
       return out.slice(0, count);
     }
     if (count >= 2) {

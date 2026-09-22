@@ -1209,6 +1209,17 @@ export type FormatCtx = {
   returning?: boolean;
   /** Set when the week already carries another quality session — keeps the biggest formats out. */
   avoidBig?: boolean;
+  /**
+   * A tighter work budget than QUALITY_WORK_CAP_SEC, in seconds, for a runner whose WHOLE session is
+   * capped — today only a 12-17 year old (see src/domain/youth.ts and YOUTH.md).
+   *
+   * ⚠️ IT NARROWS THE SAME FILTER RATHER THAN ADDING A SECOND ONE, so it inherits that filter's
+   * "cheapest wins" fallback: a pool with nothing inside the budget still yields the smallest format
+   * rather than nothing at all. A youth runner must never end up with no quality session because the
+   * library has no short enough one — they get the shortest there is, and the post-condition sweep in
+   * test/youth-plan-limits.test.ts is what reports it if even that is over.
+   */
+  maxWorkSec?: number;
 };
 
 /**
@@ -1314,6 +1325,17 @@ function selectFormat(
   // `narrow` falls back to the wider list when nothing qualifies, so a pool with no "small" format is
   // unaffected rather than broken.
   if (ctx.isDeload) list = narrow(list, (f) => f.load === "small");
+  /**
+   * ⚠️ A 12-17 RUNNER PREFERS THE SMALL FORMATS TOO, for the same reason a deload does: they get a
+   * genuine hard session at the same intensity, it is simply short. Measured before this, a
+   * 13-year-old on the main track was handed a race-specific session covering 8.6 km against a 6 km
+   * whole-session ceiling -- the pool's cheapest was still too big, and `maxWorkSec` alone could not
+   * help because the cost filter's own fallback takes the cheapest rather than nothing.
+   * ⚠️ `narrow` drops the filter when nothing qualifies, so a pool with no small format still yields
+   * a session rather than none. Where even the smallest is over the ceiling the post-condition sweep
+   * reports it; that is a gap in the library, not something to paper over here.
+   */
+  if (ctx.maxWorkSec != null) list = narrow(list, (f) => f.load === "small");
   // ⚠️ THE COST FILTER IS LAST, AND IT DOES NOT USE `narrow`. Every filter above expresses "this
   // format is not appropriate here" and falling back to the wider list is right for all of them. A
   // format that would take this runner two and a half hours is not merely inappropriate — so where
@@ -1321,7 +1343,8 @@ function selectFormat(
   // branch is unreachable (`vo2-10x1` costs about 19 minutes at any ability), but relying on a
   // constant in another table to keep a guardrail true is how a guardrail stops being one.
   if (paces) {
-    const affordable = list.filter((f) => formatWorkSec(f, paces) <= QUALITY_WORK_CAP_SEC);
+    const capSec = Math.min(QUALITY_WORK_CAP_SEC, ctx.maxWorkSec ?? Infinity);
+    const affordable = list.filter((f) => formatWorkSec(f, paces) <= capSec);
     if (affordable.length) list = affordable;
     else {
       let cheapest = list[0]!;

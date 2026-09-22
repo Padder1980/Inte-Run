@@ -1,0 +1,286 @@
+<!-- Research and specification for the 12-17 programme. Commissioned by the owner on 21 Sept 2026,
+replacing PLAN.md's D3b ("an under-18 gate"). His instruction, verbatim: "I want there to be a fully
+tailored programme for children between the ages of 12-18 ... in line with a detailed piece of research
+that you undertake ... Don't just assume that you have the right answer at the first research run,
+double check what you find ... This also applies to any weight training programme ... All of this needs
+to be written into any privacy policy and answers for the app store."
+NOTHING IN HERE IS BUILT YET. It is the spec, and it needs his sign-off before it is. -->
+
+# The 12-17 programme: research, and the limits it implies
+
+## 0. What the app does for a 13-year-old today
+
+`ageOpts` offers **12 to 90** plus "Prefer not to say", and every answer builds the same plan. The only
+youth accommodation anywhere in the codebase is in `src/science/warmup.ts:506` - a 25% shorter warm-up
+under 18. So today a 13-year-old can:
+
+- pick **marathon** as a goal and be built a block whose long run reaches `LONG_FLOOR_KM` 24-28 km;
+- be prescribed the strength gym's heavy work at **`loadPercent1RM` 80%+**, 3-6 reps off 3 minutes;
+- be shown an **estimated 1RM** and a suggested load derived from it;
+- connect **Strava**, whose own minimum age is 13 and which forbids heart-rate upload under 16.
+
+Every one of those is outside what the governing bodies and position stands below permit.
+
+## 1. How to read the sources
+
+Graded, because they are not equal and the difference decides what we may encode:
+
+| Grade | Meaning | Used for |
+|---|---|---|
+| **RULE** | A current governing body's competition rule | The hard ceiling |
+| **RECOMMENDED** | The same body's own LTAD advice, used when it licenses events | What we actually build to |
+| **POSITION STAND** | Peer-reviewed consensus from a professional body | Strength prescription |
+| **OPINION** | Stated by its own authors to be opinion, not evidence | Context only, never a limit |
+
+⚠️ **AND ONE SOURCE WAS DISCARDED. The widely-quoted "IAAF" table - under 12: 8 km, 12-15: 10 km,
+15-16: half marathon, 16-18: marathon - traces to a 1987 viewpoint article in the IAAF's own *New
+Studies in Athletics*, not to any current rule.** It is far more permissive than every current body,
+and secondary sources quoting it do not even agree with each other about its weekly-volume multiplier
+(one says twice the race distance, another three times). It circulates widely and it is folklore. **Do
+not reinstate it**, and be suspicious of any youth distance table that permits a 15-year-old a half
+marathon - that is its fingerprint.
+
+## 2. Running distance - PRIMARY SOURCE, CROSS-CONFIRMED
+
+Source: *Maximum Race Distances for Young Athletes*, scottishathletics, March 2026, citing **UK
+Athletics Rules for Competition TR3 S4**. Extracted from the PDF by layout position, because the
+tables come out of a plain text extraction in the wrong order and the first table is the one that
+looks like a recommendation.
+
+⚠️ **THE AGE GROUPS CHANGED ON 1 APRIL 2026** - U13/U15/U17/U20 became **U14/U16/U18/U20**. Anything
+written before that date, including most of what a search returns, is describing different bands. A
+search summary confidently gave me "U13: 5 km, U15: 6 km, 16: 10 km, 17: 15 km" and **every one of
+those numbers is wrong**.
+
+**Table 1 - the RULE (TR3 S4), maximum permitted, road:**
+
+| Age on day | 12-13 | 14 | 15 | 16 | 17 | 18 | 19 | 20+ |
+|---|---|---|---|---|---|---|---|---|
+| Max permitted | 6 km | 8 km | 12 km | 16 km | 25 km | Marathon | 45 km | Unlimited |
+
+**Table 2 - what the same body RECOMMENDS (road), and what it licenses events against:**
+
+| Age on day | 12-13 | 14 | 15 | 16 | 17 | 18 | 19 | 20+ |
+|---|---|---|---|---|---|---|---|---|
+| Recommended | 6 km | 8 km | 8 km | 12-14 km | 12-14 km | 22 km | 22 km | Unlimited |
+
+Cross country is shorter again (12-13: 4 km, 14-15: 5 km, 16-17: 8 km, 18-19: 10 km) and hill/trail
+shorter still (U14 5 km, U16 6 km, U18 8 km, U20 10 km).
+
+✅ **CROSS-CONFIRMED INDEPENDENTLY.** England Athletics publishes its own recommended cross-country
+distances for 2026/27: **U14 3000-4000 m, U16 5000 m, U18 8000 m, U20 10,000 m** - an exact match to
+the table above, from a different home-country governing body. Two bodies agreeing on the same
+framework is what makes the road column trustworthy too.
+
+**Corroboration from medical and club bodies, all more conservative than the folklore table:**
+- **RRCA**: 12-14 → 5K; 15-18 → 10K and potentially half marathons.
+- **American Academy of Pediatrics**: healthy children may compete up to about **5K**; longer
+  endurance races require **individual medical clearance**.
+- **Nationwide Children's**: under 14 should run **only three times per week**.
+- Major marathons (**London, and the World Marathon Majors**) require **18+**.
+
+## 3. Running volume - WEAKER EVIDENCE, AND IT MUST BE SAID SO
+
+Source: *Youth running consensus statement: minimising risk of injury and illness in youth runners*
+(Krabak et al., **Br J Sports Med 2021;55:305-318**).
+
+⚠️ **ITS OWN AUTHORS SAY THE DISTANCE NUMBERS ARE OPINION.** Verbatim from the summaries: "there are
+no studies to support specific distances or training recommendations for youth runners to prevent
+injury or guide normal growth", and current distance recommendations "are opinion based". The
+statement is evidence-based for 13-18 and explicitly **opinion** for 12 and under. Anything we build
+on it must be described to the runner as a cautious convention, never as a proven safe limit.
+
+What it does give us:
+- **Weekly volume no more than twice the maximum recommended single-session distance.**
+  ⚠️ **PROVENANCE FLAG: I could not obtain the primary text of this rule** - BJSM is paywalled and the
+  PDF hosts refused. It is attested by two independent secondary summaries; a third source quoting the
+  discarded 1987 table says *three* times instead. Treat as a sensible convention with an honest
+  caveat, not as a quoted rule, and prefer it precisely because it is the conservative of the two.
+- 5K as the sensible competitive distance from age 12.
+
+**Why conservatism is justified here regardless:** in competitive adolescent distance runners the
+measured injury incidence is **68% (95% CI 60-77)**, at 6.3 per 1,000 participation hours, and it is
+overwhelmingly overuse - knee 22%, foot/toes 16%, lower leg 16%. Injured runners ran more miles per
+week than uninjured ones (14.6 vs 12.0 at middle school, 15 vs 12.1 at high school). **Girls are more
+likely to be injured than boys and lose more time to it.** Tendonitis, apophysitis and stress
+fractures are the characteristic youth injuries, and they are load-accumulation injuries.
+
+## 4. Strength - POSITION STANDS, AND THEY PERMIT MORE THAN EXPECTED
+
+Sources: **NSCA Youth Resistance Training: Updated Position Statement** (*J Strength Cond Res* 2009,
+extracted in full) and **Position statement on youth resistance training: the 2014 International
+Consensus** (Lloyd, Faigenbaum et al., *Br J Sports Med* 2014;48:498-505 - adapted from the **UKSCA**
+position statement, so this is the UK-relevant one).
+
+⚠️ **THE GROWTH-PLATE FEAR IS A MYTH AND OUR COPY MUST NOT REPEAT IT.** Properly supervised,
+well-designed resistance training has never been shown to damage growth plates, reduce adult height or
+harm cardiovascular development. Growth-plate injuries come from acute trauma - a fall, a collision, a
+bad landing. That is the settled view of the AAP, the 2014 consensus and two decades of review.
+
+⚠️ **THERE IS NO MINIMUM AGE.** "Although there is no minimum age requirement for participation in a
+youth resistance-training program, all participants should have the emotional maturity to accept and
+follow direction". Prescription should follow **training age, motor competency and technical
+proficiency**, not birthday. **So refusing a 12-year-old strength work would be wrong**, and the
+owner's instruction to build a tailored programme rather than a ban is the better-evidenced position.
+
+⚠️⚠️ **BUT EVERY PERMISSION IS CONDITIONAL ON SUPERVISION, AND AN APP CANNOT SUPERVISE. THIS IS THE
+CLAUSE THE WHOLE STRENGTH DESIGN TURNS ON.**
+- NSCA: "**If qualified supervision, age-appropriate exercise equipment, and a safe training
+  environment are not available, youth should not perform resistance exercise** due to the increased
+  risk of injury."
+- 2014 consensus: youth may be introduced to "lower repetition ranges (<=6) and higher external loads
+  (>85% 1RM) ... **on the proviso these programmes are supervised by qualified professionals**".
+- NSCA on testing: "**unsupervised and improper 1RM testing ... should not be performed by children or
+  adolescents under any circumstances due to the real risk of injury.**"
+
+So heavy work is not forbidden to youth - it is forbidden to *unsupervised* youth, which is what an app
+has. That is a limit on us, not on them, and the copy should say so in those terms.
+
+**NSCA Table 2 - progression for strength in youth:**
+
+| | Novice | Intermediate | Advanced |
+|---|---|---|---|
+| Intensity | 50-70% 1RM | 60-80% 1RM | 70-85% 1RM |
+| Volume | 1-2 sets x 10-15 reps | 2-3 sets x 8-12 reps | >=3 sets x 6-10 reps |
+| Rest | 1 min | 1-2 min | 2-3 min |
+| Frequency | 2-3 d/wk | 2-3 d/wk | 3-4 d/wk |
+
+**NSCA Table 3 - progression for POWER in youth** (a separate table, and citing Table 2 for power
+work would have been wrong - the loads are lower and the reps far fewer):
+
+| | Novice | Intermediate | Advanced |
+|---|---|---|---|
+| Intensity | 30-60% 1RM (velocity) | 30-60% velocity / 60-70% strength | 30-60% velocity / 70-80% strength |
+| Volume | 1-2 sets x 3-6 reps | 2-3 sets x 3-6 reps | >=3 sets x 1-6 reps |
+| Rest | 1 min | 1-2 min | 2-3 min |
+| Frequency | 2 d/wk | 2-3 d/wk | 2-3 d/wk |
+
+**NSCA Table 1 - general guidelines:** qualified instruction and supervision; 5-10 min dynamic warm-up;
+begin light and focus on technique; **1-3 sets of 6-15 reps** for strength; **1-3 sets of 3-6 reps** for
+power; increase resistance gradually **5-10%**; **2-3 times per week on non-consecutive days**; keep a
+log. Power/plyometric sets stay under 6-8 reps "to maintain movement speed". Youth recover faster than
+adults, so **1 minute between sets suffices** for a novice where an adult needs 2-3.
+
+## 5. What this means the app must do
+
+⚠️ **PROPOSED, NOT BUILT, AND NOT YET SIGNED OFF.**
+
+### 5.1 Goals offered (the app offers 5k / 10k / half / marathon)
+Derived from the RECOMMENDED road table, which is the governing body's own LTAD advice:
+
+| Age | Goals offered | Because the recommended race ceiling is |
+|---|---|---|
+| 12, 13 | **5k** | 6 km |
+| 14, 15 | **5k** | 8 km |
+| 16, 17 | **5k, 10k** | 12-14 km |
+| 18+ | everything (adult app) | 22 km recommended; marathon permitted by rule; 18 is an adult in law |
+
+A half marathon is 21.1 km and reaches the recommended ceiling only at 18. A marathon is permitted by
+the rule at 18 and by every major race at 18. **So the youth programme is 12-17, and 18 is the adult
+app** - which also lines up the training limit with the legal one.
+
+### 5.2 Training limits
+- **Single session** never exceeds the recommended race ceiling for that age: 6 / 8 / 12 km.
+- **Weekly volume** capped at twice that: 12 / 16 / 24 km, with the provenance caveat in section 3.
+- **Frequency** capped: 3 runs a week to 13, 4 from 14, 5 from 16 (AAP/Nationwide's "only three times
+  per week" under 14, and the measured 4.1 sessions at 13-14 / 5.1 at 17-18).
+- The engine's `LONG_FLOOR_KM` and `LONG_CAP_KM` must not apply - those are adult event endpoints.
+
+### 5.3 Strength
+- **Offered, not withheld** - there is no minimum age and the benefits are real.
+- Prescribed by **rep range and technique, never by %1RM**: 6-15 reps strength, 3-6 power, 1-3 sets,
+  2-3 sessions a week on non-consecutive days, progression 5-10%.
+- **`loadPercent1RM` capped at the intermediate band (<=80%) and never the 85%+ heavy work**, because
+  that permission is conditional on supervision we cannot provide.
+- **No 1RM test is ever prompted**, and the estimated-1RM display is withheld under 18 - not because
+  the estimate is unsafe (it is derived from submaximal sets) but because putting a one-rep-max number
+  in front of a 14-year-old invites them to go and test it, which the NSCA forbids outright.
+- **Plyometric contacts reduced** and kept to short, quality sets.
+- A **supervision line** that says plainly what the position stands say: this is safe and good for you
+  with a coach or an adult who knows the lifts watching, and the app is not that.
+
+### 5.4 Things that are not training at all
+- **Strava**: minimum age **13**, so never offered at 12; **no heart-rate upload under 16**; no
+  messaging or Instant Workouts under 18.
+  ⚠️ **AND WE DO UPLOAD HEART RATE - VERIFIED IN OUR OWN CODE, NOT ASSUMED.** `web/app.ts:8801`
+  writes `<gpxtpx:hr>` into every GPX that has readings. So a 14-year-old connecting Strava today
+  would upload heart-rate data Strava's own rules say that athlete cannot have. Strip it under 16.
+- **RED-S / fuelling**: the existing screen matters *more* for adolescents, and the existing rule - no
+  number anybody could eat down to - is even more important. Low-normal BMI is a stated stress-fracture
+  risk factor in this population.
+- **Ask Alfie** sends a question, a plan summary and recent messages off the device. See section 6.
+
+## 5.5 The architecture this implies - gates, not a second engine
+
+⚠️ **DO NOT FORK THE PLAN GENERATOR.** The engine is 10,800 lines with ~1,700 tests behind it and a
+documented history of silent breakage; a parallel youth generator would be a second thing to keep
+correct and the divergence would be invisible. The safe shape is the one this repo already uses for
+`enforceLongRunIsLongest` - build with the tested engine, then **assert and clamp**:
+
+1. **Restrict the inputs.** `runningDayChoices` already refuses to offer days the plan cannot use;
+   the same pattern refuses goals and day-counts the age cannot have. A question whose answer is
+   thrown away is worse than no question - this repo's own ruling.
+2. **Clamp the outputs as a post-condition** over the built weeks: no single session over the age
+   ceiling, no week over twice it. Measured and asserted, not assumed.
+3. **Cap the strength prescription** at source in the builder, by rep range rather than %1RM.
+4. **Say what is happening and why**, on the screen, in the runner's own terms.
+
+⚠️ **AND THE EXISTING ADULT PLAN MUST COME OUT BYTE-IDENTICAL.** Every gate is gated on an age that
+is present and under 18. "Prefer not to say" and every adult age must produce exactly the plan they
+produce today, proved by hashing built plans across the profile grid before and after - the same
+proof A3 used for `Athlete.strength` being absent.
+
+⚠️ **THE 12-18 vs 12-17 BOUNDARY IS A QUESTION FOR THE OWNER.** He wrote "between the ages of 12-18".
+This spec draws the line at **12-17 inclusive**, with 18 getting the adult app, because 18 is majority
+in UK law, UKA's own rule permits a marathon at 18, and every World Marathon Major requires 18. If he
+meant 18 inclusive, the only change is that an 18-year-old keeps the 22 km recommended ceiling and
+loses the marathon goal - one row in the table.
+
+## 6. The legal consequence of saying yes - and it is real
+
+⚠️⚠️ **DELIBERATELY SERVING 12-17s MAKES THE APP "LIKELY TO BE ACCESSED BY CHILDREN", SO THE ICO's
+AGE APPROPRIATE DESIGN CODE (the Children's Code) APPLIES IN FULL.** Fifteen standards, the best
+interests of the child as the primary consideration, **high privacy by default**, data minimisation,
+**no nudge techniques**, and a **Data Protection Impact Assessment**. It is not itself law; it is how
+the ICO says UK GDPR applies to children, and failing it makes compliance hard to demonstrate.
+
+**The good news is that this app is unusually well placed by architecture**: no accounts, no analytics,
+no crash SDK, no advertising, no profiling, and the training data never leaves the phone. Most of the
+fifteen standards are satisfied by things already true.
+
+**The work it does create:**
+1. A **DPIA** - required, and currently does not exist.
+2. **Privacy information a 12-year-old can read** - the Code requires age-appropriate presentation, so
+   the D1 policy needs a child-facing version, not just a plain-English adult one.
+3. **Ask Alfie** is the one place a child's free text leaves the device. The consent copy must say so
+   at a reading age a child has, and the red-flag screener already runs on the phone first.
+4. **App Store**: an age rating that no longer says adults-only, and an App Privacy label that matches.
+5. **Terms**: under-18s cannot form a binding contract; the terms need a parent/guardian clause.
+
+## 7. What is honestly uncertain
+
+- The **weekly = 2x single session** rule (section 3) is secondary-sourced. Flagged at the constant.
+- Every youth **distance** number in existence is opinion by its own authors' admission. We are
+  choosing the most conservative current governing-body set, which is the defensible choice, but it is
+  a choice and the app should not present it as proven.
+- **Chronological age is a poor proxy for maturity** - the 2014 consensus says prescribe on training
+  age and competency instead. A 12-year-old past peak height velocity and a 15-year-old before it are
+  not comparable. We only have a birthday, so we are using the blunt instrument and should say so.
+- Nothing here addresses **para or adaptive** youth athletes.
+
+## 8. Sources
+
+- UK Athletics Rules for Competition TR3 S4, via scottishathletics, *Maximum Race Distances for Young
+  Athletes*, March 2026.
+- England Athletics, recommended cross-country distances 2026/27.
+- Krabak et al., *Youth running consensus statement*, Br J Sports Med 2021;55:305-318 (PMID 33122252).
+- Faigenbaum et al., *Youth Resistance Training: Updated Position Statement Paper from the NSCA*,
+  J Strength Cond Res 2009 (full text extracted).
+- Lloyd, Faigenbaum et al., *Position statement on youth resistance training: the 2014 International
+  Consensus*, Br J Sports Med 2014;48:498-505 (PMID 24055781), adapted from the UKSCA statement.
+- *Injuries and Training Practices in Competitive Adolescent Distance Runners*, Front Sports Act Living
+  2021 (PMC8264289).
+- Road Runners Club of America, FUNdamentals of Youth Running. American Academy of Pediatrics.
+  Nationwide Children's Hospital sports medicine guidance.
+- ICO, *Age appropriate design: a code of practice for online services*.
+- Strava Terms of Service and Help Centre (minimum age 13; under-16 heart-rate restriction).

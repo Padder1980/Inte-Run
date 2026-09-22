@@ -15634,3 +15634,106 @@ sticky footer at every size and its hit area bisecting to **44.49px** against th
 
 **Still to come in this track:** D3b the under-18 gate (**explicitly the owner's call**), D3c the
 wellbeing tick-boxes, then D1 the privacy policy and D2 testers.
+
+## THE 12-17 PROGRAMME (owner, 2026-09-21) — RESEARCH + Y1. READ `YOUTH.md` BEFORE TOUCHING A NUMBER.
+
+He replaced PLAN.md's under-18 gate with *"a fully tailored programme for children between the ages of
+12-18 ... in line with a detailed piece of research that you undertake ... **Don't just assume that you
+have the right answer at the first research run, double check what you find**"*. The research, every
+source graded, and the full spec are in **`YOUTH.md`** at the repo root. This chapter is only what a
+cold session must not undo. Suite 1712 → **1724**; 9 re-breaks, all 9 caught.
+
+⚠️⚠️ **THE DOUBLE-CHECK OVERTURNED THREE THINGS, AND WITHOUT IT THE WRONG APP GETS BUILT.**
+1. **A search summary gave confident numbers and every one was wrong.** UKA's age groups **changed on
+   1 April 2026** — U13/U15/U17/U20 became **U14/U16/U18/U20** — so anything written before that
+   describes different bands with different values. Assume any youth-distance figure you did not read
+   out of a 2026-or-later primary source is stale.
+2. ⚠️ **THE TABLE THAT CIRCULATES EVERYWHERE IS FOLKLORE, AND THE OWNER SUPPLIED IT.** 10K at 12, a
+   half marathon at 15, a marathon at 17 — it traces to a **1987 viewpoint article** in the IAAF's own
+   *New Studies in Athletics*, not to any rule, and secondary sources quoting it disagree about its own
+   weekly multiplier (two versus three). **Its fingerprint is a 15-year-old racing a half.** Every row
+   of it exceeds UKA's hard rule, so it would have had the app coach a 17-year-old for sixteen weeks
+   toward a race they are not permitted to enter. Put that to him and he moved to the rule.
+3. **pypdf returns that source PDF's tables in the wrong order**, so the maximum PERMITTED table reads
+   as though it were the RECOMMENDED one. Re-extract by layout position (`visitor_text`) to tell them
+   apart, or you will encode the permissive table as the conservative one.
+✅ **Cross-confirmed where it mattered:** England Athletics' published cross-country distances match
+the UKA table exactly — a different home-country governing body, same framework.
+
+### The owner's rulings, which are decisions and not defaults
+
+⚠️ **UKA'S RULE, NOT ITS RECOMMENDATION.** The same document recommends 8 km at 15 and 12–14 km at
+16–17, which would withhold the half marathon until 18. He chose the rule. **Do not quietly move to
+the recommendation** (it reverses his decision) **and do not move past the rule** (it coaches a minor
+toward a race they cannot enter). `test/youth-limits.test.ts` pins both directions as inequalities.
+⚠️ **18 IS AN ADULT** — his ruling, and it agrees with UK majority, UKA's rule (a marathon is permitted
+at 18) and every World Marathon Major. So the programme is **12–17 inclusive**.
+⚠️ **HIS FREQUENCY COLUMN WAS ADOPTED UNCHANGED** (3 runs/week to 14, 5 from 15) because it was the one
+column never in dispute and it is well supported.
+
+### Y1 — what shipped, and the three things not to unpick
+
+⚠️⚠️ **THE AGE QUESTION MOVED; IT WAS NOT ADDED.** It sat on the wizard's `details` step, **three steps
+after `goal`**, so the picker could not filter on an answer nobody had given. It is on `level` now —
+the only step present in BOTH wizard paths that precedes `goal` — and it was **removed from `details`
+in the same change**. Two copies is not merely untidy: `captureSetupFields` sweeps every `[id^="s_"]`,
+so whichever rendered last would silently win.
+
+⚠️ **GATED TWICE, OR THE STAGE IS COSMETIC.** `goalCardInner` decides what is OFFERED; `draftFromForm`
+filters again on save, because the value that reaches the engine can come from a stored profile, a
+restored backup, or "Prefer not to say" later becoming a real age. Offering one thing and saving
+another is the days question's own shipped defect.
+
+⚠️⚠️ **`goalsForAge` IS DELIBERATELY NOT WRAPPED IN try/catch, AND MY OWN GUARD IS WHAT FOUND THAT.**
+The first version returned the **unfiltered** list on any failure — so a broken engine reference would
+have quietly offered a 13-year-old a marathon. **A safety gate that fails open is worse than one that
+fails loudly**, and this one cannot throw anyway: `youthGoalsFrom` is a pure filter and an unknown key
+yields NaN and is dropped. Every other engine call in the app is unguarded for the same reason.
+⚠️ It was found because the test's own lift **serialised** the engine helper with `.toString()`, which
+drops the constants it closes over — so the harness measured the catch instead of the filter. **Pass a
+real import into `new Function` as a parameter; never serialise a function that closes over anything.**
+
+⚠️ **ADULTS ARE BYTE-IDENTICAL, AND IT IS PROVED RATHER THAN ASSERTED.** The raw goal is tested against
+the **age ceiling alone**, never against `goalCfg.dists` — folding in the status list would make a
+"new" runner carrying a stored marathon start saving 5k. Nothing in the engine imports
+`src/domain/youth.ts`, so `generatePlan` cannot have moved, and both audits came back identical.
+
+⚠️ **THE MODULE OWNS THE CEILING AND NOTHING ELSE.** `youthGoalsFrom(offered, age)` takes the caller's
+own list and intersects it, and the distances come from `RACE_DISTANCES_M`. A second list of goal keys
+would drift from `GOAL_BY_STATUS`, a second table of metres from `units.ts` — the fifth copy of a limit
+this repo already paid for in `running-days.ts`, except that this one is a competition rule.
+
+⚠️ **"PREFER NOT TO SAY" IS AN OPEN HOLE.** Absent age means adult, so a 13-year-old who declines gets
+the adult app — the one outcome all of this prevents. The proportionate fix (and what the Children's
+Code calls age assurance proportionate to risk) is one more question: if they will not give an age, ask
+whether they are 18 or over, and treat a refusal as under 18. **Not built. Do it with Y2.**
+
+### Still to come, and one of them is not a training change at all
+
+Y2 single-session and weekly ceilings on the built plan (needs `Athlete.age` in the engine; clamp as a
+**post-condition** the way `enforceLongRunIsLongest` does — **do not fork the generator**) · Y3 weight
+training by age · Y4 Strava and heart-rate gates · Y5 Children's Code · Y6 App Store answers.
+
+⚠️⚠️ **THE STRENGTH ANSWER IS THE OPPOSITE OF THE OBVIOUS ONE AND Y3 MUST NOT GET IT WRONG.** There is
+**no minimum age** for resistance training and **the growth-plate fear is a myth** — the AAP, the 2014
+International Consensus (adapted from the UKSCA statement) and two decades of review all say so. So
+banning it would be wrong. What every position stand conditions its permission on is **qualified
+supervision**, which an app cannot provide: NSCA, verbatim, *"if qualified supervision ... are not
+available, youth should not perform resistance exercise"*, and heavy loading above 85% 1RM is permitted
+to youth only *"on the proviso these programmes are supervised by qualified professionals"*. **The
+limit is on us, not on them.** And NSCA forbids unsupervised 1RM testing for under-18s outright, so
+A6's estimated-1RM display is withheld under 18 — not because the estimate is unsafe but because
+putting a one-rep-max in front of a 14-year-old invites them to go and test it.
+
+⚠️ **SERVING UNDER-18s TRIGGERS THE ICO's CHILDREN'S CODE IN FULL** — fifteen standards, high privacy by
+default, no nudging, and a **Data Protection Impact Assessment** that does not exist. The app is
+unusually well placed (no accounts, no analytics, no ads, data on the phone), but the DPIA and
+child-readable privacy wording are real work, and the App Store age rating changes with it.
+
+⚠️ **AND ONE FINDING CAME FROM OUR OWN CODE RATHER THAN A PAPER: `web/app.ts:8801` WRITES
+`<gpxtpx:hr>` INTO EVERY GPX.** Strava's minimum age is 13 and **under-16s may not upload heart-rate
+data at all**, so a 14-year-old connecting Strava today uploads data Strava's own rules forbid. Y4.
+
+⚠️ **THE THRESHOLDS ARE CLINICAL AND HAVE NOT BEEN REVIEWED BY A PROFESSIONAL.** `YOUTH.md`'s own
+sources ask for it, and this project's standing rule is that clinical wording and thresholds are
+flagged for the owner rather than inherited. Flagged on the Road Map; not signed off.

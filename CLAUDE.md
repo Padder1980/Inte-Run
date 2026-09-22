@@ -15737,3 +15737,65 @@ data at all**, so a 14-year-old connecting Strava today uploads data Strava's ow
 ⚠️ **THE THRESHOLDS ARE CLINICAL AND HAVE NOT BEEN REVIEWED BY A PROFESSIONAL.** `YOUTH.md`'s own
 sources ask for it, and this project's standing rule is that clinical wording and thresholds are
 flagged for the owner rather than inherited. Flagged on the Road Map; not signed off.
+
+### Y2 — THE CEILINGS REACH THE PLAN ITSELF (2026-09-22). `YOUTH.md` §5.7 HAS THE MEASUREMENTS.
+
+Suite 1724 → **1731**; 13 re-breaks, 9 caught and the other four recorded at the line as unreachable.
+Four levers, all folded into decisions the engine already makes — `longCapMin` and
+`beginnerLongPeakMin`, a shrink-only weekly pass, `runningDaysFor`, `qualitySessionsThisWeek` and
+`allowRacePaceWork`. **No fork of the generator**, per the spec's own architecture note.
+
+⚠️ **ADULTS ARE UNTOUCHED AND IT IS PROVED TWICE.** Every lever is a `Math.min` against a ceiling that
+is `Infinity` for an adult, or a branch gated on a null — so `Athlete.age` absent changes nothing, and
+absent is every profile ever stored. Both engine audits came back **byte-identical**, and a guard
+compares every DERIVED field of an adult plan built with and without an age. ⚠️ **That guard's first
+version compared the whole Plan and failed**: a Plan echoes its input `athlete`, so one built with
+`age: 34` differs there by construction and the comparison proved only that the field was passed.
+
+⚠️⚠️ **FOUR THINGS WERE MEASURED WRONG FIRST, AND EVERY ONE WOULD HAVE SHIPPED A WORSE PLAN.**
+1. **A CEILING IS NOT A TARGET.** Returning the weekly limit from `targetPeakWeeklyKm` made it worse:
+   that fit aims AT its target in BOTH directions, so a 17-year-old who had stated no mileage was
+   scaled **UP** from a natural 48.5 km peak to 54.8. Weeks over the limit went **18 → 42**. The
+   ceiling has its own shrink-only pass now, and the `Math.min(1, …)` that states the rule is recorded
+   as unfalsifiable rather than claimed as guarded.
+2. **THE WRONG RULER.** `fittedPeakKm` measures `plannedDistanceMeters`, which excludes warm-ups
+   because this engine treats preparation as not-load — the owner's own reframing. Right for a
+   coaching model, **wrong for a safety ceiling**: weeks of 38.7 km of actual running reported as
+   inside a 32 km cap. `youthPeakWeekKm` measures total outing distance, and counts every week.
+3. **A FLOOR EQUAL TO A CEILING PINS THE LONG RUN.** Capping `LONG_FLOOR_KM` at the youth ceiling left
+   the two identical at 15 for a 10k (both 12 km), so the long run could not move by a metre and the
+   week could not shrink. The adult event floor does **not apply** to a youth plan at all.
+4. **SHORTENING THE QUALITY SESSIONS IS THE WRONG LEVER; HAVING FEWER IS THE RIGHT ONE.** A tighter
+   work budget moved the total by **0.6 km across 81 plans**, because a quality session's WORK is
+   already small — the warm-up, recoveries and cool-down are what make it long. One key day a week
+   took a 16-year-old's worst week **36.4 → 32.0 km**, and agrees with the evidence (68% injury
+   incidence in adolescent runners, overwhelmingly overuse).
+
+⚠️ **RACE WEEK IS EXEMPT FROM THE SESSION CEILING AND THAT IS NOT A LOOPHOLE.** UKA's limit is on the
+RACE distance, which Y1 gates at the goal — a 12-year-old may race 6 km and is offered only a 5k. Race
+day's SESSION is the race plus a warm-up, so measuring it against the same number condemns a plan for
+the warm-up around a race the rule expressly permits.
+
+⚠️ **THE BEGINNER TRACK KEEPS ITS OWN SHORT TIMED RACE-PACE REPS, AND THE FIRST GUARD WAS WRONG TO
+FORBID THEM.** What the research withholds under 15 is an adult goal-pace rehearsal — the main track's
+`8 × 1 km at goal race pace`, measured at 8.6 km against a 6 km ceiling. The beginner track's
+`6 × 1′ at race pace` is short, **timed rather than distance-gated**, and inside the ceiling; that is
+exactly the shape the sources call for, and this repo reasoned its way there once already.
+
+⚠️ **TWO RESIDUALS SURVIVE AND THEY ARE STRUCTURAL. Do not loosen a bound to remove them.** A
+13-year-old on the main track draws a 6.6 km threshold session against a 6 km ceiling — the library's
+smallest format is that big once framed, so the fix is a shorter format. A 15-year-old at five days
+peaks near 27 km against 24 — the easy runs are already at the engine's 20-minute minimum, so the week
+cannot shrink without going below that floor or dropping a day, and the day count is the owner's own.
+⚠️ **And the weekly number is the weakest in `YOUTH.md`** (secondary-sourced, provenance flagged), so a
+residual there is more tolerable than one on the session ceiling, which is UKA's own rule.
+
+⚠️ **FOUR RE-BREAKS ESCAPED AND ONLY ONE WAS A WEAK GUARD — the fixture was too kind.** The walk-back
+guard could not reach its own branch, because that branch needs a STATED weekly mileage and the sweep
+passed none; the sweep now runs every case with and without one (rate identical: 6 and 6). The other
+three are unreachable by construction and are recorded at the line: the beginner long-run cap never
+binds (measured 5.0 km at every age 12–15), the `Math.min(1, …)` cannot fire, and the build-phase
+race-pace arm sits behind two independent gates.
+⚠️ **AND THE WALK-BACK TAUGHT THE USEFUL FACT:** its bisection assigns to `weeks` and **never to
+`scale`**, so after it runs the two disagree — keeping youth out of it is what keeps them in step, and
+that is a better reason than "belt and braces".

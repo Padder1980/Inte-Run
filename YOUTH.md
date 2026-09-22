@@ -265,6 +265,48 @@ in UK law, UKA's own rule permits a marathon at 18, and every World Marathon Maj
 meant 18 inclusive, the only change is that an 18-year-old keeps the 22 km recommended ceiling and
 loses the marathon goal - one row in the table.
 
+## 5.6 Y2 measured first, and the two obvious levers DO NOT suffice
+
+⚠️ **MEASURED BEFORE DESIGNING ANYTHING**, through the real generator, against the ceilings in 5.1:
+
+| age · goal · track | longest run | weekly | run days |
+|---|---|---|---|
+| 13 · 5k · beginner | 6.8 km vs **6** ❌ | 12.0 vs **12** ❌ | 3 ✓ |
+| 13 · 5k · recreational | 10.0 km vs **6** ❌ | 24.1 vs **12** ❌ | 3 ✓ |
+| 15 · 10k · beginner | 11.8 vs 12 ✓ | 20.2 vs 24 ✓ | 4 ✓ |
+| 15 · 10k · recreational | 12.0 vs 12 ✓ | 37.1 vs **24** ❌ | 5 ✓ |
+| 17 · half · recreational | 22.3 vs 25 ✓ | 48.5 vs 50 ✓ | 5 ✓ |
+| 17 · half · competitive | 22.3 vs 25 ✓ | 47.4 vs 50 ✓ | 5 ✓ |
+
+**The caps bind hard at 13-15 and not at all at 17.** Worth knowing: the 17 half fits with 2.7 km and
+1.5 km to spare, so the owner's choice of the RULE over the RECOMMENDATION is precisely what makes a
+half-marathon plan buildable at 17 at all -- on the recommendation's 12-14 km it would be 8 km over.
+
+⚠⚠ **THE ENGINE HAS TWO LEVERS THAT LOOK LIKE THE ANSWER AND NEITHER IS SUFFICIENT. Check this
+before reaching for them.**
+1. **`longCapMin = minutesFor(LONG_CAP_KM[...])`** is the exact mirror of what the session cap needs --
+   a distance ceiling converted to minutes at the runner's own easy pace -- and folding the youth
+   ceiling in there is one line. **This one does work**, and it is the right home for the session cap.
+2. **`targetPeakWeeklyKm` + the vScale fit is NOT the answer for the weekly cap, for two separate
+   reasons, and both are fatal.** The fit is gated `if (targetPeakKm && !beginner)`, so it **never runs
+   for a beginner** -- which is exactly the track the 13-year-old rows above are on. And when it does
+   run, a down-scale that breaches the easy floor is **bisected back toward 1**, which would walk a
+   youth plan straight back over a ceiling that is a safety limit rather than a preference.
+
+**So Y2 needs a post-condition clamp that cannot be walked back**, applied after the vScale fit AND
+after `enforceLongRunIsLongest`, in the shape that function already establishes: rebuild the week
+through the SAME `buildOne` closure with an override, never a second assembly path.
+
+⚠️ **AND THE CLAMP MUST SHORTEN IN MINUTES, NOT SCALE A DISTANCE FIELD.** `assemble` derives
+`estimatedDistanceMeters` from the steps, so writing a smaller distance onto a session leaves its steps
+-- and its duration, and what the runner is actually asked to run -- untouched. That is the
+computed-and-discarded trap with a safety limit attached.
+
+⚠️ **THE DAY CAP IS THE EASY ONE AND BELONGS IN `runningDaysFor`**, which is already the single
+answer to "what will the plan schedule as runs". Five other reads of the raw `daysPerWeek` are separate
+rules and must stay raw -- `test/running-days.test.ts` pins that and will catch a clamp put in the
+wrong place.
+
 ## 6. The legal consequence of saying yes - and it is real
 
 ⚠️⚠️ **DELIBERATELY SERVING 12-17s MAKES THE APP "LIKELY TO BE ACCESSED BY CHILDREN", SO THE ICO's

@@ -23922,7 +23922,18 @@ function draftFromForm() {
   // Goal adapts to the status: runners set a target time; beginners work towards *completing* the
   // distance, so we derive a realistic finish time from their current ability (no time to enter).
   const goalCfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
-  const goalDist = wizFieldVal("s_dist") || profile.goalDist;
+  // WARNING: THE PICKER IS NOT THE GATE -- THE ANSWER IS FILTERED AGAIN HERE, AND WITHOUT THIS Y1 IS
+  // COSMETIC. goalCardInner only decides what is OFFERED; the value that reaches the engine can come
+  // from a stored profile built before an age was given, from "Prefer not to say" later becoming a
+  // real age, or from a restored backup. Filtering what is shown while saving whatever was stored is
+  // exactly the shape of the days question that shipped offering answers the plan threw away.
+  const rawGoal = wizFieldVal("s_dist") || profile.goalDist;
+  // WARNING: THE RAW ANSWER IS TESTED AGAINST THE AGE CEILING ALONE, NOT AGAINST goalCfg.dists.
+  // Folding it onto the status list as well would change what an ADULT saves -- a "new" runner
+  // carrying a stored marathon would start saving 5k -- and this stage must leave every adult plan
+  // byte-identical. goalsForAge returns its argument untouched for an adult, so for them this line
+  // IS the old one; only a 12-17 answer can move.
+  const goalDist = goalsForAge([rawGoal]).length ? rawGoal : goalsForAge(goalCfg.dists)[0];
   let targetS, targetSet;
   const targetRaw = goalCfg.time ? wizFieldVal("s_target").trim() : "";
   if (goalCfg.time === "optional" && !targetRaw) {
@@ -24304,13 +24315,56 @@ function targetChosen(pf) {
   const cfg = GOAL_BY_STATUS[(pf && pf.status) || "regular"] || GOAL_BY_STATUS.regular;
   return cfg.time === true;
 }
+/**
+ * The age the app should answer for right now, or null if nobody has said.
+ *
+ * WARNING: RESOLVED INSIDE THE BUILDERS, NEVER PASSED IN. goalCardInner has three callers -- the
+ * setup form, syncStatus and the wizard's goal step -- and a convention every caller must honour is
+ * one somebody breaks. conditionsSquare was made to resolve its own session for exactly this reason
+ * after a caller was found passing the wrong one.
+ *
+ * WARNING: LIVE FIELD FIRST, THEN THE CAPTURED DRAFT, THEN THE PROFILE, and the order is the whole
+ * point. On the setup form age and the goal dropdown are on one page, so the live select is the only
+ * answer that is current. In the wizard the field is on the previous step and gone from the DOM, so
+ * the draft carries it. The stored profile is the fallback for a second plan.
+ */
+function currentAgeAnswer() {
+  const live = $("s_age");
+  if (live && typeof live.value === "string" && live.value !== "") {
+    const n = Number(live.value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const d = draft && draft.__f ? draft.__f.s_age : null;
+  if (d != null && d !== "") { const n = Number(d); if (Number.isFinite(n) && n > 0) return n; }
+  const p = profile && profile.age;
+  return (Number.isFinite(Number(p)) && Number(p) > 0) ? Number(p) : null;
+}
+/**
+ * The goals this runner may be offered, after the 12-17 ceiling.
+ *
+ * WARNING: THE CEILING LIVES IN THE ENGINE AND THIS PASSES ITS OWN LIST IN. A second table of
+ * age-to-distance here is the fifth copy of a limit this repo has already paid for once in
+ * running-days.ts -- and this one is a governing body's competition rule, so a stale copy is not
+ * untidy, it is the app coaching a minor toward a race they cannot enter. See YOUTH.md.
+ */
+function goalsForAge(dists) {
+  // WARNING: NOT WRAPPED IN try/catch, AND THAT IS DELIBERATE. The first version returned the
+  // UNFILTERED list on any failure -- so a broken engine reference would have quietly offered a
+  // 13-year-old a marathon. A safety gate that fails open is worse than one that fails loudly, and
+  // this cannot fail anyway: youthGoalsFrom is a pure filter, an unknown key yields NaN and is
+  // dropped rather than throwing, and RC is bundled into the same file as this code. Every other
+  // engine call in the app is unguarded for the same reason -- wizSafetyPaint calls
+  // RC.screenRedFlags bare, one screen earlier.
+  return RC.youthGoalsFrom(dists, currentAgeAnswer());
+}
 function goalCardInner(status, cur) {
   const cfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
-  let dist = cur.dist; if (cfg.dists.indexOf(dist) < 0) dist = cfg.dists[0];
+  const dists = goalsForAge(cfg.dists);
+  let dist = cur.dist; if (dists.indexOf(dist) < 0) dist = dists[0];
   // ⚠️ === true, NOT TRUTHY. "building" now carries "optional", and a habit-builder's dropdown must
   // still read as finishing the distance — his card says "focused on being consistent", and the time
   // is an extra they may add rather than the frame of the question.
-  const opts = cfg.dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time === true ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
+  const opts = dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time === true ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
   let h = '<div class="q" style="margin-top:0"><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
   if (cfg.time === "optional") {
     // ⚠️ THE PILL SAYS OPTIONAL AND THE HINT SAYS WHAT BLANK MEANS, because a time box with no such
@@ -24387,6 +24441,18 @@ function syncStatus() {
   if (!beginner) syncFitSrc();
   // Rebuild the goal card body so its distance options and time field match the status (the numbered
   // section header stays put outside #goalBody).
+  refreshGoalBlock(st);
+}
+/**
+ * Rebuild the goal card's body in place, for the ONE page that shows age and the goal together.
+ *
+ * WARNING: EXTRACTED SO AGE CAN CALL IT TOO, NOT AS A TIDY-UP. On the setup form both questions are
+ * on screen at once, so changing age from 30 to 13 has to take the marathon out of the dropdown
+ * there and then -- in the wizard age is on the previous step, so the next render handles it and this
+ * is never needed. Without it the form offers a goal the save then silently overrides, which is the
+ * "nothing changes" defect the days question already shipped once.
+ */
+function refreshGoalBlock(st) {
   const gb = $("goalBody");
   if (gb) {
     const cur = {
@@ -24691,8 +24757,18 @@ function wizBody(id, p, st) {
       '<div class="q" style="margin-top:16px"><label>Your name</label><input class="sel" id="s_name" value="' + esc(wizFieldVal("s_name") || p.name || "") + '" placeholder="What should we call you?" autocomplete="name"></div>';
   }
   if (id === "level") {
+    // WARNING: AGE IS ASKED HERE BECAUSE THE GOAL STEP IS NEXT AND CANNOT FILTER ON AN ANSWER NOBODY
+    // HAS GIVEN. It used to sit on "details", three steps LATER, so a 13-year-old picked a marathon
+    // and was asked their age afterwards -- the goals a 12-17 year old may be offered are capped by
+    // UK Athletics' own competition rule (YOUTH.md), and a cap applied after the choice is a dead end
+    // rather than a gate. "level" is the only step present in BOTH wizard paths that precedes "goal".
+    // WARNING: AND IT IS ASKED ONCE. It was REMOVED from "details" in the same change; two copies of
+    // one question is how the two come to disagree, and captureSetupFields sweeps every [id^="s_"],
+    // so whichever rendered last would silently win.
     return '<p class="wz-lead">Tell us where you\\u2019re at, so every pace and session fits you.</p>' +
-      statusCards(draft.status != null ? draft.status : "", { compact: true });
+      statusCards(draft.status != null ? draft.status : "", { compact: true }) +
+      '<div class="q"><label>How old are you? <span class="q-hint">it sets your training zones, and under 18 it shapes the plan</span></label>' +
+      '<select class="sel" id="s_age" style="max-width:140px">' + ageOpts(Number(wizFieldVal("s_age")) || p.age) + '</select></div>';
   }
   if (id === "goal") {
     const cur = { dist: wizFieldVal("s_dist") || p.goalDist, date: wizFieldVal("s_date") || p.raceDate || "", target: wizFieldVal("s_target") || "" };
@@ -24719,7 +24795,6 @@ function wizBody(id, p, st) {
     const sx = wizFieldVal("s_sex");
     return '<p class="wz-lead">These fine-tune the plan. Skip anything you\\u2019d rather not answer.</p>' +
       '<div class="q"><label>Coming back to running? <span class="q-hint">time off and injury shape the early weeks differently</span></label>' + seg("returning", [["0", "No"], ["break", "After time off"], ["injury", "After an injury"]], draft.returning || "0") + '</div>' +
-      '<div class="q"><label>Age</label><select class="sel" id="s_age" style="max-width:140px">' + ageOpts(Number(wizFieldVal("s_age")) || p.age) + '</select></div>' +
       '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!sx ? " selected" : "") + '>Prefer not to say</option><option value="female"' + (sx === "female" ? " selected" : "") + '>Female</option><option value="male"' + (sx === "male" ? " selected" : "") + '>Male</option></select></div>';
   }
   if (id === "plan") {
@@ -39829,6 +39904,10 @@ function wire() {
   });
   wireCoachSettings();
   ["s_age","s_sex"].forEach((id) => { const e = $(id); if (e) e.oninput = e.onchange = refreshTypePreview; });
+  // WARNING: AND AGE REBUILDS THE GOAL DROPDOWN, because on this page it is visible above it. The
+  // goals a 12-17 year old may pick are capped by age (YOUTH.md), so an age change that left a
+  // marathon sitting in the list would offer something draftFromForm then silently overrides.
+  { const a = $("s_age"); if (a) { const prev = a.onchange; a.onchange = () => { if (prev) prev(); refreshGoalBlock(draft.status || "regular"); }; } }
   // ---- Manage plan ----------------------------------------------------------------------
   // ⚠️ SCOPED TO #view, NOT document. #sheetOv lives outside #view and survives a render, so a
   // document-wide bind would rebind the sheet's own controls on every background render -- the exact

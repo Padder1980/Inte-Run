@@ -119,3 +119,11 @@ export { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
 // derived from the engine's own tables and driven through the real generator by
 // test/running-days.test.ts.
 export { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "../src/domain/running-days.ts";
+
+// ⚠️ THE 12-17 LIMITS, AND THE APP MUST NOT KEEP A SECOND COPY OF ANY OF THEM. These are UK
+// Athletics' own competition rule (TR3 S4) plus the owner's frequency column, not preferences — the
+// research, the sources and the table that was discarded as folklore are in YOUTH.md. The module owns
+// the CEILING only; youthGoalsFrom takes the caller's own goal list and intersects, so adding a goal
+// to the app needs no edit there and cannot slip past the ceiling either.
+export { isYouthAge, youthLimitsFor, youthGoalsFrom, clampYouthDays, YOUTH_MIN_AGE, YOUTH_MAX_AGE } from "../src/domain/youth.ts";
+export type { YouthLimits } from "../src/domain/youth.ts";

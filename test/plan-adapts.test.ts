@@ -17,6 +17,7 @@ import { test } from "node:test";
 import fs from "node:fs";
 import { generatePlan } from "../src/plan/generate-plan.ts";
 import type { Athlete, Goal } from "../src/domain/types.ts";
+import { youthGoalsFrom } from "../src/domain/youth.ts";
 
 const PAGE = fs.readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 /** ⚠️ COMMENTS STRIPPED. Every claim below quotes the code it forbids, which is the trap this
@@ -159,10 +160,17 @@ test("BLOCKER: a reschedule is perishable — it survives a rebuild and dies whe
 test("BLOCKER: a habit-builder may set a time goal or leave it off, and blank is not shown back", () => {
   // His screenshot: "I think 'building the habit' runner needs to have the option to set a time goal if
   // they choose to, they can also just leave it off".
-  const card = new Function(
+  // ⚠️ goalCardInner NOW FILTERS ITS OWN GOALS BY AGE, so the lift carries goalsForAge and the
+  // resolver it calls. A lift that omits a dependency measures a strictly easier program; this one
+  // failed loudly with a ReferenceError, which is the acceptable kind of stale. The real engine
+  // helper is supplied rather than stubbed, so this test exercises the shipped ceiling.
+  const card = new Function("RC",
     "const RACE_LABEL = { '10k': '10 km' }, FINISH_LABEL = { '10k': 'Complete a 10K' };\n" +
+    "const $ = () => null, draft = {}, profile = {};\n" +
     (/const GOAL_BY_STATUS = \{[\s\S]*?\n\};/.exec(PAGE) || [""])[0] + "\n" +
-    nocomment(fn("goalCardInner")) + "\nreturn goalCardInner;")();
+    nocomment(fn("currentAgeAnswer")) + "\n" +
+    nocomment(fn("goalsForAge")) + "\n" +
+    nocomment(fn("goalCardInner")) + "\nreturn goalCardInner;")({ youthGoalsFrom });
   const at = (st: string) => card(st, { dist: "10k", date: "2026-12-06", target: "" });
   // The habit-builder is asked, and told that blank is a real answer.
   const b = at("building");

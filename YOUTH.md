@@ -165,26 +165,55 @@ adults, so **1 minute between sets suffices** for a novice where an adult needs 
 
 ⚠️ **PROPOSED, NOT BUILT, AND NOT YET SIGNED OFF.**
 
-### 5.1 Goals offered (the app offers 5k / 10k / half / marathon)
-Derived from the RECOMMENDED road table, which is the governing body's own LTAD advice:
+### 5.1 Goals offered - OWNER'S RULING, 21 Sept 2026
 
-| Age | Goals offered | Because the recommended race ceiling is |
-|---|---|---|
-| 12, 13 | **5k** | 6 km |
-| 14, 15 | **5k** | 8 km |
-| 16, 17 | **5k, 10k** | 12-14 km |
-| 18+ | everything (adult app) | 22 km recommended; marathon permitted by rule; 18 is an adult in law |
+⚠⚠ **HE CHOSE UKA'S RULE OVER UKA'S RECOMMENDATION, AND OVER HIS OWN FIRST TABLE. BOTH HALVES OF
+THAT MATTER.**
 
-A half marathon is 21.1 km and reaches the recommended ceiling only at 18. A marathon is permitted by
-the rule at 18 and by every major race at 18. **So the youth programme is 12-17, and 18 is the adult
-app** - which also lines up the training limit with the legal one.
+He first supplied a table allowing 10K at 12, a half marathon at 15 and a marathon at 17, with a
+frequency column. Put to him that **every distance row exceeds UKA's own competition rule** - so the
+app would coach a 17-year-old for sixteen weeks toward a race they are not permitted to enter - he
+moved to the rule. **His frequency column was adopted unchanged**, because it is well supported
+(Nationwide Children's "only three times per week" under 14; measured practice 4.1 sessions at 13-14
+and 5.1 at 17-18) and it is the one column that was never in dispute.
+
+⚠️ **HIS FIRST TABLE WAS THE DISCARDED 1987 SET IN MILES** - 10K / half / marathon is its
+signature. It circulates on most youth-running pages. Expect to meet it again; section 1 says why it
+is not a source.
+
+| Age | Rule ceiling (road) | Goals offered | Max runs/week |
+|---|---|---|---|
+| 12 | 6 km | 5k | 3 |
+| 13 | 6 km | 5k | 3 |
+| 14 | 8 km | 5k | 3 |
+| 15 | 12 km | 5k, 10k | 5 |
+| 16 | 16 km | 5k, 10k | 5 |
+| 17 | 25 km | 5k, 10k, **half** | 5 |
+| 18+ | - | everything (adult app) | adult |
+
+**18 is an adult** - his ruling, and it agrees with UK majority, UKA's rule (marathon permitted at 18)
+and every World Marathon Major's entry age. So the youth programme is **12-17 inclusive**.
+
+⚠️ **A HALF MARATHON IS 21.1 km AND THE RULE ALLOWS 25 km AT 17, SO IT FITS - JUST.** It does
+not fit at 16 (16 km) and a marathon fits at no age under 18. The recommendation would have said 10k
+until 18; we are one band more permissive than that, by his decision, and still inside the rule.
 
 ### 5.2 Training limits
-- **Single session** never exceeds the recommended race ceiling for that age: 6 / 8 / 12 km.
-- **Weekly volume** capped at twice that: 12 / 16 / 24 km, with the provenance caveat in section 3.
-- **Frequency** capped: 3 runs a week to 13, 4 from 14, 5 from 16 (AAP/Nationwide's "only three times
-  per week" under 14, and the measured 4.1 sessions at 13-14 / 5.1 at 17-18).
-- The engine's `LONG_FLOOR_KM` and `LONG_CAP_KM` must not apply - those are adult event endpoints.
+- **Single session** never exceeds the age's rule ceiling: 6 / 6 / 8 / 12 / 16 / 25 km.
+- **Weekly volume** capped at twice the single-session ceiling, with the section 3 provenance caveat.
+- **Frequency** capped at his column: 3 runs a week to 14, 5 from 15.
+- `LONG_FLOOR_KM` and `LONG_CAP_KM` must not apply - they are adult event endpoints.
+- ⚠️ **MEASURE THE PLANS THE GATES ACTUALLY PRODUCE.** The caps interact with the volume fit,
+  the long-run ladder and the frequency cap in ways nobody can predict by reading. Sweep the reachable
+  age x goal x days grid and check every built plan against all three ceilings, the way this repo
+  audits everything else. A cap that is never reached is as much a finding as one that binds.
+
+⚠⚠ **"PREFER NOT TO SAY" IS A HOLE AND NEEDS CLOSING IN THE SAME CHANGE.** Age is optional
+today and absent means adult. Once a youth programme exists, a 13-year-old picking "Prefer not to say"
+gets the adult app - which is the one outcome all of this is built to prevent. The proportionate fix
+(and what the Children's Code calls age assurance proportionate to risk) is one extra question: if
+they will not give an age, ask whether they are 18 or over. Declining to answer *that* is treated as
+under 18.
 
 ### 5.3 Strength
 - **Offered, not withheld** - there is no minimum age and the benefits are real.

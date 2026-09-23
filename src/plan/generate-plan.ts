@@ -2748,7 +2748,7 @@ function addStrength(
       // runner gets the 100-150 ground contacts the combined-methods evidence used; a developing one
       // gets the lower 60-100 band, because tissue tolerance rather than the training effect is what
       // binds for them. See PLYO_DOSE.
-      sessions.push(strengthSession(wp.phase, maintenance, { competitive }));
+      sessions.push(strengthSession(wp.phase, maintenance, { competitive, age: ctx.athlete.age }));
       dayOf.push(strengthDays[i] ?? strengthDays[0]!);
     }
     return;
@@ -2762,7 +2762,7 @@ function addStrength(
     // developing, 144 trained, against bands of 60-100 and 100-150); four sessions each carrying it
     // would be 180. Capping the number of SESSIONS rather than scaling the dose down keeps each one a
     // real plyometric session instead of four token ones.
-    sessions.push(strengthSession(wp.phase, maintenance, { competitive, prefs, plyo: i < PLYO_MAX_SESSIONS }));
+    sessions.push(strengthSession(wp.phase, maintenance, { competitive, prefs, plyo: i < PLYO_MAX_SESSIONS, age: ctx.athlete.age }));
     dayOf.push(d);
   });
 }

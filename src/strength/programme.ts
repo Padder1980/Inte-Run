@@ -1,4 +1,5 @@
 import type { StrengthPrefs } from "../domain/types.ts";
+import { youthLimitsFor, YOUTH_LOAD_TEXT } from "../domain/youth.ts";
 import {
   REST_BY_INTENT, buildStrength,
   type BuiltStrength, type RestIntent, type StrengthIntent,
@@ -181,6 +182,16 @@ export function rotationLabel(week: number, slot: number, sessionsPerWeek: numbe
 
 export type ProgrammePrefs = Pick<StrengthPrefs, "minutes" | "level" | "goal" | "equipment"> & {
   sessionsPerWeek: number;
+  /**
+   * The runner's age, so a 12-17 programme is folded to the youth band. Absent is an adult.
+   *
+   * WARNING: IT RIDES ON THE PREFS RATHER THAN ON EACH FUNCTION'S OWN ARGUMENTS, and that is the
+   * point. `buildProgrammeSession`, `programmeWeekFor` and `programmeWeeksFor` all take these prefs
+   * and all three have to agree about who is lifting -- three separate parameters is three chances
+   * for one caller to pass it and another to forget, and the failure there is a card promising a
+   * heavy block over a session that will not contain one.
+   */
+  age?: number;
 };
 
 /**
@@ -206,9 +217,63 @@ export function buildProgrammeSession(opts: {
     plyo: false,
     intent,
     rotate: rotation,
+    // ⚠ A PROGRAMME IS THE ONE STRENGTH PATH THAT INJECTS ITS OWN INTENT, so it is the one path a
+    // youth could otherwise reach a heavy block through: the third block of an eight-week programme
+    // prescribes 3-6 reps at 85%+, and `intentFor` -- which is where the age is usually tested -- is
+    // never called. `buildStrength` folds an injected intent to the band; this is what tells it to.
+    youth: youthLimitsFor(opts.prefs.age),
   });
-  return { ...built, plan: pw, rotation };
+  return { ...built, plan: deliveredWeek(pw, built, youthLimitsFor(opts.prefs.age) != null), rotation };
 }
+
+/**
+ * What the BLOCK asked for, corrected to what the session was actually built with.
+ *
+ * ⚠️⚠️ `plan` USED TO BE THE RAW BLOCK TABLE AND ITS READERS PRINTED IT AS THOUGH IT WERE THE
+ * SESSION. `programmeSession` writes "3 sets of 3-6 (heavy) at 80%+" straight out of it, and the
+ * three figures could all be wrong at once: the clock trims the set count (A7's own note measured a
+ * 20-minute advanced heavy week prescribed 3 sets and delivered 2), and for a 12-17 runner every
+ * exercise is folded to 8-12 with no load at all — so a 13-year-old's programme card promised heavy
+ * triples at 80%+ over a session containing neither.
+ *
+ * ⚠️ THE MAIN LIFT IS THE ONE WITH THE MOST SETS, not the one carrying a load. A youth session
+ * carries no percentage anywhere by design, so `find(e => e.loadPercent1RM)` answers undefined for
+ * exactly the runner this matters most for. The spine's main lifts take `mainSets` and everything
+ * else takes one fewer, so the maximum IS the main lift's figure — and it is the same number the old
+ * test returned for every adult.
+ *
+ * ⚠️ AND A SESSION WITH NO PERCENTAGE SHOWS THE REPS-IN-RESERVE WORDING RATHER THAN THE BLOCK'S.
+ * Derived from what was BUILT rather than from a second age test, so this column can never describe a
+ * load the session does not prescribe.
+ */
+function deliveredWeek(pw: ProgrammeWeek, built: BuiltStrength, youth: boolean): ProgrammeWeek {
+  let sets = 0, reps = pw.reps, load: string | undefined, rest = pw.restSeconds;
+  for (const e of built.exercises) if (e.sets > sets) { sets = e.sets; reps = e.reps; load = e.loadPercent1RM; rest = e.restSeconds; }
+  if (!sets) return pw;
+  return {
+    ...pw, sets, reps, load: load ?? YOUTH_LOAD_TEXT,
+    restSeconds: rest, intent: built.intent,
+    focus: youth && !pw.isDeload ? YOUTH_FOCUS[pw.block] : pw.focus,
+  };
+}
+
+/**
+ * What each block is FOR when the lifter is 12-17.
+ *
+ * ⚠️⚠️ THE BLOCKS STILL PROGRESS — BY LOAD, NOT BY DROPPING INTO A HEAVY REP BAND — AND THE ADULT
+ * SENTENCES DESCRIBE A PROGRESSION THAT IS NOT HAPPENING. "Heavy and low-rep — the work the evidence
+ * is about" sat over a youth week 9 prescribing 8-12 with no percentage. What the sources describe
+ * instead is the same rep range with a little more weight each block (the NSCA's own "progression
+ * 5-10%"), which is a real progression and is what these say.
+ *
+ * ⚠️ A DELOAD KEEPS ITS OWN SENTENCE, because "ease off" is true at every age and is the one thing on
+ * the card that must not be reworded into something that sounds like more work.
+ */
+const YOUTH_FOCUS: Readonly<Record<ProgrammeBlockName, string>> = {
+  technique: "Learn the movements properly — light, clean and controlled. This block is about how it looks, not how much.",
+  loading: "Same reps, a little more weight than last block. Add it in small steps.",
+  heavy: "Keep the reps where they are and keep adding a little weight — at your age that IS the progression.",
+};
 
 /**
  * What a week will ACTUALLY deliver for this runner: the block's prescription after the clock has had
@@ -231,13 +296,12 @@ export function buildProgrammeSession(opts: {
  * the table's own number is the honest answer rather than a guess.
  */
 export function programmeWeekFor(week: number, prefs: ProgrammePrefs): ProgrammeWeek {
-  const pw = programmeWeek(week, prefs.level);
+  // ⚠ ONE DERIVATION, READ BY BOTH THE CARD AND THE SESSION'S OWN DESCRIPTION. `buildProgrammeSession`
+  // already corrects the block to what it built; asking it is what stops the two disagreeing.
   try {
-    const built = buildProgrammeSession({ week, slot: 0, prefs });
-    const main = built.exercises.find((e) => e.loadPercent1RM);
-    return main ? { ...pw, sets: main.sets } : pw;
+    return buildProgrammeSession({ week, slot: 0, prefs }).plan;
   } catch {
-    return pw;
+    return programmeWeek(week, prefs.level);
   }
 }
 

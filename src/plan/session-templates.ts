@@ -1899,6 +1899,7 @@ export function raceSpecificSession(paces: TrainingPaces, variant = 0, ctx: Form
 import { EXERCISES, exerciseById, exerciseIds } from "../strength/library.ts";
 import { buildStrength } from "../strength/builder.ts";
 import { buildProgrammeSession, type ProgrammePrefs } from "../strength/programme.ts";
+import { youthLimitsFor, youthPlyoDose, YOUTH_STRENGTH_NOTE, YOUTH_STRENGTH_TITLE, YOUTH_STRENGTH_LEAD } from "../domain/youth.ts";
 export { exerciseById, exerciseIds };
 
 function mkEx(
@@ -1971,7 +1972,7 @@ export function generalStrengthSession(theme = 0): SessionContent {
 export function strengthSession(
   phase: Phase,
   maintenance: boolean,
-  opts: { competitive?: boolean; prefs?: StrengthPrefs; plyo?: boolean } = {},
+  opts: { competitive?: boolean; prefs?: StrengthPrefs; plyo?: boolean; age?: number } = {},
 ): SessionContent {
   // ⚠️⚠️ TWO PATHS, AND THE SPLIT IS THE SAFETY PROPERTY RATHER THAN A DUPLICATE BUILDER. Everything
   // below this branch is the session as it shipped, untouched, and it is what an athlete with no
@@ -1980,17 +1981,33 @@ export function strengthSession(
   // one edit away from moving every existing block silently, which is the `weeklyVolumeKm: 30`
   // failure. `test/strength-prefs.test.ts` hashes a whole plan built both ways to hold this.
   if (opts.prefs) return builtStrengthSession(phase, maintenance, opts.prefs, opts);
+  /**
+   * ⚠️⚠️ AGE OVERRIDES THE PHASE, AND THE PHASE FACT IS STILL COMPUTED BECAUSE IT DECIDES SOMETHING
+   * ELSE. `heavy` answers two questions here — what the lifts are prescribed IN, and whether the
+   * session carries jumps at all — and only the first is age-sensitive. Folding a youth session by
+   * setting `heavy = false` would have taken the plyometrics away with the heavy reps, which is
+   * backwards: both youth position stands support jumping for this group, in SHORTER sets. See
+   * `youthPlyoDose`.
+   */
+  const youth = youthLimitsFor(opts.age);
   const heavy = !maintenance && (phase === "build" || phase === "peak");
-  const sets = maintenance ? 2 : heavy ? 3 : 2;
-  const reps = maintenance ? "4–6" : heavy ? "3–6 (heavy)" : "6–8";
+  // Two sets is inside the NSCA's 1–3 for every training level and is what the adult path already
+  // gives outside its heavy phases, so a youth session is the app's own gentlest shape rather than a
+  // new one.
+  const sets = youth ? 2 : maintenance ? 2 : heavy ? 3 : 2;
+  const reps = youth ? youth.strengthReps : maintenance ? "4–6" : heavy ? "3–6 (heavy)" : "6–8";
   // ⚠️ THE LOAD IS ONLY CLAIMED WHERE IT IS MEANT. A technique-phase session is deliberately
   // moderate, so labelling it 80%+ would be a prescription nobody wrote; a maintenance session near
   // the race keeps the load and drops the volume, which is what the taper evidence asks for.
-  const load = heavy || maintenance ? "80%+" : "70–75%";
+  // ⚠️ AND A YOUTH SESSION CLAIMS NONE AT ALL — see YouthLimits' note. `mkEx` is given an object with
+  // no `loadPercent1RM` key rather than one holding undefined, so the field is absent on the exercise
+  // and A6 has nothing to parse a percentage out of.
+  const load = youth ? null : heavy || maintenance ? "80%+" : "70–75%";
+  const mainOpts = load ? { loadPercent1RM: load } : {};
   const exercises = [
-    mkEx("squat", sets, reps, { loadPercent1RM: load }),
-    mkEx("splitSquat", sets, reps, { loadPercent1RM: load }),
-    mkEx("rdl", sets, reps, { loadPercent1RM: load }),
+    mkEx("squat", sets, reps, mainOpts),
+    mkEx("splitSquat", sets, reps, mainOpts),
+    mkEx("rdl", sets, reps, mainOpts),
     mkEx("calf", sets, "8–12"),
     mkEx("soleus", sets, "8–12"),
     mkEx("stepUp", sets, reps),
@@ -2002,21 +2019,28 @@ export function strengthSession(
   // or in the tests could see the shortfall because the count was implied by sets x reps rather than
   // stated. The contacts ride on the exercise so the weekly total is auditable.
   if (heavy) {
-    const d = opts.competitive ? PLYO_DOSE.trained : PLYO_DOSE.developing;
+    const d = youthPlyoDose(opts.competitive ? PLYO_DOSE.trained : PLYO_DOSE.developing, youth);
     exercises.push(
       mkEx("pogo", d.pogoSets, d.pogoReps, { contacts: d.pogoSets * d.pogoEach }),
       mkEx("boxjump", d.jumpSets, d.jumpReps, { contacts: d.jumpSets * d.jumpEach }),
     );
   }
   const minutes = maintenance ? 30 : 45;
-  const desc = maintenance
-    ? "Maintenance strength near your race — keep the movements, drop the volume. Tap an exercise for how to do it and to log your weights."
-    : heavy
-      ? "Heavy but controlled (~80%+ 1RM), low reps — the best-evidenced way to build economy and durability. Keep total volume low; running already supplies fatigue. Tap an exercise for how to do it and to log your weights."
-      : "Technique-focused strength to build a base. Moderate load, clean form. Tap an exercise for how to do it and to log your weights.";
+  /**
+   * ⚠️ THE YOUTH COPY NAMES NO PERCENTAGE AND SAYS WHAT TO AIM FOR INSTEAD, because the adult
+   * wordings all do ("~80%+ 1RM", "Moderate load") and leaving one in place would reinstate by
+   * sentence exactly what removing `loadPercent1RM` took out of the data.
+   */
+  const desc = youth
+    ? YOUTH_STRENGTH_LEAD + " " + YOUTH_STRENGTH_NOTE + " Tap an exercise for how to do it and to log your weights."
+    : maintenance
+      ? "Maintenance strength near your race — keep the movements, drop the volume. Tap an exercise for how to do it and to log your weights."
+      : heavy
+        ? "Heavy but controlled (~80%+ 1RM), low reps — the best-evidenced way to build economy and durability. Keep total volume low; running already supplies fatigue. Tap an exercise for how to do it and to log your weights."
+        : "Technique-focused strength to build a base. Moderate load, clean form. Tap an exercise for how to do it and to log your weights.";
   const content = assemble(
     "strength",
-    maintenance ? "Strength (maintenance)" : heavy ? "Strength (heavy)" : "Strength (technique)",
+    youth ? YOUTH_STRENGTH_TITLE : maintenance ? "Strength (maintenance)" : heavy ? "Strength (heavy)" : "Strength (technique)",
     desc,
     "none",
     [{ kind: "steady", label: "Runner-focused resistance session", durationSeconds: minutes * 60, targetRpe: RPE.threshold }],
@@ -2038,15 +2062,17 @@ function builtStrengthSession(
   phase: Phase,
   maintenance: boolean,
   prefs: StrengthPrefs,
-  opts: { competitive?: boolean; plyo?: boolean },
+  opts: { competitive?: boolean; plyo?: boolean; age?: number },
 ): SessionContent {
   const heavy = !maintenance && (phase === "build" || phase === "peak");
+  const youth = youthLimitsFor(opts.age);
   const built = buildStrength({
     phase, maintenance, prefs,
     competitive: opts.competitive === true,
     // Jumps belong to the hard end of the block and to a session that is not itself a taper-week
     // trim. The caller decides WHICH of the week's sessions carries them; this decides whether any can.
     plyo: heavy && opts.plyo === true,
+    youth,
   });
   const exercises = built.exercises.map((e) => mkEx(e.id, e.sets, e.reps, {
     loadPercent1RM: e.loadPercent1RM,
@@ -2057,17 +2083,20 @@ function builtStrengthSession(
   }));
   const mins = Math.max(1, Math.round(built.seconds / 60));
   const supersets = exercises.some((e) => e.superset != null);
-  const desc = (maintenance
-    ? "Maintenance strength near your race — keep the movements, drop the volume."
-    : heavy
-      ? "Heavy but controlled (~80%+ 1RM), low reps — the best-evidenced way to build economy and durability. Keep total volume low; running already supplies fatigue."
-      : "Technique-focused strength to build a base. Moderate load, clean form.")
+  const desc = (youth
+    ? YOUTH_STRENGTH_LEAD
+    : maintenance
+      ? "Maintenance strength near your race — keep the movements, drop the volume."
+      : heavy
+        ? "Heavy but controlled (~80%+ 1RM), low reps — the best-evidenced way to build economy and durability. Keep total volume low; running already supplies fatigue."
+        : "Technique-focused strength to build a base. Moderate load, clean form.")
     + " Built to the " + prefs.minutes + " minutes you asked for, with the rests it needs."
     + (supersets ? " Exercises marked with the same pairing are alternated, which is what keeps it inside the time." : "")
+    + (youth ? " " + YOUTH_STRENGTH_NOTE : "")
     + " Tap an exercise for how to do it and to log your weights.";
   const content = assemble(
     "strength",
-    maintenance ? "Strength (maintenance)" : heavy ? "Strength (heavy)" : "Strength (technique)",
+    youth ? YOUTH_STRENGTH_TITLE : maintenance ? "Strength (maintenance)" : heavy ? "Strength (heavy)" : "Strength (technique)",
     desc,
     "none",
     [{ kind: "steady", label: "Runner-focused resistance session", durationSeconds: mins * 60, targetRpe: RPE.threshold }],
@@ -2088,6 +2117,7 @@ function builtStrengthSession(
  */
 export function programmeSession(week: number, slot: number, prefs: ProgrammePrefs): SessionContent {
   const built = buildProgrammeSession({ week, slot, prefs });
+  const youth = youthLimitsFor(prefs.age);
   const exercises = built.exercises.map((e) => mkEx(e.id, e.sets, e.reps, {
     loadPercent1RM: e.loadPercent1RM,
     restSeconds: e.restSeconds,
@@ -2102,6 +2132,10 @@ export function programmeSession(week: number, slot: number, prefs: ProgrammePre
     + " Week " + week + ", session " + label + " — " + pw.sets + " sets of " + pw.reps
     + (pw.load ? " at " + pw.load : "") + ", " + Math.round(pw.restSeconds / 30) / 2 + " minutes between sets."
     + (supersets ? " Exercises marked with the same pairing are alternated, which is what keeps it inside the time." : "")
+    // ⚠️ THE SUPERVISION LINE RIDES ON EVERY YOUTH STRENGTH SESSION, INCLUDING A PROGRAMME'S. A
+    // programme is the path a 12-17 runner does the MOST lifting through, so it is the last one that
+    // should be the one without it.
+    + (youth ? " " + YOUTH_STRENGTH_NOTE : "")
     + " Tap an exercise for how to do it and to log your weights.";
   const content = assemble(
     "strength",

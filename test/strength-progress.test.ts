@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { exerciseById } from "../src/strength/library.ts";
 import { suggestLoad } from "../src/strength/progression.ts";
 import { detectStrengthRecords } from "../src/strength/records.ts";
+import { isYouthAge } from "../src/domain/youth.ts";
 
 const APP = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 /**
@@ -179,13 +180,22 @@ test("BLOCKER: every e1RM the engine hands the app carries the word 'estimated' 
 // 4. New-record detection and the toast it fires
 // -------------------------------------------------------------------------------------------------
 
-function loadRecordMessage() {
-  const body = [fnOf("strParseSet"), fnOf("strPriorInstances"), fnOf("strNewRecordMessage")].join("\n");
+/**
+ * ⚠️ `isYouth` IS LIFTED FOR REAL AND HANDED THE REAL `RC.isYouthAge`, NOT STUBBED. Y3 withholds the
+ * estimated-1RM figure under 18, and a stub answering false would measure a strictly easier program:
+ * the withholding would be untested and could be removed without a single assertion moving.
+ */
+function loadRecordMessage(age?: number) {
+  const body = [fnOf("strParseSet"), fnOf("strPriorInstances"), fnOf("isYouth"), fnOf("strNewRecordMessage")].join("\n");
   const store: { d: string; s: string; x: string; i: number; w?: string; r?: string }[] = [];
-  const ctx = { slogFor: (x: string) => store.filter((r) => r.x === x), RC: { detectStrengthRecords } };
+  const ctx = {
+    slogFor: (x: string) => store.filter((r) => r.x === x),
+    RC: { detectStrengthRecords, isYouthAge },
+    profile: { age },
+  };
   // eslint-disable-next-line no-new-func
   const factory = new Function("ctx",
-    "const slogFor = ctx.slogFor, RC = ctx.RC;" + body + "\nreturn strNewRecordMessage;");
+    "const slogFor = ctx.slogFor, RC = ctx.RC, profile = ctx.profile;" + body + "\nreturn strNewRecordMessage;");
   return { strNewRecordMessage: factory(ctx) as (sess: { iso: string }, items: unknown[]) => string | null, store };
 }
 
@@ -203,6 +213,30 @@ test("an e1RM-only record names it as such, distinct from a heaviest-weight one"
   store.push({ d: "2026-09-08", s: "s", x: "squat", i: 0, w: "60", r: "8" }); // e1rm 76, weight ties (no heaviest hit)
   const msg = strNewRecordMessage({ iso: "2026-09-08" }, [ITEM("squat")]);
   assert.match(msg!, /^New estimated 1RM: Squat ~76 kg$/);
+});
+
+/**
+ * ⚠️⚠️ Y3: A ONE-REP MAX IS NEVER PUT IN FRONT OF A 12-17 RUNNER, AND THE ACHIEVEMENT IS STILL
+ * NAMED. Unsupervised 1RM testing is the one thing both youth resistance-training position stands
+ * forbid outright, and a number on screen is the invitation to go and do it. Swallowing the toast
+ * instead would take a real achievement away from a child to avoid printing a figure, so what goes
+ * is the figure. The identical case for an adult is the guard directly above.
+ */
+test("BLOCKER: under 18, the estimated-1RM toast names the best without naming the number", () => {
+  for (const age of [12, 14, 17]) {
+    const { strNewRecordMessage, store } = loadRecordMessage(age);
+    for (let i = 0; i < 3; i++) store.push({ d: "2026-09-01", s: "s-old", x: "squat", i, w: "60", r: "5" });
+    store.push({ d: "2026-09-08", s: "s", x: "squat", i: 0, w: "60", r: "8" });
+    const msg = strNewRecordMessage({ iso: "2026-09-08" }, [ITEM("squat")]);
+    assert.ok(msg, "age " + age + ": the record was swallowed rather than reworded");
+    assert.ok(!/1RM|\d+\s*kg/i.test(msg!), "age " + age + ": a one-rep-max figure reached a child: " + msg);
+    assert.match(msg!, /Squat/, "age " + age + ": the toast stopped naming the exercise");
+  }
+  // 18 is an adult and gets the number, which is what makes the test above discriminate.
+  const adult = loadRecordMessage(18);
+  for (let i = 0; i < 3; i++) adult.store.push({ d: "2026-09-01", s: "s-old", x: "squat", i, w: "60", r: "5" });
+  adult.store.push({ d: "2026-09-08", s: "s", x: "squat", i: 0, w: "60", r: "8" });
+  assert.match(adult.strNewRecordMessage({ iso: "2026-09-08" }, [ITEM("squat")])!, /^New estimated 1RM: Squat ~76 kg$/);
 });
 
 test("a first-ever log of an exercise never toasts -- nothing to beat", () => {

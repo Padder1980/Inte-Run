@@ -15799,3 +15799,191 @@ race-pace arm sits behind two independent gates.
 ⚠️ **AND THE WALK-BACK TAUGHT THE USEFUL FACT:** its bisection assigns to `weeks` and **never to
 `scale`**, so after it runs the two disagree — keeping youth out of it is what keeps them in step, and
 that is a better reason than "belt and braces".
+
+## ✅ Y3 — LIFTING FOR 12-17s: A REP RANGE, NEVER A PERCENTAGE (owner, 2026-09-22)
+
+The third stage of the youth programme he commissioned. *"This also applies to any weight training
+programme. Based on the users age, this should restrict the types of plan that the user has access to
+and you again need to thoroughly research what is suitable."* The research, the position stands and the
+specification are in **`YOUTH.md` sections 4, 5.3 and 5.8**; read that before changing a number here.
+Suite 1731 → **1751**; `test/youth-strength.test.ts` holds 19 guards and **23 deliberate re-breaks**.
+
+⚠️⚠️ **STRENGTH IS OFFERED, NOT WITHHELD, AND THAT IS THE SOURCES' OWN POSITION.** Both the NSCA's
+position stand and the 2014 International Consensus state there is **no minimum age**, and both say the
+growth-plate fear is a myth. What changes is HOW it is prescribed — so an age gate here would have been
+worse-evidenced than the tailored programme the owner asked for.
+
+⚠️⚠️ **BUT EVERY PERMISSION IN BOTH SOURCES IS CONDITIONAL ON SUPERVISION, AND AN APP CANNOT
+SUPERVISE.** *"If qualified supervision, age-appropriate exercise equipment, and a safe training
+environment are not available, youth should not perform resistance exercise."* The heavy band (>85%
+1RM) is permitted to youth *"on the proviso these programmes are supervised by qualified
+professionals"*. **That is a limit on us, not on them**, which is what `YOUTH_STRENGTH_NOTE` says on
+every youth session: this is good for you, it works best with somebody watching, and the app is not
+that.
+
+**What a 13-year-old is prescribed now, measured through the real builders:**
+
+| | adult, build phase | 12-17 |
+|---|---|---|
+| main lifts | 3 × `3–6 (heavy)` **at 80%+ 1RM** | 2 × `8–12`, **no percentage at all** |
+| rest between sets | 150 s | 120 s |
+| pogo hops | 3 × 10 = 30 contacts | 3 × 6 = **18** |
+| sessions a week, asked 4 | 4 | **3** |
+| title | "Strength (heavy)" | "Strength & power" |
+
+### ⚠️⚠️ THERE IS NO LOAD FIELD, AND ITS ABSENCE IS THE PRESCRIPTION
+
+`YOUTH.md` §5.3 originally specified *"loadPercent1RM capped at the intermediate band (≤80%)"*. **That
+was the weaker reading and it was rejected in the build.** A percentage is a share of a one-rep max, so
+prescribing "70%" to a 14-year-old instructs them to go and find theirs — and *"unsupervised and
+improper 1RM testing… should not be performed by children or adolescents under any circumstances"* is
+the one thing both sources forbid outright. Capping the fraction keeps the instruction and quibbles
+about the number. The NSCA says what to do instead in as many words: *"if 1RM tests are not
+performed… establish the repetition range and then by trial and error determine the maximum load"*.
+⚠️ **So `intentFor` returns no `load` for a youth**, `buildStrength` writes `loadPercent1RM` only when
+the intent carries one, and nothing anywhere can be set to restore it.
+⚠️ **AND `YOUTH_LOAD_TEXT` NEVER GOES IN `loadPercent1RM`.** That field is DATA — A6 parses a
+percentage out of it to seed a suggested weight — so prose there is how a suggestion becomes NaN. The
+reps-in-reserve wording is for the programme card's display column and nothing else.
+
+### ⚠️⚠️ THREE BUILDERS WRITE THIS COPY AND THE FIRST CUT FOLDED THE WORDS ON ONE OF THEM
+
+The legacy no-preferences path, the preference-driven `builtStrengthSession` and a programme's
+`programmeSession` each write their own title and description. **Measured through the real builders: a
+13-year-old on the preferences path was handed a session titled "Strength (heavy)" described as "Heavy
+but controlled (~80%+ 1RM), low reps" over exercises prescribing 8–12 with no load anywhere** — which
+reinstates by sentence exactly what removing the field took out of the data. `YOUTH_STRENGTH_TITLE`,
+`YOUTH_STRENGTH_LEAD` and `YOUTH_STRENGTH_NOTE` are constants for that reason, and every guard sweeps
+all three paths and asserts it saw all three. **Found by running a probe, not by reading the diff.**
+
+### ⚠️⚠️ A STANDALONE PROGRAMME NEVER CALLS `intentFor`, SO IT IS THE PATH A YOUTH REACHES HEAVY THROUGH
+
+A7 works in BLOCKS — technique, loading, heavy — and injects its own `StrengthIntent`, so the age test
+that lives in `intentFor` is simply not consulted. An eight-week programme's third block prescribes
+3–6 reps at 85%+. `buildStrength` therefore folds an **injected** intent to the band as well, and
+⚠️ **the age rides on `ProgrammePrefs`** rather than on each function's arguments: `buildProgrammeSession`,
+`programmeWeekFor` and `programmeWeeksFor` all take those prefs, and three separate parameters is three
+chances for one caller to pass it and another to forget.
+
+⚠️⚠️ **AND THE PROGRAMME'S OWN DESCRIPTION READ THE BLOCK TABLE RATHER THAN THE SESSION.** `plan` came
+back as the raw `programmeWeek(...)`, so the card said *"3 sets of 3–6 (heavy) at 80%+, 2.5 minutes
+between sets"* over a youth session containing none of it. `deliveredWeek` now corrects all four —
+sets, reps, load and rest — from what was built, and `programmeWeekFor` reads it rather than deriving
+a second answer.
+⚠️ **THE MAIN LIFT IS FOUND BY SET COUNT, NOT BY CARRYING A LOAD.** `find(e => e.loadPercent1RM)`
+answers undefined for a youth session by construction, so the old test went blind for exactly the
+runner this matters most for. The spine's main lifts take `mainSets` and everything else one fewer, so
+the maximum IS the figure — and it is the same number the old test returned for every adult.
+⚠️ **`buildStrength` NOW REPORTS THE REST INTENT IT USED**, rather than leaving a reverse lookup: the
+seconds are not a key (light and plyo are both 90), and for a youth the intent is not the one the
+caller asked for.
+
+⚠️ **THAT IS THE ONLY ADULT-VISIBLE CHANGE IN Y3 AND IT IS A FIX. Measured against a HEAD worktree: 0
+of 72 generated PLANS changed, and 40 of 144 adult programme descriptions were overstating their own
+set count** — a card reading "3 sets" over a session containing two. A7's own note records fixing
+exactly this for the week CARD and it was left on the session description.
+
+### The rest of the decisions, each from a table rather than a taste
+
+⚠️ **THE NUMBERS DO NOT VARY BY AGE WITHIN 12-17, AND THAT IS THE SOURCES' OWN SHAPE.** The NSCA's
+tables are keyed on TRAINING EXPERIENCE, not on birthday — a 12-year-old who has lifted for two years
+and a 17-year-old who has never touched a bar get the same prescription. So the strength row is
+constant down the age column while the running limits are not, and the app's own `level` question is
+what moves it.
+
+⚠️ **THE SET CAP IS APPLIED AFTER THE CLOCK, NOT BEFORE IT.** Measured: a 17-year-old at advanced level
+and sixty minutes starts at three sets (2 + the level's +1) and `buildStrength`'s growth loop takes it
+to four, past the NSCA's 1–3. Capping the starting figure would have left that untouched; the guard
+names that exact fixture and asserts an adult still reaches four, or it would be testing nothing.
+
+⚠️ **THE SESSIONS-A-WEEK CAP IS A WRAPPER, NOT AN EIGHTH CONDITION.** `strengthSessionsFor` has seven
+returns and a youth must not reach four through any of them; the preferences path is the one that binds
+(`STRENGTH_MAX_PER_WEEK` is 4). ⚠️ **A programme returns 0 there by design and carries its own figure**,
+so the cap is applied a second time in `progPrefs`, where that figure is read.
+
+⚠️ **PLYOMETRIC SETS ARE SHORTENED, NOT DROPPED.** The NSCA's power table is 1–3 sets of **3–6 reps**
+*"to maintain quality of movement"*; trimming sets instead would keep the tired reps and remove the
+fresh ones. ⚠️ **AND THE LABEL AND THE COUNT ARE CAPPED TOGETHER** — `pogoEach` is what the ground-contact
+total is computed from and `pogoReps` is what the runner reads, so capping one gives a session that says
+"10" and counts 6.
+⚠️ **THE ENGINE HAS TWO DOSE TABLES AND `youthPlyoDose` IS NOT A THIRD.** `PLYO_DOSE` on the legacy path
+and the pair inside `plyoFor` both call it; the guard compares the two paths' OUTPUT rather than reading
+the source.
+⚠️ **AND THE PHASE FACT IS STILL COMPUTED, because `heavy` answers two questions** — what the lifts are
+prescribed in, and whether the session carries jumps at all — and only the first is age-sensitive.
+Folding a youth session by setting `heavy = false` would have taken the plyometrics away with the heavy
+reps, which is backwards.
+
+⚠️ **THE ESTIMATED 1RM IS WITHHELD AND THE TREND ARROW IS NOT.** The estimate is safe to COMPUTE — Epley
+over submaximal sets, nobody lifts anything maximal to produce it — so the direction of travel still
+shows on the history card and a new-best toast still names the achievement. What goes is the FIGURE.
+⚠️ **The toast is reworded rather than swallowed**: a runner under 18 who has just set a best has done
+something real, and dropping it would take that away to avoid printing a number.
+
+⚠️ **A YOUTH PROGRAMME STILL PROGRESSES, BY LOAD RATHER THAN BY REP BAND.** With every block folded to
+8–12, *"Heavy and low-rep — the work the evidence is about"* sat over week 9 describing a progression
+that was not happening. `YOUTH_FOCUS` says the one that is — the NSCA's own *"increase resistance
+gradually 5–10%"*. A deload keeps its own sentence at every age, because "ease off" is true always and
+is the one thing on that card that must not be reworded into something that sounds like more work.
+
+⚠️ **`isYouth()` IN THE APP ASKS THE ENGINE RATHER THAN COMPARING A NUMBER**, so the page and the plan
+cannot disagree about who is a child. `isYouthAge` is unbounded below on purpose; a bare age-under-18
+test would answer FALSE for a stored 0 or NaN, which is the one direction that must never be wrong.
+
+### ⚠️⚠️ SEVEN OF TWENTY-THREE RE-BREAKS ESCAPED THE FIRST TIME, AND THAT IS THE USEFUL HALF
+
+Every one was a guard weakness rather than an equivalence, and five were plain coverage holes in
+places the end-to-end sweeps could not see. Re-run after: **23 of 23 caught.**
+
+1. ⚠️⚠️ **A GUARD THAT SCALES WITH THE CONSTANT IT GUARDS IS NOT ONE.** The plyometric sweep asserted
+   `reps <= lim.maxPlyoReps` — reading the very constant a re-break loosens — so taking it from 6 to 12
+   passed, and the adult dose (10 and 12 reps a set) came straight through to a 12-year-old. There is
+   now an absolute `EVIDENCED_MAX_PLYO_REPS = 6` beside it, written as a literal on purpose because it
+   is a fact about the NSCA's power table rather than about our configuration. **This repo has recorded
+   the identical trap once before** (`worst <= QUALITY_WORK_CAP_SEC` passing with the cap raised to 200
+   minutes).
+2. ⚠️⚠️ **REMOVING `age` FROM THE GENERATOR'S OWN CALL CHANGED NOTHING**, because every guard drove the
+   three builders directly. The whole feature could have been unwired from the plan with the suite
+   green — the computed-and-discarded trap, and this file's eighth recording of it. A guard now builds
+   real plans for a 13-year-old and reads the strength sessions out of them.
+3. ⚠️ **BELT AND BRACES HID THE BRACE BEING TESTED.** Deleting `intentFor`'s age branch changed nothing
+   end to end, because `buildStrength` folds the result again for the injected case. `intentFor` is
+   exported, so it has to be honest on its own; it is driven directly now.
+4. ⚠️ **NOTHING ASSERTED THE BLOCK FOCUS**, so a youth week 9 could go back to "Heavy and low-rep" over
+   a session prescribing 8–12. Guarded, including that the three sentences stay distinct — a youth
+   programme still progresses and a flattened focus would say it does not.
+5. ⚠️ **THE HISTORY CARD WAS A SECOND SURFACE PRINTING THE SAME NUMBER** and only the toast was
+   covered. Asserted on the GATE around the push, not on `isYouth` being mentioned in the function.
+6-7. ⚠️⚠️ **`progPrefs` WAS DRIVEN BY NO TEST AT ALL**, and it is both halves of the only path a 12-17
+   runner does the most lifting through: it hands a programme its age, and it caps the sessions a week
+   (the engine's own cap cannot — `strengthSessionsFor` returns 0 for a programme by design). Lifted
+   from the built page and driven with the real `RC.youthLimitsFor`.
+
+### Traps this stage paid for again
+
+⚠️ **THE BACKTICK RULE FIRED — but my own pre-build sweep caught it before the build did**, for the
+second time in this project. Two backticks in a doc comment I added to `web/app.ts`.
+`git diff web/app.ts | grep '^+' | grep '\`'` before building is the whole check.
+
+⚠️ **A STALE HAND-WRITTEN LIFT LIST FAILED LOUDLY — the acceptable kind.**
+`test/strength-progress.test.ts` lifts `strNewRecordMessage` and did not know about `isYouth`
+(`ReferenceError`). Fixed by lifting the REAL `isYouth` and handing it the REAL `RC.isYouthAge`: a stub
+answering false would have measured a strictly easier program, with the withholding untested and
+removable without an assertion moving.
+
+⚠️ **AND TWO OF MY OWN GUARDS' REGEXES FAILED ON CORRECT CODE, BOTH THE SAME SHAPE.** A character
+class excluding a delimiter cannot cross a call that contains one: `if \(([^)]*)\)` stops at the `)`
+of `isYouth()`, and `(\d+) sets of ([^,]+), ` captured `"8–12 at 70%"` because the load clause carries
+no comma before it. Collection-too-narrow, in the guard rather than the code, twice in one file.
+⚠️ **AND THE SECOND ONE WAS MADE STRONGER WHILE IT WAS BEING FIXED:** `(\w+) sets of ([^,]+), ` captured
+`"8–12 at 70%"`, because the load clause carries no comma before it. Fixed — and made stronger while it
+was being fixed: it now asserts the card's LOAD matches the session's too, which is the half a 12-17
+runner is protected by.
+
+**Still to come in this track:** Y4 Strava and heart-rate gates (no Strava at 12; Strava's own rule is
+no HR upload under 16), Y5 the Children's Code (a DPIA and child-readable privacy wording), Y6 the App
+Store answers. Then D3c, a home for the wellbeing tick-boxes.
+
+⚠️ **AND THE THRESHOLDS IN THIS CHAPTER ARE STILL THE OWNER'S TO HAVE REVIEWED.** The distance and
+frequency numbers are UK Athletics' own rule; the resistance numbers are two position stands. Neither
+has been read by a clinician for this app, and `YOUTH.md` section 7 lists what is honestly uncertain.

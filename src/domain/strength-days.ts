@@ -1,4 +1,5 @@
 import type { Athlete, Phase } from "./types.ts";
+import { youthLimitsFor } from "./youth.ts";
 
 /**
  * How many strength sessions a given week of the plan gets.
@@ -33,6 +34,24 @@ export const STRENGTH_MAX_PER_WEEK = 4;
 const PEAK_MAX = 2;
 
 export function strengthSessionsFor(
+  a: Pick<Athlete, "includeStrength" | "strength" | "experience" | "daysPerWeek" | "strengthProgramme" | "age">,
+  wp: StrengthWeek,
+): number {
+  /**
+   * ⚠️⚠️ THE AGE CAP IS A WRAPPER RATHER THAN A TEST INSIDE THE RULES, BECAUSE THERE ARE SEVEN
+   * RETURNS BELOW AND A YOUTH MUST NOT REACH FOUR SESSIONS THROUGH ANY OF THEM. The NSCA and the
+   * 2014 consensus both say two to three a week on non-consecutive days; the preferences path lets a
+   * runner ask for four (`STRENGTH_MAX_PER_WEEK`), and that is the path that binds. Written as an
+   * eighth condition among the others it would be one future return statement away from being
+   * bypassed silently.
+   */
+  const youth = youthLimitsFor(a.age);
+  const n = plannedStrengthSessions(a, wp);
+  return youth ? Math.min(n, youth.maxStrengthSessions) : n;
+}
+
+/** The plan's own answer, before the runner's age has anything to say about it. */
+function plannedStrengthSessions(
   a: Pick<Athlete, "includeStrength" | "strength" | "experience" | "daysPerWeek" | "strengthProgramme">,
   wp: StrengthWeek,
 ): number {

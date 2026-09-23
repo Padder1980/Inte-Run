@@ -11858,7 +11858,15 @@ function strNewRecordMessage(sess, items) {
     // here would turn a literal "&" in an exercise name into the visible text "&amp;" on screen --
     // the opposite mistake from the one esc() exists to prevent.
     if (hit.kind === "heaviest") return "New best: " + name + " " + Math.round(hit.value) + " kg";
-    if (hit.kind === "e1rm") return "New estimated 1RM: " + name + " ~" + Math.round(hit.value) + " kg";
+    // ⚠️ THE SAME WITHHOLDING AS THE HISTORY CARD, AND IT NAMES THE ACHIEVEMENT RATHER THAN
+    // SWALLOWING IT. A runner under 18 who has just set an estimated-1RM best has done something
+    // real; dropping the toast entirely would take that away to avoid printing a number. What the
+    // number would invite is the problem, so the number is what goes.
+    if (hit.kind === "e1rm") {
+      return isYouth()
+        ? "New best on " + name + " — that is the strongest you have lifted it for the reps"
+        : "New estimated 1RM: " + name + " ~" + Math.round(hit.value) + " kg";
+    }
     return "New best volume: " + name;
   }
   return null;
@@ -12743,9 +12751,40 @@ function progWeekOf(p, iso) {
   return w >= 1 && w <= p.weeks ? w : 0;
 }
 /** The engine's preference object for a programme. */
+/**
+ * Is the runner this app is set up for 12-17?
+ *
+ * WARNING: IT ASKS THE ENGINE RATHER THAN COMPARING A NUMBER, so the page and the plan cannot
+ * disagree about who is a child. isYouthAge is unbounded below on purpose -- see its own note --
+ * and a bare age-under-18 test here would answer FALSE for a stored age of 0 or NaN, which is the one
+ * direction that must never be wrong.
+ *
+ * WARNING: NO try/catch, FOR THE SAME REASON Y1's goalsForAge HAS NONE. A catch here would fail OPEN
+ * on a child-safety gate -- any failure at all would answer "adult" and hand a 13-year-old the adult
+ * prescription. The function it calls is a pure test on a number and cannot throw, profile is always
+ * an object, and every other engine call on this page is unguarded.
+ */
+function isYouth() {
+  return RC.isYouthAge(profile.age);
+}
+
 function progPrefs(p) {
-  return { sessionsPerWeek: p.sessionsPerWeek, minutes: p.minutes, level: p.level,
-    goal: p.goal, equipment: p.equipment || [] };
+  // ⚠️ THE AGE RIDES ON THE PREFS, WHICH IS WHAT MAKES A YOUTH PROGRAMME SAFE BY CONSTRUCTION.
+  // Every one of buildProgrammeSession / programmeWeekFor / programmeWeeksFor takes these prefs, so
+  // one edit here reaches the session, the week card and the overview together -- and a standalone
+  // programme is the path a 12-17 runner does the MOST lifting through, the one that injects its own
+  // heavy block and therefore never calls intentFor at all.
+  // ⚠️ AND THE SESSIONS A WEEK ARE CAPPED HERE TOO. The plan's own strength count is folded inside the
+  // engine (strengthSessionsFor), but a programme returns 0 there by design and carries its own
+  // figure, so the cap has to be applied where that figure is read.
+  // ⚠️ IT DOES NOT BIND TODAY AND THAT IS RECORDED RATHER THAN IMPLIED: the create sheet offers 1, 2
+  // or 3, all inside the youth ceiling, while PROGRAMME_SESSIONS_MAX is 4. What it protects is a
+  // stored record carrying a figure the current picker cannot produce -- a restored backup, or a
+  // picker widened later without this being thought about.
+  const youth = isYouth() ? RC.youthLimitsFor(profile.age) : null;
+  const spw = youth ? Math.min(p.sessionsPerWeek, youth.maxStrengthSessions) : p.sessionsPerWeek;
+  return { sessionsPerWeek: spw, minutes: p.minutes, level: p.level,
+    goal: p.goal, equipment: p.equipment || [], age: profile.age };
 }
 /** A session the runner removed from a day stays removed -- see removeExtra. */
 function progSkip(id) {
@@ -15156,10 +15195,15 @@ function renderProgSheet() {
     '<span class="po-b">' + (n === 1 ? "One session, alternating between two different ones week to week."
       : n === 2 ? "Two different sessions, A and B."
       : "Three different sessions, A, B and C.") + '</span></button>';
-  const weeks = RC.programmeWeeksFor(d.weeks, {
+  // ⚠️⚠️ THROUGH progPrefs, NOT HAND-BUILT. This is the "shape of it" preview a runner reads before
+  // starting a programme, and building the prefs object here meant it carried no AGE -- so a
+  // 13-year-old was shown the adult block table ("3 x 3-6 (heavy) at 80%+") over a programme that
+  // would be built at 8-12 with no load at all. One builder, so the preview cannot describe a
+  // programme the engine will not produce.
+  const weeks = RC.programmeWeeksFor(d.weeks, progPrefs({
     sessionsPerWeek: d.sessionsPerWeek, minutes: base.minutes, level: base.level,
     goal: base.goal, equipment: base.equipment,
-  });
+  }));
   const shape = weeks.map((w) =>
     '<div class="sh-row"><span class="sh-wk">Week ' + w.week + '</span><span class="sh-sets">' +
     esc(progBlockLabel(w.block)) + (w.isDeload ? " (ease off)" : "") + ' · ' + w.sets + ' × ' +
@@ -15295,7 +15339,13 @@ function viewStrengthHistory() {
       if (lastE > 0 && prevE > 0) trend = lastE > prevE ? "up" : lastE < prevE ? "down" : "flat";
     }
     const bits = [];
-    if (e1rm) bits.push("~" + Math.round(e1rm) + " kg estimated 1RM");
+    // ⚠️⚠️ THE NUMBER IS WITHHELD UNDER 18 AND THE TREND ARROW IS NOT, and the split is the whole
+    // point. The estimate is safe to COMPUTE -- it is Epley over submaximal sets and nobody has to
+    // lift anything maximal to produce it -- so the direction of travel still shows. What is
+    // withheld is the FIGURE: a one-rep max in front of a 14-year-old is an invitation to go and
+    // test it, and unsupervised 1RM testing is the one thing both youth position stands forbid
+    // outright. See YouthLimits' own note in src/domain/youth.ts.
+    if (e1rm && !isYouth()) bits.push("~" + Math.round(e1rm) + " kg estimated 1RM");
     if (weekVol > 0) bits.push(Math.round(weekVol) + " kg this week");
     const trendGlyph = trend
       ? '<span class="sh-trend sh-trend-' + trend + '">' + (trend === "up" ? "\\u2191" : trend === "down" ? "\\u2193" : "\\u2192") + '</span>'

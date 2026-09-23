@@ -1,5 +1,7 @@
 import type { StrengthPrefs } from "../domain/types.ts";
 import type { Equipment, MovementPattern } from "./library.ts";
+import type { YouthLimits } from "../domain/youth.ts";
+import { youthPlyoDose } from "../domain/youth.ts";
 import { EXERCISES, canDo, exercisesFor } from "./library.ts";
 
 /**
@@ -139,6 +141,15 @@ export type BuiltStrength = {
   seconds: number;
   /** The budget it was filling, so a caller can report how close it landed. */
   budgetSeconds: number;
+  /**
+   * The rest intent the MAIN lifts were built at.
+   *
+   * ⚠️ REPORTED RATHER THAN LEFT TO A REVERSE LOOKUP, because the seconds are not a key —
+   * `REST_BY_INTENT` maps light and plyo to the same 90 — and because for a 12-17 runner this is not
+   * the intent the caller asked for: a heavy block is folded to moderate, so a programme card reading
+   * its own block table announced "2.5 minutes between sets" over a session prescribing two.
+   */
+  intent: RestIntent;
 };
 
 /**
@@ -160,7 +171,21 @@ export type StrengthIntent = {
   sets: number;
 };
 
-export function intentFor(phase: string, maintenance: boolean): StrengthIntent {
+export function intentFor(phase: string, maintenance: boolean, youth?: YouthLimits | null): StrengthIntent {
+  /**
+   * WARNING: AGE IS TESTED FIRST, BECAUSE IT OVERRIDES THE PHASE RATHER THAN COLOURING IT. A peak
+   * phase asks for 3-6 reps at 80%+ of a one-rep max, which is above the band both youth position
+   * stands support without qualified supervision -- so for a 12-17 runner the phase does not get to
+   * ask. Written as a modifier further down instead, the branch that returns the heavy prescription
+   * would already have returned.
+   *
+   * WARNING: IT RETURNS NO `load`, AND THAT IS THE PRESCRIPTION. See YouthLimits' own note: a
+   * percentage is a share of a one-rep max, so naming one instructs a 14-year-old to go and find
+   * theirs, which is the single thing both sources forbid outright for this group. `buildStrength`
+   * writes `loadPercent1RM` only when the intent carries one, so an absent load is an absent field on
+   * every exercise rather than a blank on screen.
+   */
+  if (youth) return { reps: youth.strengthReps, intent: "moderate", sets: 2 };
   const heavy = !maintenance && (phase === "build" || phase === "peak");
   if (maintenance) return { reps: "4–6", intent: "heavy", load: "80%+", sets: 2 };
   if (heavy) return { reps: "3–6 (heavy)", intent: "heavy", load: "80%+", sets: 3 };
@@ -229,10 +254,18 @@ function soloCost(e: BuiltExercise): number {
  * -0.47 for lifting alone), so a thirty-minute session keeping none of it is a real loss — and one
  * keeping all of it has room for a single lift, which is not a session either.
  */
-export function plyoFor(competitive: boolean, budgetSeconds: number): { pogoSets: number; jumpSets: number; pogoReps: string; jumpReps: string; pogoEach: number; jumpEach: number } | null {
-  const d = competitive
+export function plyoFor(competitive: boolean, budgetSeconds: number, youth?: YouthLimits | null): { pogoSets: number; jumpSets: number; pogoReps: string; jumpReps: string; pogoEach: number; jumpEach: number } | null {
+  const full = competitive
     ? { pogoSets: 4, pogoReps: "12", pogoEach: 12, jumpSets: 4, jumpReps: "6", jumpEach: 6 }
     : { pogoSets: 3, pogoReps: "10", pogoEach: 10, jumpSets: 3, jumpReps: "5", jumpEach: 5 };
+  /**
+   * WARNING: A YOUTH DOSE IS SHORTER SETS, NOT FEWER OF THEM, and the sources say so in as many
+   * words: the NSCA's power table is 1-3 sets of 3-6 reps "to maintain quality of movement". Ten
+   * hops in a set is where a 13-year-old's ankles stop being springs and start being brakes, which
+   * is the mechanism the rep cap protects; trimming sets instead would keep the tired reps and
+   * remove the fresh ones.
+   */
+  const d = youthPlyoDose(full, youth ?? null);
   const per = PLYO_WORK_SEC + REST_BY_INTENT.plyo;
   const cap = budgetSeconds * PLYO_BUDGET_FRAC;
   let pogo = d.pogoSets, jump = d.jumpSets;
@@ -309,6 +342,11 @@ export function buildStrength(opts: {
   intent?: StrengthIntent;
   /** Rotate each pattern's candidate list — the A/B(/C) rotation. See pickForSlot. */
   rotate?: number;
+  /**
+   * The 12-17 limits, or null/absent for an adult. Absent is an adult and nothing else, so every
+   * existing caller is byte-identical by construction.
+   */
+  youth?: YouthLimits | null;
 }): BuiltStrength {
   const { prefs } = opts;
   const level = prefs.level;
@@ -322,7 +360,18 @@ export function buildStrength(opts: {
     : prefs.minutes;
   const budget = Math.max(600, Math.round(minutes * 60));
 
-  const base = opts.intent ?? intentFor(opts.phase, opts.maintenance);
+  /**
+   * WARNING: AN INJECTED INTENT IS STILL FOLDED TO THE YOUTH BAND, AND THAT IS WHY THE CAP IS HERE
+   * RATHER THAN ONLY IN `intentFor`. A standalone strength programme (A7) supplies its own blocks --
+   * technique, then loading, then HEAVY -- so honouring `opts.intent` unconditionally would let a
+   * 13-year-old start an eight-week programme whose third block prescribes 3-6 reps at 85%+, past
+   * both the rep floor and the load rule, through a path that never calls `intentFor` at all.
+   */
+  const youth = opts.youth ?? null;
+  const injected = opts.intent ?? intentFor(opts.phase, opts.maintenance, youth);
+  const base: StrengthIntent = youth
+    ? { reps: youth.strengthReps, intent: injected.intent === "heavy" ? "moderate" : injected.intent, sets: injected.sets }
+    : injected;
 
   // ⚠️ THE JUMPS COME OUT OF THE BUDGET BEFORE THE LIFTS GO IN, so the dose can never be squeezed out
   // by a filler that ran out of room. It is a prescription, not padding.
@@ -330,7 +379,7 @@ export function buildStrength(opts: {
   // dropped the box jump for a beginner-level runner, leaving five minutes of a thirty-minute session
   // paid for and unused — a session measurably shorter than the one asked for, for a reason nothing
   // on screen could explain.
-  const ply = opts.plyo ? plyoFor(opts.competitive, budget) : null;
+  const ply = opts.plyo ? plyoFor(opts.competitive, budget, youth) : null;
   const jumps = ply != null && canDo(EXERCISES.boxjump!, owned, level);
   const plyoSets = ply ? ply.pogoSets + (jumps ? ply.jumpSets : 0) : 0;
   const plyoSeconds = plyoSets * (PLYO_WORK_SEC + REST_BY_INTENT.plyo);
@@ -364,6 +413,13 @@ export function buildStrength(opts: {
     ? setCost(n, WORK_SEC, REST_BY_INTENT[base.intent])
     : setCost(Math.max(1, n - 1), WORK_SEC, REST_BY_INTENT[s.role === "hold" ? "hold" : "light"])), 0);
   while (mainSets < Math.min(SETS_MAX, levelSets + 1) && spineCost(mainSets + 1) <= liftBudget) mainSets++;
+  /**
+   * WARNING: THE YOUTH SET CAP IS APPLIED AFTER THE CLOCK, NOT BEFORE IT, because the clock can add
+   * one. Measured: a 17-year-old at advanced level and sixty minutes starts at three sets (2 + the
+   * level's +1) and the growth loop above takes it to four, which is past the NSCA's 1-3. Capping the
+   * starting figure would have left that untouched.
+   */
+  if (youth) mainSets = Math.min(mainSets, youth.maxStrengthSets);
   // The shipped session's own relationship: the trunk work carries one set fewer than the lifts.
   const accSets = Math.max(1, mainSets - 1);
 
@@ -420,5 +476,5 @@ export function buildStrength(opts: {
     total += plyoSeconds;
   }
 
-  return { exercises: out, seconds: Math.round(total), budgetSeconds: budget };
+  return { exercises: out, seconds: Math.round(total), budgetSeconds: budget, intent: base.intent };
 }

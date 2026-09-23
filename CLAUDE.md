@@ -3369,6 +3369,10 @@ compliant, but it is the clause to re-read before adding any new route**, and it
 (host only — no scheme, no path), raise athlete capacity to 10 in the API Settings Dashboard before any
 tester tries it, and confirm the paid Strava subscription. The Road Map step `p2-strava` stays
 **unticked** until a real run has gone across. Credentials are in gitignored `strava-secret.txt`.
+✅ **THE CALLBACK DOMAIN IS REGISTERED — verified 2026-09-23 against a control, not assumed.** An
+authorize request whose `redirect_uri` is on `example.com` gets **400 `redirect_uri invalid`**; the same
+request with ours gets **302 to Strava's login**. Athlete capacity and the subscription cannot be seen
+from outside Strava's own settings page and are still the owner's to check.
 
 ## THE NATIVE APP NOW SELF-UPDATES THE WEB LAYER OVER THE AIR (2026-08-10)
 
@@ -15499,6 +15503,21 @@ reaches his phone over the air on the next launch; the Worker change needs `wran
 `alfie-proxy/`. Until then `stravaCanWeightTraining()` correctly answers false for everyone, because the
 currently-deployed Worker's `/strava/status` carries no `sportTypes` field at all — the handshake this
 stage exists to build is also what makes that safe to leave sitting unsent.
+✅ **DEPLOYED 2026-09-23 — version `3dde9be4`; the previous deploy was 2026-08-10.** Verified live:
+`/strava/status` answers `sportTypes: ["Run","WeightTraining"]`, the health report and CORS are
+unchanged, and a bare `/strava/start` still reaches its device-key refusal, so the secrets are intact —
+`wrangler deploy` does not touch them.
+⚠️ **"NO FURTHER CHANGE" AFTER THE DEPLOY WAS NOT QUITE TRUE.** The phone caches `sportTypes` and
+refreshes it in exactly three places — `wireConnectView` (Profile › Apps & devices), that screen's Check
+link, and `stravaResume` after a consent — and **nowhere at launch**. So an already-connected runner does
+not learn the server changed until they open that screen once. Not fixed: a refresh on launch would close
+it, and it wants its own guard. The same will apply to any future server capability.
+⚠️ **HOW TO DEPLOY FROM THIS MAC.** The wrangler OAuth login expires (the 2026-08-10 one had lapsed by
+2026-09-22). Run `npx wrangler login` in the owner's Terminal panel (`run_in_terminal`, cwd
+`alfie-proxy/`); **he must click Allow within about two minutes** or it fails with *"Timed out waiting
+for authorization code"*. Then from the sandbox: the README's by-hand `tsc` for `strava.ts`,
+`CI=1 WRANGLER_SEND_METRICS=false npx --no-install wrangler deploy --dry-run --outdir <scratch>`, the
+same without `--dry-run`, then re-check `/strava/status`. `wrangler deployments list` shows the history.
 
 **Still to come in this track:** A9 the watch (native, Xcode-beta).
 

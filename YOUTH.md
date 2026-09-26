@@ -10,6 +10,8 @@ NOTHING IN HERE IS BUILT YET. It is the spec, and it needs his sign-off before i
 
 ## 0. What the app does for a 13-year-old today
 
+*(Written 2026-09-21, before Y1-Y4. Sections 5.6-5.9 record what changed.)*
+
 `ageOpts` offers **12 to 90** plus "Prefer not to say", and every answer builds the same plan. The only
 youth accommodation anywhere in the codebase is in `src/science/warmup.ts:506` - a 25% shorter warm-up
 under 18. So today a 13-year-old can:
@@ -448,6 +450,20 @@ returns; a youth must not reach four through any of them, and the preferences pa
 binds (`STRENGTH_MAX_PER_WEEK` is 4). ⚠️ **A programme returns 0 there by design and carries its own
 figure**, so the cap is applied again in `progPrefs` where that figure is read.
 
+## 5.9 Y4 as built - Strava's rules, and the age answer under them (2026-09-23)
+
+- **Strava, verified on its own pages:** "Strava allows accounts starting at age 13"; "athletes under 16
+  cannot upload heart rate data or receive heart rate analysis" (Help Centre); "at least 13 years old, or
+  such higher age as may be required in your jurisdiction" (Terms, effective 1 January 2026).
+- **Under 13, no Strava at all; 13-15, runs go without heart rate; 16+ and no answer, unchanged.**
+- **Found under it, and more serious:** the app never handed the runner's age to the plan builder, so Y2
+  and Y3 were built and tested and reached no real plan. Measured for a 13-year-old: longest session
+  11.0-14.2 km, 4-5 runs a week and 51 lifts at a %1RM before; 7.6 km, 3 runs and none after.
+- **And "Prefer not to say" was stored as 0 and read as a 12-year-old.** `ageAnswer` is now the one
+  definition of an age answer.
+- **Residual:** a 13-year-old's hard sessions are 6.4-7.6 km including warm-up and cool-down, against the
+  6 km race limit.
+
 ## 6. The legal consequence of saying yes - and it is real
 
 ⚠️⚠️ **DELIBERATELY SERVING 12-17s MAKES THE APP "LIKELY TO BE ACCESSED BY CHILDREN", SO THE ICO's
@@ -495,4 +511,5 @@ fifteen standards are satisfied by things already true.
 - Road Runners Club of America, FUNdamentals of Youth Running. American Academy of Pediatrics.
   Nationwide Children's Hospital sports medicine guidance.
 - ICO, *Age appropriate design: a code of practice for online services*.
-- Strava Terms of Service and Help Centre (minimum age 13; under-16 heart-rate restriction).
+- Strava Terms of Service (effective 1 January 2026) and Help Centre article "Can I use Strava if I'm
+  under the age of 16?" (minimum age 13; under-16 heart-rate restriction) - both re-read 2026-09-23.

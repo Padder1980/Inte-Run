@@ -6657,6 +6657,17 @@ function applyProfile(pf) {
   const ath = { daysPerWeek: pf.daysPerWeek, recent, experience, includeStrength: pf.strength,
     returningFromInjury: rk === "injury", returningFromBreak: rk === "break",
     runWalk: pf.status === "new", longRunDay: pf.longRunDay != null ? pf.longRunDay : 6 };
+  // ⚠️⚠️ THE AGE HAS TO BE HANDED OVER, OR EVERY YOUTH LIMIT IS COMPUTED AND DISCARDED. Y2 and Y3 put
+  // the distance ceilings, the three-runs-a-week cap, the one hard day and rep-range lifting into the
+  // engine, each proved there with Athlete.age set by hand -- and this object never carried an age,
+  // so none of it reached a real plan. Measured when Y4 found it: a 13-year-old on four days was given
+  // an 11.0 km session (14.2 km on five days, competitive), up to five runs a week, weeks with two
+  // hard days and 51 lifts at a percentage of a one-rep max. With the age handed over: 7.6 km, three
+  // runs, no second hard day, no percentages. ONLY WHEN THEY ANSWERED, through the engine's one
+  // definition of an answer, so "Prefer not to say" (stored as 0 before Y4) stays an adult. An adult
+  // age changes nothing: every youth lever is gated on youthLimitsFor, which is null from 18.
+  const ageA = RC.ageAnswer(pf.age);
+  if (ageA != null) ath.age = ageA;
   // ⚠️ UNCLAMPED, AND ONLY WHEN THEY HAVE ACTUALLY ANSWERED. Athlete carries the runner's ANSWER —
   // what a week can honour is strengthSessionsFor's job, exactly as runningDaysFor owns the running
   // one — and a profile with no strengthDays sends nothing at all, which is what keeps every existing
@@ -8766,7 +8777,11 @@ function runStravaPayload(run) {
       Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
   };
-  const hrs = (run && Array.isArray(run.hrSeries) ? run.hrSeries : [])
+  // ⚠️ UNDER 16, NO HEART RATE GOES TO STRAVA -- STRAVA'S OWN RULE ("athletes under 16 cannot upload
+  // heart rate data"). The readings stay in Inte-Run; the GPX simply carries none, so the namespace
+  // and every gpxtpx extension drop out below by themselves. Asked here, inside the builder, so no
+  // caller can forget to ask.
+  const hrs = (stravaHeartRateOk() && run && Array.isArray(run.hrSeries) ? run.hrSeries : [])
     .filter((s) => Array.isArray(s) && isFinite(Number(s[0])) && Number(s[1]) > 0);
   // ⚠️ A DROPOUT IS NOT INTERPOLATED ACROSS. HealthKit simply stops delivering when the watch loses
   // skin contact, so a wide gap between samples is missing evidence, not a slow change -- and drawing
@@ -21279,9 +21294,31 @@ function stravaConnected() { const c = stravaCfg(); return !!(c.connected && c.k
  * to a server that has not said it understands "WeightTraining". Deploy skew is mitigated by failing
  * closed, never by guessing.
  */
+/**
+ * Strava's own age rules, asked of the engine so the page and the engine cannot disagree about who
+ * may use it: nothing at all under 13, and no heart rate under 16. STRAVA_MIN_AGE in
+ * src/domain/youth.ts quotes the two Strava pages these come from.
+ *
+ * ⚠️ stravaActive IS WHAT EVERY SEND AND EVERY SEND CONTROL ASKS, NOT stravaConnected. Connected is a
+ * fact about a token; active is whether we may use it. They differ for one runner: somebody who
+ * connected and then gave an age under 13. They must still be able to Disconnect, which tells Strava
+ * as well as us, while nothing is sent. So the Strava sheet and the Apps & devices row read the raw
+ * fact, and the senders, the send controls and the finish screen read this.
+ *
+ * ⚠️ NO try/catch, for the reason isYouth() has none: a catch fails OPEN on a child-safety gate, and
+ * both calls are pure tests on a number that cannot throw.
+ */
+function stravaAgeOk() { return RC.stravaAllowedAt(profile.age); }
+function stravaHeartRateOk() { return RC.stravaHeartRateAllowedAt(profile.age); }
+function stravaActive() { return stravaConnected() && stravaAgeOk(); }
+function stravaHeartRateNote() {
+  if (stravaHeartRateOk()) return "";
+  return '<div class="bk-md" style="margin-top:10px">Your heart rate stays in Inte-Run until you’re 16. ' +
+    'That’s Strava’s own rule for under-16s, so your runs go across without it.</div>';
+}
 function stravaCanWeightTraining() {
   const c = stravaCfg();
-  return stravaConnected() && Array.isArray(c.sportTypes) && c.sportTypes.indexOf("WeightTraining") !== -1;
+  return stravaActive() && Array.isArray(c.sportTypes) && c.sportTypes.indexOf("WeightTraining") !== -1;
 }
 /** Is this someone who is expected to configure a server by hand? Same gate as the Mapbox field:
  *  a TestFlight tester must never be shown a box asking for a URL they have never heard of. */
@@ -21347,6 +21384,8 @@ function stravaRerender() {
 function stravaConnect() {
   const base = stravaBase();
   if (!base) return;
+  // Belt: under 13 the connect button is never drawn, so this only catches a future caller.
+  if (!stravaAgeOk()) { toast("Strava is for 13 and over — that’s Strava’s own rule."); return; }
   const key = stravaDeviceKey();
   if (!key) { toast("This browser cannot generate a secure key."); return; }
   const cfg = stravaCfg(); cfg.pending = Date.now(); stravaSaveCfg(cfg);
@@ -21378,7 +21417,7 @@ function stravaDisconnect() {
  * one would come back as a run stuck sending forever, with no button to try again.
  */
 function stravaSendRun(run, onDone) {
-  if (!run || !stravaConnected()) return;
+  if (!run || !stravaActive()) return;
   const key = stravaCfg().key;
   const payload = runStravaPayload(run);
   const finish = () => { saveRuns(); if (onDone) onDone(); };
@@ -21419,7 +21458,7 @@ function stravaMaybeAutoSend(run) {
   if (!run || run.sim) return;
   if (run.strava) return;
   const cfg = stravaCfg();
-  if (!cfg.auto || !stravaConnected()) return;
+  if (!cfg.auto || !stravaActive()) return;
   stravaSendRun(run, () => { try { renderUnlessTyping(); } catch (e) {} });
 }
 /** Finish a run Strava was still processing when we stopped waiting. */
@@ -21446,7 +21485,7 @@ function stravaCheckPending(run, onDone) {
  * Connecting lives in Support › Apps & devices, once.
  */
 function stravaRunButtonHtml(run) {
-  if (!stravaConnected()) return "";
+  if (!stravaActive()) return "";
   const s = (run && run.strava) || {};
   if (s.state === "done") {
     return '<a class="card stv-done" href="https://www.strava.com/activities/' + esc(s.id) + '" target="_blank" rel="noopener">' +
@@ -21477,7 +21516,7 @@ function stravaRunButtonHtml(run) {
  * nothing to wait for here.
  */
 function strengthSendSession(row, onDone) {
-  if (!row || !stravaConnected()) return;
+  if (!row || !stravaActive()) return;
   const key = stravaCfg().key;
   const payload = strengthStravaPayload(row);
   const finish = () => { sdoneSave(row); if (onDone) onDone(); };
@@ -21560,6 +21599,14 @@ function stravaSheetHtml() {
           '<button class="primary" id="stvUrlSave" style="width:100%;margin-top:10px">Use this server</button>' +
           '<div class="bk-md" style="margin-top:10px;line-height:1.45">Stays on this phone. See alfie-proxy in the repo for the ten-minute deploy.</div>'
         : '<div class="bk-md" style="margin-top:10px">It arrives with the App Store release.</div>');
+  } else if (!stravaAgeOk()) {
+    // ⚠️ STRAVA IS FOR 13 AND OVER -- STRAVA'S RULE, NOT OURS (STRAVA_MIN_AGE). Nothing is offered to
+    // connect, and a runner who connected before giving an age under 13 keeps the one control that
+    // still matters: Disconnect, which tells Strava as well as us.
+    body = '<div class="bk-box"><div class="bk-val">Strava is for 13 and over</div>' +
+      '<div class="bk-md" style="margin-top:4px">That’s Strava’s own rule, so Inte-Run won’t ' +
+      'connect to it or send it anything until you’re 13.</div></div>' +
+      (stravaConnected() ? '<button class="bk-btn2" id="stvOff">Disconnect from Strava</button>' : "");
   } else if (stravaConnected()) {
     const on = !!cfg.auto;
     body = '<div class="bk-box"><div class="bk-val">Connected' + (cfg.name ? " as " + esc(cfg.name) : "") + '</div>' +
@@ -21573,7 +21620,7 @@ function stravaSheetHtml() {
         ? 'Only runs you finish from now on \— your existing runs stay where they are unless you send them yourself.'
         : 'Off, so nothing goes across unless you tap Send on a run.') + '</div>' +
       '<div class="bk-md" style="margin-top:12px">Inte-Run can only <b>add</b> activities. It cannot read your ' +
-      'Strava history, and it never sees your Strava password.</div>' +
+      'Strava history, and it never sees your Strava password.</div>' + stravaHeartRateNote() +
       '<button class="bk-btn2" id="stvOff">Disconnect from Strava</button>';
   } else if (waiting) {
     body = '<div class="bk-box"><div class="bk-val">Waiting for Strava</div>' +
@@ -21586,7 +21633,7 @@ function stravaSheetHtml() {
       'cannot read your Strava history and never sees your Strava password.</div>' +
       '<button class="primary" id="stvGo" style="width:100%;margin-top:14px">Connect to Strava</button>' +
       '<div class="bk-md" style="margin-top:10px;line-height:1.45">Opens Strava in your browser. Runs are only ' +
-      'sent when you tap Send on a run \— nothing goes across on its own.</div>';
+      'sent when you tap Send on a run \— nothing goes across on its own.</div>' + stravaHeartRateNote();
   }
   return '<div id="stvSheet"></div><div class="sd-type" style="--sc:var(--accent)">Apps</div>' +
     '<div class="sd-title">Strava</div>' + body;
@@ -21650,9 +21697,10 @@ function connectView() {
   const stvWaiting = !!stvCfg.pending && Date.now() - Number(stvCfg.pending) < 600000;
   let stvNote, stvBadge, stvCls;
   if (!stvSetUp) { stvNote = "Needs Inte-Run’s own server to hold the connection — it arrives with the App Store release."; stvBadge = "Planned"; stvCls = "soon"; }
-  else if (stravaConnected()) { stvNote = "Connected" + (stvCfg.name ? " as " + esc(stvCfg.name) : "") + " — send a run from its page in your Logbook."; stvBadge = "Connected"; stvCls = "ok"; }
+  else if (!stravaAgeOk()) { stvNote = "Strava is for 13 and over — that’s Strava’s own rule."; stvBadge = "13+"; stvCls = "soon"; }
+  else if (stravaConnected()) { stvNote = "Connected" + (stvCfg.name ? " as " + esc(stvCfg.name) : "") + " — send a run from its page in your Logbook." + (stravaHeartRateOk() ? "" : " Heart rate isn’t sent until you’re 16."); stvBadge = "Connected"; stvCls = "ok"; }
   else if (stvWaiting) { stvNote = "Waiting for you to give permission in your browser."; stvBadge = "…"; stvCls = "soon"; }
-  else { stvNote = "Send your finished runs to Strava. One permission — to add activities."; stvBadge = "Ready"; stvCls = "ok"; }
+  else { stvNote = "Send your finished runs to Strava. One permission — to add activities." + (stravaHeartRateOk() ? "" : " Heart rate isn’t sent until you’re 16."); stvBadge = "Ready"; stvCls = "ok"; }
 
   return '<div class="card">' +
     '<div class="cn-sec">Watches</div>' +
@@ -21662,7 +21710,7 @@ function connectView() {
     row(ICON.heart, "Apple Health", native
       ? "Watch runs save to Health automatically and count towards your rings."
       : "Works with the Inte-Run iPhone app — watch runs save to Health.", native ? "Automatic" : "Needs the app", native ? "ok" : "soon", null) +
-    row(ICON.share, "Strava", stvNote, stvBadge, stvCls, (stvSetUp || stravaDevMode()) ? "strava" : null) +
+    row(ICON.share, "Strava", stvNote, stvBadge, stvCls, ((stvSetUp || stravaDevMode()) && (stravaAgeOk() || stravaConnected())) ? "strava" : null) +
     '<div class="cn-sec">Calendars</div>' +
     row(ICON.plan, "Apple, Google & Outlook", "Put every planned session in your calendar, with a morning alert.", "Ready", "ok", "cal") +
     '</div>' +
@@ -24028,7 +24076,11 @@ function draftFromForm() {
     // ⚠️ NO FALLBACK AGE. This was || 35, which is inside the masters band, so a runner who skipped
     // the question was recorded as a masters athlete AND had their heart-rate ceiling computed from
     // an age nobody gave. Absent means absent; assessMasters and maxHrEstimate() both handle it.
-    age: Number(wizFieldVal("s_age")) || 0, sex: wizFieldVal("s_sex"),
+    // ⚠️ AND THE "|| 0" THAT REPLACED IT WAS NOT ABSENT. It stored 0, and isYouthAge counted 0 as a
+    // child, so Y3 would have given every runner who chose "Prefer not to say" a 12-year-old's lifting.
+    // RC.ageAnswer is the one definition of "they gave an age": a blank is now stored as no key at
+    // all, and a 0 already on a phone reads as no answer through it too.
+    age: RC.ageAnswer(wizFieldVal("s_age")) || undefined, sex: wizFieldVal("s_sex"),
     // ⚠️ THE BOOLEAN IS DERIVED AND STAYS, because includeStrength is read all over the engine and
     // the app and none of those readers wants a count. Zero sessions and "No" are the same answer and
     // must stay the same answer.
@@ -24381,13 +24433,15 @@ function targetChosen(pf) {
 function currentAgeAnswer() {
   const live = $("s_age");
   if (live && typeof live.value === "string" && live.value !== "") {
-    const n = Number(live.value);
-    if (Number.isFinite(n) && n > 0) return n;
+    const n = RC.ageAnswer(live.value);
+    if (n != null) return n;
   }
   const d = draft && draft.__f ? draft.__f.s_age : null;
-  if (d != null && d !== "") { const n = Number(d); if (Number.isFinite(n) && n > 0) return n; }
-  const p = profile && profile.age;
-  return (Number.isFinite(Number(p)) && Number(p) > 0) ? Number(p) : null;
+  if (d != null && d !== "") { const n = RC.ageAnswer(d); if (n != null) return n; }
+  // ⚠️ ONE DEFINITION OF AN AGE ANSWER. This function used to carry its own copy (a positive finite
+  // number), and the youth test did not -- so this screen called a stored 0 "not given" while the
+  // strength screens called the same 0 a 12-year-old.
+  return RC.ageAnswer(profile && profile.age);
 }
 /**
  * The goals this runner may be offered, after the 12-17 ceiling.
@@ -37048,7 +37102,7 @@ function liveSyncHtml(sm) {
   const rows = [];
   // ⚠️ STRAVA APPEARS ONLY WHEN CONNECTED, for the reason stravaRunButtonHtml already records: a
   // greyed-out row on every finished run advertises a feature the runner has not set up.
-  if (stravaConnected()) rows.push(syncRowHtml("lStrava", ICON.share, "Strava", stravaAutoSend(),
+  if (stravaActive()) rows.push(syncRowHtml("lStrava", ICON.share, "Strava", stravaAutoSend(),
     "Send this run to Strava when you save it"));
   // ⚠️ AND HEALTH ONLY WHERE IT EXISTS. In a browser, and in any build whose Swift predates this, there
   // is nothing to write to — and a switch over nothing is the inert control this row was rebuilt to

@@ -15,6 +15,7 @@
  * field is missing or does not list "WeightTraining".
  */
 
+import { stravaAllowedAt } from "../src/domain/youth.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
@@ -242,10 +243,13 @@ test("BLOCKER: the dedupe handle is stable across a retry, derived from the row'
 // -------------------------------------------------------------------------------------------------
 
 function loadGate(cfg: Record<string, unknown>) {
-  const src = [fnOf("stravaConnected"), fnOf("stravaCanWeightTraining")].join("\n");
-  const ctx = { stravaCfg: () => cfg };
+  // ⚠️ Y4 put the age gate under this (stravaCanWeightTraining asks stravaActive, which asks
+  // stravaAgeOk), so those are lifted too, with the REAL engine rule and an adult profile -- a stub
+  // answering true would measure a strictly easier program.
+  const src = [fnOf("stravaConnected"), fnOf("stravaAgeOk"), fnOf("stravaActive"), fnOf("stravaCanWeightTraining")].join("\n");
+  const ctx = { stravaCfg: () => cfg, RC: { stravaAllowedAt }, profile: {} };
   // eslint-disable-next-line no-new-func
-  const factory = new Function("ctx", "const stravaCfg = ctx.stravaCfg;" + src + "\nreturn stravaCanWeightTraining;");
+  const factory = new Function("ctx", "const stravaCfg = ctx.stravaCfg, RC = ctx.RC, profile = ctx.profile;" + src + "\nreturn stravaCanWeightTraining;");
   return factory(ctx) as () => boolean;
 }
 

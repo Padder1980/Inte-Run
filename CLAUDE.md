@@ -5621,6 +5621,15 @@ guard over all five labels — the count guard `shots()` already had and the pri
 by deleting a privacy case from the harness: it reports **"that is a capture that did not finish, not a
 privacy switch that failed"**. Re-measured after: 20/20 alone and **1236/1236 on three consecutive full
 runs**, so the flake remains unreproduced and the next occurrence will say what it is.
+✅ **DIAGNOSED 2026-09-24 (during Y4): A CDP CALL RUNNING PAST ITS 120-SECOND LIMIT ON A BOGGED-DOWN MAC.**
+The error is `Runtime.evaluate timed out` — `rpc`'s 120000 ms timer in `test/share-export-harness.ts`.
+Four full runs in a row hit it (under UTC once, under Kiritimati twice, and one plain `node --test` that
+took **7,299 s**), including one at four files at a time, while the file ALONE passed **21/21 in 4.4 s**
+in the same timezone. The Mac (24 GB) had **4 GB in swap and a load average of 24 with no tests
+running**; the default runner puts about 13 files up at once and a few share files hold 1.6–2.7 GB each.
+So it is environmental, and it fails all 21 tests together because they all wait on the one capture.
+`VERIFY_CONCURRENCY=N npm run verify` now runs N files at a time and says so in its summary line; it did
+not rescue that machine that day, so the real remedy is a less loaded Mac before a full check.
 
 ### THE SESSION'S OWN COLOUR, THE DESTINATIONS ROW, AND NO TOP FADE (owner, ruling 7, 2026-08-20)
 
@@ -15759,6 +15768,11 @@ flagged for the owner rather than inherited. Flagged on the Road Map; not signed
 
 ### Y2 — THE CEILINGS REACH THE PLAN ITSELF (2026-09-22). `YOUTH.md` §5.7 HAS THE MEASUREMENTS.
 
+⚠️⚠️ **CORRECTION 2026-09-23 (Y4): NONE OF THIS REACHED A REAL PLAN UNTIL Y4.** The app never put
+`age` on the Athlete it hands the plan builder, so every lever below was computed and discarded for
+anybody using the app; the engine's tests set `Athlete.age` by hand and could not see it. See the Y4
+chapter, which wired it and measured the difference.
+
 Suite 1724 → **1731**; 13 re-breaks, 9 caught and the other four recorded at the line as unreachable.
 Four levers, all folded into decisions the engine already makes — `longCapMin` and
 `beginnerLongPeakMin`, a shrink-only weekly pass, `runningDaysFor`, `qualitySessionsThisWeek` and
@@ -15820,6 +15834,10 @@ race-pace arm sits behind two independent gates.
 that is a better reason than "belt and braces".
 
 ## ✅ Y3 — LIFTING FOR 12-17s: A REP RANGE, NEVER A PERCENTAGE (owner, 2026-09-22)
+
+⚠️⚠️ **CORRECTION 2026-09-23 (Y4): ON THE RUNNING PLAN THIS REACHED NOBODY UNTIL Y4** — the app never
+handed the age to the plan builder (standalone programmes did get it, via `progPrefs`). And "Prefer not
+to say" was stored as 0 and read as a 12-year-old by `isYouth()`. Both fixed in Y4.
 
 The third stage of the youth programme he commissioned. *"This also applies to any weight training
 programme. Based on the users age, this should restrict the types of plan that the user has access to
@@ -16006,3 +16024,93 @@ Store answers. Then D3c, a home for the wellbeing tick-boxes.
 ⚠️ **AND THE THRESHOLDS IN THIS CHAPTER ARE STILL THE OWNER'S TO HAVE REVIEWED.** The distance and
 frequency numbers are UK Athletics' own rule; the resistance numbers are two position stands. Neither
 has been read by a clinician for this app, and `YOUTH.md` section 7 lists what is honestly uncertain.
+
+## ✅ Y4 — STRAVA'S OWN AGE RULES, AND THE TWO THINGS FOUND UNDER THEM (2026-09-23)
+
+The owner's instruction: *"Start Y4: Strava and heart rate for under-16s."* Suite 1751 → **1760**;
+`test/youth-strava.test.ts` holds 9 guards and **20 deliberate re-breaks were all caught**.
+
+⚠️⚠️ **STARTING Y4 FOUND THAT Y2 AND Y3 HAD NEVER REACHED A REAL PLAN.** `applyProfile` builds the
+`ath` object it hands `RC.buildPlanSummary` and `RC.generatePlan`, and it never carried an age — so
+every youth lever in the engine (`youthLimitsFor(athlete.age)`) answered null for everybody using the
+app. The engine's tests set `Athlete.age` by hand, which is why a green suite could not see it: the
+computed-and-discarded trap, and the first time it has hidden a child-safety feature. Measured, a
+13-year-old on four and five days, before → after the hand-off:
+
+| | no age handed over (shipped until Y4) | age handed over |
+|---|---|---|
+| longest session | **11.0–14.2 km** | 7.6 km |
+| runs in a week | **4–5** | 3 |
+| weeks with two hard days | **1–5** | 0 |
+| lifts at a % of a one-rep max | **51** | 0 |
+
+⚠️ **ONLY WHEN THEY ANSWERED**, through the engine's one definition (`RC.ageAnswer`), and an adult age
+changes nothing — every lever is gated on `youthLimitsFor`, null from 18. Verified in the served app
+with the real `applyProfile`: a 46-year-old, no age and "Prefer not to say" all build the identical
+adult plan (4 runs, 12.4 km, 72 %1RM lifts); a 13-year-old builds 3 runs, 7.6 km, 0.
+⚠️ **`test/youth-strava.test.ts` RUNS `applyProfile` WITH A SPY ENGINE** that records what it is handed,
+then feeds that into the real `generatePlan`. A guard on the engine alone is exactly what let this ship.
+
+⚠️⚠️ **AND "PREFER NOT TO SAY" WAS A 12-YEAR-OLD.** `draftFromForm` saved a blank age through
+`Number(...) || 0`, and `isYouthAge` tested only type, finiteness and < 18, so 0 passed and
+`youthLimitsFor(0)` was the 12 row. The goal picker had its own copy of the test demanding > 0, which
+is why the goal screen looked right and nobody saw it. Y3 made it live (`isYouth()`, `progPrefs`), and
+it was fixed the same day. `ageAnswer` is now the one definition: non-positive, non-finite and
+non-numeric mean no answer; a numeric string counts (a restored backup must not turn a 13-year-old
+into an adult); a real number below 12 is still a child. The form stores no key for a blank answer,
+and a 0 already on a phone reads as no answer through the same function.
+
+### What Strava itself says, verified on its own pages rather than a search summary
+
+- Help Centre, *"Can I use Strava if I'm under the age of 16?"*: **"Strava allows accounts starting at
+  age 13"** and **"athletes under 16 cannot upload heart rate data or receive heart rate analysis"**.
+- Terms of Service, effective 1 January 2026: **"at least 13 years old, or such higher age as may be
+  required in your jurisdiction"** — 13 in the UK.
+
+Both quotes live beside `STRAVA_MIN_AGE` / `STRAVA_HEART_RATE_MIN_AGE`, and a guard fails if a number
+moves without its quote. YOUTH.md's "no messaging or Instant Workouts under 18" are Strava's own
+features; this app uses neither.
+
+### What shipped
+
+- **Under 13: no Strava at all.** Connect is never drawn, `stravaConnect` refuses as a belt, both
+  uploads refuse, and the run page, the strength "done" screen and the finish-screen sync row are
+  absent. A runner who connected before giving an age under 13 keeps **Disconnect**, which tells Strava
+  as well as us.
+- **13–15: Strava without heart rate.** `runStravaPayload` asks the gate *inside* the builder, so no
+  caller can forget; the GPX then carries no `gpxtpx` namespace or reading, and the route still goes.
+  The sheet and the Apps & devices row say so in a sentence.
+- **16 and over, and no answer: unchanged.** Absent means allowed, exactly as it means adult everywhere
+  else — Strava checks a date of birth at its own sign-up, and refusing here would take Strava from
+  every adult who skipped the question.
+
+⚠️ **`stravaActive()` IS WHAT EVERY SEND AND SEND CONTROL ASKS; `stravaConnected()` IS NOW ONLY THE
+FACT ABOUT THE TOKEN.** They differ for exactly one runner (connected, then aged under 13), who must
+still reach Disconnect. A derived guard finds every function that calls the upload endpoint, requires
+exactly the two there are, and requires each to ask `stravaActive()` first — a third upload path fails
+until somebody decides about it.
+⚠️ **FOUR EXISTING GUARDS WERE RESTATED, NOT DELETED** (`strava-connect` ×3, `live-screens` ×1): each
+pinned the literal `stravaConnected()`; each now pins `stravaActive()` **and** that `stravaActive` still
+requires a connection, because either half alone would weaken the old promise. Eight harness lifts
+went stale loudly (ReferenceError / `RC.ageAnswer is not a function`) and were given the REAL rule —
+except the GPX-shape tests, which state they are about an adult and point here for the gate.
+
+### Still open, measured, and not fixed here
+
+- ⚠️ **A 13-year-old's hard sessions come to 6.4–7.6 km** (tempo and interval formats, of which only
+  2.5–3.7 km is the work) against a 6 km race limit. It is the Y2 residual, now measurable because the
+  age arrives; the fix is a shorter format, and whether a race limit should bound a training session's
+  warm-up and cool-down at all is itself a judgement.
+- **Runs already sent to Strava with heart rate cannot be recalled** — the app holds `activity:write`
+  only, which cannot delete.
+- **"Prefer not to say" still means adult**, so a 12-year-old who declines gets the adult app. The fix
+  CLAUDE.md already names (ask "are you 18 or over?", treat a refusal as under 18) is still not built.
+
+⚠️ **ALL WEB, SO IT REACHES PHONES OVER THE AIR.** No Swift changed.
+
+**Verified:** `verify OK · build 0 · voices clean · 3 blocks · tsc 1 pinned · tests 1760/0 ×3 tz · audits ok
+· 5m47s`, on the fourth full attempt. The three before it failed only the share-export gate's
+`Runtime.evaluate timed out` on a bogged-down Mac (diagnosed in the share-export chapter), and
+`tools/verify.mjs` gained an optional `VERIFY_CONCURRENCY` for it. Driven in the served app with the real
+`applyProfile` and the real Strava sheet and Apps & devices row at ages 12, 14, 16 and none; no console
+errors.

@@ -21,7 +21,9 @@ function lift(name: string, extra: Record<string, unknown> = {}): Function {
   // ⚠️ BOTH START READERS ARE STUBBED, because runStravaPayload asks two different questions of
   // them: runStartMs for the number to write, runStartExactMs for whether that number is real.
   // Stubbing only the first would leave the second undefined and every test here would throw.
-  const scope = { esc: (x: unknown) => String(x ?? ""),
+  // ⚠️ Y4: the age gate is proven with the REAL functions and a real engine in
+  // test/youth-strava.test.ts. Here the runner is an adult, which is what these GPX claims are about.
+  const scope = { esc: (x: unknown) => String(x ?? ""), stravaHeartRateOk: () => true,
     runStartMs: () => Date.parse("2026-08-09T09:00:00Z"),
     runStartExactMs: () => Date.parse("2026-08-09T09:00:00Z"), ...extra };
   const keys = Object.keys(scope);

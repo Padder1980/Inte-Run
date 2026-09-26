@@ -332,7 +332,9 @@ function strava(run: Record<string, unknown>) {
   // dateIso (ingestWatchRun always stores one), so runStartMs's fallback is Date.parse of that date at
   // 09:00 rather than anything read from now. A stubbed clock would have hidden a reader that DID
   // depend on the time of day.
-  const scope: Record<string, unknown> = { esc: (x: unknown) => String(x ?? "") };
+  // ⚠️ Y4: the age gate is proven with the REAL functions and a real engine in
+  // test/youth-strava.test.ts. Here the runner is an adult, which is what these GPX claims are about.
+  const scope: Record<string, unknown> = { esc: (x: unknown) => String(x ?? ""), stravaHeartRateOk: () => true };
   const keys = Object.keys(scope);
   const fn = new Function(...keys, src + "; return runStravaPayload;")(...keys.map((k) => scope[k]));
   return fn(run);

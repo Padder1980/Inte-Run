@@ -185,7 +185,27 @@ export interface YouthLimits {
  */
 
 /**
- * True for anyone this module answers for. Absent, non-finite and 18+ are all false.
+ * The runner's answer to "how old are you?", or null when they gave none.
+ *
+ * ⚠️⚠️ A STORED 0 IS "PREFER NOT TO SAY", NOT AN AGE -- AND UNTIL Y4 IT MADE AN ADULT A 12-YEAR-OLD.
+ * The setup form saved a blank age through Number(...) || 0, and isYouthAge tested only the type,
+ * finiteness and < 18, so 0 passed: youthLimitsFor(0) clamped to the 12 row and a runner who
+ * declined the question got a child's strength prescription. The goal picker had its own copy of
+ * this test that demanded > 0, which is why the two disagreed and nothing looked wrong on the goal
+ * screen. This is the one definition now; every reader of an age goes through it.
+ *
+ * Only non-positive, non-finite and non-numeric values mean "no answer". A numeric STRING counts,
+ * because a form field or a restored backup hands one over, and refusing it would turn a
+ * 13-year-old into an adult. A real number below 12 still counts -- see isYouthAge.
+ */
+export function ageAnswer(age: unknown): number | null {
+  const n = typeof age === "number" ? age : (typeof age === "string" && age.trim() !== "" ? Number(age) : NaN);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * True for anyone this module answers for. Absent, 0 (no answer -- see ageAnswer), non-finite and
+ * 18+ are all false.
  *
  * ⚠️ DELIBERATELY UNBOUNDED BELOW, AND THAT IS THE SAFE DIRECTION. There is no lower test, so
  * an age of 9 is "youth" and youthLimitsFor clamps it to the 12 row. The form cannot produce one, but
@@ -194,7 +214,8 @@ export interface YouthLimits {
  * exists to prevent.
  */
 export function isYouthAge(age: number | null | undefined): boolean {
-  return typeof age === "number" && Number.isFinite(age) && age < YOUTH_MAX_AGE + 1;
+  const a = ageAnswer(age);
+  return a != null && a < YOUTH_MAX_AGE + 1;
 }
 
 /**
@@ -208,7 +229,7 @@ export function isYouthAge(age: number | null | undefined): boolean {
  */
 export function youthLimitsFor(age: number | null | undefined): YouthLimits | null {
   if (!isYouthAge(age)) return null;
-  const a = Math.max(YOUTH_MIN_AGE, Math.min(YOUTH_MAX_AGE, Math.floor(age as number)));
+  const a = Math.max(YOUTH_MIN_AGE, Math.min(YOUTH_MAX_AGE, Math.floor(ageAnswer(age) as number)));
   const km = RULE_MAX_KM[a]!;
   return {
     age: a,
@@ -277,4 +298,39 @@ export function clampYouthDays(age: number | null | undefined, days: number): nu
   const n = Math.round(Number(days));
   if (!Number.isFinite(n)) return lim ? lim.maxRunDays : days;
   return lim ? Math.min(lim.maxRunDays, n) : n;
+}
+
+/**
+ * Strava's own age rules. They are a third party's terms rather than a coaching threshold, so these
+ * are Strava's numbers exactly and are not ours to tune.
+ *
+ * ⚠️ VERIFIED 2026-09-23 AGAINST STRAVA'S OWN PAGES, NOT A SEARCH SUMMARY (YOUTH.md's first lesson):
+ *   Help Centre, "Can I use Strava if I'm under the age of 16?": "Strava allows accounts starting at
+ *   age 13" and "athletes under 16 cannot upload heart rate data or receive heart rate analysis".
+ *   Terms of Service, effective 1 January 2026: "at least 13 years old, or such higher age as may be
+ *   required in your jurisdiction" -- 13 in the UK.
+ *
+ * ⚠️ WE DID SEND IT. The GPX the app builds for Strava writes a gpxtpx:hr reading onto every track
+ * point that has one, so before Y4 a 14-year-old's runs went to Strava carrying heart-rate data that
+ * Strava's own rules say that athlete cannot upload.
+ *
+ * ⚠️ ABSENT MEANS ALLOWED, exactly as it means adult everywhere else in this module. Strava checks a
+ * date of birth at its own sign-up, so a runner who declined to tell us is still gated by Strava;
+ * refusing them here would take Strava away from every adult who skipped the question. The hole this
+ * leaves -- a 12-year-old who says "prefer not to say" -- is the one CLAUDE.md already records for
+ * the whole youth programme, and its fix is one more question, not these functions.
+ */
+export const STRAVA_MIN_AGE = 13;
+export const STRAVA_HEART_RATE_MIN_AGE = 16;
+
+/** May this runner connect Strava and send anything to it at all? */
+export function stravaAllowedAt(age: unknown): boolean {
+  const a = ageAnswer(age);
+  return a == null || a >= STRAVA_MIN_AGE;
+}
+
+/** May a heart-rate reading be sent to Strava for this runner? */
+export function stravaHeartRateAllowedAt(age: unknown): boolean {
+  const a = ageAnswer(age);
+  return a == null || a >= STRAVA_HEART_RATE_MIN_AGE;
 }

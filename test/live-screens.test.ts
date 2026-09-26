@@ -296,8 +296,11 @@ test("BLOCKER: one Strava preference, and no toggle for something that does not 
   // to avoid, and this file's previous version asserted Health was ABSENT for exactly that reason —
   // it is built now, so the claim moves from "not offered" to "offered only where it works".
   const sync = fn("liveSyncHtml");
-  assert.match(sync, /stravaConnected\(\)/,
+  // ⚠️ Y4: the row asks stravaActive (connected AND old enough), which must itself still need a connection.
+  assert.match(sync, /stravaActive\(\)/,
     "the sync block offers Strava to somebody who has not connected it");
+  assert.match(fn("stravaActive"), /return stravaConnected\(\) && stravaAgeOk\(\);/,
+    "stravaActive no longer requires a connection, so the sync block can offer Strava unconnected");
   assert.match(sync, /healthAvailable\(\)/,
     "the sync block offers Apple Health without checking this build can write to it");
   assert.match(sync, /if \(!rows\.length\) return ""/,

@@ -17,7 +17,7 @@ import { test } from "node:test";
 import fs from "node:fs";
 import { generatePlan } from "../src/plan/generate-plan.ts";
 import type { Athlete, Goal } from "../src/domain/types.ts";
-import { youthGoalsFrom } from "../src/domain/youth.ts";
+import { youthGoalsFrom, ageAnswer } from "../src/domain/youth.ts";
 
 const PAGE = fs.readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 /** ⚠️ COMMENTS STRIPPED. Every claim below quotes the code it forbids, which is the trap this
@@ -170,7 +170,7 @@ test("BLOCKER: a habit-builder may set a time goal or leave it off, and blank is
     (/const GOAL_BY_STATUS = \{[\s\S]*?\n\};/.exec(PAGE) || [""])[0] + "\n" +
     nocomment(fn("currentAgeAnswer")) + "\n" +
     nocomment(fn("goalsForAge")) + "\n" +
-    nocomment(fn("goalCardInner")) + "\nreturn goalCardInner;")({ youthGoalsFrom });
+    nocomment(fn("goalCardInner")) + "\nreturn goalCardInner;")({ youthGoalsFrom, ageAnswer });
   const at = (st: string) => card(st, { dist: "10k", date: "2026-12-06", target: "" });
   // The habit-builder is asked, and told that blank is a real answer.
   const b = at("building");

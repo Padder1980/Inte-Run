@@ -125,5 +125,6 @@ export { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "
 // research, the sources and the table that was discarded as folklore are in YOUTH.md. The module owns
 // the CEILING only; youthGoalsFrom takes the caller's own goal list and intersects, so adding a goal
 // to the app needs no edit there and cannot slip past the ceiling either.
-export { isYouthAge, youthLimitsFor, youthGoalsFrom, clampYouthDays, YOUTH_MIN_AGE, YOUTH_MAX_AGE } from "../src/domain/youth.ts";
+export { isYouthAge, youthLimitsFor, youthGoalsFrom, clampYouthDays, YOUTH_MIN_AGE, YOUTH_MAX_AGE,
+  ageAnswer, stravaAllowedAt, stravaHeartRateAllowedAt, STRAVA_MIN_AGE, STRAVA_HEART_RATE_MIN_AGE } from "../src/domain/youth.ts";
 export type { YouthLimits } from "../src/domain/youth.ts";

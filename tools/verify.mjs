@@ -129,10 +129,17 @@ banner("npx tsc --noEmit");
 banner(`node --test under ${TIMEZONES.join(", ")}`);
 const chrome = chromePath();
 if (!chrome) console.log("  ⚠ no Chrome found — the share-card export gate will fail by design and name the fix");
+// ⚠️ VERIFY_CONCURRENCY runs fewer test files at once. Off unless set, so the recipe is unchanged for
+// everyone else. It exists because on 2026-09-24 a 24 GB Mac with other apps open pushed 4 GB into swap
+// under the default (about 13 files at once, a few of the share-card files at 1.6-2.7 GB each): one run
+// took 7,299 s and the headless Chrome of the export gate timed out, failing 21 tests that pass 21/21
+// alone. It cannot go through NODE_OPTIONS ("--test-concurrency is not allowed in NODE_OPTIONS"), hence
+// this. The summary line says when it was used, so a slower, gentler run is never passed off as the default.
+const CONC = /^[1-9][0-9]*$/.test(process.env.VERIFY_CONCURRENCY || "") ? Number(process.env.VERIFY_CONCURRENCY) : 0;
 const passCounts = [];
 for (const tz of TIMEZONES) {
   process.stdout.write(`  ${tz} … `);
-  const r = run("node", ["--test"], { env: { TZ: tz, ...(chrome ? { CHROME_PATH: chrome } : {}) } });
+  const r = run("node", CONC ? ["--test", "--test-concurrency=" + CONC] : ["--test"], { env: { TZ: tz, ...(chrome ? { CHROME_PATH: chrome } : {}) } });
   const pass = r.out.match(/^(?:ℹ|#) pass (\d+)/m);
   const failm = r.out.match(/^(?:ℹ|#) fail (\d+)/m);
   if (!pass || !failm) fail(`could not parse the test result under ${tz} (neither "ℹ fail N" nor "# fail N" found)`, r.out);
@@ -174,6 +181,6 @@ const stamp = {
 };
 writeFileSync(join(ROOT, ".verify-ok"), JSON.stringify(stamp, null, 2) + "\n");
 
-const line = `verify OK · ${summary.join(" · ")} · ${elapsed()}${QUICK ? " · QUICK (UTC only, no audits)" : ""}`;
+const line = `verify OK · ${summary.join(" · ")} · ${elapsed()}${QUICK ? " · QUICK (UTC only, no audits)" : ""}${CONC ? " · " + CONC + " test files at a time" : ""}`;
 console.log("\n" + line);
 console.log(`(.verify-ok written for ${head.slice(0, 7)}${stamp.dirty ? " + uncommitted changes" : ""})`);

@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import {
-  isYouthAge, youthLimitsFor, youthGoalsFrom, clampYouthDays, YOUTH_MIN_AGE, YOUTH_MAX_AGE,
+  isYouthAge, youthLimitsFor, youthGoalsFrom, clampYouthDays, YOUTH_MIN_AGE, YOUTH_MAX_AGE, ageAnswer,
 } from "../src/domain/youth.ts";
 import { RACE_DISTANCES_M, METRES_PER_KM, type RaceDistanceKey } from "../src/domain/units.ts";
 
@@ -174,7 +174,7 @@ test("BLOCKER: the goal picker asks the engine for the ceiling rather than keepi
     "const $ = () => null, draft = {}, profile = { age: " + (age == null ? "0" : age) + " };\n" +
     (/const GOAL_BY_STATUS = \{[\s\S]*?\n\};/.exec(APP) || [""])[0] + "\n" +
     nocomment(fn("currentAgeAnswer")) + "\n" + nocomment(fn("goalsForAge")) + "\n" +
-    nocomment(fn("goalCardInner")) + "\nreturn goalCardInner;")({ youthGoalsFrom })(
+    nocomment(fn("goalCardInner")) + "\nreturn goalCardInner;")({ youthGoalsFrom, ageAnswer })(
       "regular", { dist: "marathon", date: "2027-05-16", target: "" });
   const at13 = build(13);
   assert.ok(!/value="marathon"/.test(at13), "a 13-year-old is offered a marathon");

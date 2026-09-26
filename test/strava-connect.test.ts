@@ -102,7 +102,11 @@ test("⚠️ nothing is sent to Strava on its own, and nothing is offered that c
   const src = fn("stravaRunButtonHtml");
   // ⚠️ ABSENT, NOT DISABLED. A greyed-out Strava button on every run advertises a feature the runner
   // has not set up, on the screen they came to read about their run.
-  assert.match(src, /if \(!stravaConnected\(\)\) return "";/, "the button is shown when Strava is not connected");
+  // ⚠️ Y4 RESTATED THIS RATHER THAN DELETING IT. The gate is stravaActive now -- connected AND old
+  // enough for Strava's own rules -- so the claim is that the gate is stravaActive AND that
+  // stravaActive still requires a connection. Neither half alone would keep the old promise.
+  assert.match(src, /if \(!stravaActive\(\)\) return "";/, "the button is shown when Strava is not connected");
+  assert.match(fn("stravaActive"), /return stravaConnected\(\) && stravaAgeOk\(\);/, "stravaActive no longer requires a connection");
   // ⚠️ EVERY SEND IS EITHER A TAP OR THE SETTING THE RUNNER SWITCHED ON — there is no third path.
   // This replaced a count of stravaSendRun call sites, which said "nothing uploads on its own" and
   // became false the moment automatic sending existed. A bare count would have been "fixed" by bumping
@@ -143,7 +147,7 @@ test("⚠️ automatic sending is opt-in, forward-only, and never a simulated ru
   assert.match(src, /if \(!run \|\| run\.sim\) return;/, "a simulated run can reach somebody's Strava");
   assert.ok(src.indexOf("run.sim") < src.indexOf("cfg.auto"), "the sim guard runs after the setting check");
   // Off unless switched on, and connected.
-  assert.match(src, /if \(!cfg\.auto \|\| !stravaConnected\(\)\) return;/, "automatic sending is not gated on the setting");
+  assert.match(src, /if \(!cfg\.auto \|\| !stravaActive\(\)\) return;/, "automatic sending is not gated on the setting");
   // ⚠️ NEVER RE-SENDS. Without this, every later save would try the same run again.
   assert.match(src, /if \(run\.strava\) return;/, "a run that has already been tried can be sent again");
   // ⚠️ FORWARD-ONLY: called where a run is saved, never over the stored history. Flipping the toggle
@@ -167,7 +171,8 @@ test("⚠️ a tester is never shown a box asking for a server address", () => {
   // always truthy and the paste box appears for EVERY runner, on the screen meant to look finished.
   assert.ok(!/stravaBase\(\)/.test(gate),
     "stravaDevMode keys on stravaBase(), so a shipped server address shows the paste box to everyone");
-  assert.match(fn("connectView"), /\(stvSetUp \|\| stravaDevMode\(\)\) \? "strava" : null/,
+  // Y4 added the age to this, and with && -- so no server still means not tappable, whatever the age.
+  assert.match(fn("connectView"), /\(\(stvSetUp \|\| stravaDevMode\(\)\) && \(stravaAgeOk\(\) \|\| stravaConnected\(\)\)\) \? "strava" : null/,
     "the Strava row is tappable for someone who has no server to connect to");
 });
 

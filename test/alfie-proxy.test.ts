@@ -91,11 +91,15 @@ test("⚠️ the question actually reaches the AI", () => {
   const at = html.indexOf("alfieRemote(t).then(");
   assert.ok(at > 0, "nothing dispatches to the remote brain at all");
   const gate = html.slice(Math.max(0, at - 400), at);
-  assert.match(gate, /if \(alfieBase\(\) && !alfieRedFlags\(t\)\.length\)/,
-    "the dispatch gate does not use alfieBase(), so a shipped address never reaches the AI");
-  // ⚠️ AND RED FLAGS ARE STILL SCREENED FIRST. A symptom must be answered locally and never sent —
-  // the screener's whole point is that it does not depend on a model choosing to escalate.
-  assert.ok(gate.indexOf("alfieRedFlags") > 0, "red flags are no longer screened before dispatch");
+  // ⚠️ SINCE Y5 THE GATE IS ONE FUNCTION, alfieMaySend -- and it gained a third condition, the runner's
+  // online-answers switch (off by default for under-18s and unknown ages). The two claims this test
+  // exists for move into that function with it: a shipped address is read through alfieBase(), and
+  // red flags are screened before anything is sent.
+  assert.match(gate, /if \(alfieMaySend\(t\)\)/, "the dispatch is no longer gated on alfieMaySend");
+  const may = html.slice(html.indexOf("function alfieMaySend("), html.indexOf("function alfieMaySend(") + 200);
+  assert.match(may, /alfieBase\(\)/, "the dispatch gate does not use alfieBase(), so a shipped address never reaches the AI");
+  assert.match(may, /!alfieRedFlags\(t\)\.length/, "red flags are no longer screened before dispatch");
+  assert.match(may, /alfieOnline\(\)/, "the gate ignores the runner's online-answers switch");
 });
 
 test("⚠️ only one function reads whether a server is configured", () => {

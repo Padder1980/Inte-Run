@@ -23,21 +23,21 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>InteRun reads your heart rate during a run so it can show it live and save it with the session. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices and is never sent anywhere.</string>
+	<string>InteRun reads your heart rate during a run so it can show it live and save it with the session. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices. It only leaves them if you send a run to Strava yourself.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>InteRun saves your finished runs to Apple Health as workouts, with their distance, duration, route and heart rate, so they appear in Health and Fitness like a run recorded by any other app. Runs recorded on your Apple Watch are already saved by the watch and are never written twice. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices and is never sent anywhere by InteRun.</string>
+	<string>InteRun saves your finished runs to Apple Health as workouts, with their distance, duration, route and heart rate, so they appear in Health and Fitness like a run recorded by any other app. Runs recorded on your Apple Watch are already saved by the watch and are never written twice. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices. It only leaves them if you send a run to Strava yourself.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>InteRun uses your phone's step counter to keep measuring your distance when GPS drops out — under trees, between tall buildings or in a tunnel — and to show your cadence. It stays on your phone and is never sent anywhere.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>InteRun uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket.</string>
+	<string>InteRun uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket. It also sends your rough location, to about a kilometre, to a weather service to get the forecast for your runs.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>InteRun uses your camera only when you choose Take Photo while making a share card, so the picture you post is one you just took. Photos are used on the card and never sent anywhere by InteRun.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>InteRun saves a share card to your photo library when you tap Save to device. It only ever adds the card you made.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>InteRun lets you pick one of your own photographs as the background of a share card. The photo is used on the card on this device and is never uploaded by InteRun.</string>
+	<string>InteRun lets you pick your own photos and videos for a share card, or for a post or story in Inte-Club. They are used on this device and are never uploaded by InteRun.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>instagram-stories</string>

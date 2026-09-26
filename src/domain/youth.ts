@@ -334,3 +334,31 @@ export function stravaHeartRateAllowedAt(age: unknown): boolean {
   const a = ageAnswer(age);
   return a == null || a >= STRAVA_HEART_RATE_MIN_AGE;
 }
+
+/**
+ * Who starts on the Children's Code's high-privacy settings. The ICO's standard 7, verbatim:
+ * "Settings must be 'high privacy' by default (unless you can demonstrate a compelling reason for a
+ * different default setting, taking account of the best interests of the child)."
+ *
+ * The owner's ruling, 2026-09-26: UNDER-18s AND ANYBODY WHO HAS NOT TOLD US THEIR AGE.
+ *
+ * ⚠️⚠️ THIS IS THE ONE PLACE IN THIS MODULE WHERE "ABSENT" DOES NOT MEAN ADULT, and the difference
+ * from isYouthAge is deliberate rather than an inconsistency. Everywhere else an absent age means the
+ * adult app, because withholding training from an adult who skipped a question costs them something
+ * real and protects nobody. Here the trade runs the other way: a high-privacy default costs an adult
+ * one tap to change, while treating an unknown runner as an adult is exactly how a 13-year-old who
+ * chose "Prefer not to say" would have their questions sent to a server by default. Standard 3 says
+ * the same thing from the other side -- recognise age with a certainty proportionate to the risk, or
+ * apply the standards to everyone you cannot place.
+ *
+ * ⚠️ A DEFAULT, NEVER A LOCK. Every setting this governs can be changed by the runner in either
+ * direction, and their answer then wins. What this decides is only what an UNANSWERED setting means,
+ * which is why it takes the age rather than returning a setting of its own.
+ *
+ * ⚠️ AND IT IS NOT A TRAINING RULE. The training limits still key on isYouthAge, so somebody who
+ * declined to give an age keeps the adult plan; only the privacy defaults treat them as a child.
+ */
+export function highPrivacyByDefault(age: unknown): boolean {
+  const a = ageAnswer(age);
+  return a == null || a < YOUTH_MAX_AGE + 1;
+}

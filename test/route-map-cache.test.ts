@@ -132,7 +132,12 @@ test("there is exactly ONE tile source, and ONE place naming the styles", () => 
   // hitting. `=== 1` is what turned a silent pass into a visible failure.
   // ⚠️ TWO HOSTS IS NOW CORRECT — there are two providers. What must stay true is that they are both
   // built in ONE FUNCTION, so a swap cannot leave a surface behind on the old provider.
-  const hosts = (html.match(/basemaps\.cartocdn|api\.mapbox\.com/g) || []);
+  // ⚠️ THE PRIVACY TABLE NAMES BOTH HOSTS TOO, AND THAT IS A DISCLOSURE, NOT A URL. PRIVACY_FLOWS (Y5)
+  // lists every service the app reaches so the runner can be told, and test/childrens-code.test.ts
+  // requires it to name these two. It builds nothing, so it is taken out before counting.
+  const noTable = html.replace(/\nconst PRIVACY_FLOWS = \[[\s\S]*?\n\];/, "\n");
+  assert.notEqual(noTable, html, "the privacy table has moved; this guard no longer knows what to set aside");
+  const hosts = (noTable.match(/basemaps\.cartocdn|api\.mapbox\.com/g) || []);
   assert.equal(hosts.length, 2, "expected both tile hosts, found " + hosts.length);
   const inLoader = (lift("loadRouteMap").match(/basemaps\.cartocdn|api\.mapbox\.com/g) || []);
   assert.equal(inLoader.length, 2,

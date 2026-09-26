@@ -500,7 +500,10 @@ test("the place lookup geocodes the middle of the route, not the start", () => {
   // Once per run, ever — the result is stored and the attempt is remembered even when it fails.
   assert.match(fn, /run\.placeTried/, "a failed lookup would be retried on every open");
   assert.match(fn, /\.catch\(\(\) => \{\}\)/, "a geocoder outage must not surface as an error");
-  assert.match(fn, /toFixed\(4\)/, "full-precision coordinates are being sent when four places is a town");
+  // ⚠️ TWO PLACES SINCE Y5 (was four, about 11 m -- a point on the runner's own route). zoom=12 asks
+  // for a town, and two places, about 1 km, is enough to find one.
+  assert.match(fn, /toFixed\(2\)/, "coordinates are not rounded before they are sent");
+  assert.ok(!/toFixed\([3-9]\)/.test(fn), "more precision is being sent than a town needs");
 });
 
 test("View on Strava appears only when the run genuinely reached Strava", () => {

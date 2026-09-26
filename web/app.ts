@@ -2404,6 +2404,18 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .alf-lim { margin: 0 0 var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .alf-lim > summary { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding: var(--s3) var(--s4); min-height: var(--tap); cursor: pointer; list-style: none; }
 .alf-lim > summary::-webkit-details-marker { display: none; }
+/* Ask Alfie's online switch, and the Your data privacy rows (Y5). */
+.alf-opts { margin: 0 0 var(--s3); }
+.alf-opts .zr-auto { margin-top: 0; }
+.alf-opts .bk-md { margin: var(--s1) 0 0; }
+/* Measured 31px tall by elementFromPoint: the hit area grows to the 44px floor, not the box. */
+.alf-opts .pf-edit { position: relative; padding-left: 0; padding-right: 0; }
+.alf-opts .pf-edit::after { content: ""; position: absolute; inset: -7px 0; }
+.pv-row { display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--line); margin-top: var(--s2); }
+.pv-b { flex: 1; min-width: 0; }
+.pv-t { font-size: var(--t-body); font-weight: 700; color: var(--ink); margin-bottom: var(--s1); }
+.pv-st { flex: 0 0 auto; font-size: var(--t-meta); font-weight: 700; color: var(--ink-soft); padding-top: 2px; }
+.pv-ico { text-align: center; text-decoration: none; }
 .alf-lim[open] .sd-chev { transform: rotate(90deg); }
 .alf-limq { flex: 1; min-width: 0; font-size: var(--t-meta); color: var(--ink-soft); }
 .alf-limb { padding: 0 var(--s4) var(--s4); font-size: var(--t-body); line-height: 1.55; color: var(--ink-soft); }
@@ -8181,7 +8193,10 @@ function fetchWeather(force) {
   if (!force && !profile.personalized) return;
   WX_FETCHING = true;
   navigator.geolocation.getCurrentPosition((pos) => {
-    const la = pos.coords.latitude.toFixed(3), lo = pos.coords.longitude.toFixed(3);
+    // ⚠️ TWO DECIMALS -- about 1 km -- WAS THREE, about 110 m (Y5, standard 8: collect only the minimum).
+    // A forecast model's grid is 1-11 km, so the extra digit told Open-Meteo which street somebody was
+    // on and bought no better weather.
+    const la = pos.coords.latitude.toFixed(2), lo = pos.coords.longitude.toFixed(2);
     // ⚠️ hourly, AND dew point on both. The heat pace model wants dew point rather than a humidity
     // percentage — 70% at 10°C and 70% at 30°C are completely different runs — and it wants the
     // conditions AT THE HOUR SOMEBODY WILL RUN, not the conditions while they are reading the screen.
@@ -9848,9 +9863,9 @@ function alfieSaveCfg(c) { try { localStorage.setItem("interun_alfie_v1", JSON.s
  * Where Alfie asks its questions. Same shape as STRAVA_SERVER and the same ONE Worker — so filling
  * this in is what turns Alfie from the on-device answers into open conversation for every runner,
  * with nothing to paste.
- * ⚠️ IT IS EMPTY UNTIL THE SERVER HAS AN ANTHROPIC KEY. Pointed at a Worker with no key, every
- * question costs a round trip and falls back anyway — slower than not trying. Filled in by hand once
- * the key is set, not by the Strava setup script.
+ * ⚠️ FILLED IN since the server's brain became Cloudflare's free AI (2026-08-10), which needs no key.
+ * An address existing is NOT permission to send to it -- alfieOnline() below is that decision, and
+ * since Y5 it starts OFF for under-18s and for anybody who has not told us their age.
  */
 const ALFIE_SERVER = "https://alfie-proxy.alfie-proxy.workers.dev";
 function alfieBase() {
@@ -9858,6 +9873,26 @@ function alfieBase() {
   try { url = String(alfieCfg().proxy || ALFIE_SERVER || "").trim(); } catch (e) { url = ""; }
   return url ? url.replace(/\\/+$/, "") : "";
 }
+/**
+ * What an UNANSWERED privacy setting means for this runner: on for adults, OFF for under-18s and for
+ * anybody who has not told us their age (RC.highPrivacyByDefault -- the Children's Code's standard 7,
+ * "Settings must be 'high privacy' by default"). Every setting that sends something off this phone
+ * reads its default here, so the rule has one home. The runner's own answer always wins over it.
+ */
+function privDefaultOn() { return !RC.highPrivacyByDefault(profile && profile.age); }
+/**
+ * May a question leave this phone at all? Answered, the runner's choice wins in both directions.
+ * Unanswered, it follows privDefaultOn() -- which is ON for an adult, exactly how Alfie behaved before
+ * Y5, so no adult's Alfie changes.
+ * ⚠️ alfieBase() answers "is there a server"; this answers "may we send to it". Wherever a question
+ * could go, both are asked.
+ */
+function alfieOnline() {
+  const c = alfieCfg();
+  if (c.online === true || c.online === false) return c.online;
+  return privDefaultOn();
+}
+function alfieSetOnline(on) { const c = alfieCfg(); c.online = !!on; alfieSaveCfg(c); }
 /**
  * An opaque id for THIS install, so the server can bound how much one device spends.
  * ⚠️ NOT A CREDENTIAL, and deliberately not the Strava device key. That key authorises uploads to a
@@ -9925,9 +9960,24 @@ const ALFIE_FLAGS = [
   ["menstrual-disruption", ["amenorrh", "periods stopped", "periods have stopped", "period stopped", "period has stopped", "missed periods", "missed my period", "missing periods", "no period", "lost my period", "haven't had a period", "havent had a period", "irregular periods"]],
   ["mental-health-concern", ["depress", "really anxious", "mental health", "hopeless", "can't cope", "cant cope"]],
 ];
+/**
+ * How a question is prepared before it is matched: lower case, and curly apostrophes made straight so
+ * a phrase list needs only one spelling.
+ */
+function alfieNorm(q) { return " " + String(q || "").toLowerCase().split("\\u2019").join("'").trim() + " "; }
+/**
+ * ⚠️⚠️ IT NORMALISES THE QUESTION ITSELF, AND BEFORE Y5 IT DID NOT -- SO THE SCREEN BEFORE SENDING
+ * MISSED THE WAY PEOPLE ACTUALLY TYPE ON A PHONE. alfieLocalAnswer lower-cased the question before
+ * calling this, but the check that decides whether a question may leave the phone passed it RAW. An
+ * iPhone capitalises the first word of a message and types curly apostrophes by default, so "Chest
+ * pain when I run", "Suicidal thoughts" and "I don’t want to be here" all matched nothing, went to the
+ * server, and never met the safety answer this screener exists to give. Every caller is safe now
+ * because the matching cannot be done on text that has not been prepared.
+ */
 function alfieRedFlags(q) {
+  const s = alfieNorm(q);
   const hits = [];
-  ALFIE_FLAGS.forEach((f) => { if (f[1].some((w) => q.indexOf(w) !== -1)) hits.push(f[0]); });
+  ALFIE_FLAGS.forEach((f) => { if (f[1].some((w) => s.indexOf(w) !== -1)) hits.push(f[0]); });
   return hits;
 }
 function alfieSafetyAnswer(flags) {
@@ -10039,8 +10089,7 @@ function alfieIntents() {
   ];
 }
 function alfieLocalAnswer(question) {
-  // Normalise curly apostrophes to straight so phrase lists only need one spelling.
-  const q = " " + String(question || "").toLowerCase().split("\\u2019").join("'").trim() + " ";
+  const q = alfieNorm(question);
   const flags = alfieRedFlags(q);
   if (flags.length) { const s = alfieSafetyAnswer(flags); if (s) return s; }
   const intents = alfieIntents();
@@ -10065,13 +10114,30 @@ function alfiePlanContext() {
     today: today, experience: profile.status || null, daysPerWeek: dayAnswerOf(profile) || null,
   };
 }
+/**
+ * The earlier turns sent with a question, so a follow-up ("what about tomorrow?") makes sense.
+ *
+ * ⚠️⚠️ ONLY TURNS THAT ALREADY WENT TO THE SERVER, AND THIS CLOSES A REAL LEAK. It used to send the last
+ * eight messages whatever they were. A runner who typed "I have chest pain" had it answered on the
+ * phone by the red-flag screener -- which exists precisely so that a symptom never reaches the
+ * network -- and then had it sent anyway, as history, with their NEXT question. The same happened to
+ * anything asked while online answers were off. A turn is marked sent only once the server has
+ * answered it, so nothing leaves the phone for the first time as somebody else's context.
+ * ⚠️ AND THE CURRENT QUESTION IS NO LONGER SENT TWICE. alfieAsk pushes it before this runs, and the
+ * server appends the question as the final turn itself; it is not marked sent yet, so it is not here.
+ */
+function alfieHistory() {
+  return ALFIE_MSGS.filter((m) => m && m.sent).slice(-8)
+    .map((m) => (m.role === "user" ? { role: "user", text: m.text } : { role: "alfie", html: m.html }));
+}
 function alfieRemote(question) {
-  const cfg = alfieCfg();
   const base = alfieBase();
-  if (!base) return Promise.reject(new Error("no proxy"));
+  // ⚠️ THE ONE FUNCTION THAT SENDS ASKS FOR ITSELF, not only through its caller. A future caller that
+  // forgot the switch would otherwise send a child's question with online answers turned off.
+  if (!base || !alfieOnline()) return Promise.reject(new Error("offline"));
   return fetch(base, {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ question: question, context: alfiePlanContext(), history: ALFIE_MSGS.slice(-8), device: alfieDevice() }),
+    body: JSON.stringify({ question: question, context: alfiePlanContext(), history: alfieHistory(), device: alfieDevice() }),
   }).then((r) => r.ok ? r.json() : Promise.reject(new Error("http " + r.status))).then((d) => {
     if (!d || !d.answer) throw new Error("bad reply");
     return "<p>" + esc(d.answer).split("\\n\\n").join("</p><p>").split("\\n").join("<br>") + "</p>";
@@ -10091,11 +10157,16 @@ function alfieRenderLog() {
 let ALFIE_THINKING = false;
 function alfieAsk(text) {
   const t = String(text || "").trim(); if (!t || ALFIE_THINKING) return;
-  ALFIE_MSGS.push({ role: "user", text: t });
+  const asked = { role: "user", text: t };
+  ALFIE_MSGS.push(asked);
   ALFIE_THINKING = true; alfieRenderLog();
-  const finish = (html) => {
+  // ⚠️ fromServer marks BOTH turns sent, and only when the server answered. A fallback after a failed
+  // call is not marked: whether a failed request arrived is unknowable, and "not sent" is the direction
+  // that cannot leak it later (see alfieHistory).
+  const finish = (html, fromServer) => {
     ALFIE_THINKING = false;
-    ALFIE_MSGS.push({ role: "alfie", html: html });
+    if (fromServer) asked.sent = true;
+    ALFIE_MSGS.push(fromServer ? { role: "alfie", html: html, sent: true } : { role: "alfie", html: html });
     alfieSaveMsgs(); alfieRenderLog();
   };
   const local = () => { try { return alfieLocalAnswer(t); } catch (e) { return "<p>Something went wrong finding that answer \— try asking a different way.</p>"; } };
@@ -10108,17 +10179,26 @@ function alfieAsk(text) {
   // the one reader of "is a server configured" left behind when the address moved into the build — so
   // alfieRemote existed, worked, and was never called: every question quietly took the on-device path
   // and nothing anywhere reported a fault. Fix-one-caller-not-the-other, this file's oldest trap.
-  if (alfieBase() && !alfieRedFlags(t).length) {
-    alfieRemote(t).then(finish).catch(() => setTimeout(() => finish(local()), 120));
+  if (alfieMaySend(t)) {
+    alfieRemote(t).then((h) => finish(h, true)).catch(() => setTimeout(() => finish(local(), false), 120));
   } else {
-    setTimeout(() => finish(local()), 260); // a beat, so it reads as a reply rather than a jump
+    setTimeout(() => finish(local(), false), 260); // a beat, so it reads as a reply rather than a jump
   }
+}
+/** Would this question leave the phone? Online answers on, a server to send to, and no red flag in it. */
+function alfieMaySend(t) { return alfieOnline() && !!alfieBase() && !alfieRedFlags(t).length; }
+/** Forget the conversation on this phone. Inte-Run's server kept no copy of it to forget. */
+function alfieClear() {
+  ALFIE_MSGS = [];
+  try { localStorage.removeItem("interun_alfie_msgs"); } catch (e) {}
+  render();
 }
 function viewAlfie() {
   const chips = ALFIE_CHIPS.map((c) => '<button class="alf-chip" data-alfq="' + esc(c) + '">' + c + "</button>").join("");
   return '<button class="backbtn" id="alfBack">\\u2039 Back</button>' +
     '<div class="alf-head"><div class="alf-hero">' + ICON.alfie + '</div><div><div class="alf-name">Ask Alfie</div><div class="alf-sub">Your coach \— knows your plan</div></div></div>' +
     alfieLimits() +
+    alfieOnlineRow() +
     '<div class="alf-log" id="alfieLog"></div>' +
     '<div class="alf-chips">' + chips + "</div>" +
     '<div class="alf-input"><input id="alfieIn" placeholder="Ask about your plan or running\\u2026" autocomplete="off"><button id="alfieSend" aria-label="Send">\\u2191</button></div>';
@@ -10142,10 +10222,61 @@ function alfieLimits() {
     '<span class="sd-chev" aria-hidden="true">\u203A</span></summary>' +
     '<div class="alf-limb">' +
       '<p><b>It knows your plan.</b> Your next session, your paces, the phase you are in and how far off your race is, plus a store of running knowledge.</p>' +
-      '<p><b>It answers on this phone.</b> Nothing you type is sent anywhere, and it works with no signal.</p>' +
+      // ⚠️ THIS SENTENCE WAS FALSE for everybody from the day ALFIE_SERVER was filled in: "Nothing you
+      // type is sent anywhere", above a chat that sent every question. It now follows the switch.
+      (alfieOnline() && alfieBase()
+        ? '<p><b>Online answers are on.</b> What you type goes to Inte-Run’s server with a short summary of your plan, and an AI writes the reply. Anything about pain or feeling unwell is answered here and never sent.</p>'
+        : '<p><b>It answers on this phone.</b> Nothing you type leaves it, and it works with no signal.</p>') +
       '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain, injury or anything that feels wrong, use the symptom check-in — it is built from published warning signs and will tell you plainly when to see somebody.</p>' +
       '<button class="alf-esc" id="alfEsc">Check a symptom \u203a</button>' +
     '</div></details>';
+}
+/**
+ * The online-answers switch, and the sentence beside it saying what it does right now.
+ *
+ * ⚠️ CHILDREN'S CODE STANDARD 4, AT THE POINT OF USE. The Code asks for "bite-sized" explanations where
+ * a use of personal data is switched on, not only in a policy nobody opens -- so the sentence under the
+ * switch changes with it, and switching it ON for a runner on the high-privacy defaults goes through a
+ * sheet that says what leaves the phone first, and to ask an adult if they are not sure.
+ * ⚠️ SWITCHING IT OFF NEVER ASKS. Sharing less is always one tap; a confirmation in that direction is
+ * friction against the private choice, which is the nudge standard 13 forbids.
+ * ⚠️ ABSENT WHEN THERE IS NO SERVER: a switch over nothing is the inert control this app keeps refusing.
+ */
+function alfieOnlineRow() {
+  if (!alfieBase()) return "";
+  const on = alfieOnline();
+  return '<div class="alf-opts"><div class="zr-auto"><span>Online answers</span>' +
+    '<button class="rm-switch' + (on ? " on" : "") + '" id="alfOnline" role="switch" aria-checked="' + (on ? "true" : "false") +
+    '" aria-label="Online answers"><span class="rm-knob"></span></button></div>' +
+    '<p class="bk-md">' + (on
+      ? "On: what you type goes to Inte-Run’s server, which asks an AI to write the reply. Anything about pain or feeling unwell stays on this phone."
+      : "Off: Alfie answers from this phone, using what it knows about running and about your plan. Nothing you type leaves it.") + '</p>' +
+    (ALFIE_MSGS.length ? '<button class="pf-edit" id="alfClear">Clear this chat</button>' : "") +
+    '</div>';
+}
+/** What a young runner is told before their questions start leaving the phone. Plain text: the sheet escapes it. */
+const ALFIE_ONLINE_EXPLAIN = "With this on, what you type to Alfie goes to Inte-Run’s server with a short summary of your training plan, and an AI writes the reply. Your name, where you are and your health check-in answers are never sent, and Inte-Run doesn’t keep your questions. Anything about pain or feeling unwell always stays on your phone. Not sure? Ask a parent or an adult you trust first.";
+/**
+ * ⚠️ "KEEP THEM OFF" IS THE PRIMARY BUTTON, AND THAT IS ALLOWED. Standard 13 forbids nudging a child to
+ * WEAKEN their privacy; making the private answer the easy one is the direction the Code asks for.
+ */
+function openAlfieOnlineSheet() {
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML =
+    '<div class="sheet-h">Turn on online answers?</div>' +
+    '<div class="bk-md" style="margin-bottom:16px">' + esc(ALFIE_ONLINE_EXPLAIN) + '</div>' +
+    '<button class="primary" id="alfOnKeep">Keep them off</button>' +
+    '<button class="bk-btn2" id="alfOnYes">Turn on online answers</button>';
+  $("sheetOv").classList.add("on");
+  $("alfOnKeep").onclick = closeSheet;
+  $("alfOnYes").onclick = () => { closeSheet(); alfieSetOnline(true); render(); };
+}
+/** One handler for both switches (Alfie's own screen, and Your data), so the two cannot ask differently. */
+function alfieToggleOnline() {
+  if (alfieOnline()) { alfieSetOnline(false); render(); return; }
+  // ⚠️ ONLY the high-privacy runners are asked first; for everybody else it is one tap, as before.
+  if (!privDefaultOn()) { openAlfieOnlineSheet(); return; }
+  alfieSetOnline(true); render();
 }
 function wireAlfie() {
   alfieRenderLog();
@@ -10157,6 +10288,10 @@ function wireAlfie() {
   if (send) send.onclick = go;
   if (input) input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } };
   document.querySelectorAll("[data-alfq]").forEach((b) => b.onclick = () => alfieAsk(b.dataset.alfq));
+  const onSw = $("alfOnline"); if (onSw) onSw.onclick = alfieToggleOnline;
+  const clr = $("alfClear");
+  if (clr) clr.onclick = () => confirmSheet("Clear this chat?",
+    "Everything you and Alfie have said here is deleted from this phone. It can’t be undone.", "Clear chat", alfieClear);
 }
 function openAlfie() { if (liveRunning()) return; stopTrialRun(); state.screen = "alfie"; render(); }
 
@@ -15506,7 +15641,10 @@ function clubDbOpen() {
         const db = rq.result;
         if (!db.objectStoreNames.contains(CLUBSTORE)) db.createObjectStore(CLUBSTORE, { keyPath: "k" });
       };
-      rq.onsuccess = () => resolve(rq.result);
+      // ⚠️ CLOSE WHEN ASKED. Every call opens a new connection and none is ever closed, so a delete of
+      // this database (Your data > Delete everything) would be blocked behind them. Honouring
+      // versionchange lets it go straight through.
+      rq.onsuccess = () => { const db = rq.result; db.onversionchange = () => { try { db.close(); } catch (e) {} }; resolve(db); };
       rq.onerror = () => resolve(null);
     } catch (e) { resolve(null); }
   });
@@ -20352,7 +20490,7 @@ const SUPPORT_HUB = [
   // ⚠️ Lives here for now. The design brief and its mockup put shoes under Profile > Connections, and
   // Phase 3 builds that screen — this is the honest interim home, not the intended one.
   { id: "shoes", ic: "rEasy", c: "var(--eff-easy)", t: "Shoe rack", d: "Track the mileage in your trainers and see when they are due.", interactive: false },
-  { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Back it up, or move it to another device.", interactive: false },
+  { id: "data", ic: "share", c: "var(--steady)", t: "Your data", d: "Who sees it, backups, and deleting it.", interactive: false },
   // ⚠️ kw IS SEARCH-ONLY, same reasoning as the two guides above: nobody types "pace calculator" when
   // what they want to know is what pace gets them under four hours.
   { id: "pace", ic: "timer", c: "var(--accent)", t: "Pace calculator", d: "What pace gets you the finish time you want.", interactive: false,
@@ -20640,14 +20778,16 @@ function viewSupport() {
  * Safety, privacy and human help -- one destination, and every sentence in it checked against the code.
  *
  * ⚠️ THIS PAGE IS THE EASIEST IN THE APP TO WRITE DISHONESTLY, because everything on it sounds
- * reassuring whether or not it is true. Every claim below was verified: localStorage is the only
- * store (dataView discovers backup keys by the interun_/rc_ prefix); Alfie answers on-device unless a
- * proxy is configured, which nothing ships configured; the check-in answers are read out of the DOM
- * by chkValues and written nowhere; and there is no account, no server and no analytics anywhere in
- * this build. If any of that changes, this page changes in the same commit.
+ * reassuring whether or not it is true.
+ * ⚠️⚠️ AND IT WAS DISHONEST FOR MONTHS WITHOUT ANYBODY WRITING A FALSE SENTENCE. Its header promised the
+ * page would change "in the same commit" as the code it described. Then Alfie's server was filled in,
+ * and Strava, town names, the update check and the pre-run map arrived, and it went on saying "two
+ * things do reach the internet, and only these". What leaves the phone is now a table
+ * (PRIVACY_FLOWS) that this page reads, and a test fails on any address the app can reach that the
+ * table does not name. The check-in answers are still read out of the DOM by chkValues and written
+ * nowhere, and there is still no account and no analytics.
  */
 function safetyView() {
-  const proxy = (function () { try { return !!alfieBase(); } catch (e) { return false; } })();
   return EMERGENCY_BANNER() +
     '<h2 class="sec" style="margin-top:0">Safety, privacy &amp; human help</h2>' +
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">What this app is not</div>' +
@@ -20664,20 +20804,18 @@ function safetyView() {
       '<button class="perf-a" data-hub="redflags">Check a symptom \u203a</button></div>' +
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">Where your information lives</div>' +
       '<p><b>On this phone.</b> Your runs, your plan, your profile and your answers are stored in this ' +
-      'app on this device. There is no account and no server holding them.</p>' +
+      'app on this device. There is no account, and Inte-Run keeps no copy of them anywhere else.</p>' +
       '<p><b>The health check-ins keep nothing at all.</b> Your answers are read as you tick them and ' +
       'are gone the moment you leave the screen.</p>' +
-      (proxy
-        ? '<p><b>Ask Alfie sends your question off this phone.</b> It goes to Inte-Run\u2019s own server, ' +
-          'which asks an AI to answer it. Your question, a short summary of your plan and the last few ' +
-          'messages go with it — never your name, your location, or your check-in answers. Inte-Run ' +
-          'does not store any of it.</p>' +
-          '<p>If that server cannot be reached, Alfie answers on this phone instead, from what it already ' +
-          'knows about running and about your plan.</p>'
-        : '<p><b>Ask Alfie answers on this phone</b> and works with no signal. Nothing you type is sent anywhere.</p>') +
-      '<p>Two things do reach the internet, and only these: the <b>weather</b> for your next session, ' +
-      'and the <b>map tiles</b> for a run you have recorded.</p>' +
-      '<button class="perf-a" data-hub="data">Back up or move your data \u203a</button></div>' +
+      (alfieOnline() && alfieBase()
+        ? '<p><b>Ask Alfie has online answers on.</b> Your question and a short summary of your plan go ' +
+          'to Inte-Run’s own server, which asks an AI to answer it — never your name, where you are, ' +
+          'or your check-in answers, and Inte-Run does not store any of it. Anything about pain or ' +
+          'feeling unwell is answered on this phone and never sent.</p>'
+        : '<p><b>Ask Alfie answers on this phone</b> and works with no signal. Nothing you type leaves it.</p>') +
+      '<p><b>Some things do go online</b>, each for one job: ' + privacyFlowList() + '. Every one is ' +
+      'listed, with what it sends, under Your data.</p>' +
+      '<button class="perf-a" data-hub="data">Your data and privacy ›</button></div>' +
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">A human, not an app</div>' +
       '<p>Nothing here replaces a coach who can watch you run, or a clinician who can examine you. If ' +
       'something feels wrong and the app is telling you it is fine, believe yourself.</p></div>';
@@ -21715,7 +21853,7 @@ function connectView() {
     row(ICON.plan, "Apple, Google & Outlook", "Put every planned session in your calendar, with a morning alert.", "Ready", "ok", "cal") +
     '</div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Why so few toggles?</div>' +
-    '<div class="bk-md">Inte-Run runs entirely on your devices — there\u2019s no Inte-Run server for other apps to talk to yet. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
+    '<div class="bk-md">Inte-Run keeps your training on your devices, so other apps only get what you choose to send them. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
 }
 function wireConnectView() {
   if (!document.querySelector(".cn-row")) return;
@@ -22000,7 +22138,7 @@ function mapTokenCard() {
       'background:var(--surface);color:var(--ink);font:16px ui-monospace,monospace">' +
       '<button class="primary" id="mbxSave" style="width:100%;margin-top:10px">Use these maps</button>' +
       (prov.kind === "mapbox" ? '<button class="bk-btn2" id="mbxClear">Go back to the standard maps</button>' : "") +
-      '<div class="bk-lab" style="margin-top:10px;line-height:1.45">Stays on this phone. It is never included in a backup and never leaves the app.</div>') +
+      '<div class="bk-lab" style="margin-top:10px;line-height:1.45">Stays on this phone, and goes only to Mapbox, with each map it draws. It is never included in a backup.</div>') +
     '<div class="bk-msg" id="mbxMsg"></div></div>';
 }
 /**
@@ -22380,6 +22518,158 @@ function shoeBar(sh) {
     '% of the way to the distance you set"><i style="width:' + pct + '%"></i></div>';
 }
 
+// ============ PRIVACY (Y5: the Children's Code) ============================
+/**
+ * EVERYTHING THAT LEAVES THIS PHONE, IN ONE TABLE THAT EVERY SCREEN DESCRIBING IT READS.
+ *
+ * ⚠️⚠️ THE SAFETY PAGE SAID "TWO THINGS DO REACH THE INTERNET, AND ONLY THESE" WHILE SIX DID. Its header
+ * promised it would change "in the same commit" as anything it describes, and five services arrived
+ * without it changing: town names for runs, Ask Alfie's server, Strava, the iPhone app's update check
+ * and the map of where you stand before a run. A promise to keep a sentence in step is not a
+ * mechanism. test/childrens-code.test.ts derives every web address this page and the iPhone shell can
+ * reach and fails on one that nothing here names, so the next one cannot arrive without being told.
+ *
+ * ⚠️ WRITTEN FOR A 12-YEAR-OLD. Standard 4: "concise, prominent and in clear language suited to the age
+ * of the child". One job per row: what is sent, to whom, and when.
+ * ⚠️ sw NAMES A SWITCH, and only where the thing can be turned off without losing the run it belongs to.
+ * Weather and maps have none -- the forecast is what the heat advice stands on, and the map is the run
+ * they opened -- so they are disclosed instead.
+ */
+const PRIVACY_FLOWS = [
+  { id: "weather", hosts: ["api.open-meteo.com"], short: "the weather",
+    t: "Weather", d: "Your rough location, to about 1 km, goes to Open-Meteo, a weather service, to get the forecast for your runs." },
+  { id: "maps", hosts: ["basemaps.cartocdn.com", "api.mapbox.com"], short: "maps of your runs",
+    t: "Maps", d: "To draw a map of a run, or of where you are before you start one, the app asks a map company (CARTO or Mapbox) for the pieces of map around it." },
+  { id: "place", hosts: ["nominatim.openstreetmap.org"], short: "town names for runs", sw: "pvPlace",
+    t: "Town names for runs", d: "The middle of a run, to about 1 km, goes to OpenStreetMap to find which town it was in. Once for each run." },
+  { id: "alfie", hosts: ["alfie-proxy.alfie-proxy.workers.dev"], short: "Ask Alfie’s online answers", sw: "pvAlfie",
+    t: "Ask Alfie online answers", d: "Your question and a short summary of your plan go to Inte-Run’s server, which asks an AI to write the reply. Questions about pain or feeling unwell never leave the phone." },
+  { id: "strava", hosts: ["alfie-proxy.alfie-proxy.workers.dev"], short: "Strava if you connect it",
+    t: "Strava", d: "Only if you connect it. Then the runs and strength sessions you send go to your Strava account, through Inte-Run’s server." },
+  { id: "update", hosts: ["padder1980.github.io"], short: "app updates", native: true,
+    t: "App updates", d: "The iPhone app asks GitHub whether there is a newer version of itself. Nothing about you is sent." },
+];
+/** Pages the RUNNER opens in their own browser -- a calendar's import page, a run already on Strava, the ICO. The app sends them nothing, so they are not flows; the address sweep is told about them here. */
+const PRIVACY_LINK_HOSTS = ["calendar.google.com", "outlook.live.com", "www.strava.com", "ico.org.uk"];
+/**
+ * An address a runner can write to about their data. EMPTY UNTIL THE OWNER CHOOSES ONE (his ruling,
+ * 2026-09-26), and while it is empty the line offering it does not appear at all: an address that
+ * reaches nobody is worse than none. Until then the ICO is the route offered.
+ */
+const PRIVACY_CONTACT = "";
+const ICO_COMPLAINTS_URL = "https://ico.org.uk/make-a-complaint/";
+/**
+ * Whether a run's town is looked up. The runner's answer wins; unanswered it follows privDefaultOn().
+ * It is the one flow that sends a location FROM A RUN to a third party, for a caption -- exactly what
+ * standard 9 ("Do not disclose children's data unless you can demonstrate a compelling reason") rules
+ * out as a default.
+ */
+const PLACE_KEY = "interun_placenames_v1";
+function placeNamesOn() {
+  try { const v = localStorage.getItem(PLACE_KEY); if (v === "1") return true; if (v === "0") return false; } catch (e) {}
+  return privDefaultOn();
+}
+function placeNamesSet(on) { try { localStorage.setItem(PLACE_KEY, on ? "1" : "0"); } catch (e) {} }
+function privacyFlowShown(f) {
+  if (f.native && !inNativeApp()) return false;
+  if (f.id === "alfie" && !alfieBase()) return false;
+  if (f.id === "strava" && !stravaBase()) return false;
+  return true;
+}
+/** The flows that apply to this build, as one phrase: "a, b and c". */
+function privacyFlowList() {
+  const names = PRIVACY_FLOWS.filter(privacyFlowShown).map((f) => f.short);
+  return names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+function privacyCardHtml() {
+  const row = (t, d, right) => '<div class="pv-row"><div class="pv-b"><div class="pv-t">' + esc(t) + '</div>' +
+    '<div class="bk-md">' + esc(d) + '</div></div>' + right + '</div>';
+  const sw = (id, label, on) => '<button class="rm-switch' + (on ? " on" : "") + '" id="' + id + '" role="switch" aria-checked="' +
+    (on ? "true" : "false") + '" aria-label="' + esc(label) + '"><span class="rm-knob"></span></button>';
+  const rows = PRIVACY_FLOWS.filter(privacyFlowShown).map((f) => {
+    if (f.id === "alfie") return row(f.t, f.d, sw(f.sw, f.t, alfieOnline()));
+    if (f.id === "place") return row(f.t, f.d, sw(f.sw, f.t, placeNamesOn()));
+    if (f.id === "strava") return row(f.t, f.d, '<span class="pv-st">' +
+      (!stravaAgeOk() ? "13 and over" : stravaConnected() ? "Connected" : "Not connected") + '</span>');
+    return row(f.t, f.d, "");
+  });
+  // Apple Health is not the internet, but it is somewhere a run goes that this app does not control.
+  if (healthAvailable()) rows.push(row("Apple Health",
+    "Saves runs recorded on this phone, and your heart rate if a watch measured it, to the Health app. Runs recorded on your Apple Watch are saved to Health by the watch itself.",
+    sw("pvHealth", "Apple Health", healthSyncOn())));
+  return '<div class="card"><div class="subhead" style="margin-top:0">Your information</div>' +
+    '<p class="bk-md">Your runs, your plan and your answers are saved on this phone. There’s no account, and Inte-Run keeps no copy anywhere else. A few things do go online, each for one job. Here they all are.</p>' +
+    rows.join("") + '</div>';
+}
+function privacyDeleteHtml() {
+  return '<div class="card"><div class="subhead" style="margin-top:0">Delete everything</div>' +
+    '<p class="bk-md">Deletes your runs, plan, profile, chats, photos and settings from this phone, and disconnects Strava. It can’t be undone, so export a backup first if you might want any of it back.</p>' +
+    '<p class="bk-md" style="margin-top:8px">It can’t reach copies kept somewhere else: runs you sent to Strava, runs saved in Apple Health, backup files you exported, or the copy of this week’s plan kept for your Apple Watch. Deleting the app from your phone removes everything it kept there.</p>' +
+    '<button class="bk-btn2" id="pvDelete">Delete everything…</button></div>' +
+    '<div class="card"><div class="subhead" style="margin-top:0">Worried about your information?</div>' +
+    '<p class="bk-md">Talk to a parent or an adult you trust.' +
+    (PRIVACY_CONTACT ? ' You can write to Inte-Run at <a href="mailto:' + esc(PRIVACY_CONTACT) + '">' + esc(PRIVACY_CONTACT) + '</a>.' : "") +
+    ' You, or they, can also tell the ICO, the UK’s information watchdog, if you think your information isn’t being looked after properly.</p>' +
+    '<a class="bk-btn2 pv-ico" href="' + ICO_COMPLAINTS_URL + '" target="_blank" rel="noopener noreferrer">Contact the ICO ›</a></div>';
+}
+/**
+ * DELETE EVERYTHING -- the erasure tool standard 15 asks for: "prominent and accessible tools to help
+ * children exercise their data protection rights and report concerns".
+ *
+ * ⚠️ IT REMOVES WHAT A BACKUP DELIBERATELY DOES NOT CARRY. backupKeys() leaves out the Strava device key
+ * and a Mapbox token (BACKUP_NEVER) so they never ride out in an export; a delete that left a live
+ * credential behind would be a lie with a button on it. So every key with the app's own prefixes goes,
+ * both IndexedDB stores -- the club's photos and videos, and the cached maps of every run, which are
+ * pictures of where somebody runs -- and anything the web version's offline copy cached from another
+ * site (forecasts, town names, map tiles).
+ * ⚠️ STRAVA IS TOLD, NOT JUST FORGOTTEN, and before the key is gone. Wiping our copy of the device key
+ * alone would leave Inte-Run's server holding a working token, with write access, for an account nobody
+ * on this phone can reach any more. keepalive, so the request survives the reload; best-effort, so a
+ * phone with no signal can still delete its own data.
+ * ⚠️ NOTHING MAY BE WRITTEN BACK BEFORE THE RELOAD. The app keeps its data in memory as well as on disk,
+ * and hiding the page is exactly when the strength log flushes itself -- which a reload does. So once
+ * the wipe has run, this page's storage writes do nothing and new database opens fail; the reload
+ * starts a fresh page where both work again.
+ */
+function deleteEverything() {
+  let dk = "";
+  try { dk = String(stravaCfg().key || ""); } catch (e) {}
+  const strava = dk && stravaBase()
+    ? stravaCall("/strava/disconnect", { method: "POST", keepalive: true, headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dk: dk }) }).catch(() => null)
+    : Promise.resolve(null);
+  wipeAppStorage();
+  try { Storage.prototype.setItem = function () {}; } catch (e) {}
+  const dbs = Promise.all([CLUBDB, MAPCACHE_DB].map((name) => new Promise((done) => {
+    try { const rq = indexedDB.deleteDatabase(name); rq.onsuccess = rq.onerror = () => done(); } catch (e) { done(); }
+  })));
+  try { indexedDB.open = function () { throw new Error("deleted"); }; } catch (e) {}
+  const offsite = purgeOffsiteCache();
+  const cap = new Promise((done) => setTimeout(done, 3000));
+  return Promise.race([Promise.all([strava, dbs, offsite]), cap]).then(() => { try { location.reload(); } catch (e) {} });
+}
+/** Every localStorage key this app owns: the backup's own prefixes, WITHOUT its BACKUP_NEVER exclusion. Returns what it removed. */
+function wipeAppStorage() {
+  const gone = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && BACKUP_PREFIXES.some((p) => k.indexOf(p) === 0)) gone.push(k);
+    }
+    gone.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {}
+  return gone;
+}
+/** The web version's offline copy caches other sites' replies too. This site's own files stay, so the app still opens offline. */
+function purgeOffsiteCache() {
+  try {
+    if (typeof caches === "undefined") return Promise.resolve();
+    const offsite = (r) => { try { return new URL(r.url).origin !== location.origin; } catch (e) { return false; } };
+    return caches.keys().then((names) => Promise.all(names.map((n) => caches.open(n).then((c) =>
+      c.keys().then((reqs) => Promise.all(reqs.filter(offsite).map((r) => c.delete(r))))))))
+      .catch(() => {});
+  } catch (e) { return Promise.resolve(); }
+}
 function dataView() {
   const cur = backupSummary(collectBackup().data);
   const bytes = JSON.stringify(collectBackup()).length;
@@ -22387,7 +22677,10 @@ function dataView() {
   const move = inNativeApp()
     ? '<div class="bk-move"><div class="bk-mh">Moving over from the web version?</div><div class="bk-md">Open Inte-Run in your browser, go to <b>Support \\u203a Your data</b>, and export a backup. Send it to this phone \— AirDrop, Files or email all work \— then tap <b>Restore</b> below and pick the file.</div></div>'
     : '<div class="bk-move"><div class="bk-mh">Moving to the iPhone app?</div><div class="bk-md">Your runs don\\u2019t travel automatically \— the app is a separate place on your phone and can\\u2019t reach into your browser\\u2019s storage. Export a backup here, then open the app and go to <b>Support \\u203a Your data \\u203a Restore</b>.</div></div>';
-  return '<div class="card">' +
+  // ⚠️ PRIVACY FIRST ON THE PAGE. Standard 15 asks for tools that are "prominent", and the backup below
+  // IS the download-your-data tool, so the page now holds all of them: see, choose, download, delete.
+  return privacyCardHtml() +
+    '<div class="card">' +
     '<div class="subhead" style="margin-top:0">On this device</div>' +
     '<div class="bk-box"><div class="bk-val">' + summaryLine(cur) + '</div><div class="bk-lab" style="margin-top:4px">' + cur.keys + " items \\u00b7 " + size + '</div></div>' +
     '<button class="primary" id="bkExport" style="width:100%;margin-top:14px">' + ICON.share + " " + (canShareBackup() ? "Export a backup" : "Download a backup") + '</button>' +
@@ -22395,6 +22688,7 @@ function dataView() {
     '<input type="file" id="bkFile" accept="application/json,.json" style="display:none">' +
     '<div class="bk-msg" id="dataMsg"></div>' +
     '</div>' +
+    privacyDeleteHtml() +
     mapTokenCard() +
     '<div class="card"><div class="subhead" style="margin-top:0">This version</div>' +
     '<div class="bk-box"><div class="bk-val">' + (inNativeApp() ? "iPhone app" : "Web") + '</div>' +
@@ -22420,6 +22714,13 @@ function wireDataView() {
   wireShoeRack();
   wireMapToken();
   const ex = $("bkExport"); if (ex) ex.onclick = exportBackup;
+  const pa = $("pvAlfie"); if (pa) pa.onclick = alfieToggleOnline;
+  const pp = $("pvPlace"); if (pp) pp.onclick = () => { placeNamesSet(!placeNamesOn()); render(); };
+  const ph = $("pvHealth"); if (ph) ph.onclick = () => { healthSyncSet(!healthSyncOn()); render(); };
+  const pd = $("pvDelete");
+  if (pd) pd.onclick = () => confirmSheet("Delete everything?",
+    "Your runs, plan, profile, chats, photos and settings will be deleted from this phone, and Strava disconnected. This can’t be undone.",
+    "Delete everything", deleteEverything);
   const im = $("bkImport"), f = $("bkFile");
   if (im && f) {
     im.onclick = () => { f.value = ""; f.click(); };
@@ -25467,7 +25768,10 @@ function coachLoadPersonal() {
   const slug = RC.personalPackSlug(String((WHY && WHY.name) || ""));
   if (COACH.personalTried === slug) return Promise.resolve();
   COACH.personalTried = slug; COACH.personal = null;
-  if (!slug) return Promise.resolve();
+  // ⚠️ THE iPHONE APP ONLY (Y5). A personal pack is baked into one person's own build and is never on
+  // GitHub Pages, so on the web this request could only ever 404 -- while carrying somebody's first
+  // name in its address to GitHub's servers. Not asking loses nothing.
+  if (!slug || !inNativeApp()) return Promise.resolve();
   return fetch("voices-personal/" + slug + "/manifest.json").then((r) => r.ok ? r.json() : null).then((m) => {
     if (!m || !m.clips || !m.clips.length) return;
     const byKey = {}; m.clips.forEach((c) => { byKey[c.coach + "/" + c.id] = c; });
@@ -28886,6 +29190,13 @@ function loadSharePriv() {
   return {};
 }
 let SHAREPRIV = loadSharePriv();
+/**
+ * A young runner's "show my route" and "show the place", for THIS visit to the share studio only.
+ * ⚠️ NEVER WRITTEN TO DISK. Standard 10: "Options which make a child's location visible to others should
+ * default back to 'off' at the end of each session." A card's route and its place show where somebody
+ * runs; closing the studio empties this, and the next card starts hidden again.
+ */
+let SHAREPRIV_SESS = {};
 function saveSharePriv() {
   try {
     let keys = Object.keys(SHAREPRIV);
@@ -28905,10 +29216,16 @@ function saveSharePriv() {
 function sharePrivacyFor(run) {
   const own = (run && run.id && SHAREPRIV[run.id]) || null;
   const ends = own && typeof own.ends === "boolean" ? own.ends : true;
+  // ⚠️ ON THE HIGH-PRIVACY DEFAULTS (Y5) THE ROUTE AND THE PLACE START HIDDEN, every time, and only a
+  // choice made in this visit can show them (SHAREPRIV_SESS). A stored per-run record is ignored for
+  // those two, or a route shown once would be shown on every card of that run for ever.
+  const young = !privDefaultOn();
+  const sess = young && run && run.id ? SHAREPRIV_SESS[run.id] : null;
+  const hide = (k) => (young ? !(sess && sess[k] === false) : !!(own && own[k]));
   return {
     ends: !!(PRIVACY.ends || ends),
-    map: !!(PRIVACY.map || (own && own.map)),
-    loc: !!(own && own.loc),
+    map: !!(PRIVACY.map || hide("map")),
+    loc: hide("loc"),
     date: !!(own && own.date),
   };
 }
@@ -28916,6 +29233,11 @@ function sharePrivacyFor(run) {
 function sharePrivacyLocked(key) { return key === "ends" ? !!PRIVACY.ends : key === "map" ? !!PRIVACY.map : false; }
 function setSharePrivacy(run, key, val) {
   if (!run || !run.id) return;
+  if ((key === "map" || key === "loc") && !privDefaultOn()) {
+    const sess = SHAREPRIV_SESS[run.id] || (SHAREPRIV_SESS[run.id] = {});
+    sess[key] = !!val;
+    return;
+  }
   const rec = SHAREPRIV[run.id] || (SHAREPRIV[run.id] = {});
   rec[key] = !!val;
   saveSharePriv();
@@ -29221,13 +29543,18 @@ function rdIdentityHtml(run) {
  */
 function runPlaceLookup(run) {
   if (!run || run.place || run.placeTried) return;
+  // ⚠️ BEFORE placeTried IS SET, so a runner who turns town names on later still gets them for runs
+  // already recorded rather than finding every old run marked as tried.
+  if (!placeNamesOn()) return;
   const route = Array.isArray(run.route) ? run.route : null;
   if (!route || route.length < 2) return;
   run.placeTried = 1;
   const mid = route[Math.floor(route.length / 2)];
   if (!mid || !isFinite(mid.lat) || !isFinite(mid.lng)) return;
   const url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&addressdetails=1&lat=" +
-    encodeURIComponent(mid.lat.toFixed(4)) + "&lon=" + encodeURIComponent(mid.lng.toFixed(4));
+    // ⚠️ TWO DECIMALS, WAS FOUR (about 11 m -- a point on the runner's own route). zoom=12 asks for a
+    // town, and a town does not need to know which house somebody ran past.
+    encodeURIComponent(mid.lat.toFixed(2)) + "&lon=" + encodeURIComponent(mid.lng.toFixed(2));
   fetch(url, { headers: { "Accept": "application/json" } })
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => {
@@ -31669,7 +31996,8 @@ function mapCacheOpen() {
         const db = rq.result;
         if (!db.objectStoreNames.contains(MAPCACHE_STORE)) db.createObjectStore(MAPCACHE_STORE, { keyPath: "k" });
       };
-      rq.onsuccess = () => resolve(rq.result);
+      // ⚠️ CLOSE WHEN ASKED -- the same reason as the club's media store: Delete everything must not wait.
+      rq.onsuccess = () => { const db = rq.result; db.onversionchange = () => { try { db.close(); } catch (e) {} }; resolve(db); };
       rq.onerror = () => resolve(null);
     } catch (e) { resolve(null); }
   });
@@ -35272,6 +35600,8 @@ function closeShareStudio() {
   // persists "for that card export, not globally" — and the template is resolved from a run's own
   // eligibility, so carrying last run's ask into the next one is an ask that may make no sense there.
   SCARD.template = null; SCARD.metrics = null;
+  // ⚠️ AND A YOUNG RUNNER'S "SHOW MY ROUTE" GOES WITH IT -- this is the end of the session the Code means.
+  SHAREPRIV_SESS = {};
   STUDIO = null;
 }
 /**
@@ -35454,6 +35784,7 @@ function studioPrivHtml(run) {
     studioSwitch("map", "Hide the route entirely", sp.map) +
     studioSwitch("loc", "Hide the place", sp.loc) +
     studioSwitch("date", "Hide the date", sp.date) +
+    (privDefaultOn() ? "" : '<p class="sst-note">Your route and the place start hidden every time you open this, because they show where you run. You can show them on this card.</p>') +
     '<p class="sst-note">These apply to this card only. The map on the run\\u2019s own page follows Route privacy there.</p>';
 }
 // ⚠️ data-sstpriv, NOT data-rdpriv. The sheet's own sweep for that attribute is document-wide and
@@ -37026,11 +37357,14 @@ function healthAvailable() {
 }
 /** ⚠️ ONE KEY, AND IT IS NOT THE STRAVA ONE. Two destinations, two decisions — a runner may well want
  *  their runs in Health and not on Strava. Defaults to ON where Health exists, because that is what
- *  "naturally, like all running apps" means: a run appears in Fitness without being asked to. */
+ *  "naturally, like all running apps" means: a run appears in Fitness without being asked to.
+ *  ⚠️ EXCEPT ON THE HIGH-PRIVACY DEFAULTS (Y5): unanswered means OFF for under-18s and for anybody who
+ *  has not given an age, because Health is a store other apps and other people can be given access to.
+ *  The switch sits on the finish screen, at the moment it applies. */
 const HEALTH_KEY = "interun_health_v1";
 function healthSyncOn() {
   if (!healthAvailable()) return false;
-  try { const v = localStorage.getItem(HEALTH_KEY); return v == null ? true : v === "1"; } catch (e) { return true; }
+  try { const v = localStorage.getItem(HEALTH_KEY); return v == null ? privDefaultOn() : v === "1"; } catch (e) { return privDefaultOn(); }
 }
 function healthSyncSet(on) { try { localStorage.setItem(HEALTH_KEY, on ? "1" : "0"); } catch (e) {} }
 /**
@@ -40799,6 +41133,10 @@ self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) =
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
+  // ⚠️ A FORECAST NEVER COMES FROM THIS CACHE (Y5). Cache-first handed back the first forecast fetched
+  // for a place until the app next updated -- the address is identical every time for somebody who
+  // runs from home -- and kept a reply carrying their rough location. Straight to the network instead.
+  if (req.url.indexOf("//api.open-meteo.com/") !== -1) return;
   if (req.mode === "navigate") {
     // Network-first, and it MUST bypass the HTTP cache. GitHub Pages serves index.html with
     // cache-control: max-age=600, so a plain fetch() is answered from the browser's own cache and

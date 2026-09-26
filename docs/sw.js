@@ -1,10 +1,14 @@
-const CACHE = "interun-13824990";
+const CACHE = "interun-13849118";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png", "./roadmap/", "./roadmap/index.html", "./roadmap/manifest.webmanifest", "./mapstyles/", "./mapstyles/index.html"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
+  // ⚠️ A FORECAST NEVER COMES FROM THIS CACHE (Y5). Cache-first handed back the first forecast fetched
+  // for a place until the app next updated -- the address is identical every time for somebody who
+  // runs from home -- and kept a reply carrying their rough location. Straight to the network instead.
+  if (req.url.indexOf("//api.open-meteo.com/") !== -1) return;
   if (req.mode === "navigate") {
     // Network-first, and it MUST bypass the HTTP cache. GitHub Pages serves index.html with
     // cache-control: max-age=600, so a plain fetch() is answered from the browser's own cache and

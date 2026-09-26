@@ -40,6 +40,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { request as httpRequest } from "node:http";
 import { fileURLToPath } from "node:url";
+import { ageAnswer, highPrivacyByDefault, YOUTH_MAX_AGE } from "../src/domain/youth.ts";
 
 /* ================================================================================================ *
  * LIFTING THE PIPELINE OUT OF THE BUILT PAGE                                                       *
@@ -108,7 +109,7 @@ const ROOTS = ["drawShareCard", "shareCardCanvas", "canvasToShareFile", "shareFi
  * and the gate could only ever measure one of the two fit modes. The seam is entirely in this file: no
  * production identifier exists for a test to poke.
  */
-const STUB = new Set(["PHOTODIAG", "state", "PRIVACY", "SHAREPRIV", "profile", "PLAN", "RAW",
+const STUB = new Set(["PHOTODIAG", "state", "PRIVACY", "SHAREPRIV", "SHAREPRIV_SESS", "RC", "profile", "PLAN", "RAW",
   "SHARE_LPROBE", "SHARE_LPROBE_KEY", "SHARE_LIN_LUT", "SHARE_TOPO_C", "SHARE_TOPO_KEY",
   "SPHOTO", "SPHOTO_SEQ", "SHARE_BLUR_C", "SHARE_BLUR_KEY"]);
 
@@ -645,8 +646,14 @@ async function capture(): Promise<Gate> {
   const S = await openBrowser();
   try {
     await S.metrics(430, 932, 3);
-    await S.ev("globalThis.PHOTODIAG={err:''};globalThis.state={};globalThis.profile={};" +
-      "globalThis.PRIVACY={ends:false,map:false};globalThis.SHAREPRIV={};" +
+    // ⚠️ AN ADULT, AND THE REAL PRIVACY RULE (Y5). sharePrivacyFor now asks RC.highPrivacyByDefault,
+    // and an unknown age counts as young, which would hide every route. The gate measures the adult
+    // card it was written for. The rule is shipped to the page WITH everything it closes over (ageAnswer
+    // and YOUTH_MAX_AGE), because a function serialised without its closure is a different function.
+    await S.ev("globalThis.PHOTODIAG={err:''};globalThis.state={};globalThis.profile={age:40};" +
+      "globalThis.RC=(function(){const YOUTH_MAX_AGE=" + YOUTH_MAX_AGE + ";\n" + ageAnswer.toString() + "\n" +
+      highPrivacyByDefault.toString() + "\nreturn { highPrivacyByDefault };})();" +
+      "globalThis.PRIVACY={ends:false,map:false};globalThis.SHAREPRIV={};globalThis.SHAREPRIV_SESS={};" +
       "globalThis.CARD=(function(){" + lifted.body + "})();'lifted'");
 
     // ---- the source photograph, and its GPS metadata ------------------------------------------

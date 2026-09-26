@@ -252,15 +252,19 @@ test("⚠️ the red-flag screen runs BEFORE anything is sent to a remote model"
   // whole value is that it does not depend on a model choosing to escalate.
   const fn = fnSrc("alfieAsk");
   const remote = fn.indexOf("alfieRemote(");
-  const screen = fn.indexOf("alfieRedFlags(");
+  // ⚠️ SINCE Y5 THE SCREEN SITS INSIDE alfieMaySend, the one gate on sending, so it is asked there. The
+  // ordering claim is unchanged: the gate that screens runs before anything is dispatched.
+  const screen = fn.indexOf("alfieMaySend(");
   assert.ok(screen > 0, "alfieAsk does not screen for red flags at all");
   assert.ok(screen < remote, "the red-flag screen runs after the remote dispatch");
+  assert.match(fnSrc("alfieMaySend"), /!alfieRedFlags\(t\)\.length/, "the gate on sending does not screen for red flags");
   // ⚠️ THE SHAPE, NOT THE SPELLING. This pinned `alfieCfg().proxy && !alfieRedFlags(` and so failed the
   // day the "is a server configured" check moved into alfieBase() — a safety guard breaking on a
   // rename, which invites whoever meets it to edit the assertion. What must hold is that the remote
   // dispatch is gated on the red-flag screen finding nothing, whichever function answers the first
   // half. test/alfie-proxy.test.ts separately pins that resolver.
-  assert.match(fn, /\w+\(\) && !alfieRedFlags\(t\)\.length/,
+  assert.match(fn, /if \(alfieMaySend\(t\)\) \{\s*alfieRemote\(/, "the remote dispatch is not inside the gate");
+  assert.match(fnSrc("alfieMaySend"), /\w+\(\) && !alfieRedFlags\(t\)\.length/,
     "the remote dispatch is no longer gated on the red-flag screen, so a symptom can be sent");
 });
 
@@ -778,11 +782,16 @@ test("⚠️ the safety page states only what the code actually does", () => {
   assert.match(fn, /On this phone/, "it does not say where the data lives");
   // The check-ins genuinely keep nothing — chkValues reads the DOM and writes nowhere.
   assert.match(fn, /keep nothing at all/i, "it overstates or understates what the check-ins retain");
-  // ⚠️ It must name the two things that DO leave the phone, or "nothing is sent anywhere" is false.
-  assert.match(fn, /weather/i, "the weather request is not disclosed");
-  assert.match(fn, /map tiles/i, "the map tile request is not disclosed");
-  // ⚠️ And it must adapt if the runner has pointed Alfie at their own service.
-  assert.match(fn, /!!alfieBase\(\)/, "the Alfie claim is fixed rather than read from config");
+  // ⚠️ It must name what DOES leave the phone, or "nothing is sent anywhere" is false. ⚠️ AND IT DID
+  // NAME "the two things" -- while six left. Since Y5 the page reads one table (PRIVACY_FLOWS), which
+  // test/childrens-code.test.ts holds to every address the app can reach; this asserts the page reads
+  // it, and that the table still names the two this guard was first written for.
+  assert.match(fn, /privacyFlowList\(\)/, "the page keeps its own list instead of reading the table");
+  const table = page().slice(page().indexOf("const PRIVACY_FLOWS = ["), page().indexOf("const PRIVACY_LINK_HOSTS"));
+  assert.match(table, /id: "weather"/, "the weather request is not disclosed");
+  assert.match(table, /id: "maps"/, "the map tile request is not disclosed");
+  // ⚠️ And the Alfie claim is read from what is configured AND what the runner chose, never fixed.
+  assert.match(fn, /alfieOnline\(\) && alfieBase\(\)/, "the Alfie claim is fixed rather than read from config");
   assert.match(fn, /EMERGENCY_BANNER\(\)/, "the emergency route is missing from the safety page");
 });
 

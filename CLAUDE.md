@@ -16114,3 +16114,134 @@ except the GPX-shape tests, which state they are about an adult and point here f
 `tools/verify.mjs` gained an optional `VERIFY_CONCURRENCY` for it. Driven in the served app with the real
 `applyProfile` and the real Strava sheet and Apps & devices row at ages 12, 14, 16 and none; no console
 errors.
+
+## ✅ Y5 — THE CHILDREN'S CODE, AND FOUR THINGS IT FOUND WRONG FOR EVERYBODY (owner, 2026-09-26)
+
+The fifth stage of the 12-17 programme. The ICO's Age Appropriate Design Code applies in full once an
+app deliberately serves children (`YOUTH.md` section 6). The owner's two rulings: **the high-privacy
+defaults cover under-18s AND anybody who has not told us their age**, and **there is no privacy contact
+address yet** — the line offering one appears only once `PRIVACY_CONTACT` is set, and the ICO is offered
+meanwhile. The fifteen standards were read word for word from the ICO's own pages, and standard 10's full
+text checked separately ("Options which make a child's location visible to others should default back to
+'off' at the end of each session"). Suite 1760 → **1780**; `test/childrens-code.test.ts` holds 20 guards;
+**28 deliberate re-breaks, all 28 caught** (each applied to a pristine copy, rebuilt, and the tree restored byte-identical after). All web except four iPhone permission strings, which need an Xcode build.
+
+⚠️ **THE AUTHORITATIVE LIST OF WHAT LEAVES THE PHONE IS `PRIVACY_FLOWS` IN `web/app.ts`**, and the full
+assessment is **`DPIA.md`** at the repo root. Read both before adding anything that talks to a server.
+
+### ⚠️⚠️ FOUR THINGS WERE WRONG FOR EVERYBODY, NOT ONLY FOR CHILDREN
+
+1. ⚠️⚠️ **ASK ALFIE'S RED-FLAG SCREEN BEFORE SENDING MATCHED RAW TEXT — SO ON AN iPHONE IT MISSED THE
+   WORST QUESTIONS.** `alfieLocalAnswer` lower-cased the question and straightened curly apostrophes before
+   calling `alfieRedFlags`; the gate that decides whether a question may leave the phone passed it raw.
+   The phrase lists are lower case with straight apostrophes, and an iPhone capitalises the first word and
+   types curly apostrophes by default — so **"Chest pain when I run", "Suicidal thoughts" and "I don’t want
+   to be here" matched nothing, were sent to the server, and never met the safety answer.** CLAUDE.md had
+   recorded this screener as "runs first now, and a hit is answered locally and never sent" for months;
+   that was true only for someone typing in lower case with straight apostrophes. `alfieNorm` is the one
+   preparation and **`alfieRedFlags` applies it itself**, so no caller can hand it unprepared text.
+2. ⚠️⚠️ **THE HISTORY SENT WITH A QUESTION LEAKED WHAT THE SCREENER HAD KEPT BACK.** `alfieRemote` sent
+   `ALFIE_MSGS.slice(-8)` — the last eight messages whatever they were — so "I have chest pain", answered
+   on the phone precisely so it never reached the network, went to the server as history with the NEXT
+   question. Same for anything asked while offline. `alfieHistory()` sends only turns marked `sent`, and a
+   turn is marked only once the server has answered it (a failed request is not marked: whether it arrived
+   is unknowable, and "not sent" cannot leak later). It also stopped sending the current question twice.
+3. ⚠️⚠️ **THE SAFETY PAGE SAID "TWO THINGS DO REACH THE INTERNET, AND ONLY THESE" WHILE SIX DID**, and Ask
+   Alfie's own panel said "Nothing you type is sent anywhere" above a chat that sent every question. The
+   page's header promised it would change "in the same commit" as the code; it didn't, five times. What
+   leaves the phone is now one table, `PRIVACY_FLOWS`, read by the Safety page and Your data, and
+   `test/childrens-code.test.ts` sweeps every web address in the app script AND the Swift and fails on one
+   the table does not name (and on a table entry nothing reaches any more).
+   ⚠️ **XML NAMESPACES ARE NOT REQUESTS** — `www.w3.org` in an SVG's `xmlns` and `createElementNS`, and the
+   GPX file's `topografix.com`/`garmin.com` — and the sweep skips exactly those shapes. Pages the RUNNER
+   opens (a calendar import, a run on Strava, the ICO) are `PRIVACY_LINK_HOSTS`, because the app sends them
+   nothing.
+4. ⚠️ **THE WEB VERSION'S OFFLINE COPY SERVED A STALE FORECAST.** The service worker is cache-first for
+   every GET, including cross-origin ones, and the forecast URL is identical every time for somebody who
+   runs from home — so the PWA showed the first forecast it fetched until the next deploy replaced the
+   cache, while keeping a reply that carried a rough location. `docs/sw.js` (generated in `web/app.ts`) now
+   passes Open-Meteo straight to the network. The native app has no service worker and was never affected.
+
+### What shipped
+
+- **`highPrivacyByDefault(age)`** in `src/domain/youth.ts` — ⚠️ **THE ONE PLACE WHERE ABSENT DOES NOT MEAN
+  ADULT**, and the difference from `isYouthAge` is the design: an unknown age still trains as an adult
+  (withholding training costs them something real) but starts on the private settings (a default costs an
+  adult one tap). A test asserts the two disagree on "absent".
+- **`privDefaultOn()`** is the ONE home of the rule in the app, and **a default is never a lock**: Ask
+  Alfie's online answers (`alfieOnline`, stored as `online` in `interun_alfie_v1`), town names
+  (`placeNamesOn`, `interun_placenames_v1`) and Apple Health (`healthSyncOn`) all read it only when the
+  runner has not answered. An adult's app is byte-for-byte unchanged.
+- **The gate on sending is `alfieMaySend(t)`** — online, a server, and no red flag — and **`alfieRemote`
+  refuses on its own** as well, so a future caller that forgot the switch still sends nothing. ⚠️ The two
+  are tested separately, because belt and braces hides the brace you are testing.
+- **Switching online answers ON for a high-privacy runner shows a sheet** saying what is sent, what never
+  is, and to ask a parent or an adult they trust (standard 4's "bite-sized" explanation at the point of
+  use). ⚠️ **SWITCHING OFF NEVER ASKS**, and **"Keep them off" is the primary button** — standard 13 forbids
+  nudging a child towards LESS privacy, not more. One handler, `alfieToggleOnline`, serves both switches.
+- **"Clear this chat"** on the Alfie screen (confirmed, because it cannot be undone). ⚠️ Its box measured
+  31px tall by `elementFromPoint`; the hit area grows to 45px via `::after`, not the box.
+- **Locations rounded** to two decimals (about 1 km): the weather request was three (about 110 m), the
+  town-name lookup four (about 11 m — a point on the runner's own route). `run-debrief.test.ts`'s guard
+  that pinned four places was **tightened, not relaxed**, and now also forbids more than two.
+- **A young runner's share card hides the route and the place every visit** (`SHAREPRIV_SESS`, never
+  written to disk, emptied by `closeShareStudio`). An adult's per-run choice is still remembered.
+- **Your data** (standard 15) now opens with the table, the switches (with the runner's real default),
+  backup (the download tool), **Delete everything**, and "Worried about your information?" with the ICO.
+- **Delete everything** — ⚠️ read `deleteEverything` before changing it; every line is load-bearing:
+  it removes the keys a BACKUP deliberately leaves out (the Strava device key, a Mapbox token); it tells
+  Inte-Run's server to disconnect Strava **before** the key is gone, with `keepalive` so the request
+  survives the reload; it deletes both IndexedDB stores (club media, cached route maps) — which needed
+  `onversionchange` → `close()` added to both open functions, because every call opened a connection and
+  none was ever closed; it purges other sites' replies from the PWA's cache but keeps the app's own files;
+  and it **freezes `Storage.prototype.setItem` and `indexedDB.open`** until the reload, because the strength
+  log flushes itself when the page is hidden — which a reload does — and would otherwise write the deleted
+  data straight back. Driven end to end in a real browser: every app key gone, another site's key kept,
+  both databases gone, the app back at the welcome screen.
+- **The personal voice pack is never requested on the web** — its address carries a first name, and on
+  GitHub Pages it can only ever 404.
+- **Truthful wording**: the Safety page (and its header comment), Ask Alfie's panel, Apps & devices ("no
+  Inte-Run server"), the Mapbox card ("never leaves the app" — it goes to Mapbox with every tile), and four
+  iPhone permission strings (heart rate can reach Strava; the location string now names the weather; the
+  photo string now names Inte-Club).
+- **`DPIA.md`** — the seven ICO steps, the data map, thirteen risks and the fifteen standards. ⚠️ The test
+  fails if a flow in `PRIVACY_FLOWS` is missing from its data map, so the document cannot quietly go stale.
+
+### Guards restated, none deleted (the guard-scoped-to-a-HOW pattern, again)
+
+`alfie-proxy` (the gate is `alfieMaySend`; `alfieBase()` and the red-flag screen are asserted inside it,
+plus the switch); `silent-defects` ×2 (the screen-before-send ordering reads `alfieMaySend`; the Safety
+page must read `privacyFlowList()` and the table must name weather and maps); `route-map-cache` (the
+privacy table names both tile hosts as a DISCLOSURE, so it is set aside before counting tile URLs — and
+the guard fails if it cannot find the table to set aside); `run-debrief` (two decimals). **`share-model`
+and `share-export-harness` now measure an ADULT on purpose** — sharePrivacyFor asks the privacy rule, and
+an unknown age would hide every route. ⚠️ The harness ships the REAL rule into the browser page together
+with everything it closes over (`ageAnswer`, `YOUTH_MAX_AGE`), because a function serialised without its
+closure is a different function.
+
+### Traps this stage paid for
+
+- ⚠️ **THE Write TOOL TURNED `\uXXXX` ESCAPES IN MY PATCH ANCHORS INTO THE CHARACTERS THEMSELVES**, so an
+  anchor copied from `web/app.ts` (which writes `’`, `›` as escapes in places) matched nothing.
+  The patch helper now matches a non-ASCII character as itself OR as a one- or two-backslash escape.
+- ⚠️ **A CONST STATEMENT'S EXTRACTOR MUST TRACK QUOTES**: `ALFIE_FLAGS` holds `"don't want to be here"`.
+- ⚠️ **THE EXISTING Safety-page guard asserted `/!!alfieBase\(\)/` and "map tiles" as literals** — correct
+  for the old design, and exactly the kind of assertion that let the page go stale: it checked that two
+  things were named, not that everything was.
+
+### Still open — the owner's, and none is fixable from here
+
+- **A privacy contact address** (`PRIVACY_CONTACT`; the line appears the moment it is set).
+- **`DPIA.md` sign-off**, ideally after a data-protection professional reads it (the lawful-basis
+  position especially).
+- **The privacy policy and terms (D1)** with a version a 12-year-old can read.
+- **Y6 — the App Store answers** (age rating and privacy label must match `PRIVACY_FLOWS`).
+- ⚠️ **"Prefer not to say" still gets the ADULT training plan**; only the privacy defaults treat them as
+  a child (the known gap in `YOUTH.md`).
+- ⚠️ **What Cloudflare, CARTO, Mapbox, Open-Meteo and OpenStreetMap keep is set by their own terms** and is
+  deliberately not asserted anywhere in the app.
+- ⚠️ **A run recorded on the Apple Watch is saved to Health by watchOS itself**, whatever the phone's
+  switch says — stated on the Your data page.
+- ⚠️ **Existing profiles with no stored age now start private.** Most older profiles carry the phantom
+  `age: 38` the old `DEFAULT_PROFILE` wrote, so they read as adults; a runner who genuinely chose "Prefer
+  not to say" will find Ask Alfie's online answers off until they switch them on.

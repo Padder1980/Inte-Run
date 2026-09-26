@@ -464,6 +464,30 @@ figure**, so the cap is applied again in `progPrefs` where that figure is read.
 - **Residual:** a 13-year-old's hard sessions are 6.4-7.6 km including warm-up and cool-down, against the
   6 km race limit.
 
+## 5.10 Y5 as built - the Children's Code (2026-09-26)
+
+- **High privacy by default** (standard 7) for under-18s **and for anybody who has not given an age**
+  (the owner's ruling): Ask Alfie's online answers, town names for runs and Apple Health start off. One
+  rule, `highPrivacyByDefault` in `src/domain/youth.ts` - the one place in this module where an absent age
+  does NOT mean adult. The runner's own answer always wins in both directions.
+- **What leaves the phone, completely** (the table the app shows, `PRIVACY_FLOWS`, and `DPIA.md`):
+  - `weather` - location rounded to about 1 km (was about 110 m), to Open-Meteo.
+  - `maps` - which map squares to draw, to CARTO or Mapbox.
+  - `place` - the middle of a run to about 1 km (was about 11 m), to OpenStreetMap; **off by default**.
+  - `alfie` - the question, a plan summary with no name, age or location, and earlier turns that already
+    reached the server; **off by default**, and switching it on explains what is sent first.
+  - `strava` - only after connecting (13+), no heart rate under 16 (Y4).
+  - `update` - the iPhone app's version check, carrying nothing about the runner.
+- **Share cards** keep a young runner's route and place hidden every time the share studio opens
+  (standard 10: location-visible options "should default back to 'off' at the end of each session").
+- **Your data** (standard 15): the table, the switches, backup, **Delete everything**, and the ICO.
+- **Four defects found on the way, for everybody:** the red-flag screen before sending missed capitalised
+  and curly-apostrophe text (how an iPhone types); Ask Alfie's history re-sent a symptom the screener had
+  kept back; the Safety page listed two services while six were live; and the web version's offline copy
+  served a stale forecast.
+- **Open:** a privacy contact address; the DPIA's sign-off and a professional review; a privacy policy a
+  12-year-old can read (D1); and Y6.
+
 ## 6. The legal consequence of saying yes - and it is real
 
 ⚠️⚠️ **DELIBERATELY SERVING 12-17s MAKES THE APP "LIKELY TO BE ACCESSED BY CHILDREN", SO THE ICO's
@@ -473,15 +497,28 @@ interests of the child as the primary consideration, **high privacy by default**
 the ICO says UK GDPR applies to children, and failing it makes compliance hard to demonstrate.
 
 **The good news is that this app is unusually well placed by architecture**: no accounts, no analytics,
-no crash SDK, no advertising, no profiling, and the training data never leaves the phone. Most of the
-fifteen standards are satisfied by things already true.
+no crash SDK and no advertising, and the training record lives on the phone. Most of the fifteen
+standards are satisfied by things already true.
+⚠️ **CORRECTED BY Y5 (2026-09-26): "the training data never leaves the phone" was not quite true when it
+was written.** Six things leave it -- the weather (a rough location), map tiles, town names for runs, Ask
+Alfie's online answers, Strava if connected, and the iPhone app's update check -- and Ask Alfie's plan
+summary carries training facts. None of that is the run log itself, but a sentence a reader relies on has
+to be exactly true. Section 5.10 is the complete list, and `PRIVACY_FLOWS` in `web/app.ts` is the table a
+test holds to every address the app can reach. "No profiling" was also too strong: the plan adapts to the
+runner's answers, which is the service they chose and is disclosed as such in `DPIA.md`.
 
-**The work it does create:**
-1. A **DPIA** - required, and currently does not exist.
+**The work it does create** (status after Y5 in brackets):
+1. A **DPIA** - required. [Drafted as `DPIA.md`; awaits the owner's sign-off, ideally after a
+   data-protection professional has read it.]
 2. **Privacy information a 12-year-old can read** - the Code requires age-appropriate presentation, so
-   the D1 policy needs a child-facing version, not just a plain-English adult one.
+   the D1 policy needs a child-facing version, not just a plain-English adult one. [In the app: Your
+   data now explains every flow in plain words. The formal policy (D1) is still to write.]
 3. **Ask Alfie** is the one place a child's free text leaves the device. The consent copy must say so
-   at a reading age a child has, and the red-flag screener already runs on the phone first.
+   at a reading age a child has, and the red-flag screener already runs on the phone first. [Done:
+   online answers start OFF for under-18s and unknown ages, and switching them on explains what is sent
+   first. ⚠️ And "the red-flag screener already runs on the phone first" was only half true: it matched
+   raw text, so a capitalised or curly-apostrophe symptom -- how an iPhone types -- went to the server.
+   Fixed in Y5.]
 4. **App Store**: an age rating that no longer says adults-only, and an App Privacy label that matches.
 5. **Terms**: under-18s cannot form a binding contract; the terms need a parent/guardian clause.
 

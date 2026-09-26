@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { highPrivacyByDefault } from "../src/domain/youth.ts";
 
 /**
  * THE SHARE CARD'S DATA LAYER — THE MODEL, THE VERDICT'S CONFIDENCE, ELIGIBILITY AND PRIVACY.
@@ -65,7 +66,7 @@ const CONSTS = ["SHARE_MODEL_VERSION", "SHARE_TEMPLATES", "SHARE_TEMPLATE_LABEL"
   "SESSION_EFFORT"];
 const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis", "runVerdict",
   "rdMetresBetween", "redactRouteEnds", "runRoutePresentation", "loadSharePriv", "saveSharePriv",
-  "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
+  "privDefaultOn", "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
   "runStartExactMs",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
   "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
@@ -106,6 +107,12 @@ function env(): Env {
     CONSTS.map(liftConst).join("\n") + "\n" +
     'let PRIVACY = { ends: false, map: false };\n' +
     'let SHAREPRIV = {};\n' +
+    // ⚠️ AN ADULT, ON PURPOSE (Y5). Since the Children's Code work, sharePrivacyFor asks whether this
+    // runner is on the high-privacy defaults, and a young or unknown-age runner's route and place start
+    // hidden every visit. These guards were written for the adult behaviour, so they measure an adult;
+    // the young runner's card is test/childrens-code.test.ts.
+    'let SHAREPRIV_SESS = {};\n' +
+    'let profile = { age: 40 };\n' +
     'let SPHOTO = null;\n' +
     'let SCARD = { aspect: "story", template: null, routeOn: null, key: null, file: null, pending: 0, metrics: null };\n' +
     FNS.map(lift).join("\n") + "\n" +
@@ -120,8 +127,8 @@ function env(): Env {
   // come from the build, like every other value in here.
   const SESSION_LABEL = new Function("return " + liftConst("SESSION_LABEL")
     .replace(/^const SESSION_LABEL = /, "").replace(/;$/, ""))() as Record<string, string>;
-  const out = new Function("SESSION_LABEL", "maxHrEstimate", "esc", "state", "localStorage", body)(
-    SESSION_LABEL, () => 190, (s: any) => String(s), { logged: [] }, store,
+  const out = new Function("SESSION_LABEL", "maxHrEstimate", "esc", "state", "localStorage", "RC", body)(
+    SESSION_LABEL, () => 190, (s: any) => String(s), { logged: [] }, store, { highPrivacyByDefault },
   ) as Env;
   out.store = store;
   return out;

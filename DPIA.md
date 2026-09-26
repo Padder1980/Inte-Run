@@ -108,7 +108,7 @@ Not yet done, and it should be before children are invited:
 |---|---|---|---|---|
 | R1 | A child's free text reaches an AI service | possible | medium | **low** — off by default; explained before it is turned on; worrying questions never sent; no name or location in what is sent. What Cloudflare keeps is set by Cloudflare's own terms and is not ours to assert. |
 | R2 | Location disclosed to third parties | likely | low | **low** — rounded to about 1 km; town names off by default; map tiles cached so the same area is fetched once |
-| R3 | A child's location made visible to others on a share card | possible | high | **low** — route and place start hidden every time the share studio opens, and a choice to show them is forgotten when it closes (standard 10); start and finish are trimmed for everybody |
+| R3 | A child's location or heart rate made visible to others on a share card | possible | high | **low** — route and place start hidden every time the share studio opens, and a choice to show them is forgotten when it closes (standard 10); heart rate is never one of the card's usual numbers for a high-privacy runner and appears only if they add it, which is also forgotten on closing (standard 7); start and finish are trimmed for everybody |
 | R4 | Heart rate sent to Strava against Strava's rules | — | medium | **low** — no Strava under 13; no heart rate under 16 (Y4) |
 | R5 | Health data written where other apps or people can read it | possible | medium | **low** — Apple Health off by default for high-privacy runners. **Residual:** a run recorded on the Apple Watch is saved to Health by watchOS itself, as with any watch workout app |
 | R6 | A symptom disclosure leaves the phone | possible | high | **low** — check-ins keep nothing; Ask Alfie answers red flags on the phone; the screener was fixed in Y5 to catch capitalised text and curly apostrophes, which it had been missing |
@@ -132,7 +132,8 @@ Not yet done, and it should be before children are invited:
 4. **The red-flag screener** normalises text itself, so a phone's capitals and curly apostrophes no
    longer slip past it.
 5. **Rounded locations** for weather (was about 110 m) and town names (was about 11 m).
-6. **Share cards** keep a young runner's route and place hidden every session (standard 10).
+6. **Share cards** keep a young runner's route and place hidden every session (standard 10), and leave
+   their heart rate off unless they add it (standard 7).
 7. **Your data page** (standard 15): what goes online and to whom, the switches, backup (download), and
    **Delete everything** — which also removes the Strava key and Mapbox token a backup leaves out, tells
    Inte-Run's server to disconnect Strava, and deletes the stored photos, videos and map pictures.

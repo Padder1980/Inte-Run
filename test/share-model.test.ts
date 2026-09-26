@@ -69,7 +69,7 @@ const FNS = ["fmtPace", "rdCue", "rdWell", "runEvidenceConfidence", "runAnalysis
   "privDefaultOn", "sharePrivacyFor", "sharePrivacyLocked", "setSharePrivacy", "runMetricLadder", "runStartMsKnown",
   "runStartExactMs",
   "rdWhenText", "rdDateText", "shareTemplateStates", "shareTemplateFor", "shareEvidenceLine", "shareFileName",
-  "shareProgressionClaim", "shareMetricPool", "shareMetricsChosen",
+  "shareProgressionClaim", "shareMetricPool", "shareHealthMetric", "shareMetricsChosen",
   "shareCropKey", "shareCropRead", "shareCropWrite", "sharePhotoView", "shareCropSig",
   "shareCardModel", "shareKey", "shareRouteOn", "shareCardOpts", "shareCardKey", "shareAspect",
   // ⚠️ THE ONE MAPPING FROM A RUN TO ITS EFFORT BAND, AND effortOf UNDER IT. The card's ground is the

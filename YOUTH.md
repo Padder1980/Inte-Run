@@ -479,7 +479,8 @@ figure**, so the cap is applied again in `progPrefs` where that figure is read.
   - `strava` - only after connecting (13+), no heart rate under 16 (Y4).
   - `update` - the iPhone app's version check, carrying nothing about the runner.
 - **Share cards** keep a young runner's route and place hidden every time the share studio opens
-  (standard 10: location-visible options "should default back to 'off' at the end of each session").
+  (standard 10: location-visible options "should default back to 'off' at the end of each session"), and
+  leave their heart rate off unless they add it (standard 7).
 - **Your data** (standard 15): the table, the switches, backup, **Delete everything**, and the ICO.
 - **Four defects found on the way, for everybody:** the red-flag screen before sending missed capitalised
   and curly-apostrophe text (how an iPhone types); Ask Alfie's history re-sent a symptom the screener had

@@ -29594,6 +29594,12 @@ function runPlaceLookup(run) {
  * the debrief, where it belongs, and the flag is what stops the card's "take the next available metric"
  * rule quietly publishing it the day a run has no elevation, heart rate, cadence or calories.
  *
+ * ⚠️ health: true MARKS A HEALTH FIGURE (Y5). Heart rate is special-category data under data protection
+ * law, and on the Children's Code's high-privacy defaults it is never one of a share card's usual three
+ * numbers -- see shareMetricsChosen. The marker sits here, beside share, so a new heart-rate figure is
+ * covered by the same line that adds it, and test/childrens-code.test.ts fails on any bpm entry that
+ * is missing it.
+ *
  * ⚠️ THE ICON IS A NAME, LOOKED UP AT RENDER TIME. ICON is declared far below this list in the emitted
  * script; holding the markup here would capture undefined and draw six empty slots in silence, which is
  * exactly how ICON.search once shipped as a blank square.
@@ -29601,13 +29607,13 @@ function runPlaceLookup(run) {
 const RUN_METRIC_LADDER = [
   { key: "elev",    icon: "trendUp", u: "m",   k: "Elevation gain", short: "ELEV",     share: true,
     get: (run) => (run.elevGain > 0 ? Math.round(run.elevGain) : null) },
-  { key: "avgHr",   icon: "heart",   u: "bpm", k: "Avg HR",         short: "AVG HR",   share: true,
+  { key: "avgHr",   icon: "heart",   u: "bpm", k: "Avg HR",         short: "AVG HR",   share: true, health: true,
     get: (run) => (run.avgHr ? Math.round(run.avgHr) : null) },
   { key: "cadence", icon: "rEasy",   u: "spm", k: "Cadence",        short: "CADENCE",  share: true,
     get: (run) => (run.cadence ? Math.round(run.cadence) : null) },
   { key: "kcal",    icon: "flame",   u: "",    k: "Calories",       short: "CALORIES", share: true,
     get: (run) => (run.kcal ? Math.round(run.kcal) : null) },
-  { key: "maxHr",   icon: "heart",   u: "bpm", k: "Max HR",         short: "MAX HR",   share: true,
+  { key: "maxHr",   icon: "heart",   u: "bpm", k: "Max HR",         short: "MAX HR",   share: true, health: true,
     get: (run) => (run.maxHr ? Math.round(run.maxHr) : null) },
   { key: "rpe",     icon: "gauge",   u: "",    k: "RPE",            short: "RPE",      share: false,
     get: (run) => (run.rpe ? run.rpe + "/10" : null) },
@@ -35017,6 +35023,8 @@ function shareMetricPool(run) {
 }
 /** The most numbers any of the four templates prints in its supporting row. */
 const SHARE_METRIC_MAX = 3;
+/** Is this pool key a health figure? Read off the ladder's own marker (health: true), so one is added in one place. */
+function shareHealthMetric(key) { return RUN_METRIC_LADDER.some((m) => m.key === key && m.health); }
 /**
  * The row this card actually gets: the runner's pick where there is one, the pool's head where there
  * is not.
@@ -35033,6 +35041,14 @@ function shareMetricsChosen(run, keys) {
     for (const k of keys) { const m = pool.filter((x) => x.key === k)[0]; if (m) pick.push(m); }
     if (pick.length) return pick.slice(0, SHARE_METRIC_MAX);
   }
+  // ⚠️⚠️ ON THE HIGH-PRIVACY DEFAULTS (Y5) A HEALTH FIGURE IS NEVER ONE OF THE USUAL THREE. Heart rate is
+  // special-category data and a card is made to be posted -- yet on a run with heart rate and no
+  // recorded climb, the pool's head put AVG HR third on the card by default, so a 14-year-old sharing a
+  // run published their heart rate without ever choosing to. It stays IN THE POOL: one tap in the
+  // Metrics sheet adds it, because a default is never a lock -- and SCARD.metrics is forgotten when the
+  // studio closes, so the next card starts private again, the same rule sharePrivacyFor applies to
+  // the route and the place. An adult's card is unchanged.
+  if (!privDefaultOn()) return pool.filter((x) => !shareHealthMetric(x.key)).slice(0, SHARE_METRIC_MAX);
   return pool.slice(0, SHARE_METRIC_MAX);
 }
 function shareCardModel(run, opt) {
@@ -35879,6 +35895,10 @@ function studioMetricsHtml(run) {
   const pool = shareMetricPool(run);
   const chosen = shareMetricsChosen(run, SCARD.metrics).map((x) => x.key);
   const full = chosen.length >= SHARE_METRIC_MAX, last = chosen.length <= 1;
+  // ⚠️ SAID IN WORDS ONLY WHEN IT IS TRUE: a high-privacy runner whose run recorded a heart rate, which
+  // shareMetricsChosen has just left out of the usual three. Anywhere else the sentence would describe
+  // a choice that is not being made.
+  const hrOff = !privDefaultOn() && pool.some((m) => shareHealthMetric(m.key));
   const chips = pool.map((m) => {
     const on = chosen.indexOf(m.key) >= 0;
     const dead = on ? last : full;
@@ -35892,7 +35912,7 @@ function studioMetricsHtml(run) {
   // does not appear has to be explained; both remaining shapes carry all three, so there is nothing to
   // explain and a sentence about a shape nobody can choose would be worse than none.
   return '<p class="sst-note">Up to ' + SHARE_METRIC_MAX + ', and only what this run recorded. ' +
-      'This card keeps them for this export only.</p>' +
+      'This card keeps them for this export only.' + (hrOff ? ' Heart rate stays off unless you add it.' : '') + '</p>' +
     '<div class="sst-mets" data-sst-mets>' + (chips.length ? chips.join("") :
       '<p class="sst-note">This run recorded no supporting numbers, so the card shows its distance alone.</p>') + '</div>' +
     (SCARD.metrics && SCARD.metrics.length

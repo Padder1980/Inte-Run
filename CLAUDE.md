@@ -16123,8 +16123,8 @@ defaults cover under-18s AND anybody who has not told us their age**, and **ther
 address yet** — the line offering one appears only once `PRIVACY_CONTACT` is set, and the ICO is offered
 meanwhile. The fifteen standards were read word for word from the ICO's own pages, and standard 10's full
 text checked separately ("Options which make a child's location visible to others should default back to
-'off' at the end of each session"). Suite 1760 → **1780**; `test/childrens-code.test.ts` holds 20 guards;
-**28 deliberate re-breaks, all 28 caught** (each applied to a pristine copy, rebuilt, and the tree restored byte-identical after). All web except four iPhone permission strings, which need an Xcode build.
+'off' at the end of each session"). Suite 1760 → **1781**; `test/childrens-code.test.ts` holds 21 guards;
+**36 deliberate re-breaks, all 36 caught** (28 in the build, 8 in the heart-rate follow-up below; each applied to a pristine copy, rebuilt, and the tree restored byte-identical after). All web except four iPhone permission strings, which need an Xcode build.
 
 ⚠️ **THE AUTHORITATIVE LIST OF WHAT LEAVES THE PHONE IS `PRIVACY_FLOWS` IN `web/app.ts`**, and the full
 assessment is **`DPIA.md`** at the repo root. Read both before adding anything that talks to a server.
@@ -16186,6 +16186,23 @@ assessment is **`DPIA.md`** at the repo root. Read both before adding anything t
   that pinned four places was **tightened, not relaxed**, and now also forbids more than two.
 - **A young runner's share card hides the route and the place every visit** (`SHAREPRIV_SESS`, never
   written to disk, emptied by `closeShareStudio`). An adult's per-run choice is still remembered.
+- ⚠️⚠️ **AND IT LEAVES HEART RATE OFF UNLESS THEY ADD IT — found by the session that committed Y5, not by the
+  one that built it.** A card's usual three numbers are the head of `shareMetricPool`, and on a run with heart
+  rate and no recorded climb that head was **TIME, AVG PACE, AVG HR** — so a young runner sharing a run
+  published their heart rate (special-category data) without choosing to, on the very card whose route and
+  place had just been made private. Measured on a fixture: an adult's default `time/pace/avgHr`, a
+  14-year-old's and an unknown age's `time/pace/cadence`. `health: true` on the two bpm entries of
+  `RUN_METRIC_LADDER` is the one marker, `shareHealthMetric` reads it, and `shareMetricsChosen` leaves them
+  out of the DEFAULT only: an explicit pick still wins (a default is never a lock), and `SCARD.metrics` is
+  forgotten when the studio closes, so the next card starts private again. The Metrics sheet says *"Heart
+  rate stays off unless you add it"* only when that is true. An adult's card is byte-identical (the export
+  gate measures an adult and did not move).
+  ⚠️ **A derived check fails on any bpm entry without the marker, and it is the only thing that can see a
+  missing marker on `maxHr`** — fifth in the pool, so it never reaches the usual three. Re-broken: the
+  default test passed, the derived check caught it.
+  ⚠️ **The lesson: a privacy pass over a card has to cover every field the card can print, not the one the
+  standard happens to name.** Standard 10 names location, so location was made private; no standard names
+  heart rate by field, so it was not.
 - **Your data** (standard 15) now opens with the table, the switches (with the runner's real default),
   backup (the download tool), **Delete everything**, and "Worried about your information?" with the ICO.
 - **Delete everything** — ⚠️ read `deleteEverything` before changing it; every line is load-bearing:
@@ -16204,6 +16221,10 @@ assessment is **`DPIA.md`** at the repo root. Read both before adding anything t
   Inte-Run server"), the Mapbox card ("never leaves the app" — it goes to Mapbox with every tile), and four
   iPhone permission strings (heart rate can reach Strava; the location string now names the weather; the
   photo string now names Inte-Club).
+  ⚠️ **And the Health strings' first replacement said heart rate *only* leaves via Strava** — false the
+  moment a runner shares a card showing it, or saves a backup. They now read *"unless you choose to send or
+  share it, for example by sending a run to Strava"*, and the guard requires both Strava and sharing to be
+  named — deriving the sharing half from the ladder's `share: true`, so it cannot go vacuous in silence.
 - **`DPIA.md`** — the seven ICO steps, the data map, thirteen risks and the fifteen standards. ⚠️ The test
   fails if a flow in `PRIVACY_FLOWS` is missing from its data map, so the document cannot quietly go stale.
 

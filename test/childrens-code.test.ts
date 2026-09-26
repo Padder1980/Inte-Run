@@ -446,9 +446,53 @@ test("the web version's offline copy never answers a forecast from its cache", (
 
 test("the iPhone's permission wording says what really happens", () => {
   const str = (key: string) => (PLIST.match(new RegExp("<key>" + key + "</key>\\s*<string>([^<]*)</string>")) || [])[1] || "";
+  // ⚠️ STRAVA IS NOT THE ONLY WAY HEART RATE LEAVES THE PHONE, and Y5's first wording said it was ("It only
+  // leaves them if you send a run to Strava yourself"). A share card can print the run's heart rate --
+  // RUN_METRIC_LADDER marks those entries share: true -- and a backup file carries it as well. So the
+  // wording names Strava as an EXAMPLE of the runner's own choice and admits sharing. Derived from the
+  // ladder: the day no heart-rate figure can reach a card, this says so instead of going quietly vacuous.
+  const ladder = lift([], ["RUN_METRIC_LADDER"], "RUN_METRIC_LADDER", {}) as Array<{ key: string; share: boolean; health?: boolean }>;
+  assert.ok(ladder.some((m) => m.health && m.share),
+    "no heart-rate figure can reach a share card any more -- restate the 'or share it' half of this guard");
   for (const k of ["NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription"]) {
     assert.ok(!/never sent anywhere/.test(str(k)), k + " still says health data is never sent anywhere -- heart rate goes to Strava when a runner sends a run");
-    assert.ok(str(k).includes("Strava"), k + " names the one place it can go");
+    assert.ok(str(k).includes("Strava"), k + " no longer names Strava, the main place a runner sends a run");
+    assert.ok(/\bshar/i.test(str(k)), k + " reads as if Strava were the only way out -- a share card can print heart rate too");
   }
   assert.ok(str("NSLocationWhenInUseUsageDescription").includes("weather"), "the location wording names the weather lookup");
+});
+
+test("a young runner's share card leaves heart rate off unless they add it", () => {
+  // ⚠️⚠️ A DEFAULT, NOT A LOCK (standard 7). On a run with heart rate and no recorded climb, the pool's head
+  // put AVG HR third on the card, so a young runner sharing a run published their heart rate -- special
+  // category data -- without ever choosing to. Found by the session that committed Y5, after the route and
+  // the place had already been made private on the same card. Driven through the real shareMetricsChosen
+  // and the real Metrics sheet, with the real privacy rule.
+  const env = (profile: Record<string, unknown>) => lift(
+    ["privDefaultOn", "runMetricLadder", "shareMetricPool", "shareHealthMetric", "shareMetricsChosen", "studioMetricsHtml", "esc"],
+    ["RUN_METRIC_LADDER", "SHARE_METRIC_MAX"],
+    "{ chosen: shareMetricsChosen, pool: shareMetricPool, sheet: studioMetricsHtml, ladder: RUN_METRIC_LADDER }",
+    { RC, profile, STUDIO: null, SCARD: { metrics: null }, SHARE_TEMPLATE_LABEL: {} });
+  const run = { time: "32:10", pace: "5:21 /km", avgPaceSec: 321, avgHr: 152, maxHr: 176, cadence: 168, elevGain: 0 };
+  const keys = (e: any, picked: string[] | null = null) => e.chosen(run, picked).map((x: any) => x.key);
+  const adult = env({ age: 34 });
+  // The control. Without it the cases below could pass on a fixture that never showed heart rate at all.
+  assert.deepEqual(keys(adult), ["time", "pace", "avgHr"], "an adult's card no longer shows what it did before Y5");
+  assert.doesNotMatch(adult.sheet(run), /Heart rate stays off/, "an adult is told heart rate is held back when it is not");
+  const cases: Array<[string, any]> = [["a 14-year-old", env({ age: 14 })], ["a runner with no age", env({})]];
+  for (const [who, e] of cases) {
+    assert.deepEqual(keys(e), ["time", "pace", "cadence"], who + "'s card shows a heart-rate figure by default");
+    assert.ok(e.pool(run).some((x: any) => x.key === "avgHr"), who + " cannot add heart rate at all -- a default must never be a lock");
+    assert.deepEqual(keys(e, ["time", "avgHr"]), ["time", "avgHr"], who + " picked heart rate and did not get it");
+    assert.match(e.sheet(run), /Heart rate stays off unless you add it/, who + "'s Metrics sheet does not say why heart rate is missing");
+    const noHr = { time: "32:10", pace: "5:21 /km", avgPaceSec: 321, cadence: 168 };
+    assert.doesNotMatch(e.sheet(noHr), /Heart rate stays off/, "the sentence appears on a run that recorded no heart rate");
+  }
+  // ⚠️ DERIVED, SO A NEW HEART-RATE FIGURE CANNOT ARRIVE UNMARKED: every bpm entry must carry health: true.
+  // The default case above cannot see a missing marker on maxHr -- it is fifth in the pool, so it never
+  // reaches the usual three -- which is exactly why this half exists.
+  const bpm = (adult.ladder as Array<{ key: string; u: string; health?: boolean }>).filter((m) => m.u === "bpm");
+  assert.ok(bpm.length >= 2, "the ladder's heart-rate entries were not found, so this sweep would pass on anything");
+  const unmarked = bpm.filter((m) => !m.health).map((m) => m.key);
+  assert.deepEqual(unmarked, [], "these heart-rate figures are not marked health: true: " + unmarked.join(", "));
 });

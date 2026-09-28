@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 /**
  * THE RELEASE GATE'S OWN NUMBERS, DERIVED FROM THE GATE — SO THE THREE PLACES THAT QUOTE THEM CANNOT
@@ -27,6 +27,15 @@ import { readFileSync } from "node:fs";
 
 const read = (p: string) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 
+/**
+ * ⚠️ THE FIGURES THIS FILE READS MOVED OUT OF CLAUDE.md ON 2026-09-28, INTO notes/. CLAUDE.md loads into every
+ * Claude session and had reached 1.29 MB, so its chapters were moved into notes/ word for word. Reading CLAUDE.md
+ * plus every notes file, rather than naming the one file they landed in, means the next move cannot leave this
+ * guard pointed at a file the figures are no longer in.
+ */
+const readNotes = () => ["CLAUDE.md", ...readdirSync(new URL("../notes/", import.meta.url))
+  .filter((f) => f.endsWith(".md")).sort().map((f) => "notes/" + f)].map(read).join("\n\n");
+
 /** Numbers as the Road Map writes them, because it is written for a person, not for a parser. */
 const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
   "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
@@ -52,17 +61,17 @@ function gateSections(): Record<string, number> {
   return out;
 }
 
-test("BLOCKER: the release gate's total is counted from the gate, and CLAUDE.md's split adds up to it", () => {
+test("BLOCKER: the release gate's total is counted from the gate, and the notes' split adds up to it", () => {
   const sections = gateSections();
   const total = Object.values(sections).reduce((a, b) => a + b, 0);
   assert.ok(Object.keys(sections).length >= 5, "the gate parsed as " + Object.keys(sections).length + " sections");
   assert.ok(total > 20, "the gate parsed as only " + total + " items, so the parse is wrong rather than the docs");
 
-  const md = read("CLAUDE.md");
+  const md = readNotes();
   const m = /\*\*(\d+) items: (\d+) PASS,\s*\n?(\d+) BLOCKED, (\d+) FAIL\*\*/.exec(md);
-  assert.ok(m, "CLAUDE.md no longer states the gate's result in the '<n> items: <p> PASS, <b> BLOCKED, <f> FAIL' shape the derivation reads");
+  assert.ok(m, "the notes no longer states the gate's result in the '<n> items: <p> PASS, <b> BLOCKED, <f> FAIL' shape the derivation reads");
   const [t, pass, blocked, fail] = [Number(m![1]), Number(m![2]), Number(m![3]), Number(m![4])];
-  assert.equal(t, total, "CLAUDE.md says " + t + " checklist items; the gate has " + total +
+  assert.equal(t, total, "the notes says " + t + " checklist items; the gate has " + total +
     " (per section " + JSON.stringify(sections) + ")");
   assert.equal(pass + blocked + fail, total,
     "the split " + pass + "+" + blocked + "+" + fail + " does not account for all " + total + " items");
@@ -70,14 +79,14 @@ test("BLOCKER: the release gate's total is counted from the gate, and CLAUDE.md'
   // ⚠️ THE PER-SECTION BREAKDOWN IS RECORDED IN CLAUDE.md AS THE WORKING, so it is checked against the
   // count rather than trusted. It is the line a future reader will re-add the totals from.
   const brk = /Counted: ((?:[A-Z]\d+\s*)+)\./.exec(md);
-  assert.ok(brk, "CLAUDE.md no longer records the per-section count it added up");
+  assert.ok(brk, "the notes no longer records the per-section count it added up");
   const stated: Record<string, number> = {};
   for (const p of brk![1]!.trim().split(/\s+/)) stated[p[0]!] = Number(p.slice(1));
-  assert.deepEqual(stated, sections, "CLAUDE.md's per-section breakdown disagrees with the gate itself");
+  assert.deepEqual(stated, sections, "the notes' per-section breakdown disagrees with the gate itself");
 });
 
 test("BLOCKER: the enumerated blocked items number exactly as many as the figure claims", () => {
-  const md = read("CLAUDE.md");
+  const md = readNotes();
   const m = /\*\*(\d+) items: (\d+) PASS,\s*\n?(\d+) BLOCKED/.exec(md);
   const blocked = Number(m![3]);
   // ⚠️ THE WORD AND THE LIST, BOTH. "eleven" survived for a day as a WORD in a paragraph that then
@@ -85,7 +94,7 @@ test("BLOCKER: the enumerated blocked items number exactly as many as the figure
   // would have passed the exact defect this file exists for.
   const word = spell(blocked).toUpperCase();
   const at = md.indexOf("The " + word + " BLOCKED checklist items");
-  assert.ok(at > 0, "CLAUDE.md no longer opens the blocked paragraph with 'The " + word +
+  assert.ok(at > 0, "the notes no longer opens the blocked paragraph with 'The " + word +
     " BLOCKED checklist items', so the count and the list have nothing tying them together");
   const para = md.slice(at, at + 1400);
   const items = para.match(/\(\d+\)/g) || [];
@@ -98,7 +107,7 @@ test("BLOCKER: the enumerated blocked items number exactly as many as the figure
   for (let n = 0; n < 30; n++) {
     if (n === blocked) continue;
     assert.ok(!md.includes("The " + spell(n).toUpperCase() + " BLOCKED checklist items"),
-      "a second blocked-item count survives in CLAUDE.md: " + spell(n));
+      "a second blocked-item count survives in the notes: " + spell(n));
   }
 });
 
@@ -110,7 +119,7 @@ test("BLOCKER: the Road Map spells the gate's own figures, and spells them the s
    * real iPhone" while the step detail four paragraphs below said sixty-two of sixty-seven and five —
    * i.e. the correction had reached the step and CLAUDE.md and not the summary line at the top.
    */
-  const md = read("CLAUDE.md");
+  const md = readNotes();
   const m = /\*\*(\d+) items: (\d+) PASS,\s*\n?(\d+) BLOCKED, (\d+) FAIL\*\*/.exec(md);
   const [total, pass, blocked, fail] = [Number(m![1]), Number(m![2]), Number(m![3]), Number(m![4])];
   const rm = read("docs/roadmap/index.html");
@@ -122,12 +131,12 @@ test("BLOCKER: the Road Map spells the gate's own figures, and spells them the s
   assert.ok(found.length >= 2, "the Road Map states the gate's result " + found.length +
     " times; the hero and the step detail both have to carry it, and they are what disagreed");
   for (const [p, t, f, b] of found) {
-    assert.equal(p!.toLowerCase(), spell(pass), "the Road Map says '" + p + "' pass against CLAUDE.md's " + pass);
-    assert.equal(t!.toLowerCase(), spell(total), "the Road Map says '" + t + "' checks against CLAUDE.md's " + total);
-    assert.equal(b!.toLowerCase(), spell(blocked), "the Road Map says '" + b + "' blocked against CLAUDE.md's " + blocked);
+    assert.equal(p!.toLowerCase(), spell(pass), "the Road Map says '" + p + "' pass against the notes' " + pass);
+    assert.equal(t!.toLowerCase(), spell(total), "the Road Map says '" + t + "' checks against the notes' " + total);
+    assert.equal(b!.toLowerCase(), spell(blocked), "the Road Map says '" + b + "' blocked against the notes' " + blocked);
     // "none fails" is how the page says zero, so the word has to track the figure rather than sit there.
     assert.equal(f!.toLowerCase(), fail === 0 ? "none" : spell(fail),
-      "the Road Map says '" + f + "' fails against CLAUDE.md's " + fail);
+      "the Road Map says '" + f + "' fails against the notes' " + fail);
   }
   // ⚠️ AND NO STALE FIGURE SURVIVES ANYWHERE ELSE ON THE PAGE. The denominator that never existed (74)
   // is the tell: it was arrived at by counting rows that are not checklist items, twice.

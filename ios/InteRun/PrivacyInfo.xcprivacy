@@ -2,16 +2,125 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- ⚠️ WITHOUT THIS FILE THE FIRST UPLOAD IS EMAILED BACK AS ITMS-91053, "Missing API Declaration".
+  <!-- ⚠️ WITHOUT THIS FILE AN UPLOAD IS EMAILED BACK AS ITMS-91053, "Missing API Declaration".
        Since 1 May 2024 Apple requires any app using a "required reason" API to declare which of those
-       APIs it uses and why. This app uses exactly one of them, in 35 places: UserDefaults. The error
-       arrives by email after the upload appears to have succeeded, which is a slow way to find out. -->
+       APIs it uses and why. This app uses two: UserDefaults, and one file-metadata read. The error
+       arrives by email after the upload appears to have succeeded, which is a slow way to find out.
+       ⚠️ THE WATCH APP IS A SEPARATE BINARY AND CARRIES ITS OWN FILE (ios/InteRunWatch/), because
+       Apple checks every binary in the upload, not just this one. -->
 
-  <!-- Nothing is collected. Every run, every route and every answer stays in localStorage on the
-       device; there is no account, no server and no analytics. The only network calls are for map
-       tiles and a weather lookup, neither of which is tied to an identity. -->
+  <!-- ⚠️⚠️ UNTIL Y6 (27 Sept 2026) THIS SAID "Nothing is collected ... no server", AND BOTH HALVES HAD
+       STOPPED BEING TRUE: Ask Alfie's online answers and the Strava connection both go through
+       Inte-Run's own server. These entries now match the App Privacy answers in APPSTORE.md, entry for
+       entry, and test/app-store.test.ts fails if the two disagree. The reasoning for each line, and
+       why the fuller reading of Apple's definition was chosen, is in APPSTORE.md section 3.
+       Every entry is App Functionality only. Nothing is used for tracking, advertising or analytics. -->
   <key>NSPrivacyCollectedDataTypes</key>
-  <array/>
+  <array>
+    <!-- LINKED TO YOU: only if the runner connects Strava. Runs and strength sessions they send go to
+         their own Strava account through Inte-Run's server, which holds the connection (the account's
+         tokens, its first name for "Connected as ...", and the hashed key of this device). -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypePreciseLocation</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeHealth</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeFitness</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeName</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeUserID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeDeviceID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <!-- NOT LINKED TO YOU: a rough location for the weather, the map and a run's town (sent to
+         Open-Meteo, CARTO or Mapbox, and OpenStreetMap, with no identifier from us), and Ask Alfie's
+         questions once the runner has said yes (sent through Inte-Run's server to an AI service run
+         by Cloudflare; the server keeps none of it). -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeCoarseLocation</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
 
   <!-- No tracking, and no third-party SDKs to do any. -->
   <key>NSPrivacyTracking</key>
@@ -22,9 +131,10 @@
   <key>NSPrivacyAccessedAPITypes</key>
   <array>
     <dict>
-      <!-- CA92.1: reading and writing this app's own preferences, never another app's and never a
-           shared container. Used for the runner's settings, the watch bridge's last payload, and the
-           coach/keyboard/live-activity diagnostics. -->
+      <!-- CA92.1, in Apple's words: "to read and write information that is only accessible to the app
+           itself". The runner's native settings, the watch bridge's last payload, the web-update
+           service's bookkeeping, and the coach/keyboard/live-activity diagnostics. Never another
+           app's defaults and never a shared container. -->
       <key>NSPrivacyAccessedAPIType</key>
       <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
       <key>NSPrivacyAccessedAPITypeReasons</key>
@@ -33,9 +143,10 @@
       </array>
     </dict>
     <dict>
-      <!-- C617.1: BundleSchemeHandler reads the size of files INSIDE THIS APP'S OWN BUNDLE to answer
-           HTTP range requests, which is what makes the coach's audio play at all. It never inspects a
-           file it did not ship. -->
+      <!-- C617.1, in Apple's words: "the timestamps, size, or other metadata of files inside the app
+           container". BundleSchemeHandler calls attributesOfItem for the SIZE of files the app shipped
+           (or downloaded into its own Application Support) to answer HTTP range requests, which is
+           what makes the coach's audio play at all. It never inspects a file it does not own. -->
       <key>NSPrivacyAccessedAPIType</key>
       <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
       <key>NSPrivacyAccessedAPITypeReasons</key>

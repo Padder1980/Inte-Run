@@ -16172,6 +16172,10 @@ assessment is **`DPIA.md`** at the repo root. Read both before adding anything t
   Alfie's online answers (`alfieOnline`, stored as `online` in `interun_alfie_v1`), town names
   (`placeNamesOn`, `interun_placenames_v1`) and Apple Health (`healthSyncOn`) all read it only when the
   runner has not answered. An adult's app is byte-for-byte unchanged.
+  ⚠️⚠️ **NO LONGER TRUE FOR ASK ALFIE, SINCE Y6 (2026-09-27).** App Review guideline 5.1.2(i) requires
+  explicit permission before anything is shared with a third-party AI, so an ADULT who has not answered is
+  now asked once, at their first question, where Y5 sent it silently. `alfieOnline()` answers true only
+  for an explicit yes. See the Y6 chapter; town names and Apple Health are unchanged.
 - **The gate on sending is `alfieMaySend(t)`** — online, a server, and no red flag — and **`alfieRemote`
   refuses on its own** as well, so a future caller that forgot the switch still sends nothing. ⚠️ The two
   are tested separately, because belt and braces hides the brace you are testing.
@@ -16256,7 +16260,7 @@ closure is a different function.
 - **`DPIA.md` sign-off**, ideally after a data-protection professional reads it (the lawful-basis
   position especially).
 - **The privacy policy and terms (D1)** with a version a 12-year-old can read.
-- **Y6 — the App Store answers** (age rating and privacy label must match `PRIVACY_FLOWS`).
+- ✅ **Y6 — the App Store answers** — done 2026-09-27; see the next chapter and `APPSTORE.md`.
 - ⚠️ **"Prefer not to say" still gets the ADULT training plan**; only the privacy defaults treat them as
   a child (the known gap in `YOUTH.md`).
 - ⚠️ **What Cloudflare, CARTO, Mapbox, Open-Meteo and OpenStreetMap keep is set by their own terms** and is
@@ -16266,3 +16270,139 @@ closure is a different function.
 - ⚠️ **Existing profiles with no stored age now start private.** Most older profiles carry the phantom
   `age: 38` the old `DEFAULT_PROFILE` wrote, so they read as adults; a runner who genuinely chose "Prefer
   not to say" will find Ask Alfie's online answers off until they switch them on.
+
+## ✅ Y6 — THE APP STORE ANSWERS, AND FIVE THINGS THE APP WAS TELLING APPLE WRONGLY (owner, 2026-09-27)
+
+The sixth stage of the 12-17 programme, and what the owner asked for at the start of it: *"All of this
+needs to be written into any privacy policy and answers for the app store."* The answers are
+**`APPSTORE.md`** at the repo root — age rating, App Privacy label, both privacy manifests, content
+rights, review notes, and what App Review might question — with every Apple rule quoted from Apple's own
+pages, read that day. **The owner types them into App Store Connect; nothing is submitted by itself.**
+Suite 1781 → **1793**; `test/app-store.test.ts` holds 11 guards, and **28 deliberate re-breaks were all
+caught** (one only after the break itself was made strong enough — below).
+
+⚠️ **THE ANSWERS COULD NOT BE WRITTEN HONESTLY UNTIL THE APP WAS FIXED, AND THAT IS MOST OF THIS STAGE.**
+
+1. ⚠️⚠️ **THE iPHONE'S PRIVACY MANIFEST SAID "NOTHING IS COLLECTED ... NO SERVER"**, and both halves had
+   stopped being true when Ask Alfie's online answers and the Strava connection arrived. Apple reads that
+   file out of the binary, so a label contradicting it contradicts the app. It now declares the same eight
+   types as the label, entry for entry, and a guard parses both and fails if they disagree.
+2. ⚠️⚠️ **THE WATCH APP HAD NO MANIFEST, AND APPLE CHECKS EVERY BINARY IN AN UPLOAD.** `WatchSettings`
+   and `SessionStore` use UserDefaults, so the watch binary is the one that would have drawn ITMS-91053 —
+   by email, after an upload that looked successful — while the phone's own file was complete.
+   `ios/InteRunWatch/PrivacyInfo.xcprivacy` is new; the widget uses no required-reason API and needs none.
+   ⚠️ **THE GUARD DERIVES BOTH LISTS**: the shipped targets out of `project.pbxproj`, and each target's
+   API use out of its own Swift (comments stripped, so a sentence naming an API is not a use). A new
+   target or a new API use fails until it is declared. ⚠️ The C `stat()` family is left out of the
+   patterns on purpose — this codebase has SwiftUI helpers called `stat()`. Verified by an Xcode build
+   (beta toolchain): both files are inside the built bundles.
+3. ⚠️⚠️ **AN ADULT'S ASK ALFIE QUESTIONS WENT TO A THIRD-PARTY AI WITHOUT THEM EVER BEING ASKED.**
+   Guideline 5.1.2(i), added November 2025: *"You must clearly disclose where personal data will be shared
+   with third parties, including with third-party AI, and obtain explicit permission before doing so."*
+   Y5 made "unanswered" mean off for under-18s and unknown ages and left adults on — the one default Apple
+   now rules out.
+   - `alfieOnline()` answers true **only for an explicit yes**, at every age.
+   - `alfieNeedsAsk(t)` — an adult who has never answered, a server to send to, and a question allowed off
+     the phone at all — opens the sheet at their FIRST question, leaves the question in the box, and
+     answers it straight after, online or on the phone, whichever they chose. ⚠️ The box is emptied only if
+     it still holds that question, so anything typed meanwhile survives.
+   - ⚠️ **NEVER ASKED OF A HIGH-PRIVACY RUNNER.** Offering a child the less private choice unprompted is
+     the nudge the Children's Code's standard 13 forbids; they can still switch it on themselves.
+   - ⚠️ **A RED-FLAG QUESTION NEVER TRIGGERS THE ASK** — it is answered on the phone whatever the switch
+     says, so asking permission for it would be asking for nothing.
+   - ⚠️ **TURNING THE SWITCH ON ALWAYS GOES THROUGH THE SHEET, AT EVERY AGE** (`alfieToggleOnline`, one
+     handler for both switches). Before Y6 an adult's switch was one silent tap. Turning it off never asks.
+   - An adult's sheet leads with "Allow online answers" and says it can be changed; a young runner's still
+     leads with "Keep them off" and says to ask a parent or an adult they trust.
+4. ⚠️ **"AN AI" SAYS WHAT, NOT WHERE, AND 5.1.2(i) ASKS WHERE.** Every sentence about online answers —
+   the sheet (`ALFIE_ONLINE_EXPLAIN`), Alfie's own screen, the Safety page and `PRIVACY_FLOWS` — names
+   Cloudflare. ⚠️ **THE NAME IS DERIVED, NOT TRUSTED**: the guard reads `BRAIN` in
+   `alfie-proxy/src/worker.ts`, so switching the server to Claude fails the suite until every sentence
+   changes with it — re-broken exactly that way.
+5. ⚠️ **THE LOCATION PERMISSION MESSAGE NAMED THE WEATHER AND NOTHING ELSE**, while a rough location also
+   goes to the map provider and to OpenStreetMap for a run's town. It names all three; the guard checks it
+   against every `PRIVACY_FLOWS` entry that mentions a location, so a fourth flow cannot join silently.
+   Native — it reaches Apple only in a build.
+
+Two more, found on the way:
+- ⚠️⚠️ **OPEN-METEO'S LICENCE (CC BY 4.0) REQUIRES A CREDIT, AND THE APP HAD NONE:** *"You must include a
+  link next to any location Open-Meteo data are displayed."* Without it the content-rights answer ("do you
+  have the rights to this third-party content?") was false. `wxCreditHtml()` is one builder carrying their
+  own suggested words, and appears under Today's tile, in the weather sheet's live line, in the heat block
+  and in the heat sheet. ⚠️ **Today's credit shows when the forecast is live OR a heat adaptation is on
+  screen**, because the heat chip is their data too; a sample preset carries none — it is the app's own
+  example. ⚠️ **Their free tier is for apps "that do not have subscriptions or advertising"** — true today,
+  and the day Inte-Run charges, it needs a paid plan. The link's hit area grows via `::after`, not its box,
+  and `open-meteo.com` joined `PRIVACY_LINK_HOSTS` (the runner opens it; the app sends it nothing).
+- ⚠️ **THE STRAVA SERVER KEPT THE ATHLETE NUMBER AND NOTHING EVER READ IT** — standard 8, data
+  minimisation. New connections no longer store it, and an existing record loses it the next time its
+  token is refreshed. **Needs `wrangler deploy`**; the label does not depend on it, because the tokens
+  identify the account anyway.
+
+### The label: the full reading, deliberately
+
+Apple's "collect" is transmitting data off the device in a way that lets you or your partners access it
+longer than it takes to serve the request. Read narrowly, only what Inte-Run's own server keeps must be
+declared. **Read fully — which is what `APPSTORE.md` recommends and what the manifest carries —
+everything that leaves the phone for somebody who may keep it is declared too**: Strava and Cloudflare do
+keep what we send them, 5.1.2(i) singles out third-party AI, and over-declaring is never a rejection
+reason while under-declaring can be. Eight types, App Functionality only, none tracking: **Precise
+Location, Health, Fitness, Name, User ID and Device ID linked** (Strava, and the hashed install keys);
+**Coarse Location and Other User Content not linked** (weather/maps/town, and Alfie's questions).
+⚠️ Photos, check-in answers, diagnostics and search are deliberately not declared, and `APPSTORE.md` 2.3
+says why for each.
+
+### The age rating, and the decision that is the owner's
+
+⚠️⚠️ **THERE IS NO 12+ RATING ANY MORE.** Apple replaced 12+ and 17+ with 13+, 16+ and 18+ in 2025, and
+the youth programme starts at 12 — so a 13+ rating locks a 12-year-old out wherever Screen Time age
+limits are on. ⚠️ **AND APPLE'S RULE IS THAT TERMS SETTING A MINIMUM AGE ABOVE THE CALCULATED RATING
+FORCE AN OVERRIDE UP TO IT**, so D1's terms saying "you must be 12 or over" would force 13+. The
+recommendation: accept the calculated rating, do not override it, and have D1 describe the app as
+*designed for runners aged 12 and over* rather than making 12 a contractual minimum. **The owner's call.**
+- ⚠️ **ALCOHOL IS "INFREQUENT", NOT NONE, AND IT IS THE EASY ONE TO GET WRONG.** The injury guide, the
+  fuelling guide ("Alcohol is not a recovery drink") and the race-morning caffeine warning all reference
+  licit substances, and Apple counts references. They advise against — and they are clinically reviewed
+  wording that must never be edited to change an answer. The guard reads the app's own copy: while it
+  mentions alcohol, the answer cannot be None.
+- ⚠️ **MADE FOR KIDS: NO, and the choice cannot be undone once approved.** Guideline 2.3.8 also means the
+  listing must not say "for kids" or "for children".
+- The guard holds every question on Apple's questionnaire, and fails if one goes unanswered or if
+  section 1.3 stops naming the programme's real minimum age (`YOUTH_MIN_AGE`).
+
+### What App Review might question — recorded, not fixed
+
+- ⚠️ **Guideline 5.1.1(v): Strava's tokens are held on our server,** and Strava calls itself a social
+  network. The position (the token exchange needs our client secret, which must never ship; the tokens
+  never leave the server; `activity:write` only; Disconnect revokes at Strava) and the fallback if it is
+  rejected (hand the tokens to the app once and let the server only refresh them) are in `APPSTORE.md`
+  6.1. Real work, and not built unless Apple asks.
+- **Downloaded web code** (2.5.2, DPLA 3.3.1(B)) is disclosed in the review notes on purpose; keeping that
+  paragraph is the owner's call.
+- **OpenStreetMap / Nominatim** attribution and usage policy: worth confirming before a public launch.
+- **Apple's Declared Age Range API** (iOS 26) would close the "Prefer not to say" gap. Native; not built.
+
+### Traps this stage paid for
+
+- ⚠️ **APPLE'S DOCUMENTATION PAGES ARE RENDERED BY JAVASCRIPT, SO WebFetch READS NOTHING.** Fetch the
+  DocC JSON with curl (sandbox off):
+  `https://developer.apple.com/tutorials/data/documentation/bundleresources/<path>.json`. In the reason
+  codes, each description comes BEFORE its `"name":"CA92.1"` — a parser that takes the next description
+  reads the wrong code's text.
+- ⚠️ **ONE OF MY OWN GUARDS PASSED FOR THE WRONG REASON.** "No server means no ask" blanked the stored
+  proxy — which falls back to the built-in `ALFIE_SERVER`, so the server was there the whole time. The
+  harness gained a `noServer` option that replaces the constant itself.
+- ⚠️ **ONE RE-BREAK WAS TOO GENTLE AND LOOKED LIKE AN ESCAPE.** Removing "draw maps of your runs" left
+  "a map service" in the same message, so the guard rightly passed. Redone removing both, and caught —
+  a re-break has to cross the boundary the guard tests, which this file already records once for A2.
+- ⚠️ **The re-break harness normalises the build stamp** (`const BUILD = "…"` changes every minute), or
+  every "did the break reach the built page" comparison reads as changed.
+- ⚠️ The existing address sweep failed on the new credit link — correctly: it is a page the runner opens,
+  so it joined `PRIVACY_LINK_HOSTS` rather than the flow table.
+
+### Still the owner's
+
+The privacy policy and terms (**D1 — now the one thing blocking a submission**) · a support URL leading
+to a real email address (the same address can be `PRIVACY_CONTACT`) · the rating decision · an Xcode
+build and upload (the manifests and the location message reach Apple only in a build) · `wrangler deploy`
+for the athlete-number removal · `DPIA.md` sign-off · the clinical review of every threshold.

@@ -47,8 +47,8 @@ or if a flow below goes missing from this document.
 | `weather` | location rounded to 2 decimal places (about 1 km) | Open-Meteo | when the app checks the forecast for a run | on (disclosed; needed for heat safety) |
 | `maps` | which map squares to draw around a run or the runner's current position | CARTO, or Mapbox where configured | when a map is shown | on (disclosed; the map is the run they opened) |
 | `place` | the middle of a run, rounded to about 1 km | OpenStreetMap (Nominatim) | once per run, to name the town | **off** |
-| `alfie` | the question typed, a short plan summary (goal, week, phase, paces, today's session — no name, age or location), and earlier turns that already reached the server | Inte-Run's own server (a Cloudflare Worker), which asks Cloudflare's AI | only when online answers are on | **off** |
-| `strava` | runs and strength sessions the runner chooses to send; no heart rate under 16 | Strava, through Inte-Run's server | only after the runner connects Strava (13+) | not connected |
+| `alfie` | the question typed, a short plan summary (goal, week, phase, paces, today's session — no name, age or location), and earlier turns that already reached the server | Inte-Run's own server (a Cloudflare Worker), which asks Cloudflare's AI | only after the runner says yes — since Y6, at every age | **off** (and off until asked for adults too, Y6) |
+| `strava` | runs and strength sessions the runner chooses to send; no heart rate under 16. Inte-Run's server keeps the connection itself (the account's tokens and first name) while connected; since Y6 it no longer keeps the Strava athlete number, which nothing used | Strava, through Inte-Run's server | only after the runner connects Strava (13+) | not connected |
 | `update` | nothing about the runner — a request for the latest version of the app | GitHub | when the iPhone app opens | on (carries no personal data) |
 
 \* The high-privacy defaults apply to under-18s **and to anybody who has not given an age** (the owner's
@@ -127,7 +127,10 @@ Not yet done, and it should be before children are invited:
    `src/domain/youth.ts`); the runner's own answer always wins.
 2. **Bite-sized explanation at the point of use** (standard 4): turning Ask Alfie's online answers on
    shows what leaves the phone and says to ask a parent or an adult they trust; turning it off never asks
-   (standard 13).
+   (standard 13). **Since Y6 the same explanation comes before anybody's first online answer, adults
+   included**, and names the AI company (Cloudflare): Apple's guideline 5.1.2(i) requires "explicit
+   permission" before personal data goes to a third-party AI. An adult is asked once, at their first
+   question; a young or unknown-age runner is never asked unprompted.
 3. **Ask Alfie's history** sends only turns that already reached the server.
 4. **The red-flag screener** normalises text itself, so a phone's capitals and curly apostrophes no
    longer slip past it.
@@ -141,6 +144,10 @@ Not yet done, and it should be before children are invited:
    texts no longer claim that nothing leaves the phone. What leaves it is one table, guarded by a test.
 9. **The web version's offline copy** no longer serves a stale forecast or keeps location-bearing
    weather replies.
+10. **App Store answers (Y6)**: the age rating, the App Privacy label and the privacy manifests inside the
+   app now tell the same story as this document (`APPSTORE.md`, guarded by `test/app-store.test.ts`). The
+   location permission message names the weather, the maps and the town lookup, and the weather credit
+   Open-Meteo's licence asks for is shown wherever its forecast is.
 
 ### The fifteen standards
 
@@ -153,7 +160,7 @@ Not yet done, and it should be before children are invited:
 | 5 | Detrimental use of data | no advertising, no engagement tricks tied to data; training limits cap load for 12–17s |
 | 6 | Policies and community standards | Inte-Club has no community features to police; policies to publish with D1 |
 | 7 | Default settings | high privacy by default (Step 6.1) |
-| 8 | Data minimisation | Step 6.3–6.5 |
+| 8 | Data minimisation | Step 6.3–6.5; the server stopped keeping the unused Strava athlete number (Y6) |
 | 9 | Data sharing | nothing shared by default beyond weather, maps and the update check; Strava and Health by the runner's choice |
 | 10 | Geolocation | location only while recording or when asked; an obvious sign while tracking (iOS indicator and the app's live pill); share-card location reverts each session |
 | 11 | Parental controls | none provided |

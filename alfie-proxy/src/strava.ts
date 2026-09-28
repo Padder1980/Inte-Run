@@ -70,7 +70,14 @@ type Stored = {
   refresh: string;
   /** Unix seconds, from Strava's own expires_at. */
   expiresAt: number;
-  athleteId: number | null;
+  /**
+   * The Strava account's first name, shown in the app as "Connected as ...". It is the one piece of
+   * the account's profile kept here, and it is declared on the App Store privacy label (APPSTORE.md).
+   * ⚠️ THE ATHLETE ID IS NOT KEPT (Y6, 27 Sept 2026). It was stored from the first version and read by
+   * nothing -- uploads, status and disconnect all work from the tokens -- and the Children's Code's
+   * standard 8 says keep only what the service in use needs. Records written before this still carry
+   * the field until their next token refresh, which drops it (see accessToken).
+   */
   athleteName: string;
   scope: string;
 };
@@ -208,7 +215,6 @@ async function callback(url: URL, env: StravaEnv): Promise<Response> {
     access: String(tok.access_token || ""),
     refresh: String(tok.refresh_token || ""),
     expiresAt: Number(tok.expires_at) || 0,
-    athleteId: Number(athlete.id) || null,
     athleteName: String(athlete.firstname || "").trim(),
     scope,
   };
@@ -246,6 +252,9 @@ async function accessToken(env: StravaEnv, hash: string): Promise<Stored | null>
   rec.access = String(tok.access_token);
   rec.refresh = String(tok.refresh_token || rec.refresh);
   rec.expiresAt = Number(tok.expires_at) || 0;
+  // A record written before Y6 still carries the athlete id nothing reads; it goes the first time the
+  // record is rewritten anyway, which is here.
+  delete (rec as Stored & { athleteId?: unknown }).athleteId;
   await env.STRAVA!.put("tok:" + hash, JSON.stringify(rec));
   return rec;
 }

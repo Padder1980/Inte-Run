@@ -766,6 +766,11 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .wx-seg button { font-size: 12px; padding: 5px 10px; }
 .wx-src { font-size: 12px; color: var(--ink-faint); margin: 6px 0 2px; display: flex; align-items: center; gap: 7px; }
 .wx-src.live { color: var(--ink-soft); font-weight: 600; }
+/* ⚠️ OPEN-METEO'S LICENCE (CC BY 4.0) ASKS FOR THIS WORDING, AS A LINK, NEXT TO ITS DATA (Y6). The hit area
+   grows through ::after, not the box, so the line stays small and still clears the 44px tap floor. */
+.wx-credit { position: relative; color: var(--ink-faint); font-size: var(--t-label); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.wx-credit::after { content: ""; position: absolute; inset: -16px -6px; }
+.wx-credit-row { margin: var(--s2) 0 0; text-align: right; }
 .wx-src .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ready); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ready) 22%, transparent); animation: wxPulse 2s ease-in-out infinite; }
 @keyframes wxPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 .wx-loc { font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; }
@@ -7991,6 +7996,10 @@ function viewToday() {
     nextUp +
     '<div class="ui-section">What to know today</div>' +
     '<div class="tsq-row">' + conditionsSquare() + feelSquare() + '</div>' +
+    // Under the tiles rather than in one: the conditions tile is a button, and a link inside a button
+    // is invalid markup and an unpredictable tap.
+    // It also covers the heat chip above, which prints a forecast temperature and is itself a button.
+    (activeWeather().live || heatChoice(conditionsSession()) ? '<p class="wx-credit-row">' + wxCreditHtml() + '</p>' : "") +
     coachWatchCard() +
     addedTodayBlock() +
     weeklyOverview() +
@@ -8256,6 +8265,18 @@ function fetchWeather(force) {
  * resolver is INSIDE, so there is no argument to get wrong. Same reasoning as weatherSheetHtml, which
  * resolves its own.
  */
+/**
+ * The credit Open-Meteo's licence asks for, in its own words. Their licence page, read on 27 September
+ * 2026: "You must include a link next to any location Open-Meteo data are displayed, for example: ...
+ * Weather data by Open-Meteo.com". Shown wherever a real forecast is on screen, and only then -- a
+ * sample preset is the app's own example, not their data.
+ * ⚠️ ONE BUILDER, because the App Store's content-rights answer ("do you have the rights to this
+ * third-party content?") is only true while every weather surface carries it. test/app-store.test.ts
+ * checks each surface asks for it.
+ */
+function wxCreditHtml() {
+  return '<a class="wx-credit" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Weather data by Open-Meteo.com</a>';
+}
 function conditionsSquare() {
   const session = conditionsSession();
   const w = activeWeather();
@@ -8311,7 +8332,8 @@ function weatherSheetHtml() {
   const pen = penSec ? '<span class="chip rpe">≈ +' + penSec + 's/km for the same effort</span>' : "";
   const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (!state.wx && k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
   const source = w.live
-    ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>'
+    ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>' +
+      '<p class="wx-credit-row" style="text-align:left;margin-top:0">' + wxCreditHtml() + '</p>'
     : (WX_FETCHING ? '<div class="wx-src">Reading your local forecast…</div>' : '<div class="wx-src">Sample conditions · <button class="wx-loc" id="wxUseLoc">Use my location</button></div>');
   return '<div class="sd-type" style="--sc:' + c + '">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
     // ⚠️ COMPOSED HERE RATHER THAN USING imp.summary, which fixes a duplicate AND the units in one
@@ -9881,16 +9903,29 @@ function alfieBase() {
  */
 function privDefaultOn() { return !RC.highPrivacyByDefault(profile && profile.age); }
 /**
- * May a question leave this phone at all? Answered, the runner's choice wins in both directions.
- * Unanswered, it follows privDefaultOn() -- which is ON for an adult, exactly how Alfie behaved before
- * Y5, so no adult's Alfie changes.
+ * May a question leave this phone at all? ONLY WITH THE RUNNER'S EXPLICIT YES, AT EVERY AGE.
+ * ⚠️⚠️ APP REVIEW GUIDELINE 5.1.2(i), read on Apple's own page on 27 September 2026: "You must clearly
+ * disclose where personal data will be shared with third parties, including with third-party AI, and
+ * obtain explicit permission before doing so." Until Y6 an adult's UNANSWERED setting read as on, so
+ * their questions went to an AI service without their ever being asked -- the one default Y5 left
+ * alone for adults, and the one Apple now rules out. Unanswered is off for everybody. What still
+ * differs by age is only WHO IS ASKED: an adult is offered it once, at their first question
+ * (alfieNeedsAsk); a young or unknown-age runner is never nudged towards it (the Children's Code,
+ * standard 13) and can switch it on themselves, through the same sheet.
  * ⚠️ alfieBase() answers "is there a server"; this answers "may we send to it". Wherever a question
  * could go, both are asked.
  */
-function alfieOnline() {
+function alfieOnline() { return alfieCfg().online === true; }
+/**
+ * Should Alfie ask before answering this one? An adult who has never answered, a server to send to,
+ * and a question that would be allowed off the phone at all -- a red flag is answered here whatever
+ * the switch says, so asking about it would be asking for nothing.
+ * ⚠️ NEVER FOR A HIGH-PRIVACY RUNNER: offering a child the less private choice unprompted is the nudge
+ * standard 13 forbids.
+ */
+function alfieNeedsAsk(t) {
   const c = alfieCfg();
-  if (c.online === true || c.online === false) return c.online;
-  return privDefaultOn();
+  return c.online !== true && c.online !== false && privDefaultOn() && !!alfieBase() && !alfieRedFlags(t).length;
 }
 function alfieSetOnline(on) { const c = alfieCfg(); c.online = !!on; alfieSaveCfg(c); }
 /**
@@ -10157,6 +10192,14 @@ function alfieRenderLog() {
 let ALFIE_THINKING = false;
 function alfieAsk(text) {
   const t = String(text || "").trim(); if (!t || ALFIE_THINKING) return;
+  // ⚠️ ASK BEFORE THE FIRST QUESTION EVER LEAVES THE PHONE (guideline 5.1.2(i) -- see alfieOnline). The
+  // question goes back into the box while the sheet is up, so closing it without choosing loses nothing,
+  // and either choice then asks it.
+  if (alfieNeedsAsk(t)) {
+    const box = $("alfieIn"); if (box && !box.value) box.value = t;
+    openAlfieOnlineSheet(t);
+    return;
+  }
   const asked = { role: "user", text: t };
   ALFIE_MSGS.push(asked);
   ALFIE_THINKING = true; alfieRenderLog();
@@ -10225,7 +10268,7 @@ function alfieLimits() {
       // ⚠️ THIS SENTENCE WAS FALSE for everybody from the day ALFIE_SERVER was filled in: "Nothing you
       // type is sent anywhere", above a chat that sent every question. It now follows the switch.
       (alfieOnline() && alfieBase()
-        ? '<p><b>Online answers are on.</b> What you type goes to Inte-Run’s server with a short summary of your plan, and an AI writes the reply. Anything about pain or feeling unwell is answered here and never sent.</p>'
+        ? '<p><b>Online answers are on.</b> What you type goes to Inte-Run’s server with a short summary of your plan, and an AI service run by Cloudflare writes the reply. Anything about pain or feeling unwell is answered here and never sent.</p>'
         : '<p><b>It answers on this phone.</b> Nothing you type leaves it, and it works with no signal.</p>') +
       '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain, injury or anything that feels wrong, use the symptom check-in — it is built from published warning signs and will tell you plainly when to see somebody.</p>' +
       '<button class="alf-esc" id="alfEsc">Check a symptom \u203a</button>' +
@@ -10249,34 +10292,57 @@ function alfieOnlineRow() {
     '<button class="rm-switch' + (on ? " on" : "") + '" id="alfOnline" role="switch" aria-checked="' + (on ? "true" : "false") +
     '" aria-label="Online answers"><span class="rm-knob"></span></button></div>' +
     '<p class="bk-md">' + (on
-      ? "On: what you type goes to Inte-Run’s server, which asks an AI to write the reply. Anything about pain or feeling unwell stays on this phone."
+      ? "On: what you type goes to Inte-Run’s server, which asks an AI service run by Cloudflare to write the reply. Anything about pain or feeling unwell stays on this phone."
       : "Off: Alfie answers from this phone, using what it knows about running and about your plan. Nothing you type leaves it.") + '</p>' +
     (ALFIE_MSGS.length ? '<button class="pf-edit" id="alfClear">Clear this chat</button>' : "") +
     '</div>';
 }
-/** What a young runner is told before their questions start leaving the phone. Plain text: the sheet escapes it. */
-const ALFIE_ONLINE_EXPLAIN = "With this on, what you type to Alfie goes to Inte-Run’s server with a short summary of your training plan, and an AI writes the reply. Your name, where you are and your health check-in answers are never sent, and Inte-Run doesn’t keep your questions. Anything about pain or feeling unwell always stays on your phone. Not sure? Ask a parent or an adult you trust first.";
+/**
+ * What every runner is told before their questions start leaving the phone. Plain text: the sheet escapes it.
+ * ⚠️ IT NAMES THE AI COMPANY. Guideline 5.1.2(i) asks us to "clearly disclose where personal data will be
+ * shared", and "an AI" says what, not where. The name follows BRAIN in alfie-proxy/src/worker.ts, and
+ * test/app-store.test.ts fails if the two disagree -- switching the server to another model means
+ * changing every sentence that names this one.
+ */
+const ALFIE_ONLINE_EXPLAIN = "With this on, what you type to Alfie goes to Inte-Run’s server with a short summary of your training plan, and an AI service run by Cloudflare writes the reply. Your name, where you are and your health check-in answers are never sent, and Inte-Run doesn’t keep your questions. Anything about pain or feeling unwell always stays on your phone.";
+/** Added for a runner on the high-privacy defaults (standard 4: say who to talk to). */
+const ALFIE_ONLINE_ASK_ADULT = "Not sure? Ask a parent or an adult you trust first.";
+/** Added for everybody else. */
+const ALFIE_ONLINE_CHANGE = "You can change this whenever you like, on Alfie’s screen or in Your data.";
 /**
  * ⚠️ "KEEP THEM OFF" IS THE PRIMARY BUTTON, AND THAT IS ALLOWED. Standard 13 forbids nudging a child to
  * WEAKEN their privacy; making the private answer the easy one is the direction the Code asks for.
  */
-function openAlfieOnlineSheet() {
+function openAlfieOnlineSheet(pending) {
   ensureSheet(); SHEET_CTX = null;
+  const young = !privDefaultOn();
+  const asking = typeof pending === "string";
+  // Either choice is recorded, and a question that was waiting is asked straight after -- online or on
+  // the phone, whichever the runner just chose. The box is emptied only if it still holds that question.
+  const choose = (on) => {
+    closeSheet(); alfieSetOnline(on);
+    if (!asking) { render(); return; }
+    const box = $("alfieIn"); if (box && box.value === pending) box.value = "";
+    alfieAsk(pending);
+  };
   $("sheetBody").innerHTML =
-    '<div class="sheet-h">Turn on online answers?</div>' +
-    '<div class="bk-md" style="margin-bottom:16px">' + esc(ALFIE_ONLINE_EXPLAIN) + '</div>' +
-    '<button class="primary" id="alfOnKeep">Keep them off</button>' +
-    '<button class="bk-btn2" id="alfOnYes">Turn on online answers</button>';
+    '<div class="sheet-h">' + (asking ? "Answer this online?" : "Turn on online answers?") + '</div>' +
+    '<div class="bk-md" style="margin-bottom:16px">' + esc(ALFIE_ONLINE_EXPLAIN + " " + (young ? ALFIE_ONLINE_ASK_ADULT : ALFIE_ONLINE_CHANGE)) + '</div>' +
+    (young
+      ? '<button class="primary" id="alfOnKeep">Keep them off</button><button class="bk-btn2" id="alfOnYes">Turn on online answers</button>'
+      : '<button class="primary" id="alfOnYes">Allow online answers</button><button class="bk-btn2" id="alfOnKeep">Keep answers on this phone</button>');
   $("sheetOv").classList.add("on");
-  $("alfOnKeep").onclick = closeSheet;
-  $("alfOnYes").onclick = () => { closeSheet(); alfieSetOnline(true); render(); };
+  // A young runner's "keep them off" from the switch records nothing: unanswered already means off.
+  $("alfOnKeep").onclick = () => { if (young && !asking) closeSheet(); else choose(false); };
+  $("alfOnYes").onclick = () => choose(true);
 }
 /** One handler for both switches (Alfie's own screen, and Your data), so the two cannot ask differently. */
 function alfieToggleOnline() {
   if (alfieOnline()) { alfieSetOnline(false); render(); return; }
-  // ⚠️ ONLY the high-privacy runners are asked first; for everybody else it is one tap, as before.
-  if (!privDefaultOn()) { openAlfieOnlineSheet(); return; }
-  alfieSetOnline(true); render();
+  // ⚠️ TURNING IT ON ALWAYS GOES THROUGH THE SHEET, AT EVERY AGE (guideline 5.1.2(i)). The sheet is where
+  // the runner is told what is sent and to whom, and their tap there is the permission. Before Y6 an
+  // adult's switch was one tap with nothing said.
+  openAlfieOnlineSheet();
 }
 function wireAlfie() {
   alfieRenderLog();
@@ -20809,7 +20875,7 @@ function safetyView() {
       'are gone the moment you leave the screen.</p>' +
       (alfieOnline() && alfieBase()
         ? '<p><b>Ask Alfie has online answers on.</b> Your question and a short summary of your plan go ' +
-          'to Inte-Run’s own server, which asks an AI to answer it — never your name, where you are, ' +
+          'to Inte-Run’s own server, which asks an AI service run by Cloudflare to answer it — never your name, where you are, ' +
           'or your check-in answers, and Inte-Run does not store any of it. Anything about pain or ' +
           'feeling unwell is answered on this phone and never sent.</p>'
         : '<p><b>Ask Alfie answers on this phone</b> and works with no signal. Nothing you type leaves it.</p>') +
@@ -22543,14 +22609,14 @@ const PRIVACY_FLOWS = [
   { id: "place", hosts: ["nominatim.openstreetmap.org"], short: "town names for runs", sw: "pvPlace",
     t: "Town names for runs", d: "The middle of a run, to about 1 km, goes to OpenStreetMap to find which town it was in. Once for each run." },
   { id: "alfie", hosts: ["alfie-proxy.alfie-proxy.workers.dev"], short: "Ask Alfie’s online answers", sw: "pvAlfie",
-    t: "Ask Alfie online answers", d: "Your question and a short summary of your plan go to Inte-Run’s server, which asks an AI to write the reply. Questions about pain or feeling unwell never leave the phone." },
+    t: "Ask Alfie online answers", d: "Your question and a short summary of your plan go to Inte-Run’s server, which asks an AI service run by Cloudflare to write the reply. Nothing is sent until you say yes, and questions about pain or feeling unwell never leave the phone." },
   { id: "strava", hosts: ["alfie-proxy.alfie-proxy.workers.dev"], short: "Strava if you connect it",
     t: "Strava", d: "Only if you connect it. Then the runs and strength sessions you send go to your Strava account, through Inte-Run’s server." },
   { id: "update", hosts: ["padder1980.github.io"], short: "app updates", native: true,
     t: "App updates", d: "The iPhone app asks GitHub whether there is a newer version of itself. Nothing about you is sent." },
 ];
-/** Pages the RUNNER opens in their own browser -- a calendar's import page, a run already on Strava, the ICO. The app sends them nothing, so they are not flows; the address sweep is told about them here. */
-const PRIVACY_LINK_HOSTS = ["calendar.google.com", "outlook.live.com", "www.strava.com", "ico.org.uk"];
+/** Pages the RUNNER opens in their own browser -- a calendar's import page, a run already on Strava, the ICO, the weather credit's link. The app sends them nothing, so they are not flows; the address sweep is told about them here. */
+const PRIVACY_LINK_HOSTS = ["calendar.google.com", "outlook.live.com", "www.strava.com", "ico.org.uk", "open-meteo.com"];
 /**
  * An address a runner can write to about their data. EMPTY UNTIL THE OWNER CHOOSES ONE (his ruling,
  * 2026-09-26), and while it is empty the line offering it does not appear at all: an address that
@@ -38471,8 +38537,10 @@ function heatBlockHtml(sess) {
   // ⚠️ ASKED AS "is this on today's plate", through the one definition of that, so an extra dated
   // tomorrow is excluded by the same test as a planned session next month.
   try { if (!heatCandidates(todayIso()).some((c) => c.id === sess.id)) return ""; } catch (e) { return ""; }
-  const wrap = (cls, inner) => '<div class="heat-block ' + cls + '">' +
-    '<div class="heat-h">' + ICON.wxSun + '<span>Heat</span></div>' + inner + '</div>';
+  // A state that puts a forecast figure on screen carries the weather credit (see wxCreditHtml).
+  const wrap = (cls, inner, credit) => '<div class="heat-block ' + cls + '">' +
+    '<div class="heat-h">' + ICON.wxSun + '<span>Heat</span></div>' + inner +
+    (credit ? '<p class="wx-credit-row">' + wxCreditHtml() + '</p>' : "") + '</div>';
   const c = heatChoice(sess);
   if (c) {
     const row = hourAt(c.day, c.hour);
@@ -38496,7 +38564,7 @@ function heatBlockHtml(sess) {
         '% slower</b> than planned, which is the same effort in that air. Your effort targets have ' +
         'not moved.</div>' +
       '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Change the hour</button>' +
-      '<button class="ap-no" data-heatclear="' + esc(sess.id) + '">Back to planned</button></div>');
+      '<button class="ap-no" data-heatclear="' + esc(sess.id) + '">Back to planned</button></div>', true);
   }
   const off = heatOffer(sess);
   if (off) {
@@ -38507,7 +38575,7 @@ function heatBlockHtml(sess) {
         'the paces below in that would be about <b>' + off.pct + '% harder</b> than this session is ' +
         'meant to be.' + (declined ? ' You said keep as planned today \— that still stands.' : '') + '</div>' +
       '<div class="act-pair"><button class="ap-yes" data-heatopen="' + esc(sess.id) + '">Adjust my paces</button>' +
-      '<button class="ap-no" data-heatno="' + esc(sess.id) + '">Keep as planned</button></div>');
+      '<button class="ap-no" data-heatno="' + esc(sess.id) + '">Keep as planned</button></div>', true);
   }
   // STATE 4 — no hourly forecast, and the conditions we DO have say the heat matters. Gated on that,
   // because a "we have no forecast" line on every session sheet on a cold day in February is nagging.
@@ -38523,7 +38591,7 @@ function heatBlockHtml(sess) {
         'hour-by-hour forecast on this device, so the app will not put a number on <i>your</i> run. ' +
         'Fetch one, or run this by effort rather than by the clock.</div>' +
       '<div class="act-pair"><button class="ap-yes" data-heatfetch="1">Get my local forecast</button>' +
-      '<button class="ap-no" data-heateffort="1">Run it by effort</button></div>');
+      '<button class="ap-no" data-heateffort="1">Run it by effort</button></div>', w.live);
   }
   return "";
 }
@@ -38596,7 +38664,8 @@ function heatSheetHtml(sess) {
     // pace would be in cool air". It does not support "you will get the same training out of it",
     // which is what the competitor claims.
     '<div class="heat-note">Slowing down in heat keeps the session at <b>the effort it was designed ' +
-      'for</b>. Your effort targets do not change — only the pace it takes to reach them.</div>';
+      'for</b>. Your effort targets do not change — only the pace it takes to reach them.</div>' +
+    '<p class="wx-credit-row">' + wxCreditHtml() + '</p>';
 }
 /** The chip on an adapted session, and the way back out of it. */
 function heatChipHtml(sess) {

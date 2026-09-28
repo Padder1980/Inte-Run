@@ -112,8 +112,11 @@ test("BLOCKER: every setting that sends something off the phone starts OFF for a
   for (const age of [13, 16, 17, undefined, 0]) {
     assert.deepEqual(defaults(age), { alfie: false, place: false, health: false }, "high-privacy defaults at age " + String(age));
   }
-  // An adult is exactly where they were before Y5 -- nothing here may change an adult's app.
-  assert.deepEqual(defaults(34), { alfie: true, place: true, health: true }, "an adult's defaults are unchanged");
+  // An adult's town names and Apple Health are exactly where they were before Y5. Ask Alfie's online
+  // answers are the one exception, and it is Apple's rather than ours: guideline 5.1.2(i) requires
+  // explicit permission before personal data goes to a third-party AI, so since Y6 they wait for a yes
+  // at every age (an adult is asked once, at their first question -- see the tests below).
+  assert.deepEqual(defaults(34), { alfie: false, place: true, health: true }, "an adult's defaults, with Alfie waiting to be asked");
 });
 
 test("a default is never a lock: the runner's own answer wins in both directions", () => {
@@ -123,27 +126,43 @@ test("a default is never a lock: the runner's own answer wins in both directions
   assert.deepEqual(defaults(34, off), { alfie: false, place: false, health: false }, "an adult who turned things off has them off");
 });
 
-/** Ask Alfie, lifted whole: the screener, the switch, what is sent and when. */
-function alfie(age: unknown, stored: Record<string, string> = {}, fetchImpl?: (u: string, o: any) => Promise<any>) {
+/** A runner who has already said yes to online answers. */
+const ONLINE = { interun_alfie_v1: JSON.stringify({ online: true }) };
+/** Just enough page for the sheet and the question box: every id answers with a node that remembers. */
+function fakePage() {
+  const nodes: Record<string, any> = {};
+  const $ = (id: string) => (nodes[id] ||= { id, value: "", innerHTML: "", onclick: null, classList: { on: false, add(c: string) { if (c === "on") this.on = true; } } });
+  return { nodes, $ };
+}
+/** Ask Alfie, lifted whole: the screener, the switch, the permission sheet, what is sent and when. */
+function alfie(age: unknown, stored: Record<string, string> = {}, fetchImpl?: (u: string, o: any) => Promise<any>,
+  opts: { noServer?: boolean } = {}) {
   const calls: any[] = [];
   const msgs: any[] = [];
+  const page = fakePage();
+  const localStorage = fakeStorage(stored);
+  let closed = 0, renders = 0;
   const fetch = (u: string, o: any) => {
     calls.push({ url: u, body: JSON.parse(o.body) });
     return fetchImpl ? fetchImpl(u, o) : Promise.resolve({ ok: true, json: () => Promise.resolve({ answer: "Here is your plan." }) });
   };
   const api = lift(
     ["alfieNorm", "alfieRedFlags", "alfieCfg", "alfieSaveCfg", "alfieBase", "privDefaultOn", "alfieOnline", "alfieSetOnline",
-      "alfieHistory", "alfieRemote", "alfieMaySend", "alfieAsk"],
-    ["ALFIE_FLAGS", "ALFIE_SERVER"],
-    "{ alfieAsk, alfieRemote, alfieHistory, alfieMaySend, alfieRedFlags }",
+      "alfieNeedsAsk", "alfieHistory", "alfieRemote", "alfieMaySend", "alfieAsk", "openAlfieOnlineSheet", "alfieToggleOnline"],
+    // ⚠️ A blank proxy in storage does NOT remove the server -- alfieBase falls back to ALFIE_SERVER -- so
+    // "no server" has to replace that constant rather than the stored setting.
+    (opts.noServer ? [] : ["ALFIE_SERVER"]).concat(["ALFIE_FLAGS", "ALFIE_ONLINE_EXPLAIN", "ALFIE_ONLINE_ASK_ADULT", "ALFIE_ONLINE_CHANGE"]),
+    "{ alfieAsk, alfieRemote, alfieHistory, alfieMaySend, alfieRedFlags, alfieOnline, alfieToggleOnline }",
     {
-      RC, profile: { age }, localStorage: fakeStorage(stored), fetch, ALFIE_MSGS: msgs, ALFIE_THINKING: false,
+      RC, profile: { age }, localStorage, fetch, ALFIE_MSGS: msgs, ALFIE_THINKING: false,
       alfieRenderLog: () => {}, alfieSaveMsgs: () => {}, alfieLocalAnswer: () => "<p>answered on the phone</p>",
       alfiePlanContext: () => ({ goal: "10k" }), alfieDevice: () => "device-1", setTimeout: (f: () => void) => f(),
-      esc: (x: unknown) => String(x),
+      esc: (x: unknown) => String(x), $: page.$, SHEET_CTX: null, ensureSheet: () => {},
+      closeSheet: () => { closed++; }, render: () => { renders++; },
+      ...(opts.noServer ? { ALFIE_SERVER: "" } : {}),
     },
   );
-  return { api, calls, msgs };
+  return { api, calls, msgs, page, localStorage, closed: () => closed, renders: () => renders };
 }
 
 test("BLOCKER: a young or unknown-age runner's questions stay on the phone unless they turn online answers on", async () => {
@@ -155,14 +174,54 @@ test("BLOCKER: a young or unknown-age runner's questions stay on the phone unles
     assert.equal(msgs.length, 2, "the question was still answered, on the phone");
     assert.ok(msgs.every((m) => !m.sent), "and nothing is marked as having reached the server");
   }
-  const adult = alfie(34);
-  adult.api.alfieAsk("What's my next session?");
-  await flush();
-  assert.equal(adult.calls.length, 1, "an adult's Alfie still goes online, as it did before Y5");
+  // A young runner is never shown the sheet unprompted (standard 13).
+  const young = alfie(13);
+  young.api.alfieAsk("What's my next session?");
+  assert.equal(young.page.nodes.sheetOv, undefined, "a young runner is not offered online answers unprompted");
+});
+
+test("BLOCKER: nothing reaches the AI service before the runner says yes, at any age (App Review 5.1.2(i))", async () => {
+  const q = "What's my next session?";
+  // An adult who has never answered is ASKED, and nothing is sent or even added to the chat meanwhile.
+  const a = alfie(34);
+  a.api.alfieAsk(q); await flush();
+  assert.equal(a.calls.length, 0, "an adult's first question is not sent before they have said yes");
+  assert.equal(a.msgs.length, 0, "and it is not answered either -- it waits for their choice");
+  assert.equal(a.page.nodes.sheetOv && a.page.nodes.sheetOv.classList.on, true, "the permission sheet is shown");
+  assert.match(a.page.nodes.sheetBody.innerHTML, /Answer this online\?/, "and it asks about this question");
+  assert.equal(a.page.nodes.alfieIn.value, q, "the question goes back in the box, so closing the sheet loses nothing");
+  // Saying yes records it, asks the question online, and empties the box.
+  a.page.nodes.alfOnYes.onclick(); await flush();
+  assert.equal(a.api.alfieOnline(), true, "the yes is remembered");
+  assert.equal(a.calls.length, 1, "and the waiting question is then sent");
+  assert.equal(a.calls[0].body.question, q);
+  assert.equal(a.page.nodes.alfieIn.value, "", "the box is emptied once the question is asked");
+  a.api.alfieAsk("And tomorrow?"); await flush();
+  assert.equal(a.calls.length, 2, "an adult is asked once, not every time");
+  // Saying no records it and answers on the phone.
+  const b = alfie(34);
+  b.api.alfieAsk(q); b.page.nodes.alfOnKeep.onclick(); await flush();
+  assert.equal(b.api.alfieOnline(), false, "the no is remembered");
+  assert.equal(b.calls.length, 0, "nothing is sent");
+  assert.equal(b.msgs.length, 2, "and the question is answered on the phone");
+  b.api.alfieAsk("And tomorrow?"); await flush();
+  assert.equal(b.page.nodes.sheetOv.classList.on, true);
+  assert.equal(b.calls.length, 0, "a no is not asked again at the next question");
+  // A red flag is answered on the phone whatever the switch says, so it never triggers the question.
+  const c = alfie(34);
+  c.api.alfieAsk("Chest pain when I run"); await flush();
+  assert.equal(c.page.nodes.sheetOv, undefined, "a symptom never opens the permission sheet");
+  assert.equal(c.calls.length, 0);
+  // With no server there is nothing to ask about, so the question is simply answered on the phone.
+  const d = alfie(34, {}, undefined, { noServer: true });
+  d.api.alfieAsk(q); await flush();
+  assert.equal(d.page.nodes.sheetOv, undefined, "no server, no permission sheet");
+  assert.equal(d.msgs.length, 2, "the question is answered on the phone");
+  assert.equal(d.calls.length, 0);
 });
 
 test("BLOCKER: the red-flag screen before sending catches what a phone actually types", () => {
-  const { api } = alfie(34);
+  const { api } = alfie(34, ONLINE);
   // An iPhone capitalises the first word and types curly apostrophes. Every one of these went to the
   // server before Y5.
   for (const q of ["Chest pain when I run", "Suicidal thoughts again", "I don’t want to be here anymore",
@@ -175,7 +234,7 @@ test("BLOCKER: the red-flag screen before sending catches what a phone actually 
 
 test("BLOCKER: history carries only turns that already reached the server -- never a symptom kept off it", async () => {
   let fail = false;
-  const { api, calls } = alfie(34, {}, () => (fail
+  const { api, calls } = alfie(34, ONLINE, () => (fail
     ? Promise.reject(new Error("no signal"))
     : Promise.resolve({ ok: true, json: () => Promise.resolve({ answer: "Here is your plan." }) })));
   api.alfieAsk("I have chest pain"); await flush();
@@ -201,7 +260,7 @@ test("the one function that sends refuses on its own when online answers are off
   assert.equal(calls.length, 0, "and it sent nothing");
 });
 
-test("turning online answers ON asks a young runner first; turning them OFF never asks", () => {
+test("turning online answers ON always goes through the sheet; turning them OFF never asks", () => {
   function toggle(age: unknown, stored: Record<string, string>) {
     const localStorage = fakeStorage(stored);
     let sheet = 0, renders = 0;
@@ -217,15 +276,28 @@ test("turning online answers ON asks a young runner first; turning them OFF neve
   assert.deepEqual(toggle(undefined, {}), { sheet: 1, renders: 0, online: false }, "so is somebody who has not given an age");
   assert.deepEqual(toggle(13, { interun_alfie_v1: JSON.stringify({ online: true }) }), { sheet: 0, renders: 1, online: false },
     "switching OFF is one tap -- a confirmation there is friction against the private choice");
-  assert.deepEqual(toggle(34, { interun_alfie_v1: JSON.stringify({ online: false }) }), { sheet: 0, renders: 1, online: true },
-    "an adult's switch is one tap, as before");
-  // The sheet itself says what is sent, what is not, and to ask an adult.
-  const explain = stmt("ALFIE_ONLINE_EXPLAIN");
-  for (const bit of ["Inte-Run’s server", "never sent", "stays on your phone", "Ask a parent or an adult you trust"]) {
-    assert.ok(explain.includes(bit), "the explanation says: " + bit);
+  assert.deepEqual(toggle(34, { interun_alfie_v1: JSON.stringify({ online: false }) }), { sheet: 1, renders: 0, online: false },
+    "an adult is told what is sent and to whom before it is switched on too (guideline 5.1.2(i)) -- it was one silent tap before Y6");
+  // The real sheet, both variants. Each says what is sent, what is not, and where it goes.
+  function sheet(age: unknown) {
+    const x = alfie(age);
+    x.api.alfieToggleOnline();
+    return { html: x.page.nodes.sheetBody.innerHTML as string, x };
   }
-  assert.ok(/id="alfOnKeep"[^]*?id="alfOnYes"/.test(fnOf("openAlfieOnlineSheet")) && fnOf("openAlfieOnlineSheet").includes('class="primary" id="alfOnKeep"'),
-    "keeping them off is the primary button -- the Code forbids nudging a child towards LESS privacy, not more");
+  const young = sheet(13), adult = sheet(40);
+  for (const s of [young.html, adult.html]) {
+    for (const bit of ["Inte-Run’s server", "Cloudflare", "never sent", "stays on your phone"]) assert.ok(s.includes(bit), "the sheet says: " + bit);
+  }
+  assert.ok(young.html.includes("Ask a parent or an adult you trust"), "a young runner is told who to talk to");
+  assert.ok(!adult.html.includes("Ask a parent"), "an adult is not");
+  assert.ok(young.html.includes('class="primary" id="alfOnKeep"'),
+    "for a young runner, keeping them off is the primary button -- the Code forbids nudging a child towards LESS privacy, not more");
+  // A young runner's "keep them off" from the switch changes nothing; saying yes records it.
+  young.x.page.nodes.alfOnKeep.onclick();
+  assert.equal(young.x.api.alfieOnline(), false);
+  assert.ok(!String(young.x.localStorage.getItem("interun_alfie_v1") || "").includes("online"), "no answer is recorded -- unanswered already means off");
+  adult.x.page.nodes.alfOnYes.onclick();
+  assert.equal(adult.x.api.alfieOnline(), true, "an adult's yes from the switch turns them on");
 });
 
 test("Alfie's own words follow the switch, and the old false sentence is gone", () => {
@@ -349,8 +421,12 @@ test("Your data shows each switch with the runner's real default, and every cont
   const young = card(13), adult = card(40);
   for (const id of ["pvAlfie", "pvPlace", "pvHealth"]) {
     assert.ok(young.includes('id="' + id + '" role="switch" aria-checked="false"'), id + " starts off for a 13-year-old");
+  }
+  for (const id of ["pvPlace", "pvHealth"]) {
     assert.ok(adult.includes('id="' + id + '" role="switch" aria-checked="true"'), id + " starts on for an adult");
   }
+  assert.ok(adult.includes('id="pvAlfie" role="switch" aria-checked="false"'),
+    "Ask Alfie's online answers are off for an adult until they say yes (guideline 5.1.2(i))");
   const wire = fnOf("wireDataView");
   for (const id of ["pvAlfie", "pvPlace", "pvHealth", "pvDelete"]) {
     assert.ok(new RegExp('\\$\\("' + id + '"\\);\\s*if \\(\\w+\\) \\w+\\.onclick').test(wire), id + " is wired");

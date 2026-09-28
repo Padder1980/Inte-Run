@@ -487,7 +487,32 @@ figure**, so the cap is applied again in `progPrefs` where that figure is read.
   kept back; the Safety page listed two services while six were live; and the web version's offline copy
   served a stale forecast.
 - **Open:** a privacy contact address; the DPIA's sign-off and a professional review; a privacy policy a
-  12-year-old can read (D1); and Y6.
+  12-year-old can read (D1). Y6 is done (section 5.11).
+
+## 5.11 Y6 as built - the App Store answers (2026-09-27)
+
+The answers the owner types into App Store Connect are in **`APPSTORE.md`**, read against Apple's own pages
+the same day, and **`test/app-store.test.ts`** keeps them, the privacy manifests inside the app and
+`PRIVACY_FLOWS` saying the same thing.
+
+- **Age rating**: every question on Apple's 2025 questionnaire answered with its reason. Apple works out
+  the rating itself; expect **9+ or 13+**. ⚠️ **There is no 12+ rating any more** (Apple replaced 12+ and
+  17+ with 13+, 16+ and 18+), so a 13+ result would stop a 12-year-old whose phone has Screen Time age
+  limits from installing the app. And Apple's rule is that terms setting a minimum age above the
+  calculated rating force an override, so **how D1 words the minimum age decides the rating** -
+  `APPSTORE.md` 1.3 recommends "designed for 12 and over" rather than a contractual minimum. The owner's
+  decision.
+- **App Privacy label**: eight data types, all App Functionality, none used for tracking; everything
+  linked to the runner comes from the optional Strava connection.
+- ⚠️ **Guideline 5.1.2(i) changed Ask Alfie for everybody, not only for young runners.** Since November
+  2025 Apple requires "explicit permission" before personal data goes to a third-party AI. Y5 had left an
+  adult's online answers on by default; now nobody's question is sent until they say yes. An adult is
+  asked once, at their first question; a young or unknown-age runner is still never asked unprompted.
+- **The watch app had no privacy manifest** although it uses UserDefaults, and Apple checks every binary
+  in an upload. It has one now.
+- **The iPhone manifest said "no server"**; it now declares what the label declares.
+- **Open-Meteo's licence** asks for a "Weather data by Open-Meteo.com" link next to its forecast; it was
+  missing and is now shown wherever the forecast is.
 
 ## 6. The legal consequence of saying yes - and it is real
 
@@ -521,6 +546,7 @@ runner's answers, which is the service they chose and is disclosed as such in `D
    raw text, so a capitalised or curly-apostrophe symptom -- how an iPhone types -- went to the server.
    Fixed in Y5.]
 4. **App Store**: an age rating that no longer says adults-only, and an App Privacy label that matches.
+   [Done in Y6: `APPSTORE.md`, section 5.11. The one decision left is the owner's - see the no-12+ note.]
 5. **Terms**: under-18s cannot form a binding contract; the terms need a parent/guardian clause.
 
 ## 7. What is honestly uncertain

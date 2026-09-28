@@ -404,7 +404,13 @@ test("⚠️ every health check-in says what happens to the answers, and says it
 
   // Every screener route carries the emergency route, not just the injury one — somebody arrives at the
   // fuelling or women's-health page in exactly the same state of worry.
-  for (const view of ["redsView", "femaleView", "redflagsView"])
+  // ⚠️ DERIVED FROM HUB_CHECKINS AND supportDetail (D3c), not a typed list: the list named three views, and
+  // a fourth check-in added beside them would have been exempt from this without anybody deciding it.
+  const ids = [...(html.match(/const HUB_CHECKINS = \[([^\]]*)\]/) || [])[1]!.matchAll(/"([a-z]+)"/g)].map((m) => m[1]!);
+  const detail = fnSrc("supportDetail");
+  const views = ids.map((id) => (detail.match(new RegExp('if \\(id === "' + id + '"\\) return back \\+ (\\w+)\\(\\);')) || [])[1]);
+  assert.ok(ids.length >= 4 && views.every(Boolean), "a check-in has no page, or this guard cannot find it: " + ids.join(","));
+  for (const view of views as string[])
     assert.ok(/promise|EMERGENCY_BANNER\(\)/.test(fnSrc(view)), view + " has no emergency route");
 
   // The injury guide collects nothing, so it needs no consent line — but that only holds while it

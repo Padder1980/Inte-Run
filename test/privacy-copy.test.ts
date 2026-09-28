@@ -240,8 +240,9 @@ test("the pages carry the date the app shows, and every page the app links to ex
     assert.equal(Number(m[3]) + " " + months[Number(m[2]) - 1] + " " + m[1], updated, "docs/" + p.path + "'s machine date disagrees with its words");
   }
   // They open outside the app, and all three places that promise them really show them.
-  const html = new Function("esc", "LEGAL_SITE", "LEGAL_UPDATED", "LEGAL_PAGES", "PRIVACY_CONTACT", fnOf("legalLinksHtml") + "\nreturn legalLinksHtml();")(
-    (x: unknown) => String(x), site, updated, pages, CONTACT) as string;
+  const html = new Function("esc", "LEGAL_SITE", "LEGAL_UPDATED", "LEGAL_PAGES", "PRIVACY_CONTACT", "inNativeApp", "window",
+    fnOf("appCanOpen") + "\n" + fnOf("mailLink") + "\n" + fnOf("legalLinksHtml") + "\nreturn legalLinksHtml();")(
+    (x: unknown) => String(x), site, updated, pages, CONTACT, () => false, {}) as string;
   for (const p of pages) assert.ok(html.includes('href="' + site + p.path + '" target="_blank" rel="noopener noreferrer"'), p.id + " does not open outside the app");
   assert.ok(html.includes('href="mailto:' + CONTACT + '"'), "the legal card does not offer the address");
   assert.ok(constValue<string[]>("HUB_TOOLS").includes("legal"), "Support › Tools has no Privacy policy & terms row");

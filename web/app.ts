@@ -741,7 +741,11 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .setup-foot { text-align: center; font-size: 12px; color: var(--ink-faint); margin: 14px 0 4px; }
 .result { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: none; }
 .result.show { display: block; }
-.result .rb { padding: 12px 14px; color: #fff; background: var(--rbc); font-weight: 600; font-size: 14px; }
+/* ⚠️ THE BAND IS MIXED 65% TOWARDS BLACK (D3c), because white on the plain colour failed in both themes: measured
+   from rendered pixels on 28 Sept 2026, light 2.75-5.11:1 and dark 2.29-3.13:1 (the emergency headline in dark
+   mode was 2.93:1, the first thing a frightened runner reads). At 65% every urgency measures 5.81-9.33:1 light
+   and 5.02-6.47:1 dark. One declaration serves both themes; re-measure before changing the mix. */
+.result .rb { padding: 12px 14px; color: #fff; background: color-mix(in srgb, var(--rbc) 65%, #000); font-weight: 600; font-size: 14px; }
 .result .ri { padding: 10px 14px; background: var(--surface); }
 .result .item { padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; } .result .item:first-child { border-top: 0; }
 .result .item .g { color: var(--ink-soft); margin-top: 3px; } .result .item .rf { color: var(--accent); font-weight: 600; margin-top: 4px; font-size: 12.5px; }
@@ -2492,6 +2496,20 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .legal-r { text-decoration: none; }
 .legal-foot { margin-top: var(--s2); }
 .legal-foot a { color: var(--accent); }
+/* D3c: the UK crisis lines, under a result's headline band or inside Alfie's answer. The number is always
+   printed as text, and is a link only where a tap can dial; its hit area grows with ::after, not its box. */
+.crisis { padding: var(--s3) 14px; background: color-mix(in srgb, var(--rest) 7%, var(--surface)); border-bottom: 1px solid var(--line); }
+.crisis .cr-t { font-weight: 700; font-size: var(--t-body); color: var(--ink); margin-bottom: 4px; }
+.crisis .cr-r { padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--rest) 16%, var(--line)); }
+.crisis .cr-n { font-weight: 700; font-size: var(--t-body); color: var(--ink); }
+.crisis .cr-h { font-size: var(--t-body); color: var(--ink); margin-top: 2px; }
+.crisis .cr-num { font-weight: 800; font-size: var(--t-card); color: var(--ink); }
+.crisis a.cr-num { position: relative; text-decoration: underline; text-underline-offset: 3px; }
+.crisis a.cr-num::after { content: ""; position: absolute; inset: -14px -10px; }
+.crisis .cr-d { font-size: var(--t-meta); color: var(--ink-soft); margin-top: 2px; }
+.crisis .cr-999 { margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--rest) 16%, var(--line)); font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.alf-msg .crisis { margin: var(--s2) 0; border: 1px solid var(--line); border-radius: var(--r-ctl); }
+.alf-esc + .alf-esc { margin-top: var(--s2); }
 .hub-ri { flex: none; width: 36px; height: 36px; border-radius: var(--r-pill); display: grid; place-items: center; background: color-mix(in srgb, var(--hc) 20%, transparent); color: var(--hc); }
 .hub-ri svg { width: 19px; height: 19px; }
 .hub-rb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -10010,6 +10028,24 @@ const ALFIE_FLAGS = [
   ["eating-disorder-concern", ["eating disorder", "not eating", "purge", "purging", "binge", "starving myself", "anorexi", "bulimi"]],
   ["menstrual-disruption", ["amenorrh", "periods stopped", "periods have stopped", "period stopped", "period has stopped", "missed periods", "missed my period", "missing periods", "no period", "lost my period", "haven't had a period", "havent had a period", "irregular periods"]],
   ["mental-health-concern", ["depress", "really anxious", "mental health", "hopeless", "can't cope", "cant cope"]],
+  // ⚠️ D3c, THE OWNER RULING OF 28 SEPT 2026: THE EIGHT ACUTE-LIMB SIGNS, which the engine has resolved since
+  // the injury brief and nothing reached -- the guide lists them as text, and typing one to Alfie got general
+  // advice. Each phrase says what the runner OBSERVES, as the flags do, and deliberately not the everyday
+  // words a harmless question uses: cold toes, a fever on its own, cannot walk after a long run, and a knee
+  // that clicks are all left out, because an emergency answer to a harmless question teaches people to stop
+  // asking. test/wellbeing-checkin.test.ts holds a list of ordinary questions that must stay unflagged.
+  // ⚠️ NO APOSTROPHES OR QUOTE MARKS IN THESE COMMENTS: the tests lift this const with a quote-aware
+  // extractor, and an unpaired one in a comment runs it past the end of the array.
+  // ⚠️ AWAITING CLINICAL REVIEW, like every phrase list here.
+  ["deformity-or-crack", ["heard a crack", "heard something crack", "felt something crack", "looks out of shape", "looks deformed", "at a funny angle", "at a weird angle", "at an odd angle", "bone sticking out"]],
+  ["cold-blue-or-numb-limb", ["foot is numb", "leg is numb", "toes are numb", "went numb", "gone numb", "can't feel my foot", "cant feel my foot", "can't feel my leg", "cant feel my leg", "can't feel my toes", "cant feel my toes", "turned blue", "gone blue", "foot is blue", "leg is blue"]],
+  // ⚠️ NOT EXCRUCIATING OR AGONISING: runners say both about a hard interval, and each would get an emergency answer.
+  ["severe-constant-pain-or-tense-swelling", ["unbearable pain", "pain is unbearable", "severe constant pain", "constant severe pain", "hard swelling", "swelling is hard", "tense swelling", "swollen and hard", "swollen and tight", "tight and swollen"]],
+  ["cannot-bear-weight-four-steps", ["can't put weight on", "cant put weight on", "cannot put weight on", "can't bear weight", "cant bear weight", "cannot bear weight", "can't walk on it", "cant walk on it", "cannot walk on it", "can't stand on it", "cant stand on it", "cannot stand on it", "four steps", "4 steps"]],
+  ["rapid-swelling-or-bruising", ["swelled up straight away", "swelled up immediately", "swelled up really fast", "swelled up quickly", "swelling fast", "swelling quickly", "huge swelling", "massive swelling", "huge bruise", "massive bruise", "bruise is spreading", "bruising is spreading", "swelling is spreading", "swelling is getting bigger", "bruise is getting bigger"]],
+  ["pop-with-loss-of-push-off", ["heard a pop", "felt a pop", "heard a snap", "felt a snap", "something snapped", "kicked in the back of my leg", "kicked in the back of the leg", "kicked in the calf", "can't push off", "cant push off", "cannot push off", "can't go up on my toes", "cant go up on my toes", "can't stand on my toes", "cant stand on my toes", "can't go on tiptoe", "cant go on tiptoe"]],
+  ["hot-swollen-one-sided-calf", ["calf is swollen", "swollen calf", "calf is hot", "hot calf", "calf is warm", "warm calf", "calf is red", "red calf", "calf is bigger", "one calf is bigger", "calf has swollen", "calf has swelled", "calf swelled up"]],
+  ["open-wound-or-fever", ["open wound", "deep cut", "won't stop bleeding", "wont stop bleeding", "wound is red", "wound is hot", "cut is red", "cut is hot", "hot red skin", "skin is hot and red"]],
 ];
 /**
  * How a question is prepared before it is matched: lower case, and curly apostrophes made straight so
@@ -10035,11 +10071,21 @@ function alfieSafetyAnswer(flags) {
   let r; try { r = RC.screenRedFlags(flags); } catch (e) { return null; }
   const refer = (r.refer || []).map((p) => (RC.PROFESSIONAL_LABEL && RC.PROFESSIONAL_LABEL[p]) || p);
   const points = (r.flags || []).map((f) => "<li>" + esc(f.guidance) + "</li>").join("");
+  // ⚠️ D3c: IT POINTED AT "Support → When to stop and seek help", A PAGE THAT HAS NEVER EXISTED. It now names
+  // the page that fits what was typed -- read off the engine's own categories, so a new flag lands
+  // somewhere true -- and gives the crisis lines straight under the headline when they apply.
+  const cats = (r.flags || []).map((f) => f.category);
+  const where = cats.some((c) => c === "psychological" || c === "hormonal")
+    ? "You can also tick what’s going on in <b>Support → Wellbeing</b>, which says who can help."
+    : cats.indexOf("musculoskeletal") >= 0
+      ? "<b>Support → Injury &amp; symptoms</b> starts with the signs that need help today."
+      : "<b>Support → Safety, privacy &amp; human help</b> says when to stop and get help.";
   return '<div class="alf-flag"><b>' + esc(r.headline) + "</b></div>" +
+    (crisisFlagged(flags) ? crisisLinesHtml() : "") +
     (points ? "<ul class=\\"alf-ul\\">" + points + "</ul>" : "") +
     (refer.length ? "<p>Who to speak to: <b>" + esc(refer.join(", ")) + "</b>.</p>" : "") +
     "<p class=\\"alf-dim\\">" + esc(r.disclaimer || "") + "</p>" +
-    '<p class="alf-dim">You can also open <b>Support \\u2192 When to stop and seek help</b> in the app.</p>';
+    '<p class="alf-dim">' + where + '</p>';
 }
 // ---- The on-device knowledge base -----------------------------------------
 // Each intent: keywords to match, and a function returning the answer HTML. Ordered — first match
@@ -10287,8 +10333,10 @@ function alfieLimits() {
       (alfieOnline() && alfieBase()
         ? '<p><b>Online answers are on.</b> What you type goes to Inte-Run’s server with a short summary of your plan, and an AI service run by Cloudflare writes the reply. Serious warning signs, like chest pain or fainting, are answered here and never sent.</p>'
         : '<p><b>It answers on this phone.</b> Nothing you type leaves it, and it works with no signal.</p>') +
-      '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain, injury or anything that feels wrong, use the symptom check-in — it is built from published warning signs and will tell you plainly when to see somebody.</p>' +
-      '<button class="alf-esc" id="alfEsc">Check a symptom \u203a</button>' +
+      '<p><b>It is not a doctor or a physiotherapist</b>, and it cannot examine you. For pain or an injury, <b>Injury &amp; symptoms</b> starts with the warning signs that need help today. For how you are in yourself, the <b>Wellbeing</b> check-in says who can help.</p>' +
+      // ⚠️ D3c: this said "use the symptom check-in", and the page behind the button had become a leg-injury guide.
+      '<button class="alf-esc" id="alfEsc">Injury &amp; symptoms \u203a</button>' +
+      '<button class="alf-esc" id="alfWb">Wellbeing \u203a</button>' +
     '</div></details>';
 }
 /**
@@ -10375,6 +10423,8 @@ function wireAlfie() {
   const back = $("alfBack"); if (back) back.onclick = () => { state.screen = null; render(); };
   const escBtn = $("alfEsc");
   if (escBtn) escBtn.onclick = () => { state.screen = null; state.tab = "support"; state.support = "redflags"; render(); };
+  const wbBtn = $("alfWb");
+  if (wbBtn) wbBtn.onclick = () => { state.screen = null; state.tab = "support"; state.support = "wellbeing"; render(); };
   const input = $("alfieIn"), send = $("alfieSend");
   const go = () => { if (!input) return; const v = input.value; input.value = ""; alfieAsk(v); };
   if (send) send.onclick = go;
@@ -20572,6 +20622,11 @@ const SUPPORT_HUB = [
   // Private check-ins, same orange drop — so existing navigation, links and search keep working.
   // ⚠️ kw IS SEARCH-ONLY, and it is what makes "porridge" or "gel" find this page. The description is
   // one calm line; the words a hungry runner actually types are not.
+  // ⚠️ D3c. The four wellbeing tick-boxes' home again: they left with the old injury check-in, and the
+  // crisis route was reachable only by typing. kw is search-only, as above: the words somebody who is
+  // struggling might type into Support's search, which the calm description deliberately does not carry.
+  { id: "wellbeing", ic: "person", c: "var(--base)", t: "Wellbeing", d: "Your mind, eating and periods, and who can help.", interactive: true,
+    kw: "wellbeing mental health mood low down depressed depression anxious anxiety stress stressed struggling sad lonely self harm self-harm suicide suicidal hurting myself harming myself eating disorder eating worries food worries periods stopped missed period crisis samaritans childline shout helpline talk to someone" },
   { id: "reds", ic: "fuel", c: "var(--peak)", t: "Fuelling & energy", d: "Food, fluids and recovery for every run.", interactive: false,
     kw: "food eat eating meal meals breakfast lunch dinner snack snacks porridge oats pasta rice banana before run after run pre-run post-run carb carbs carbohydrate protein iron calcium fat fibre drink drinking water hydration hydrate dehydration fluid fluids sodium salt electrolyte sports drink gel gels chews loading carb loading 5k 10k half marathon race day fuelling fueling recovery refuel sleep rest gut stomach nausea RED-S under-fuelling underfuelling low energy availability energy availability appetite dietitian vegan vegetarian plant-based" },
   { id: "female", ic: "flower", c: "var(--taper)", t: "Women's health", d: "Symptom-informed prompts — periods, postpartum, more.", interactive: true },
@@ -20822,7 +20877,7 @@ function hubRow(h) {
     '<span class="hub-rb"><span class="hub-rt">' + h.t + '</span><span class="hub-rd">' + h.d + '</span></span>' +
     '<span class="sd-chev" aria-hidden="true">\u203A</span></button>';
 }
-const HUB_CHECKINS = ["redflags", "reds", "female"];
+const HUB_CHECKINS = ["redflags", "wellbeing", "reds", "female"];
 // ⚠️ "why" IS NOT HERE ANY MORE -- it moved to the profile, under Motivation, beside the other
 // answers that shape the plan. It is a thing about the runner, not an article to read.
 const HUB_LEARN = ["understand", "strength", "guides"];
@@ -20896,7 +20951,10 @@ function safetyView() {
       'medical help now — do not use an app to decide.</p>' +
       '<p>Pain that sharpens as you run, changes how you move, or wakes you at night is worth a ' +
       'professional\u2019s opinion rather than another week of guessing.</p>' +
-      '<button class="perf-a" data-hub="redflags">Check a symptom \u203a</button></div>' +
+      '<p>And if you are struggling in yourself, with your mood, your eating or your periods, the Wellbeing check-in says who can help.</p>' +
+      // ⚠️ D3c: one button said "Check a symptom" and opened a leg-injury guide. Two doors, each named for where it goes.
+      '<button class="perf-a" data-hub="redflags">Injury &amp; symptoms \u203a</button>' +
+      '<button class="perf-a" data-hub="wellbeing">Wellbeing check-in \u203a</button></div>' +
     '<div class="card sf-c"><div class="subhead" style="margin-top:0">Where your information lives</div>' +
       '<p><b>On this phone.</b> Your runs, your plan, your profile and your answers are stored in this ' +
       'app on this device. There is no account, and Inte-Run keeps no copy of them anywhere else.</p>' +
@@ -21089,6 +21147,7 @@ function supportDetail(id) {
   if (id === "safety") return back + safetyView();
   if (id === "understand") return back + understandView();
   if (id === "redflags") return back + redflagsView();
+  if (id === "wellbeing") return back + wellbeingView();
   if (id === "reds") return back + redsView();
   if (id === "female") return back + femaleView();
   if (id === "strength") return back + strengthView();
@@ -22682,7 +22741,7 @@ function legalLinksHtml(bare) {
   return '<div class="card">' + (bare ? "" : '<div class="subhead" style="margin-top:0">Privacy policy and terms</div>') +
     '<div class="legal-list">' + LEGAL_PAGES.map(row).join("") + '</div>' +
     '<p class="bk-md legal-foot">Updated ' + esc(LEGAL_UPDATED) + '. They open outside the app.' +
-    (PRIVACY_CONTACT ? ' Questions? Email <a href="mailto:' + esc(PRIVACY_CONTACT) + '">' + esc(PRIVACY_CONTACT) + '</a>.' : "") + '</p></div>';
+    (PRIVACY_CONTACT ? ' Questions? Email ' + mailLink(PRIVACY_CONTACT) + '.' : "") + '</p></div>';
 }
 function legalView() {
   // bare: the page's own title already says what the card's heading would.
@@ -22742,7 +22801,7 @@ function privacyDeleteHtml() {
     '<button class="bk-btn2" id="pvDelete">Delete everything…</button></div>' +
     '<div class="card"><div class="subhead" style="margin-top:0">Worried about your information?</div>' +
     '<p class="bk-md">Talk to a parent or an adult you trust.' +
-    (PRIVACY_CONTACT ? ' You can write to Inte-Run at <a href="mailto:' + esc(PRIVACY_CONTACT) + '">' + esc(PRIVACY_CONTACT) + '</a>.' : "") +
+    (PRIVACY_CONTACT ? ' You can write to Inte-Run at ' + mailLink(PRIVACY_CONTACT) + '.' : "") +
     ' You, or they, can also tell the ICO, the UK’s information watchdog, if you think your information isn’t being looked after properly.</p>' +
     '<a class="bk-btn2 pv-ico" href="' + ICO_COMPLAINTS_URL + '" target="_blank" rel="noopener noreferrer">Contact the ICO ›</a></div>';
 }
@@ -22878,6 +22937,49 @@ function guidesView() {
 }
 const FLAGS_PHYS = { "chest-pain":"Chest pain or pressure","collapse-or-fainting":"Fainting or collapse","severe-breathlessness":"Severe breathlessness","neurological":"Confusion, severe headache, weakness","bone-pain":"Pinpoint bone pain","rapidly-worsening-pain":"Pain worsening quickly" };
 const FLAGS_WELL = { "eating-disorder-concern":"Worries about my eating","menstrual-disruption":"Periods stopped / irregular","mental-health-concern":"Struggling mentally","self-harm-thoughts":"Thoughts of harming myself" };
+/** The Wellbeing check-in's checkbox group. ⚠️ NOT "rf": wire() binds every [data-chk="rf"] to runRf, which reads a node this screen does not have (D3a paid for that name). */
+const WB_CHK = "wb";
+/**
+ * UK CRISIS LINES (stage D3c, the owner's ruling of 28 September 2026). The engine's guidance for
+ * self-harm says "please contact an urgent crisis line" -- and until D3c the app named none, anywhere.
+ * Shown when self-harm or struggling mentally is ticked in the Wellbeing check-in or typed to Ask Alfie
+ * (CRISIS_FLAGS), never as a default on every screen.
+ * ⚠️⚠️ EVERY NUMBER WAS READ ON THE SERVICE'S OWN PAGES, 28 SEPTEMBER 2026: the NHS's "Where to get urgent
+ * help for mental health" (111 with the mental health option; 999 if a life is at risk; Samaritans 116 123;
+ * Childline 0800 1111 for under-19s, "the number will not appear on your phone bill"), Samaritans' contact
+ * page (free, day or night, 365 days a year) and Shout's own "text the word Shout to 85258". Re-check
+ * them there before changing one: a wrong crisis number is worse than none.
+ * ⚠️ THE NUMBER IS ALWAYS PRINTED AS TEXT, and it is a link only where a tap can dial (appCanOpen).
+ */
+const CRISIS_LINES = [
+  { name: "Samaritans", how: "Call", num: "116 123", href: "tel:116123", note: "Free, day or night, every day of the year." },
+  { name: "Shout", how: "Text SHOUT to", num: "85258", href: "sms:85258", note: "Free, any time, by text." },
+  { name: "Childline", how: "Call", num: "0800 1111", href: "tel:08001111", note: "Free if you’re under 19, and it won’t show on the phone bill." },
+  { name: "NHS 111", how: "Call", num: "111", href: "tel:111", note: "Choose the mental health option." },
+];
+const CRISIS_FLAGS = ["self-harm-thoughts", "mental-health-concern"];
+function crisisFlagged(flags) { return (flags || []).some((f) => CRISIS_FLAGS.indexOf(f) >= 0); }
+/**
+ * Can a tapped link of this scheme open anything here? On the web, yes: the browser hands tel:, sms: and
+ * mailto: to the phone. In the iPhone app only when the build says so -- WebHost opens a link only when
+ * canOpenURL agrees, which it never does for a scheme the build has not declared, so an over-the-air page
+ * must not show a tap that does nothing (the flag is window.__interunLinkSchemes, set by WebHost).
+ */
+function appCanOpen(scheme) {
+  if (!inNativeApp()) return true;
+  try { return String(window.__interunLinkSchemes || "").split(",").indexOf(scheme) >= 0; } catch (e) { return false; }
+}
+/** An email address: a link where a tap can open Mail, bold text where it cannot. */
+function mailLink(addr) {
+  return appCanOpen("mailto") ? '<a href="mailto:' + esc(addr) + '">' + esc(addr) + '</a>' : '<b>' + esc(addr) + '</b>';
+}
+function crisisLinesHtml() {
+  const num = (href, n) => appCanOpen(href.slice(0, href.indexOf(":"))) ? '<a class="cr-num" href="' + href + '">' + esc(n) + '</a>' : '<b class="cr-num">' + esc(n) + '</b>';
+  return '<div class="crisis"><div class="cr-t">You don’t have to deal with this alone. You can talk to someone now:</div>' +
+    CRISIS_LINES.map((c) => '<div class="cr-r"><div class="cr-n">' + esc(c.name) + '</div>' +
+      '<div class="cr-h">' + esc(c.how) + ' ' + num(c.href, c.num) + '</div><div class="cr-d">' + esc(c.note) + '</div></div>').join("") +
+    '<div class="cr-999">If a life is at risk right now, call ' + num("tel:999", "999") + '.</div></div>';
+}
 /**
  * ⚠️ ALL TWELVE INDICATORS THE ENGINE SUPPORTS, IN THE ORDER SOMEBODY WOULD NOTICE THEM. Four of the
  * RedSIndicator union had no checkbox at all — preoccupation with food, libido, poor recovery and gut
@@ -23728,11 +23830,45 @@ function femaleView() {
     '<label style="font-size:12.5px;font-weight:600;color:var(--ink-soft)">Menstrual status</label><select class="sel" id="fhStatus" style="margin-top:6px"><option value="regular">Regular periods</option><option value="irregular">Irregular periods</option><option value="absent-3m-plus">No period for 3+ months</option><option value="postpartum">Postpartum</option><option value="perimenopause">Perimenopause</option><option value="menopause">Menopause</option><option value="prefer-not-to-say">Prefer not to say</option></select>' +
     '<div class="subhead">Any of these?</div><div class="opts">' + checks({ "pelvic-floor":"Leaking / heaviness","iron-fatigue":"Tired / breathless","heavy-bleeding":"Very heavy periods","painful-periods":"Painful periods" },"fh") + '</div><div class="result" id="fhRes"></div></div>';
 }
-function renderResult(elId, urgency, headline, items, disclaimer) {
+/**
+ * Support › Private check-ins › Wellbeing (stage D3c, 28 September 2026).
+ * ⚠️⚠️ THE TICKABLE ROUTE TO THE FOUR WELLBEING FLAGS, BACK. When the injury guide replaced the old "How
+ * are you feeling?" screen it took these tick-boxes with it, and the only way left to reach the app's
+ * crisis escalation was to type it to Ask Alfie: the four questions where the bar to say something should
+ * be lowest sat behind the highest one. FLAGS_WELL is the list and the engine's screenRedFlags is the
+ * answer; the only words of this screen's own are the lead and the crisis lines.
+ * ⚠️ NOTHING IS KEPT, and checkinConsent() says so (silent-defects checks it is said): the ticks live in
+ * the DOM, runWb writes nowhere, and leaving the screen clears them.
+ * ⚠️ NOT INSIDE redflagsView. The injury guide collects nothing, and a guard keeps it that way.
+ */
+function wellbeingView() {
+  return EMERGENCY_BANNER() +
+    '<h2 class="sec" style="margin-top:0">Wellbeing</h2><div class="card">' + checkinConsent() +
+    '<p class="bk-md" style="margin-bottom:10px">How you are in yourself matters more than any training plan. If any of these are true for you at the moment, tick them to see who can help.</p>' +
+    '<div class="subhead">Any of these?</div><div class="opts">' + checks(FLAGS_WELL, WB_CHK) + '</div>' +
+    '<div class="result" id="wbRes"></div></div>';
+}
+/**
+ * The check-in's answer: the engine's escalation for what is ticked, with the crisis lines straight under
+ * the headline when self-harm or struggling mentally is among it.
+ * ⚠️ FILTERED TO FLAGS_WELL'S OWN KEYS: screenRedFlags throws on an id it does not know, and this runs
+ * from an onchange, where a throw leaves the panel dead for the rest of the visit (D3a's lesson).
+ * ⚠️ NOTHING IS SHOWN UNTIL SOMETHING IS TICKED. Reassurance about nothing is worse than silence.
+ */
+function runWb() {
+  const e = $("wbRes"); if (!e) return;
+  const picks = chkValues(WB_CHK).filter((v) => Object.prototype.hasOwnProperty.call(FLAGS_WELL, v));
+  if (!picks.length) { e.classList.remove("show"); e.innerHTML = ""; return; }
+  const r = RC.screenRedFlags(picks);
+  renderResult("wbRes", r.urgency, r.headline, r.flags.map((f) => ({ title: f.label, guidance: f.guidance, refer: f.refer })), r.disclaimer,
+    crisisFlagged(picks) ? crisisLinesHtml() : "");
+}
+function renderResult(elId, urgency, headline, items, disclaimer, under) {
   const e = $(elId); if (!e) return;
   const UC = { emergency:"var(--rest)", urgent:"var(--eff-hard)", professional:"var(--peak)", monitor:"var(--ready)", none:"var(--ready)" };
   e.classList.add("show");
-  e.innerHTML = '<div class="rb" style="--rbc:' + UC[urgency] + '">' + headline + '</div>' + (items.length ? '<div class="ri">' + items.map((it) => '<div class="item"><b>' + it.title + '</b><div class="g">' + it.guidance + '</div>' + referLine(it.refer) + '</div>').join("") + '</div>' : '') + '<div class="disc">' + disclaimer + '</div>';
+  // under: shown straight beneath the headline, before anything else (D3c: the crisis lines).
+  e.innerHTML = '<div class="rb" style="--rbc:' + UC[urgency] + '">' + headline + '</div>' + (under || "") + (items.length ? '<div class="ri">' + items.map((it) => '<div class="item"><b>' + it.title + '</b><div class="g">' + it.guidance + '</div>' + referLine(it.refer) + '</div>').join("") + '</div>' : '') + '<div class="disc">' + disclaimer + '</div>';
 }
 function chkValues(name) { return [].slice.call(document.querySelectorAll('[data-chk="' + name + '"]:checked')).map((x) => x.value); }
 function runRf() { const picks = chkValues("rf"); const e = $("rfRes"); if (!picks.length) { e.classList.remove("show"); return; } const r = RC.screenRedFlags(picks); renderResult("rfRes", r.urgency, r.headline, r.flags.map((f) => ({ title: f.label, guidance: f.guidance, refer: f.refer })), r.disclaimer); }
@@ -40477,6 +40613,7 @@ function wire() {
   document.querySelectorAll('[data-chk="rf"]').forEach((c) => c.onchange = runRf);
   document.querySelectorAll('[data-chk="reds"]').forEach((c) => c.onchange = runReds);
   document.querySelectorAll('[data-chk="fh"]').forEach((c) => c.onchange = runFh);
+  document.querySelectorAll('[data-chk="' + WB_CHK + '"]').forEach((c) => c.onchange = runWb);
   const fh = $("fhStatus"); if (fh) fh.onchange = runFh;
   if ($("redsRes")) runReds();
   // Setup screen wiring

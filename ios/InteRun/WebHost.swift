@@ -56,6 +56,13 @@ struct WebHost: UIViewRepresentable {
                   // clip handed over, none played, no reply, and a coach that says nothing all run.
                   // Bump this when the contract changes; never widen it to a handler-exists check.
                   + "window.__interunCoachNativePlay = 1;"
+                  // Which link schemes this build can hand to iOS: the navigation delegate below opens a
+                  // tapped link only when canOpenURL says yes, and that answers no for any scheme missing
+                  // from LSApplicationQueriesSchemes. tel and mailto joined the list in the same build as
+                  // this flag (D1 and D3c, 2026-09-28), so an over-the-air page that rendered a crisis
+                  // line's phone number as a link on an OLDER build would show a tap that does nothing.
+                  // Same rule as the flags above: never infer it from anything else.
+                  + "window.__interunLinkSchemes = \"tel,sms,mailto\";"
                   // Which share destinations this build can open DIRECT. Same rule as the flag above:
                   // the page must never infer this from the message handler existing, because
                   // docs/index.html reaches phones whose Swift predates the handler's new actions and

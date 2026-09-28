@@ -45,6 +45,7 @@
 		<string>whatsapp</string>
 		<string>sms</string>
 		<string>mailto</string>
+		<string>tel</string>
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>

@@ -438,13 +438,17 @@ test("Your data shows each switch with the runner's real default, and every cont
 });
 
 test("the contact line appears only once there is an address; the ICO is always offered", () => {
-  const html = (contact: string) => lift(["privacyDeleteHtml"], ["ICO_COMPLAINTS_URL"], "privacyDeleteHtml()",
-    { PRIVACY_CONTACT: contact, esc: new Function(ESC + "\nreturn esc;")() });
+  // ⚠️ mailLink and appCanOpen are lifted too (D3c): an older iPhone build cannot open a mailto: link, so the
+  // address is a link only where a tap can open Mail -- see test/wellbeing-checkin.test.ts for that half.
+  const html = (contact: string, native = false) => lift(["appCanOpen", "mailLink", "privacyDeleteHtml"], ["ICO_COMPLAINTS_URL"], "privacyDeleteHtml()",
+    { PRIVACY_CONTACT: contact, esc: new Function(ESC + "\nreturn esc;")(), inNativeApp: () => native, window: {} });
   const none = html("");
   assert.ok(!none.includes("mailto:"), "no address, no line offering one -- an address that reaches nobody is worse than none");
   assert.ok(none.includes('href="https://ico.org.uk/make-a-complaint/" target="_blank" rel="noopener noreferrer"'), "the ICO link opens outside the app");
   assert.ok(none.includes("Talk to a parent or an adult you trust"), "and it tells a child who to talk to first");
   assert.ok(html("privacy@inte-run.test").includes('href="mailto:privacy@inte-run.test"'), "once an address exists, it is offered");
+  const old = html("privacy@inte-run.test", true);
+  assert.ok(old.includes("<b>privacy@inte-run.test</b>") && !old.includes("mailto:"), "an iPhone build that cannot open Mail shows the address, not a dead link");
 });
 
 test("BLOCKER: Delete everything removes what a backup leaves out, tells Strava first, and nothing is written back", async () => {

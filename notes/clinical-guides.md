@@ -382,3 +382,79 @@ The race-pace detection in `fuelHtml` is the same **content** test `buildWeek` u
 
 Not done: the watch shows no fuelling text — it would need new payload keys, and the phone is where
 you read a plan. Say so rather than half-doing it.
+
+## ✅ D3c — THE WELLBEING CHECK-IN, UK CRISIS LINES, AND ALFIE LEARNS THE EIGHT LIMB SIGNS (owner, 2026-09-28)
+
+The stage PLAN.md calls D3c and the Road Map calls `pc-wellbeing`. Suite 1813 → **1823**;
+`test/wellbeing-checkin.test.ts` holds 10 guards and **26 deliberate re-breaks were all caught**, each on a
+copy restored byte-identical. ⚠️ **ALL NEW WORDING HERE AWAITS THE CLINICAL REVIEW** — the card, the lead,
+the crisis block, the Safety page sentence, and every phrase Alfie now matches. The engine's own guidance
+strings are unchanged.
+
+### The owner's rulings, one question at a time
+
+1. **Show UK crisis numbers** when self-harm or struggling mentally is ticked (the check-in) or typed
+   (Ask Alfie), never as a default on every screen (`CRISIS_FLAGS`).
+2. **Teach Ask Alfie the eight acute-limb signs** the injury guide lists as text.
+
+### ⚠️⚠️ WHAT IT FOUND
+
+1. ⚠️⚠️ **THE APP NAMED NO CRISIS LINE ANYWHERE.** The engine's guidance for self-harm says "please contact
+   an urgent crisis line" and `PROFESSIONAL_LABEL` says "an urgent crisis-support line" — and nothing gave a
+   number. APPSTORE.md's age-rating answer even said Alfie answers "with crisis contacts". `CRISIS_LINES`:
+   Samaritans 116 123, Shout (text SHOUT to 85258), Childline 0800 1111 (under 19), NHS 111 (mental health
+   option), and 999 if a life is at risk — **every one read on the service's own page on 28 Sept 2026**
+   (the NHS's "Where to get urgent help for mental health", Samaritans' contact page, Shout's get-help
+   page; Childline's own site refused the fetch, so its number and age come from the NHS page). The test
+   pins them as typed values ON PURPOSE, with that provenance: they are outside facts.
+2. ⚠️⚠️ **A PHONE NUMBER LINK WOULD HAVE DONE NOTHING IN THE iPHONE APP.** `WebHost` opens a tapped link
+   only when `canOpenURL` agrees, which it never does for a scheme missing from `LSApplicationQueriesSchemes`
+   — `tel` was not there (nor `mailto`, found at D1). Added, with a capability flag in the same build,
+   `window.__interunLinkSchemes = "tel,sms,mailto"`; the page reads it through `appCanOpen(scheme)` and
+   renders a number as a link only where a tap can dial. **The number is always printed as text.** D1's
+   email links use the same rule now (`mailLink`). ⚠️ Both need an Xcode build to become tappable in the app.
+3. ⚠️⚠️ **THE CHECK-IN RESULT HEADLINE WAS UNREADABLE IN DARK MODE — THE EMERGENCY ONE AT 2.93:1.**
+   `.result .rb` is white on the plain urgency colour. Measured from rendered pixels (canvas-resolved, since
+   Chromium reports `color-mix` unresolved): light 2.75–5.11:1, dark 2.29–3.13:1 — so it had failed on the
+   fuelling and women's health results all along. One declaration fixes both themes:
+   `color-mix(in srgb, var(--rbc) 65%, #000)` → **light 5.81–9.33:1, dark 5.02–6.47:1**. The guard computes
+   it from the page's own theme values and the mix, both themes, every urgency colour.
+4. **Ask Alfie pointed at "Support → When to stop and seek help", a page that has never existed.** It now
+   names the page that fits what was typed, read off the engine's own categories: psychological or hormonal
+   → Support → Wellbeing; musculoskeletal → Injury & symptoms; anything else → Safety, privacy & human help.
+5. **The two "symptom checker" promises** (Alfie's limits panel and the Safety page's "Check a symptom ›",
+   both landing on the leg-injury guide) are now two doors each named for where it goes.
+
+### What shipped
+
+- **Support › Private check-ins › Wellbeing** (`wellbeingView`, second in `HUB_CHECKINS`, with the Check-in
+  badge): the emergency route, `checkinConsent()`, the four `FLAGS_WELL` tick-boxes in group `WB_CHK = "wb"`
+  (⚠️ never `rf`: `wire()` binds that name to the dead `runRf`), and `runWb()` → `screenRedFlags` →
+  `renderResult`, which now takes an `under` argument so the crisis lines sit straight beneath the headline.
+  ⚠️ `runWb` filters to `FLAGS_WELL`'s own keys, because `screenRedFlags` throws on an unknown id and this
+  runs from an `onchange` (re-broken: the throw is a TypeError). Nothing is kept or sent; the guard checks
+  the function writes nowhere.
+- **Eight new `ALFIE_FLAGS` entries**, one per acute-limb flag, each phrased as what the runner OBSERVES.
+  ⚠️ **THE NEGATIVE LIST IS THE OTHER HALF OF THE GUARD**: ten ordinary questions ("My last interval was
+  excruciating", "Is it ok to run with a fever?", "My toes get cold on winter runs", "My knee clicks when I
+  squat", "I can't walk properly after my long run" …) must stay unflagged. That is why excruciating,
+  agonising, a bare fever, cold toes and "can't walk" are NOT phrases — an emergency answer to a harmless
+  question teaches runners to stop asking. Re-broken by putting "fever" and "excruciating" back.
+- ⚠️ **NO APOSTROPHES OR QUOTE MARKS IN COMMENTS INSIDE `ALFIE_FLAGS`.** The tests lift it with a
+  quote-aware extractor, and one unpaired `'` in a comment ran it past the end of the array — six unrelated
+  Alfie tests failed with "Identifier ALFIE_THINKING has already been declared". Said inside the array now.
+- `test/silent-defects.test.ts`'s emergency-route guard now DERIVES the check-in pages from `HUB_CHECKINS`
+  and `supportDetail` (it listed three by name, so a fourth would have been exempt without anybody deciding).
+- The privacy policy's list of check-ins that keep nothing names Wellbeing; APPSTORE.md's "Mature or
+  Suggestive Themes" answer names the check-in and the crisis lines.
+- ⚠️ **The crisis block was first written in raw px sizes (14, 13.5, 12.5, 16) and `npm run verify` failed on
+  `design-system.test.ts`'s off-ladder ratchet** — the quick loop had not run that file. Sizes are
+  `var(--t-*)` now (body 15, card 17, meta 13); run the design-system test after any CSS you add.
+
+### Still open
+
+- **The clinical review of all of the above** — and particularly the limb phrases, which trade missed
+  warnings against false alarms in a way only a clinician should settle.
+- **An Xcode build** for `tel`/`mailto` and the capability flag.
+- Childline's own page refused an automated fetch; its number was confirmed on the NHS page instead.
+- `runRf()` and its `[data-chk="rf"]` binding are still dead code, left as they were.

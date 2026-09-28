@@ -10,10 +10,12 @@ bottom. Do the steps in order.
 The order matters because Apple's checks lock into place at each step. Skip a step
 and the error message won't say what's missing.
 
-**Where you are today.** The app is on your iPhone via Xcode and works. You have
-joined the Apple Developer Program. The two health guides are approved (the injury
-one after the PRICE rewrite is pending a physio read, and it needs one before you
-send it to strangers).
+**Where you are today (updated 28 September 2026, stage D2).** The app is on your iPhone
+via Xcode and works. You have joined the Apple Developer Program. The privacy policy,
+terms and a tester brief are live on the website. Claude uploads builds itself — no
+Transporter, no password — using Xcode's own signed-in account. **Testers:** send them
+the brief at https://padder1980.github.io/Inte-Run/testflight/testers/ — it says what
+to try, what isn't ready, and how to report a problem.
 
 **Where you'll be at the end.** Up to 100 people you know will have Inte-Run on
 their phone from the TestFlight app, updates will arrive automatically, and their
@@ -67,7 +69,7 @@ upload a build.
 
 ---
 
-## 2 — Do the first upload (Claude does it)
+## 2 — Do the upload (Claude does it)
 
 This is the fiddly step where Xcode talks to Apple. Claude handles it.
 
@@ -85,7 +87,8 @@ This is the fiddly step where Xcode talks to Apple. Claude handles it.
 > (c) Regenerate the Xcode project: `python3 ios/make-project.py`.
 >     This picks up the latest commit count as the build number and applies
 >     it to all four targets (phone, watch, watch extension, widget).
-> (d) Build the app FOR ARCHIVE (not for my phone):
+> (d) Build the app FOR ARCHIVE (not for my phone), with the RELEASE Xcode
+>     (xcode-select's default, 26.6) — App Store Connect takes release builds:
 >     ```
 >     node web/app.ts
 >     git checkout -- docs/voices/
@@ -94,17 +97,17 @@ This is the fiddly step where Xcode talks to Apple. Claude handles it.
 >       -allowProvisioningUpdates \
 >       -archivePath /tmp/InteRun.xcarchive archive
 >     ```
-> (e) Export the .ipa:
+> (e) Export AND upload in one go — the export IS the upload when the options
+>     say so, through Xcode's own signed-in account (no Transporter, no
+>     app-specific password, no API key):
 >     ```
+>     cp ios/ExportOptions.plist /tmp/ExportOptions-upload.plist
+>     /usr/libexec/PlistBuddy -c "Add :destination string upload" /tmp/ExportOptions-upload.plist
 >     xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive \
->       -exportOptionsPlist ios/ExportOptions.plist \
->       -exportPath /tmp/InteRun-ipa \
->       -allowProvisioningUpdates
+>       -exportOptionsPlist /tmp/ExportOptions-upload.plist \
+>       -exportPath /tmp/InteRun-upload -allowProvisioningUpdates
 >     ```
-> (f) Open Transporter (Applications → Transporter). If it isn't installed,
->     tell me and I'll get it from the Mac App Store. Drag
->     /tmp/InteRun-ipa/InteRun.ipa into Transporter, sign in with my Apple ID
->     and click **Deliver**. Wait for the green tick.
+> (f) Wait for "Upload succeeded" (or the exact error) in the output.
 > (g) Tell me the exact build number that went up (it's in the terminal output
 >     from step c, and it's what I'll see in App Store Connect).
 >
@@ -118,8 +121,8 @@ This is the fiddly step where Xcode talks to Apple. Claude handles it.
 >   commit count.
 > ```
 
-**Check:** Transporter shows a green tick and says *"Delivery successful."* You
-see the build number in your terminal (something like `350`).
+**Check:** Claude reports the upload succeeded and names the build number (the first
+one through this route was `560`).
 
 **What if it fails?** Almost always one of three things, and Claude will name which:
 
@@ -162,15 +165,23 @@ invite anyone else.
 > a valid internal tester by default.
 
 > **Do this:** open **Inte-Run** → **TestFlight** → **Internal Testing** →
-> **Create New Group** → name it `Owner + close friends`. Tick **"Enable
-> automatic distribution"** (means new builds go to them automatically). Click
-> **Create**.
+> **Create New Group** → name it exactly `Internal Testers` (the name Claude's
+> script looks for). Tick **"Enable automatic distribution"** (means every new
+> build goes to the group by itself). Click **Create**.
 
 > **Do this:** on that group's page, click **Add Testers** → tick your own name.
 > Then in the **Builds** area of the same group, click **+** and add the build
 > you just uploaded.
 
 **Check:** the group shows 1 tester and 1 build.
+
+> **Optional, once — so Claude can add builds and check on them without you:**
+> App Store Connect → **Users and Access** → **Integrations** → **App Store Connect
+> API** → **+** → name it `Claude`, role **App Manager** → **Generate** →
+> **Download API Key** (Apple lets you download it ONCE). Then tell Claude: *"the key
+> is in my Downloads, and the Issuer ID is on that page"*. Claude moves the file to
+> `~/.appstoreconnect/private_keys/` and runs `node tools/testflight-distribute.mjs`.
+> Never paste the key's contents into a chat.
 
 > **Do this:** on your iPhone, install **TestFlight** from the App Store if you
 > haven't already. Open the email from Apple ("You have been invited to test
@@ -261,7 +272,7 @@ tap it, done.
 
 ## Common problems, and what to do
 
-**"My build isn't in App Store Connect."** Transporter didn't finish the upload,
+**"My build isn't in App Store Connect."** The upload didn't finish (Claude will have the error),
 or step 3's processing failed. Wait 15 more minutes. If still nothing, look for an
 email from Apple that says why — those emails always name the real problem.
 
@@ -289,21 +300,18 @@ Motion / Notifications are all on.
 
 1. The injury guide's PRICE rewrite has been read by a physio (the PRE-PRICE
    wording was signed off; PRICE was not — see the Road Map hero for the honest
-   status).
-2. A privacy policy exists and is linked from the app. External review requires
-   it. The simplest version: a page on your website that says what data the app
-   collects (a name, a plan, runs stored on the phone) and that nothing leaves
-   the device except when you tap Send-to-Strava.
+   status), and the D3c safety wording (the Wellbeing check-in, the crisis lines
+   and Ask Alfie's limb phrases) has had its clinical review.
+2. Someone who knows data protection law has read the privacy policy, terms and
+   simple version (they are live since D1, 28 September 2026:
+   https://padder1980.github.io/Inte-Run/privacy/). External testing needs
+   Apple's Beta App Review and that privacy-policy URL.
 
-**Strava.** Testers won't be able to connect Strava until you finish the
-15-minute Worker setup in `alfie-proxy/README.md`. Everything else works without
-it — hide the button in their versions by leaving `STRAVA_SERVER` empty if that
-step isn't done. (Claude will tell you whether it's done when you ask for a
-build.)
+**Strava** works for testers: the server is live (deployed 28 September 2026).
+It is for testers aged 13 and over, which is Strava's own rule.
 
-**The wellbeing questions and the eight limb warning signs.** Still open from
-today's work — the definitions are in the engine but nothing on screen offers
-them. Fine for internal testing; needs finishing before external.
+**Garmin** is not in the app yet — the application to Garmin is in and waiting.
+The tester brief says so.
 
 ---
 
@@ -312,9 +320,9 @@ them. Fine for internal testing; needs finishing before external.
 ```
 FIRST TIME
   Step 1  App Store Connect → New App → com.interun.app                 (you)
-  Step 2  Ask Claude to build, export and upload via Transporter        (Claude)
+  Step 2  Ask Claude to build and upload (xcodebuild, no Transporter)  (Claude)
   Step 3  Wait for green dot, answer the encryption email               (you)
-  Step 4  Add yourself as a tester, install via TestFlight, verify      (you)
+  Step 4  Group "Internal Testers" + yourself; install; verify (+ key)  (you)
   Step 5  Invite friends by email, add them to the group                (you)
   Step 6  Testers install the watch app via the Watch app on iPhone     (them)
 

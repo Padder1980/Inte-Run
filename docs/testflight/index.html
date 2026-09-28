@@ -565,9 +565,11 @@ I'm following TESTFLIGHT.md step 2. Do all of this and stop after step (g):
     node web/app.ts
     git checkout -- docs/voices/
     xcodebuild -project ios/InteRun.xcodeproj -scheme InteRun -configuration Release -destination 'generic/platform=iOS' -allowProvisioningUpdates -archivePath /tmp/InteRun.xcarchive archive
-(e) Export the .ipa:
-    xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive -exportOptionsPlist ios/ExportOptions.plist -exportPath /tmp/InteRun-ipa -allowProvisioningUpdates
-(f) Upload using Transporter. Drag /tmp/InteRun-ipa/InteRun.ipa into Transporter, sign in with my Apple ID and click Deliver. Wait for the green tick.
+(e) Export AND upload in one go, through Xcode's own signed-in account (no Transporter):
+    cp ios/ExportOptions.plist /tmp/ExportOptions-upload.plist
+    /usr/libexec/PlistBuddy -c "Add :destination string upload" /tmp/ExportOptions-upload.plist
+    xcodebuild -exportArchive -archivePath /tmp/InteRun.xcarchive -exportOptionsPlist /tmp/ExportOptions-upload.plist -exportPath /tmp/InteRun-upload -allowProvisioningUpdates
+(f) Wait for "Upload succeeded" (or the exact error) in the output.
 (g) Tell me the exact build number (from step c output).
 
 Rules: If any step fails, stop and tell me the exact error message. Do not guess past it.
@@ -612,7 +614,7 @@ Rules: If any step fails, stop and tell me the exact error message. Do not guess
     <ul class="checklist">
       <li class="checklist-section">In App Store Connect on your Mac:</li>
       <li data-id="s4-1"><div class="check-box"></div><div class="check-text">Go to <strong>Inte-Run → TestFlight → Internal Testing</strong></div></li>
-      <li data-id="s4-2"><div class="check-box"></div><div class="check-text">Click <strong>Create New Group</strong> → name it <em>Owner + close friends</em> → tick <strong>Enable automatic distribution</strong> → click Create</div></li>
+      <li data-id="s4-2"><div class="check-box"></div><div class="check-text">Click <strong>Create New Group</strong> → name it exactly <em>Internal Testers</em> (the name Claude's script looks for) → tick <strong>Enable automatic distribution</strong> → click Create</div></li>
       <li data-id="s4-3"><div class="check-box"></div><div class="check-text">On the group page: click <strong>Add Testers</strong> → tick your own name</div></li>
       <li data-id="s4-4"><div class="check-box"></div><div class="check-text">In the Builds section: click <strong>+</strong> and add the build you just uploaded</div></li>
       <li class="checklist-section">On your iPhone:</li>
@@ -641,7 +643,7 @@ Rules: If any step fails, stop and tell me the exact error message. Do not guess
     <ul class="checklist">
       <li data-id="s5-1"><div class="check-box"></div><div class="check-text">In App Store Connect → <strong>Users and Access</strong> → click <strong>+</strong> → add each person's email → give them <strong>App Manager</strong> role → tick access to <strong>Inte-Run only</strong></div></li>
       <li data-id="s5-2"><div class="check-box"></div><div class="check-text">Back in <strong>TestFlight → Internal Testing → your group</strong> → click <strong>Add Testers</strong> → tick their names</div></li>
-      <li data-id="s5-3"><div class="check-box"></div><div class="check-text">Text each person: <em>"Check your email for an invite from Apple — install TestFlight first, then open the invite on your phone and tap Install."</em></div></li>
+      <li data-id="s5-3"><div class="check-box"></div><div class="check-text">Text each person: <em>"Check your email for an invite from Apple — install TestFlight first, then open the invite on your phone and tap Install. This page says what to try and how to tell me about problems: padder1980.github.io/Inte-Run/testflight/testers"</em></div></li>
       <li data-id="s5-4"><div class="check-box"></div><div class="check-text">Wait for each tester to confirm they got in</div></li>
     </ul>
   </div>

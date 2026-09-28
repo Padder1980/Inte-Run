@@ -32,6 +32,7 @@ const DOC = {
   terms: read("docs/terms/index.html"),
   simple: read("docs/simple/index.html"),
   support: read("docs/support/index.html"),
+  testers: read("docs/testflight/testers/index.html"),
 };
 type DocName = keyof typeof DOC;
 const ALL = Object.keys(DOC) as DocName[];

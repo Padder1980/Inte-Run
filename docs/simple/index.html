@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The simple version · Inte-Run</title>
+<meta name="description" content="What happens to your information in Inte-Run, and the rules for using it, in plain words that anyone aged 12 or over can read.">
+<link rel="stylesheet" href="../legal.css">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
+</head>
+<!--
+  The simple version of Inte-Run's privacy policy and terms, written so a 12-year-old can read it: the
+  ICO's Children's Code, standard 4, asks for information "in clear language suited to the age of the
+  child". Hand-written (stage D1, 28 September 2026).
+  ⚠️ test/privacy-copy.test.ts holds it to the same facts as the full policy: one data-flow section for
+  each flow in PRIVACY_FLOWS, in the same order; the ages the code enforces; the contact address. It also
+  MEASURES the reading level (a Flesch-Kincaid grade), so a rewrite that stops being readable at 12
+  fails the suite rather than slipping through.
+-->
+<body class="simple">
+<a class="skip" href="#main">Skip to the page</a>
+<header><div class="head-in">
+  <a href="./" aria-label="Inte-Run: the simple version">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>
+      <rect x="8" y="8" width="104" height="104" rx="30" fill="url(#g)"/>
+      <circle cx="82" cy="37" r="11" fill="#fff"/>
+      <path d="M35 88 L57 45 L71 45 L49 88 Z" fill="#fff"/>
+      <path d="M57 88 L79 45 L93 45 L71 88 Z" fill="#fff" opacity=".62"/>
+    </svg>
+    <span class="head-t"><b>Inte-Run</b><span>The simple version</span></span>
+  </a>
+</div></header>
+
+<main id="main">
+<h1>The simple version</h1>
+<p class="meta">Your information and the rules, in plain words. Updated <time datetime="2026-09-28" data-updated>28 September 2026</time></p>
+
+<div class="lead">
+  <b>Start here</b>
+  <p>This page explains what happens to your information in Inte-Run, and the rules for using it. It is the short version of our <a href="../privacy/">privacy policy</a> and <a href="../terms/">terms of use</a>.</p>
+  <p>If anything here worries you, talk to a parent, a carer or another adult you trust.</p>
+</div>
+
+<section id="who">
+<h2>Who makes Inte-Run?</h2>
+<p>Inte-Run is made by one person, Adam Palmer, who lives in England. If you have a question, you can email him at <a href="mailto:adam.palmer86@gmail.com" data-contact>adam.palmer86@gmail.com</a>.</p>
+</section>
+
+<section id="idea">
+<h2>The big idea</h2>
+<div class="card">
+  <p><strong>Your running stays on your phone.</strong></p>
+  <ul>
+    <li>You don’t need an account.</li>
+    <li>There are no adverts.</li>
+    <li>Nobody is watching what you do in the app.</li>
+    <li>Adam can’t see your runs, your plan or your chats. He doesn’t have a copy.</li>
+  </ul>
+</div>
+</section>
+
+<section id="saved">
+<h2>What is saved on your phone?</h2>
+<ul>
+  <li>What you tell the app about you, like your name, your age and your goal.</li>
+  <li>Your plan.</li>
+  <li>Your runs: where you went, how far, how fast, and your heart rate if a watch measured it.</li>
+  <li>Your strength sessions and your shoes.</li>
+  <li>Your Inte-Club posts, photos and videos. Nobody else can see them.</li>
+  <li>Your chats with Alfie.</li>
+  <li>Your settings.</li>
+</ul>
+<p>Your answers in the health check-ins are not saved at all. They are gone when you leave the screen.</p>
+<p>If you have an Apple Watch, it keeps a copy of your next few sessions, your first name and your answers about why you run. That way it can work without your phone.</p>
+</section>
+
+<section id="online">
+<h2>What goes online?</h2>
+<p>A few things need the internet. Here is every one of them.</p>
+
+<div class="card" data-flow="weather">
+  <h3>The weather</h3>
+  <p>Your rough location goes to a weather company called Open-Meteo. The app needs the forecast to warn you about heat. “Rough” means it only shows the area, to about 1 km. It does not show your street.</p>
+  <p><strong>Can I turn it off?</strong> There is no switch, because the heat warnings need it. If you don’t let the app use your location, it can’t get the weather.</p>
+</div>
+
+<div class="card" data-flow="maps">
+  <h3>Maps</h3>
+  <p>To draw a map of your run, the app asks a map company for the pieces of map around it. The company is called CARTO or Mapbox.</p>
+  <p><strong>Can I turn it off?</strong> No. The map is part of your run.</p>
+</div>
+
+<div class="card" data-flow="place">
+  <h3>Town names</h3>
+  <p>The middle of your run goes to OpenStreetMap, to find out which town you were in. It only shows the area, to about 1 km.</p>
+  <p><strong>Can I turn it off?</strong> Yes. If you are under 18, it starts switched off. If you are 12, it stays off until you are <span data-age="own-consent">13</span>.</p>
+</div>
+
+<div class="card" data-flow="alfie">
+  <h3>Ask Alfie online</h3>
+  <p>Alfie can answer on your phone. If you switch on online answers, your question goes to Inte-Run’s computer, called a server. It also sends a short summary of your plan, and a random code for your phone so that no phone can ask too many questions. Then an AI run by a company called Cloudflare writes the reply.</p>
+  <p>Alfie never sends your name or where you are. Inte-Run doesn’t keep your questions. If you type about something serious, like chest pain or fainting, Alfie answers on your phone and never sends it.</p>
+  <p><strong>Can I turn it off?</strong> It starts off, and nothing is sent until you say yes. If you are 12, it stays off until you are <span data-age="own-consent">13</span>.</p>
+</div>
+
+<div class="card" data-flow="strava">
+  <h3>Strava</h3>
+  <p>Strava is an app for sharing your runs. When you are <span data-age="strava">13</span> or over, you can connect it to Inte-Run. Then the runs you choose go to your Strava account, through Inte-Run’s server. The server keeps the connection, but not your runs. Your heart rate doesn’t go to Strava until you are <span data-age="strava-hr">16</span>. That is Strava’s rule.</p>
+  <p><strong>Can I turn it off?</strong> It is off unless you connect it. You can disconnect whenever you like.</p>
+</div>
+
+<div class="card" data-flow="update">
+  <h3>App updates</h3>
+  <p>The iPhone app asks GitHub, a website company, if there is a newer version of the app. Nothing about you is sent.</p>
+  <p><strong>Can I turn it off?</strong> No, but it sends nothing about you.</p>
+</div>
+
+<p>When a phone connects to a website, the website can see the phone’s internet address. That is how the internet works.</p>
+</section>
+
+<section id="yourself">
+<h2>Things only you can send</h2>
+<p>Some things only leave your phone when you choose to send them:</p>
+<ul>
+  <li>sharing a picture of your run,</li>
+  <li>saving a backup file,</li>
+  <li>adding your plan to a calendar,</li>
+  <li>emailing Adam.</li>
+</ul>
+<p><strong>Think before you share.</strong> A map of your run can show where you live. If you are under 18, share cards hide your route, your town and your heart rate each time. You can add them if you want to.</p>
+</section>
+
+<section id="health">
+<h2>Apple Health</h2>
+<p>If you say yes, the iPhone app saves your runs in the Health app on your phone. If you are under 18, this starts switched off.</p>
+</section>
+
+<section id="never">
+<h2>What we will never do</h2>
+<ul>
+  <li>Sell your information.</li>
+  <li>Show you adverts.</li>
+  <li>Follow what you do in other apps or on websites.</li>
+  <li>Show your information to other people.</li>
+  <li>Use your questions to teach an AI. Cloudflare says it doesn’t either.</li>
+</ul>
+</section>
+
+<section id="choices">
+<h2>Your choices</h2>
+<p>It is your information, so you are in charge of it. In the app, open <strong>Profile</strong>, then <strong>Your data</strong>.</p>
+<ul>
+  <li><strong>See it.</strong> Your data shows what goes online, with the switches.</li>
+  <li><strong>Change it.</strong> You can change your answers at any time.</li>
+  <li><strong>Keep a copy.</strong> Tap Export a backup.</li>
+  <li><strong>Delete it.</strong> Tap Delete everything, or delete the app.</li>
+  <li><strong>Ask a question.</strong> Email <a href="mailto:adam.palmer86@gmail.com" data-contact>adam.palmer86@gmail.com</a>.</li>
+  <li><strong>Complain.</strong> If you think your information is not being looked after, you or an adult can tell the ICO. The ICO is the UK’s information watchdog. <a href="https://ico.org.uk/make-a-complaint/">Contact the ICO</a></li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>The rules</h2>
+<div class="card">
+<ul>
+  <li><strong>Inte-Run is a coach, not a doctor.</strong> It can’t tell what is wrong if something hurts.</li>
+  <li><strong>If you get chest pain, faint, can’t breathe properly, or get hurt and can’t walk:</strong> stop, and get help straight away. In an emergency, call 999.</li>
+  <li>If something hurts and gets worse when you run, stop and tell an adult. A doctor or a physio can help.</li>
+  <li>Talk to a parent or carer before you start a plan, and keep them in the loop.</li>
+  <li>Tell someone where you are going when you run, and take care near roads.</li>
+  <li>Alfie is a computer program. It can get things wrong.</li>
+  <li>Your plan is yours. The app never changes it without asking you.</li>
+  <li>Be kind. Only share pictures of other people if they say it is OK.</li>
+  <li>Don’t try to break the app, or use it to hurt anyone.</li>
+  <li>The app is free. We try hard to get things right, but GPS and other things can be wrong.</li>
+</ul>
+</div>
+</section>
+
+<section id="changes">
+<h2>If things change</h2>
+<p>When we change this page, we change the date at the top. You will see the same date in the app, under Support, then Privacy policy &amp; terms.</p>
+</section>
+
+<div class="others">
+  <a href="../privacy/">The full privacy policy</a>
+  <a href="../terms/">The full terms of use</a>
+  <a href="../support/">Support</a>
+</div>
+</main>
+
+<footer>Inte-Run · made by Adam Palmer in England · <a href="mailto:adam.palmer86@gmail.com" data-contact>adam.palmer86@gmail.com</a></footer>
+</body>
+</html>

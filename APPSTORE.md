@@ -12,7 +12,9 @@ test/app-store.test.ts keeps this file, the privacy manifests and the app's own 
    rating itself as you go. Expect **9+ or 13+**; section 1.3 explains the one decision that is yours.
 2. **App Privacy (the "nutrition label")** — declare the eight data types in section 2. Nothing is
    used to track anyone.
-3. **You cannot submit yet.** Apple requires a privacy policy link (section 0). That is stage D1.
+3. **The privacy policy link now exists** (stage D1, 28 September 2026). Paste
+   `https://padder1980.github.io/Inte-Run/privacy/` into App Store Connect as the Privacy Policy URL and
+   `https://padder1980.github.io/Inte-Run/support/` as the Support URL (section 0).
 4. **Review notes** — paste section 5 into the notes field.
 
 Everything else Apple asks is answered in section 4.
@@ -21,10 +23,10 @@ Everything else Apple asks is answered in section 4.
 
 | Blocker | Why | Whose |
 |---|---|---|
-| A **privacy policy link**, in App Store Connect **and** inside the app | Guideline 5.1.1(i): "All apps must include a link to their privacy policy in the App Store Connect metadata field and within the app in an easily accessible manner." Guideline 5.1.4 says the same for any app that transmits personal information "from a minor". | Stage D1 — you, ideally with a legal read |
-| A version of that policy a **12-year-old can read** | The ICO's Children's Code (see `DPIA.md`) | D1 |
-| **Terms** with a parent or guardian clause | Under-18s cannot sign a binding contract (`YOUTH.md` section 6). ⚠️ How the terms word a minimum age changes the age rating — section 1.3. | D1 |
-| A **support URL** that leads to real contact details | Apple: "This URL must lead to actual contact information (legal address, email address, telephone number), as may be required by local law ... This property is required." One email address could serve this and the privacy contact the app is still waiting for (`PRIVACY_CONTACT`). | You |
+| ✅ A **privacy policy link**, in App Store Connect **and** inside the app | Guideline 5.1.1(i): "All apps must include a link to their privacy policy in the App Store Connect metadata field and within the app in an easily accessible manner." Guideline 5.1.4 says the same for any app that transmits personal information "from a minor". | **Done (D1):** `https://padder1980.github.io/Inte-Run/privacy/`, linked in the app from Support › Tools › Privacy policy & terms, the Safety page and Your data. You paste the URL into App Store Connect. ⚠️ Have it read by someone who knows data protection before external testers. |
+| ✅ A version of that policy a **12-year-old can read** | The ICO's Children's Code (see `DPIA.md`) | **Done (D1):** `https://padder1980.github.io/Inte-Run/simple/`, measured at Flesch-Kincaid grade 2.6 |
+| ✅ **Terms** with a parent or guardian clause | Under-18s cannot sign a binding contract (`YOUTH.md` section 6). ⚠️ How the terms word a minimum age changes the age rating — section 1.3. | **Done (D1):** `https://padder1980.github.io/Inte-Run/terms/`. "Designed for runners aged 12 and up", with no minimum age (your ruling, section 1.3) |
+| ✅ A **support URL** that leads to real contact details | Apple: "This URL must lead to actual contact information (legal address, email address, telephone number), as may be required by local law ... This property is required." | **Done (D1):** `https://padder1980.github.io/Inte-Run/support/`, giving adam.palmer86@gmail.com, which is also `PRIVACY_CONTACT` in the app |
 | A **new app build** | The privacy files, the location message and the watch app's privacy file only reach Apple in a build (section 7) | Press Play in Xcode, then upload |
 | Signing `DPIA.md` | Not an Apple rule — UK data protection law | You |
 
@@ -86,7 +88,10 @@ matters because the app's youth programme starts at **12**:
 
 **My recommendation:** accept whatever rating App Store Connect calculates, do not override it, and have
 D1 describe the app as *designed for runners aged 12 and over* rather than making 12 a contractual
-minimum. That keeps a 12-year-old able to install it. **This is your decision.**
+minimum. That keeps a 12-year-old able to install it.
+✅ **Decided, 28 September 2026: "designed for 12 and up".** The terms (`docs/terms/`) say exactly that and
+set no minimum age, and `test/privacy-copy.test.ts` fails if a minimum-age sentence appears in the terms
+or the simple version. So: **accept the calculated rating and do not override it.**
 
 Other choices on the same screen:
 
@@ -196,9 +201,10 @@ Apple: "The Notes field can contain up to 4000 bytes." This is well under (a tes
 >
 > Ask Alfie is an optional AI assistant. Nothing is sent until the user agrees in the app. Then the
 > question and a short summary of their plan go to our server, which asks an AI service run by
-> Cloudflare for the reply and stores nothing. Questions about pain or feeling unwell are recognised on
-> the device and answered with safety guidance; they are never sent. Users aged 12 to 17, or who have not
-> given an age, are never offered online answers unprompted.
+> Cloudflare for the reply and stores nothing. Questions that mention a serious warning sign (chest pain,
+> fainting, thoughts of self-harm and similar) are recognised on the device and answered with safety
+> guidance; they are never sent. Users aged 12 to 17, or who have not given an age, are never offered
+> online answers unprompted, and users under 13 cannot switch them on.
 >
 > Strava is optional. Connecting uses Strava's own page in Safari. The access tokens are kept on our
 > server, never on the device, because Strava's token exchange needs our client secret. The user can
@@ -274,8 +280,9 @@ family's own settings. It would close the known gap that "Prefer not to say" sti
   the maps and the town lookup. (Needs a build.)
 - **The iPhone privacy manifest** was corrected, and **the watch app got its own**. (Needs a build.)
 - **The weather credit** Open-Meteo's licence asks for. (Web.)
-- **The server no longer keeps the Strava athlete number**, which nothing ever read. (Needs a server
-  deploy; the answers above do not depend on it.)
+- **The server no longer keeps the Strava athlete number**, which nothing ever read. (Deployed 28
+  September 2026, with D1's year limit on unused Strava connections; the answers above do not depend
+  on it.)
 
 ## 8. Sources, read on 27 September 2026
 
@@ -285,3 +292,13 @@ family's own settings. It would close the known gap that "Prefer not to say" sti
 - App Review Guidelines (1.4.1, 2.3.6, 2.3.8, 2.5.2, 5.1.1, 5.1.2, 5.1.3, 5.1.4) — https://developer.apple.com/app-store/review/guidelines/
 - Required-reason API codes — https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitypereasons
 - Open-Meteo terms and licence — https://open-meteo.com/en/terms and https://open-meteo.com/en/licence
+
+Read on 28 September 2026 for the privacy policy (stage D1):
+
+- Cloudflare Workers AI data usage — https://developers.cloudflare.com/workers-ai/platform/data-usage/
+- Cloudflare privacy policy (UK Extension to the EU–US Data Privacy Framework) — https://www.cloudflare.com/privacypolicy/
+- Strava privacy policy (effective 1 January 2026) — https://www.strava.com/legal/privacy
+- Mapbox privacy policy (IP addresses kept 30 days; UK Extension) — https://www.mapbox.com/legal/privacy
+- CARTO privacy notice — https://carto.com/privacy
+- OpenStreetMap Foundation privacy policy — https://osmfoundation.org/wiki/Privacy_Policy
+- Apple's Licensed Application End User License Agreement — https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

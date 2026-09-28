@@ -127,5 +127,5 @@ export { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "
 // to the app needs no edit there and cannot slip past the ceiling either.
 export { isYouthAge, youthLimitsFor, youthGoalsFrom, clampYouthDays, YOUTH_MIN_AGE, YOUTH_MAX_AGE,
   ageAnswer, stravaAllowedAt, stravaHeartRateAllowedAt, STRAVA_MIN_AGE, STRAVA_HEART_RATE_MIN_AGE,
-  highPrivacyByDefault } from "../src/domain/youth.ts";
+  highPrivacyByDefault, ownConsentAllowedAt, OWN_CONSENT_MIN_AGE } from "../src/domain/youth.ts";
 export type { YouthLimits } from "../src/domain/youth.ts";

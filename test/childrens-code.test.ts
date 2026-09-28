@@ -25,14 +25,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { highPrivacyByDefault, isYouthAge } from "../src/domain/youth.ts";
+import { highPrivacyByDefault, isYouthAge, ownConsentAllowedAt } from "../src/domain/youth.ts";
 import { personalPackSlug } from "../src/live/coach-prompts.ts";
 
 const PAGE = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 const SW = readFileSync(new URL("../docs/sw.js", import.meta.url), "utf8");
 const PLIST = readFileSync(new URL("../ios/InteRun-Info.plist", import.meta.url), "utf8");
 const DPIA = readFileSync(new URL("../DPIA.md", import.meta.url), "utf8");
-const RC = { highPrivacyByDefault };
+const RC = { highPrivacyByDefault, ownConsentAllowedAt };
 
 /** A top-level function's source out of the built page, brace-matched. */
 function fnOf(name: string): string {
@@ -100,7 +100,7 @@ test("the high-privacy defaults cover under-18s AND anybody who has not given an
 function defaults(age: unknown, stored: Record<string, string> = {}) {
   const localStorage = fakeStorage(stored);
   const api = lift(
-    ["privDefaultOn", "alfieCfg", "alfieSaveCfg", "alfieOnline", "alfieSetOnline", "placeNamesOn", "placeNamesSet", "healthSyncOn"],
+    ["privDefaultOn", "ownConsentOk", "alfieCfg", "alfieSaveCfg", "alfieOnline", "alfieSetOnline", "placeNamesOn", "placeNamesSet", "healthSyncOn"],
     ["PLACE_KEY", "HEALTH_KEY"],
     "{ alfieOnline, placeNamesOn, healthSyncOn }",
     { RC, profile: { age }, localStorage, healthAvailable: () => true },
@@ -147,7 +147,7 @@ function alfie(age: unknown, stored: Record<string, string> = {}, fetchImpl?: (u
     return fetchImpl ? fetchImpl(u, o) : Promise.resolve({ ok: true, json: () => Promise.resolve({ answer: "Here is your plan." }) });
   };
   const api = lift(
-    ["alfieNorm", "alfieRedFlags", "alfieCfg", "alfieSaveCfg", "alfieBase", "privDefaultOn", "alfieOnline", "alfieSetOnline",
+    ["alfieNorm", "alfieRedFlags", "alfieCfg", "alfieSaveCfg", "alfieBase", "privDefaultOn", "ownConsentOk", "alfieOnline", "alfieSetOnline",
       "alfieNeedsAsk", "alfieHistory", "alfieRemote", "alfieMaySend", "alfieAsk", "openAlfieOnlineSheet", "alfieToggleOnline"],
     // ⚠️ A blank proxy in storage does NOT remove the server -- alfieBase falls back to ALFIE_SERVER -- so
     // "no server" has to replace that constant rather than the stored setting.
@@ -265,7 +265,7 @@ test("turning online answers ON always goes through the sheet; turning them OFF 
     const localStorage = fakeStorage(stored);
     let sheet = 0, renders = 0;
     const api = lift(
-      ["privDefaultOn", "alfieCfg", "alfieSaveCfg", "alfieOnline", "alfieSetOnline", "alfieToggleOnline"], [],
+      ["privDefaultOn", "ownConsentOk", "alfieCfg", "alfieSaveCfg", "alfieOnline", "alfieSetOnline", "alfieToggleOnline"], [],
       "{ alfieToggleOnline, alfieOnline }",
       { RC, profile: { age }, localStorage, openAlfieOnlineSheet: () => { sheet++; }, render: () => { renders++; } },
     );
@@ -303,11 +303,13 @@ test("turning online answers ON always goes through the sheet; turning them OFF 
 test("Alfie's own words follow the switch, and the old false sentence is gone", () => {
   function words(online: boolean) {
     return lift(["alfieLimits", "alfieOnlineRow"], [], "alfieLimits() + alfieOnlineRow()",
-      { alfieOnline: () => online, alfieBase: () => "https://server.test", ALFIE_MSGS: [{ role: "user", text: "hi" }], esc: (x: unknown) => String(x) });
+      { alfieOnline: () => online, ownConsentOk: () => true, alfieBase: () => "https://server.test", ALFIE_MSGS: [{ role: "user", text: "hi" }], esc: (x: unknown) => String(x) });
   }
   const off = words(false), on = words(true);
   assert.ok(off.includes("Nothing you type leaves it") && !off.includes("Online answers are on"), "off, it says the words stay on the phone");
-  assert.ok(on.includes("Online answers are on") && on.includes("pain or feeling unwell"), "on, it says what is sent and what never is");
+  // ⚠️ D1 (28 Sept 2026): it used to promise that "anything about pain or feeling unwell" stays on the phone,
+  // and only the serious warning signs alfieRedFlags knows do. "My knee hurts" is sent when this is on.
+  assert.ok(on.includes("Online answers are on") && on.includes("Serious warning signs"), "on, it says what is sent and what never is");
   assert.ok(off.includes('id="alfClear"'), "a conversation can be cleared");
   assert.ok(!PAGE.includes("Nothing you type is sent anywhere"), "the sentence that was false for everybody is gone");
 });
@@ -316,7 +318,7 @@ test("a run's town is looked up only when the setting allows it, and from a loca
   function lookup(age: unknown) {
     const urls: string[] = [];
     const run: any = { id: "r1", route: [{ lat: 51.507351, lng: -0.127758 }, { lat: 51.508912, lng: -0.125511 }, { lat: 51.51034, lng: -0.1231 }] };
-    lift(["privDefaultOn", "placeNamesOn", "runPlaceLookup"], ["PLACE_KEY"], "runPlaceLookup(run)", {
+    lift(["privDefaultOn", "ownConsentOk", "placeNamesOn", "runPlaceLookup"], ["PLACE_KEY"], "runPlaceLookup(run)", {
       RC, profile: { age }, localStorage: fakeStorage(), run, state: { screen: null },
       saveRuns: () => {}, render: () => {}, fetch: (u: string) => { urls.push(u); return Promise.resolve({ ok: false }); },
     });
@@ -409,7 +411,7 @@ test("the Safety page and Apps & devices no longer claim what stopped being true
 test("Your data shows each switch with the runner's real default, and every control is wired", () => {
   function card(age: unknown) {
     return lift(
-      ["privDefaultOn", "alfieCfg", "alfieOnline", "placeNamesOn", "healthSyncOn", "privacyFlowShown", "privacyCardHtml"],
+      ["privDefaultOn", "ownConsentOk", "alfieCfg", "alfieOnline", "placeNamesOn", "healthSyncOn", "privacyFlowShown", "privacyCardHtml"],
       ["PRIVACY_FLOWS", "PLACE_KEY", "HEALTH_KEY"], "privacyCardHtml()",
       {
         RC, profile: { age }, localStorage: fakeStorage(), healthAvailable: () => true, inNativeApp: () => true,

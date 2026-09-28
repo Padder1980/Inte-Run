@@ -548,6 +548,15 @@ runner's answers, which is the service they chose and is disclosed as such in `D
 4. **App Store**: an age rating that no longer says adults-only, and an App Privacy label that matches.
    [Done in Y6: `APPSTORE.md`, section 5.11. The one decision left is the owner's - see the no-12+ note.]
 5. **Terms**: under-18s cannot form a binding contract; the terms need a parent/guardian clause.
+   [Done in D1, 28 Sept 2026: `docs/terms/` section 2 asks an under-18 to read the terms (or the simple
+   version) with a parent, carer or another adult they trust and make sure they are happy, and tells a
+   parent or carer the decision and the supervision are theirs. **No minimum age** — "designed for runners
+   aged 12 and up", the owner's ruling — because a minimum above the calculated rating forces Apple's
+   rating up to 13+ (APPSTORE.md 1.3). The privacy information a 12-year-old can read is `docs/simple/`.]
+6. **UK GDPR Article 8, found at D1.** Where consent is the basis for an online service offered to a
+   child, the child must be at least 13 (Data Protection Act 2018, section 9). A 12-year-old could switch
+   on Ask Alfie's online answers and town names alone; both now stay off until 13, like Strava
+   (`OWN_CONSENT_MIN_AGE` in `src/domain/youth.ts`).
 
 ## 7. What is honestly uncertain
 

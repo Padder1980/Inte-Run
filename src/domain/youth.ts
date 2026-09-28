@@ -336,6 +336,31 @@ export function stravaHeartRateAllowedAt(age: unknown): boolean {
 }
 
 /**
+ * The youngest runner whose own "yes" can send something online. UK law, not a coaching threshold:
+ * UK GDPR Article 8(1), with the age set by the Data Protection Act 2018, section 9 -- where consent is
+ * the basis for an online service offered to a child, the child must be at least 13, and below that
+ * the consent must be "given or authorised by the holder of parental responsibility".
+ *
+ * ⚠️ THE OWNER'S RULING, 28 SEPTEMBER 2026 (stage D1): the two extras that run on the runner's own
+ * permission -- Ask Alfie's online answers and town names for runs -- stay OFF UNTIL 13, the same way
+ * Strava already does, rather than asking a 12-year-old to tap "my parent says yes" on their own
+ * phone. So under 13 this is a lock, where highPrivacyByDefault is only ever a default, and the
+ * difference is the law: a default is the runner's to change, and a 12-year-old's permission is not
+ * permission at all.
+ * ⚠️ ABSENT MEANS ALLOWED, exactly as stravaAllowedAt treats it, and for the same reason. An unknown
+ * age still starts on the private settings (highPrivacyByDefault), so nothing is sent unless they
+ * switch it on themselves. The hole is the one this module already records: a 12-year-old who chose
+ * "Prefer not to say".
+ */
+export const OWN_CONSENT_MIN_AGE = 13;
+
+/** May this runner switch on something that sends their information online on their own say-so? */
+export function ownConsentAllowedAt(age: unknown): boolean {
+  const a = ageAnswer(age);
+  return a == null || a >= OWN_CONSENT_MIN_AGE;
+}
+
+/**
  * Who starts on the Children's Code's high-privacy settings. The ICO's standard 7, verbatim:
  * "Settings must be 'high privacy' by default (unless you can demonstrate a compelling reason for a
  * different default setting, taking account of the best interests of the child)."

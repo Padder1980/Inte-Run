@@ -5,7 +5,8 @@
  * Neither can hold a credential. This Worker holds them instead, and it now does two unrelated jobs
  * for that one reason:
  *
- *   POST /            → Ask Alfie's optional "real AI" brain (holds the Anthropic API key)
+ *   POST /            → Ask Alfie's online answers: Cloudflare's own AI by default (BRAIN below), which
+ *                       needs no key; an Anthropic key is held only if BRAIN is switched to "claude"
  *   /strava/*         → the Strava token holder (holds the Strava client secret + the runner's tokens)
  *
  * ⚠️ THE ROOT PATH IS ALFIE'S AND MUST STAY THAT WAY. The app POSTs to the bare proxy URL it was

@@ -288,7 +288,8 @@ test("⚠️ a rotated refresh token is written back", () => {
   const at = src.indexOf("async function accessToken(");
   const body = src.slice(at, src.indexOf("\nconst sleep", at));
   assert.match(body, /rec\.refresh = String\(tok\.refresh_token \|\| rec\.refresh\)/, "the new refresh token is dropped");
-  assert.match(body, /put\("tok:" \+ hash, JSON\.stringify\(rec\)\)/, "the refreshed record is never saved");
+  // ⚠️ AND SAVED WITH ITS EXPIRY (D1): the year an unused connection lasts restarts here.
+  assert.match(body, /put\("tok:" \+ hash, JSON\.stringify\(rec\), \{ expirationTtl: CONNECTION_TTL_SECONDS \}\)/, "the refreshed record is never saved, or saved with no expiry");
 });
 
 test("⚠️ no route ever hands a Strava token to the client", () => {

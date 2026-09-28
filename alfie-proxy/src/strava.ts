@@ -47,6 +47,19 @@ const API = "https://www.strava.com/api/v3";
 const SCOPE = "activity:write";
 
 /**
+ * How long an unused Strava connection is kept: a year.
+ * ⚠️ BEFORE D1 (28 Sept 2026) IT WAS KEPT FOR EVER. A runner who deleted the app without pressing
+ * Disconnect left their tokens here with no end date, filed under the hash of a device key nobody held
+ * any more -- so not even the owner could find the record to delete it when asked. UK GDPR's storage
+ * limitation principle (Article 5(1)(e)) wants an end, and the privacy policy now states this one.
+ * ⚠️ EVERY WRITE OF THE RECORD SETS IT, so the year restarts whenever the record is rewritten: on
+ * connecting, and at each token refresh -- the first use of the connection after its six-hour access
+ * token runs out. A year without sending anything to Strava and the connection deletes itself; the
+ * runner connects again with one tap. KV's expirationTtl is in seconds.
+ */
+export const CONNECTION_TTL_SECONDS = 365 * 24 * 60 * 60;
+
+/**
  * ⚠️ ONE LIST, READ BY BOTH UPLOAD SHAPES, SO AN UNRECOGNISED VALUE IS REFUSED RATHER THAN SILENTLY
  * FILED AS A RUN. Every run this Worker has ever uploaded left this field unset, so "absent means
  * Run" is not a new default, it is the behaviour every existing caller already gets. What changes is
@@ -221,7 +234,7 @@ async function callback(url: URL, env: StravaEnv): Promise<Response> {
   if (!record.access || !record.refresh) {
     return resultPage("Strava could not confirm it", "The reply from Strava was incomplete. Nothing has been saved.", false);
   }
-  await env.STRAVA!.put("tok:" + hash, JSON.stringify(record));
+  await env.STRAVA!.put("tok:" + hash, JSON.stringify(record), { expirationTtl: CONNECTION_TTL_SECONDS });
 
   return resultPage("Strava connected",
     "You can close this and go back to Inte-Run. Your runs can now be sent to Strava.", true);
@@ -255,7 +268,7 @@ async function accessToken(env: StravaEnv, hash: string): Promise<Stored | null>
   // A record written before Y6 still carries the athlete id nothing reads; it goes the first time the
   // record is rewritten anyway, which is here.
   delete (rec as Stored & { athleteId?: unknown }).athleteId;
-  await env.STRAVA!.put("tok:" + hash, JSON.stringify(rec));
+  await env.STRAVA!.put("tok:" + hash, JSON.stringify(rec), { expirationTtl: CONNECTION_TTL_SECONDS });
   return rec;
 }
 

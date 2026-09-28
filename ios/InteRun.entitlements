@@ -2,8 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Needed only to call HKHealthStore.startWatchApp(with:), the one API that can wake the
-	     watchOS app from the phone. The phone reads and writes no health data of its own. -->
+	<!-- Needed to call HKHealthStore.startWatchApp(with:), the one API that can wake the watchOS app
+	     from the phone, and to save phone-recorded runs to Health (HealthKitService.swift writes the
+	     workout, its route, distance, energy and heart rate). The phone reads no health data itself. -->
 	<key>com.apple.developer.healthkit</key>
 	<true/>
 	<key>com.apple.developer.healthkit.access</key>

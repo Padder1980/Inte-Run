@@ -1,80 +1,55 @@
-# Alfie proxy — optional "real AI" brain for Ask Alfie
+# Inte-Run's server — Ask Alfie's online answers, and Strava
 
-**You do not need this.** Ask Alfie already works in the app with on-device answers: it reads your
-real plan (next session, paces, phase, race date) and covers the running fundamentals. That path is
-free, private, offline, and needs no key.
+One Cloudflare Worker with two jobs. The app has this Worker's address built in (`ALFIE_SERVER` and
+`STRAVA_SERVER` in `web/app.ts`), so nothing needs pasting on a phone.
 
-Deploy this only when you want Alfie to handle **open-ended** conversation — anything outside the
-authored topics, and proper follow-up questions.
+⚠️ **What this Worker receives and keeps is published in the privacy policy** (`docs/privacy/`), and
+`test/privacy-copy.test.ts` holds the two together. Change what it stores or where it sends anything,
+and the policy has to change in the same commit, or the suite fails.
 
-## Why a proxy at all?
+## Ask Alfie's online answers (`POST /`)
 
-InteRun is a **public** static site on GitHub Pages. An Anthropic API key placed in it would be
-readable by anyone viewing source, and they could spend your money. So the key lives here instead,
-in a Cloudflare Worker you own. The app calls the Worker; the Worker calls Claude.
+Ask Alfie answers on the phone by default. **Online answers are off until the runner says yes** (at
+every age: App Review guideline 5.1.2(i)), and a runner under 13 cannot switch them on at all. Questions
+that mention a serious warning sign (chest pain, fainting, thoughts of self-harm and similar) are
+answered on the phone and never sent, whatever the switch says.
 
 ```
-phone (public page)  →  your Worker (holds the key)  →  Claude API
+phone  →  this Worker  →  Cloudflare Workers AI (env.AI)
 ```
 
-## Deploy (about 10 minutes)
+- **Brain:** `BRAIN = "cloudflare"` in `src/worker.ts`, model `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
+  (`CF_MODEL`), replies capped at 700 tokens. It runs on the Workers Free plan's daily allowance: no key,
+  no card, and past the allowance requests simply fail and the app answers on the phone instead.
+  Switching `BRAIN` to `"claude"` (model `claude-opus-5`) needs `npx wrangler secret put ANTHROPIC_API_KEY`
+  and a billing account, and every sentence that names the AI company has to change with it.
+- **What arrives:** the question, a short plan summary (goal, race date and target, week and phase, the
+  week's distance, easy/threshold/goal paces, today's session, experience, days per week — no name, age
+  or location), up to eight earlier turns that already reached this Worker, and a random per-install id.
+- **What is kept:** nothing of the question or the answer. The per-install id is only ever stored as a
+  SHA-256 hash, inside rate-limit counters that delete themselves (`expirationTtl` 3,900 s for the hourly
+  count, 90,000 s for the daily ones).
+- **Limits:** a burst guard of 12 a minute per install (Cloudflare's own rate-limit binding), then 15 an
+  hour and 40 a day per install, and 200 a day for the whole app (KV counters, approximate by design).
+  `ALLOWED_ORIGINS` is not a lock: the native app's `interun://app` origin and requests with no origin are
+  always allowed, and curl ignores CORS. The limits are what cap use.
 
-Prerequisites: a Cloudflare account (the free tier is fine) and an Anthropic API key with billing.
+A `GET /` reports the brain and whether the burst guard and the counter store are bound, without
+spending a question.
+
+## Deploy
 
 ```bash
 cd alfie-proxy
-npm install
-npx wrangler login
-npx wrangler secret put ANTHROPIC_API_KEY     # paste your key when prompted — never commit it
-npx wrangler deploy
+npx wrangler login          # opens a browser; click Allow within about two minutes
+CI=1 WRANGLER_SEND_METRICS=false npx --no-install wrangler deploy
 ```
-
-Deploy prints a URL like `https://alfie-proxy.<your-subdomain>.workers.dev`.
-
-**Lock it down to your site** (otherwise anyone can use your key via your Worker). Set the allowed
-origins, then redeploy:
-
-```bash
-npx wrangler secret put ALLOWED_ORIGINS       # e.g. https://padder1980.github.io
-```
-
-## Point the app at it
-
-In the app, open the browser console on the deployed site and run:
-
-```js
-localStorage.setItem('interun_alfie_v1', JSON.stringify({ proxy: 'https://alfie-proxy.<you>.workers.dev' }))
-```
-
-Reload. Ask Alfie now routes questions to Claude, and **falls back to the on-device answer** if the
-Worker is unreachable, errors, or you're offline — so Alfie always replies.
-
-To go back to on-device only: `localStorage.removeItem('interun_alfie_v1')`.
-
-## What it sends
-
-The question, a short conversation history, and a small JSON summary of your plan (goal, race date,
-current week/phase, your paces, today's session). No name, no location, no health check-in data.
-
-## Cost
-
-Billed per message against your own Anthropic account. Answers are capped at ~1024 output tokens and
-run at `effort: "low"` to stay quick and cheap on a phone. The system prompt is cached, so repeat
-questions in a session cost less. Watch your usage in the Anthropic console.
-
-## Notes
-
-- Model: `claude-opus-4-8`.
-- Safety: the system prompt routes pain/injury/health and crisis topics to professional help rather
-  than coaching them. The **app's own** safety routing runs first and independently of this proxy —
-  red-flag symptoms are handled on-device by the training engine's escalation screen and never
-  depend on the network.
 
 ---
 
 # Strava — the same Worker, a second job
 
-This Worker also holds the **Strava** connection, for the same reason it holds the Anthropic key: the
+This Worker also holds the **Strava** connection, because the
 Strava **client secret** authorises Inte-Run to act on a runner's account, so it behaves like a
 password. It cannot live in a public page, and it cannot ship inside the native app either — anyone can
 read the strings out of an installed app.
@@ -84,7 +59,10 @@ phone  →  your Worker (holds the client secret AND the runner's tokens)  →  
 ```
 
 **The app never sees a Strava token.** The page generates a random 32-byte *device key*, the Worker maps
-that key to the tokens in KV, and the tokens never cross back. A leaked device key is revocable and
+that key to the tokens in KV, and the tokens never cross back. The record (`tok:<sha256("interun-strava:" + key)>`)
+holds the tokens, the granted scope and the account's first name, and nothing else since Y6. It deletes
+itself a year after it was last written (`CONNECTION_TTL_SECONDS`), and Disconnect deletes it at once and
+tells Strava to revoke access. A leaked device key is revocable and
 useless against Strava directly; a leaked refresh token is neither.
 
 The two halves are independent — Alfie works with no Strava credentials set, and Strava works with no
@@ -114,7 +92,8 @@ already connected.
 
 **Steps 3 and 4** are the two the script prints for you: paste the Worker's **host** into Strava's
 *Authorization Callback Domain* at <https://www.strava.com/settings/api>, and paste the Worker's
-**full URL** into the app at *Support › Apps & devices › Strava*. Then tap **Connect to Strava**.
+**full URL** into `STRAVA_SERVER` in `web/app.ts` if it has changed (the paste box in *Support › Apps &
+devices › Strava* shows only in developer mode). Then tap **Connect to Strava**.
 
 ⚠️ The callback domain is the **host only** — no `https://`, no path, no trailing slash. Strava
 refuses any redirect outside it and the error it returns does not say so clearly.

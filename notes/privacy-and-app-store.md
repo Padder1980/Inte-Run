@@ -299,3 +299,131 @@ The privacy policy and terms (**D1 — now the one thing blocking a submission**
 to a real email address (the same address can be `PRIVACY_CONTACT`) · the rating decision · an Xcode
 build and upload (the manifests and the location message reach Apple only in a build) · `wrangler deploy`
 for the athlete-number removal · `DPIA.md` sign-off · the clinical review of every threshold.
+
+## ✅ D1 — THE PRIVACY POLICY, THE TERMS AND A VERSION A 12-YEAR-OLD CAN READ (owner, 2026-09-28)
+
+The owner's brief: *"the privacy policy and terms for Inte-Run, plus a version a 12-year-old can read ...
+Everything the app sends off the phone is listed in PRIVACY_FLOWS in web/app.ts, so the policy must match
+that list exactly."* Contact for privacy AND support: **adam.palmer86@gmail.com** (now `PRIVACY_CONTACT`).
+Four hand-written pages under `docs/`, served by Pages, **left out of the iPhone bundle on purpose** so a
+runner always reads the current version: `privacy/`, `terms/`, `simple/` (the version for a 12-year-old,
+which covers the rules too) and `support/` (Apple's Support URL), sharing `docs/legal.css`. Suite 1793 →
+**1813**; `test/privacy-copy.test.ts` (12) and `test/own-consent-age.test.ts` (4) are new; **30 deliberate
+re-breaks, all 30 caught**, each on a copy restored byte-identical (the harness asserts the hash).
+
+### The owner's rulings, one question at a time
+
+1. **Who is responsible:** "Adam Palmer, a one-person developer in England" — the controller. So the terms
+   are under the law of England and Wales, with the usual right of a consumer in Scotland or Northern
+   Ireland to use their own courts.
+2. **Age wording: "designed for runners aged 12 and up", and NO minimum age** (APPSTORE.md 1.3's
+   recommendation). A minimum above the calculated rating forces Apple's rating up, and there is no 12+
+   rating, so "you must be 12" would lock 12-year-olds out. The test fails on a minimum-age sentence in the
+   terms or the simple version. **Accept the calculated rating; do not override it.**
+3. **Under 13: Ask Alfie's online answers and town names are OFF, like Strava** — a lock, not a default.
+   See the first finding.
+4. **The pain promise: fix the words**, not widen the screen. See the second finding.
+5. **Deploy the Worker now** — done (version `670df6ba`, 2026-09-28 16:09 UTC; the probe answered
+   `brain: cloudflare`, `alfie: ready`, `burstGuard: bound`, `budgetStore: bound`).
+
+### ⚠️⚠️ WHAT WRITING IT HONESTLY FOUND
+
+1. ⚠️⚠️ **UK GDPR ARTICLE 8 WAS MISSING FROM THE DPIA, AND A 12-YEAR-OLD COULD CONSENT ALONE.** Where
+   consent is the basis for an online service offered to a child, the child must be at least 13 (Data
+   Protection Act 2018, section 9); under 13 a parent must give or authorise it. The DPIA's own lawful
+   basis for the optional flows was "the runner's own choice" — consent — and a 12-year-old could switch on
+   Ask Alfie's online answers and town names by themselves. `ownConsentAllowedAt` / `OWN_CONSENT_MIN_AGE`
+   in `src/domain/youth.ts`; `ownConsentOk()` in the app, read by **the getters themselves**
+   (`alfieOnline`, `placeNamesOn`) so a yes stored before the age was given sends nothing either;
+   `alfieToggleOnline` never opens the sheet under 13; Your data and Alfie's own row show "13 and over"
+   where the switches were (a switch that cannot turn on is the inert control this app refuses).
+   ⚠️ **Absent means allowed, like `stravaAllowedAt`** — the recorded hole is "Prefer not to say".
+   ⚠️ **Town names start ON for adults, so consent cannot be their basis for adults** (consent must be
+   opted into): the policy states legitimate interests for them. Flagged for the legal read.
+2. ⚠️⚠️ **"ANYTHING ABOUT PAIN OR FEELING UNWELL STAYS ON YOUR PHONE" WAS FALSE — IN FIVE PLACES AND IN THE
+   APP STORE REVIEW NOTES.** `alfieRedFlags` knows a fixed list of warning signs (`ALFIE_FLAGS`: chest pain,
+   fainting, palpitations, breathlessness, heat illness, neurological signs, bone pain, worsening pain,
+   eating disorders, lost periods, self-harm and low mood). "My knee hurts" is not on it, and nor is
+   Alfie's own suggestion chip "Should I run if I'm sore?" — with online answers on, both are sent. Now:
+   *"serious warning signs, like chest pain or fainting"*, in `ALFIE_ONLINE_EXPLAIN`, `alfieLimits`,
+   `alfieOnlineRow`, `safetyView`, `PRIVACY_FLOWS` and APPSTORE.md section 5. The test forbids the old
+   phrase in the app and the pages, and checks the two examples really are caught as a phone types them.
+3. ⚠️ **STRAVA CONNECTIONS WERE KEPT FOR EVER — AND ONE LEFT BY A DELETED APP COULD NOT EVEN BE FOUND.**
+   The `tok:` record had no expiry, and it is filed under the hash of a device key only the phone held, so
+   an erasure request by email could not be honoured. `CONNECTION_TTL_SECONDS` (a year) on **every** write
+   of the record: at connecting, and at each token refresh (the first use after the six-hour access token
+   runs out). ⚠️ Records written before the deploy carry no expiry until their next refresh.
+4. ⚠️ **TWO "INTE-RUN HAS NO SERVER" SENTENCES SURVIVED Y5**: the backup card in `dataView` ("nothing is
+   uploaded anywhere, because Inte-Run has no server") and "Your why" in `whyView`. Both corrected; the
+   why answers also go to the watch, and now say so. Also `commPeopleHtml` ("a server Inte-Run does not
+   have" → accounts) and the watch mirror card ("stays on your wrist" — it comes to the phone at the end).
+5. ⚠️ **DELETE EVERYTHING LEAVES THE RUNNER'S FIRST NAME ON THE WATCH.** The reload re-syncs the watch with
+   an empty profile, and `SessionStore.apply` clears why answers, max HR and the sessions when they are
+   absent — but writes the name only when present, so the old one stays. The card and the policy now say
+   so. **For another day:** clear it when absent, as the same function's own comment says it should (a
+   watch build). The phone also keeps `interun_watch_last_payload` (replaced by that same sync),
+   `interun_pending_watch_runs` (normally empty) and `InteRunHealthWritten` (run ids only).
+6. ⚠️ **AN EMAIL LINK IN THE iPHONE APP MAY HAVE DONE NOTHING.** `WebHost` opens a tapped link only if
+   `canOpenURL` says yes, and that answers no for any scheme missing from `LSApplicationQueriesSchemes` —
+   which listed `sms` but not `mailto`. Added (needs a build); the address is also printed as text.
+7. **The DPIA's inventory was short**: the profile photo, the "why" answers (which can name a person),
+   "did anything hurt", a measured max HR, and the watch's copy of the first name, max HR and why answers.
+   All in the DPIA and the policy now. Confirmed NOT stored: menstrual status and every check-in answer.
+8. Also corrected: the camera permission string (Take Photo also serves Inte-Club and the profile
+   picture — needs a build); the entitlements comment ("the phone reads and writes no health data" — it
+   writes workouts, routes and heart rate); `alfie-proxy/README.md`, whose Alfie half still described a
+   Claude proxy with a pasted address (`claude-opus-4-8`, "the Worker calls Claude"); two stale comments
+   in `web/app.ts` and one in `worker.ts`.
+
+### What the test holds (derived, never typed)
+
+- **The flows:** `data-flow` sections in `privacy/` and `simple/` are exactly `PRIVACY_FLOWS`, in order.
+- **The addresses:** each flow's section names its hosts as `<span class="host">`; the Strava section names
+  what the Worker reaches (`www.strava.com`, swept from `alfie-proxy/src/`); the policy names no other.
+- **The AI:** the company from `BRAIN`, the model from `CF_MODEL` (`llama-3.3` → "Llama 3.3").
+- **The ages:** every `data-age` equals the engine constant; `YOUTH_MAX_AGE + 1 === 18` and
+  `YOUTH_MIN_AGE === OWN_CONSENT_MIN_AGE - 1` guard the words used unmarked ("under 18", "if you are 12");
+  the age picker's lowest option equals `YOUTH_MIN_AGE`.
+- **The numbers:** runs kept (`saveRuns`' slice, every mention), Alfie messages kept, history sent (the
+  app's slice AND the Worker's), the year, the ten-minute link, the counters' lifetimes, two decimals.
+- **The address, the date, the links:** every `mailto:` equals `PRIVACY_CONTACT`; each page's
+  `data-updated` date equals `LEGAL_UPDATED` in words and machine date; each `LEGAL_PAGES` path exists and
+  opens outside the app; the Support row, the Safety page and Your data all carry them.
+- **The bundle and the offline copy:** every page is excluded in `make-project.py` AND in the regenerated
+  `project.pbxproj`; ⚠️ **every `docs/sw.js` ASSET must exist, because `c.addAll()` fails whole on one
+  missing file and the web version's offline copy then never installs** — nothing guarded that before.
+- **The terms:** `NOT_A_DIAGNOSIS` word for word; no minimum age; the parent or carer clause.
+- **The reading level:** Flesch-Kincaid grade of `simple/` ≤ 6 and at least 1.5 below the full policy.
+  Measured: **simple 2.6** (reading ease 90), privacy 5.1, terms 5.8. Headings, list items and table cells
+  end a sentence, as they do for a reader — which is also why the full policy measures lower than its prose.
+- **The promise register (`CLAIMS`):** every runtime string in the app that promises something stays on
+  the phone, as `[enclosing function, exact sentence]`. 28 today, each read against the code and true. A
+  new promise fails until registered; a registered one that disappears fails too. Error messages
+  (`new Error("…")`) are skipped — no runner reads them.
+
+### Traps this stage paid for
+
+- ⚠️ **`.lg-list` WAS ALREADY THE LOGBOOK'S CLASS.** Borrowing the short prefix indented the new rows by
+  the logbook's padding; renamed `legal-*`. Grep a class before inventing one.
+- ⚠️ **THE WEB VERSION'S SERVICE WORKER CACHES `legal.css`**, cache-first like every asset, and the
+  browser's HTTP cache held it too: two contrast measurements read the OLD colours. Unregister the worker,
+  clear the caches, then `fetch(url, {cache: "reload"})` before believing a stylesheet change.
+- ⚠️ **A HAND-MADE `rc_profile_v1` WAS DISCARDED**: the page booted on `DEFAULT_PROFILE` and the age read as
+  absent, so the first "under 13" screenshot showed the switches. Set `profile.age` on the live page.
+- ⚠️ **`python3 ios/make-project.py` REWRITES THE WHOLE `project.pbxproj`** (Xcode had reflowed the
+  committed one, and `CURRENT_PROJECT_VERSION` is the commit count: 495 → 558). Same 57 objects and team;
+  compare `sort`ed copies before believing a 200-line diff is only formatting.
+- Contrast measured on the rendered pages: `--ink-faint` 4.37 and `--accent` 4.49 in light mode, both
+  under 4.5; darkened. **Lowest now 5.61 light, 6.44 dark.** No page scrolls sideways at 375 px.
+- ⚠️ `hostsIn` in this test and in `childrens-code.test.ts` are separate sweeps with different jobs: that
+  one proves the TABLE names every address the app reaches; this one proves the PAGE names the table.
+
+### Still the owner's
+
+- **A data-protection read of the four pages and `DPIA.md` before external testers** (PLAN.md D1.E) — the
+  lawful-basis table (section 8 of the policy), town names on legitimate interests, the international
+  transfers section, and whether an ICO data protection fee is due.
+- **The DPIA sign-off.**
+- **Paste the URLs into App Store Connect**: Privacy Policy `…/Inte-Run/privacy/`, Support `…/support/`.
+- **An Xcode build** for the camera wording, the `mailto` scheme and everything Y6 left waiting.
+- For another day: the watch keeping the first name; "Prefer not to say" still passing both age gates.

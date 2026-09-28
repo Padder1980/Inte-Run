@@ -1,0 +1,108 @@
+/*
+ * The look shared by Inte-Run's public pages: the privacy policy, the terms, the simple version and
+ * support. Hand-written, like the Road Map, whose colours these are. No web fonts and no external
+ * files: the pages must open quickly on a phone and still read when saved or printed.
+ * ⚠️ These pages are NOT inside the iPhone app (ios/make-project.py excludes them). The app opens them
+ * here, on GitHub Pages, so a runner always reads the current version.
+ */
+:root {
+  --bg: #eef1f1; --surface: #ffffff; --surface-2: #f6f8f8; --line: #dbe1e0;
+  --ink: #14201b; --ink-soft: #435049; --ink-faint: #56625b;
+  --accent: #09695f; --accent-soft: #e2f1ee; --warn: #9a4a06; --warn-soft: #fbefe2;
+  --shadow: 0 1px 2px rgba(20,32,27,.05), 0 10px 28px -14px rgba(20,32,27,.16);
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a100e; --surface: #151e1b; --surface-2: #1b2622; --line: #2a3832;
+    --ink: #e7eeea; --ink-soft: #b3c0b9; --ink-faint: #8d9c94;
+    --accent: #3cc2b1; --accent-soft: #11302b; --warn: #f0a868; --warn-soft: #33230f;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.5);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; }
+body { margin: 0; font-family: var(--sans); font-size: 17px; line-height: 1.6; background: var(--bg); color: var(--ink);
+  padding-bottom: calc(40px + env(safe-area-inset-bottom)); overflow-wrap: break-word; }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--surface); color: var(--ink); padding: 8px 12px; border-radius: 8px; z-index: 20; }
+.skip:focus { left: 12px; }
+
+header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  padding-top: env(safe-area-inset-top); }
+.head-in { display: flex; align-items: center; gap: 11px; padding: 11px 16px; max-width: 720px; margin: 0 auto; }
+.head-in a { display: flex; align-items: center; gap: 11px; color: inherit; text-decoration: none; min-height: 44px; }
+.head-in svg { width: 36px; height: 36px; flex: none; }
+.head-t b { display: block; font-size: 16px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+.head-t span { display: block; font-size: 13px; color: var(--ink-faint); line-height: 1.3; }
+
+main { display: block; max-width: 720px; margin: 0 auto; padding: 0 16px; }
+h1 { margin: 26px 0 6px; font-size: 32px; font-weight: 800; letter-spacing: -.025em; line-height: 1.15; }
+h2 { margin: 38px 0 10px; font-size: 23px; font-weight: 800; letter-spacing: -.015em; line-height: 1.25; }
+h3 { margin: 24px 0 6px; font-size: 18.5px; font-weight: 750; line-height: 1.3; }
+p, ul, ol { margin: 0 0 14px; }
+ul, ol { padding-left: 24px; }
+li { margin: 5px 0; }
+a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+strong, b { font-weight: 700; }
+code, .host { font-family: var(--mono); font-size: .86em; background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 5px; padding: 0 5px; white-space: nowrap; }
+.meta { color: var(--ink-faint); font-size: 15px; margin: 0 0 18px; }
+
+/* The one box at the top of each page: the short version, and where the other versions are. */
+.lead { margin: 18px 0 8px; padding: 16px 18px; background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 16px; }
+.lead > b:first-child { display: block; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.lead ul { margin-bottom: 8px; }
+.lead p:last-child, .lead ul:last-child { margin-bottom: 0; }
+
+.card { margin: 14px 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.card > h3:first-child { margin-top: 0; }
+.card p:last-child, .card ul:last-child { margin-bottom: 0; }
+.note { margin: 14px 0; padding: 12px 16px; border-left: 4px solid var(--warn); background: var(--warn-soft); border-radius: 0 12px 12px 0; }
+.note p:last-child { margin-bottom: 0; }
+
+/* One flow off the phone: a card with its facts in a small two-column list. */
+.facts { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 15.5px; }
+.facts dt { font-weight: 700; color: var(--ink-soft); }
+.facts dd { margin: 0; min-width: 0; }
+@media (max-width: 460px) {
+  .facts { grid-template-columns: 1fr; gap: 2px; }
+  .facts dd { margin-bottom: 8px; }
+}
+
+nav.toc { margin: 18px 0; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+nav.toc b { display: block; margin-bottom: 6px; }
+nav.toc ol { margin: 0; padding-left: 22px; columns: 2 220px; column-gap: 24px; }
+nav.toc li { margin: 3px 0; break-inside: avoid; }
+
+table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 15.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+th { font-weight: 700; color: var(--ink-soft); }
+.tbl { overflow-x: auto; }
+
+.others { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0 8px; }
+.others a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; text-decoration: none; font-weight: 650; }
+
+footer { max-width: 720px; margin: 40px auto 0; padding: 18px 16px 0; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 14.5px; }
+
+/* The simple version: bigger type, shorter lines, more air. */
+body.simple { font-size: 18.5px; line-height: 1.65; }
+body.simple main { max-width: 640px; }
+body.simple h2 { font-size: 25px; }
+body.simple .card { padding: 18px 20px; }
+.says { display: inline-block; font-size: 14px; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft); margin-left: 4px; vertical-align: 2px; }
+
+@media print {
+  header { position: static; backdrop-filter: none; }
+  body { background: #fff; color: #000; font-size: 12pt; }
+  .card, .lead, nav.toc { box-shadow: none; break-inside: avoid; }
+  .skip, .others { display: none; }
+  a { color: #000; }
+}

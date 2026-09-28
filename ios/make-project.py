@@ -43,11 +43,18 @@ fi
 
 mkdir -p "${DST}"
 # Dev-only pages and the owner's private roadmap never ship.
+# ⚠️ Nor do the privacy policy, terms, simple version and support pages (stage D1). The app opens them
+# on GitHub Pages, so a runner always reads the version that is current, not the one this build froze.
 rsync -a --delete \
   --exclude 'coverage.html' \
   --exclude 'walkthrough.html' \
   --exclude 'roadmap' \
   --exclude 'mapstyles' \
+  --exclude 'privacy' \
+  --exclude 'terms' \
+  --exclude 'simple' \
+  --exclude 'support' \
+  --exclude 'legal.css' \
   "${SRC}/" "${DST}/"
 echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}"
 

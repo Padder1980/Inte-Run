@@ -33,7 +33,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>InteRun uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket. To show the weather, draw maps of your runs and name the town you ran in, it sends a rough location to a weather service, a map service and OpenStreetMap.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>InteRun uses your camera only when you choose Take Photo while making a share card, so the picture you post is one you just took. Photos are used on the card and never sent anywhere by InteRun.</string>
+	<string>InteRun uses your camera only when you choose Take Photo, for a share card, an Inte-Club post or your profile picture. Photos stay on your phone and are never sent anywhere by InteRun unless you share them yourself.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>InteRun saves a share card to your photo library when you tap Save to device. It only ever adds the card you made.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -44,6 +44,7 @@
 		<string>instagram</string>
 		<string>whatsapp</string>
 		<string>sms</string>
+		<string>mailto</string>
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>

@@ -621,11 +621,11 @@ Rules: If any step fails, stop and tell me the exact error message. Do not guess
       <li data-id="s4-5"><div class="check-box"></div><div class="check-text">Install the <strong>TestFlight app</strong> from the App Store if you don't have it already</div></li>
       <li data-id="s4-6"><div class="check-box"></div><div class="check-text">Wait for the email from Apple that says <em>"You have been invited to test Inte-Run"</em></div></li>
       <li data-id="s4-7"><div class="check-box"></div><div class="check-text">Tap <strong>View in TestFlight</strong> in the email → tap <strong>Install</strong></div></li>
-      <li data-id="s4-8"><div class="check-box"></div><div class="check-text">Open the app → go to <strong>Support → Your data → This version</strong> → confirm the build number matches what Claude told you</div></li>
+      <li data-id="s4-8"><div class="check-box"></div><div class="check-text">Open the app → go to <strong>Profile → Your data → This version</strong> → confirm the build number matches what Claude told you</div></li>
     </ul>
     <div class="warn-box">
       <div class="warn-title">⚠️ If you still have the Xcode version on your phone</div>
-      Delete it first. Long press → Remove App → Delete. Your data is safe — it will be there when you reinstall via TestFlight (same bundle ID).
+      <strong>Don’t delete it</strong> — deleting an app deletes everything it saved, including your runs. First open Inte-Run → <strong>Profile → Your data → Export a backup</strong>. Then install from TestFlight over the top: it replaces the app and keeps its data. If anything is missing, use <strong>Restore from a backup</strong>.
     </div>
   </div>
 

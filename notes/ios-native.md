@@ -604,6 +604,16 @@ absent from `~/.appstoreconnect/private_keys/`); **never report an upload as a d
   the group name the script expects: **"Internal Testers"**, with automatic distribution on.
 - The privacy policy says what TestFlight shows the developer about a tester.
 
+### ⚠️⚠️ THE GUIDES TOLD HIM TO DELETE THE APP BEFORE INSTALLING FROM TESTFLIGHT — AND THAT WIPES IT
+
+TESTFLIGHT.md step 4 and the checklist page both said *"Delete the Xcode-installed copy first … your data
+is safe"*. It is not: **deleting an iOS app deletes its container, and Inte-Run's entire record — every
+run, the plan, the profile — lives in that container's web storage.** Corrected everywhere (both guides and
+the tester brief): export a backup first (Profile › Your data › Export a backup), then install from
+TestFlight OVER the top — same bundle id and team, so iOS treats it as an update and keeps the data — and
+Restore from a backup if anything is missing. The guides also sent him to "Support → Your data", which is
+under Profile.
+
 ### What finishes D2 (the owner's)
 
 1. When App Store Connect shows build 562 as Ready to Test: TestFlight → Internal Testing → new group

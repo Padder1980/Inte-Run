@@ -187,12 +187,15 @@ invite anyone else.
 > haven't already. Open the email from Apple ("You have been invited to test
 > Inte-Run"), tap **View in TestFlight**, then **Install**.
 >
-> ⚠️ **Delete the Xcode-installed copy first** if you have one. Same bundle id,
-> so your data survives, but two installs of the same app confuse iOS. Long
-> press → Remove App → **Keep on My iPhone** first if you want a belt-and-braces
-> backup of your data, otherwise Delete App.
+> ⚠️ **DON'T DELETE THE XCODE COPY.** Deleting an app deletes everything it
+> saved, which for Inte-Run is your whole run history. Instead: open Inte-Run
+> first → **Profile › Your data › Export a backup** (so nothing can be lost),
+> then install from TestFlight **over the top**. It has the same bundle id and
+> team, so iOS treats it as an update and keeps the app's data. If anything is
+> missing afterwards, **Profile › Your data › Restore from a backup**.
+> (Corrected 2026-09-29: this box used to say to delete the Xcode copy first.)
 
-**Check:** Support → Your data → **This version** shows the build number Claude
+**Check:** Profile → Your data → **This version** shows the build number Claude
 told you in step 2. Take a screenshot of that line.
 
 **Try one thing:** start a short outdoor run, let it record for a minute, then

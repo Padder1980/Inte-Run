@@ -212,7 +212,8 @@ node --test            # the suite (about 1,800 tests)
 As of 2026-09-28: strength A1–A8, the 12–17 programme Y1–Y6 and **D1** (the privacy policy, terms, a simple
 version and a support page, at `docs/privacy/`, `terms/`, `simple/`, `support/`) are built. The published pages
 are held to the code by `test/privacy-copy.test.ts`: change what leaves the phone, and they change too. D3c
-(the Wellbeing check-in, UK crisis lines, Alfie's limb warning signs) is built too, awaiting clinical review. Next: D2. `PLAN.md` holds the full list and the Road Map is the live status; update both when a stage lands.
+(the Wellbeing check-in, UK crisis lines, Alfie's limb warning signs) is built too, awaiting clinical review. D2: build
+562 is uploaded to TestFlight; the owner makes the "Internal Testers" group and installs it. Archive with the RELEASE Xcode. `PLAN.md` holds the full list and the Road Map is the live status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
 

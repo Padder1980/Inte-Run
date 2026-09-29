@@ -565,3 +565,49 @@ Store Connect or Transporter, and `xcrun altool`, which refuses without either a
 password. The Claude-in-Chrome extension — which would have driven his own logged-in session — reports
 not connected. So the CLI genuinely cannot do it today, and **an upload is not a distribution: never
 report a build as being with the testers.**
+
+## ✅ D2, PART ONE — THE FIRST TESTFLIGHT UPLOAD THROUGH xcodebuild: BUILD 562 (2026-09-28/29)
+
+**Build 562 uploaded to App Store Connect on 2026-09-29 at 09:29 ("Upload succeeded … Uploaded package
+is processing").** Archived with the RELEASE Xcode (26.6, `xcode-select`'s default), exported with
+`destination upload` through Xcode's own signed-in account — no Transporter, no key, no password. The app
+record for `com.interun.app` exists (the upload would have been refused otherwise). What is NOT done: the
+build is not with any tester. Adding it to a group needs the owner (or the App Store Connect key, still
+absent from `~/.appstoreconnect/private_keys/`); **never report an upload as a distribution.**
+
+### ⚠️ THREE THINGS THIS UPLOAD PAID FOR
+
+1. ⚠️⚠️ **THE RELEASE XCODE COULD NOT ARCHIVE AT ALL: "This scheme builds an embedded Apple Watch app.
+   watchOS 26.5 must be installed in order to archive the scheme."** The watchOS 26.5 SDK was listed by
+   `xcodebuild -showsdks`, which is why this reads as impossible; what was missing is the watchOS 26.5
+   PLATFORM (a simulator runtime, 3.96 GB), which Xcode 26 wants installed before it will archive an
+   embedded watch app. Fixed with the owner's OK: `/usr/bin/xcodebuild -downloadPlatform watchOS` (about
+   ten minutes here). `xcrun simctl runtime list` now shows `watchOS 26.5 (23T570) (Ready)`.
+2. ⚠️⚠️ **THE OWNER'S PERSONAL VOICE PACK WAS INSIDE THE ARCHIVE**, 680 KB of clips saying "Alfie", on
+   its way to every tester's phone. The notes said the pack is "baked into his own build only", and the
+   embed phase copied all of `docs/` regardless. His ruling (2026-09-29): leave it out of anything for
+   Apple, and plan "the coach says each runner's own name" (PLAN.md B13). The embed phase now runs
+   `rsync … ${PERSONAL_EXCLUDE}`, set to `--exclude voices-personal` when `ACTION=install` — which an
+   archive is, and a build straight to his phone is not. **Measured: build 561's archive held
+   `web/voices-personal/`, build 562's does not, and the build log says "personal voice packs left out".**
+   ⚠️ So build 561 was archived and NEVER uploaded; 562 is the first one with Apple.
+3. ⚠️ **THE FIRST UPLOAD ATTEMPT FAILED WITH "The Internet connection appears to be offline" AFTER
+   STALLING FOR 17 MINUTES**, while `curl` reached every Apple host moments later. A network drop, not a
+   configuration fault: the same command, re-run on the same archive, uploaded in eleven seconds of
+   transfer. Re-run once before diagnosing anything.
+
+### Also in D2 part one
+
+- `docs/testflight/testers/` — the tester brief (install, what to try, what is not ready, how to report
+  with the "This version" lines), and the TestFlight pages are left out of the app bundle.
+- TESTFLIGHT.md and `docs/testflight/index.html` describe the xcodebuild upload, the release Xcode, and
+  the group name the script expects: **"Internal Testers"**, with automatic distribution on.
+- The privacy policy says what TestFlight shows the developer about a tester.
+
+### What finishes D2 (the owner's)
+
+1. When App Store Connect shows build 562 as Ready to Test: TestFlight → Internal Testing → new group
+   **Internal Testers**, automatic distribution ON, add himself, add build 562.
+2. Install from TestFlight; **Profile › Your data › This version** must say 562 — PLAN.md's verify step.
+3. Optionally the App Store Connect key (App Manager), so `node tools/testflight-distribute.mjs 562
+   "Internal Testers"` can do step 1's last part and report it — the other half of the verify step.

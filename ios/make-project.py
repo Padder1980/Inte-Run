@@ -46,7 +46,13 @@ mkdir -p "${DST}"
 # ⚠️ Nor do the privacy policy, terms, simple version and support pages (stage D1). The app opens them
 # on GitHub Pages, so a runner always reads the version that is current, not the one this build froze.
 # Nor the TestFlight guide and tester brief (stage D2): pages for people, which the app never opens.
-rsync -a --delete \
+# ⚠️ AND A PERSONAL VOICE PACK STAYS IN THE OWNER'S OWN BUILDS (his ruling, 2026-09-29, stage D2). docs/
+# voices-personal/ holds clips of the coach saying one real person's name, so it must never reach another
+# person's phone. An ARCHIVE -- every TestFlight or App Store build -- runs this phase with ACTION=install,
+# and leaves the packs out; a build straight onto his phone from Xcode (ACTION=build) keeps them.
+PERSONAL_EXCLUDE=""
+if [ "${ACTION:-build}" = "install" ]; then PERSONAL_EXCLUDE="--exclude voices-personal"; fi
+rsync -a --delete ${PERSONAL_EXCLUDE} \
   --exclude 'coverage.html' \
   --exclude 'walkthrough.html' \
   --exclude 'roadmap' \
@@ -58,7 +64,7 @@ rsync -a --delete \
   --exclude 'legal.css' \
   --exclude 'testflight' \
   "${SRC}/" "${DST}/"
-echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}"
+echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}${PERSONAL_EXCLUDE:+, personal voice packs left out}"
 
 # ⚠️ THE MAPBOX TOKEN TRAVELS WITH THE APP AND NEVER WITH THE REPO. docs/ is committed and is served
 # publicly by GitHub Pages, so a token written into the built page would be published and scraped —

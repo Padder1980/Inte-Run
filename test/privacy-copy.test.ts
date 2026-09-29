@@ -258,6 +258,14 @@ test("the pages stay out of the iPhone bundle, and the web version's offline cop
     assert.ok(MAKE_PROJECT.includes("--exclude '" + w + "'"), "ios/make-project.py does not leave " + w + " out of the app bundle");
     assert.ok(PBXPROJ.includes("--exclude '" + w + "'"), "the Xcode project was not regenerated after " + w + " was excluded -- run python3 ios/make-project.py");
   }
+  // ⚠️ A PERSONAL VOICE PACK (a real person's name, spoken) goes in the owner's own builds only -- his ruling,
+  // 2026-09-29. Every archive for Apple runs the embed phase with ACTION=install and must leave it out.
+  // The project file stores the script with its quote marks escaped, so it is read with them unescaped.
+  for (const src of [MAKE_PROJECT, PBXPROJ.replace(/\\"/g, '"')]) {
+    assert.match(src, /if \[ "\$\{ACTION:-build\}" = "install" \]; then PERSONAL_EXCLUDE="--exclude voices-personal"; fi/,
+      "an archive for TestFlight or the App Store would carry the owner's personal voice pack to other people's phones");
+    assert.match(src, /rsync -a --delete \$\{PERSONAL_EXCLUDE\}/, "the personal-pack exclusion is worked out and never applied");
+  }
   // ⚠️ c.addAll() FAILS WHOLE IF ONE ASSET IS MISSING, and then the offline copy never installs. Every
   // entry must exist -- a directory entry needs its index.html.
   const assets = JSON.parse((SW.match(/const ASSETS = (\[[^\]]*\]);/) || [])[1] || "[]") as string[];

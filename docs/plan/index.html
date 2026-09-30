@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Development plan · Inte-Run</title>
+<meta name="description" content="Where Inte-Run is today, and the stages from here to the App Store and beyond.">
+<link rel="stylesheet" href="../legal.css">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="theme-color" content="#eef1f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a100e" media="(prefers-color-scheme: dark)">
+<style>
+  .who { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px; margin-left: 6px; vertical-align: 2px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-soft); }
+  .who.you { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn); background: var(--warn-soft); }
+  .who.claude { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--accent); background: var(--accent-soft); }
+  .stage h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
+  .stage .n { font-family: var(--mono); color: var(--accent); font-weight: 800; margin-right: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 12px 0; }
+  .grid .card { margin: 0; }
+  .grid .card h3 { font-size: 16.5px; margin: 0 0 4px; }
+  .grid .card p { font-size: 15.5px; color: var(--ink-soft); }
+  .figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+  .fig { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .fig b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+  .fig span { font-size: 14px; color: var(--ink-faint); }
+</style>
+</head>
+<!--
+  Inte-Run's development plan, written for the owner (30 September 2026). Hand-written, like the Road Map,
+  and left out of the iPhone bundle (ios/make-project.py). It summarises PLAN.md, which stays the detailed
+  source for every stage; the Road Map stays the live tick-list. ⚠️ THE ORDER IS THE OWNER'S RULING OF 30
+  SEPTEMBER 2026: the eleven parity features (PLAN.md S and B1-B11) come BEFORE submitting to Apple.
+-->
+<body>
+<a class="skip" href="#main">Skip to the plan</a>
+<header><div class="head-in">
+  <a href="../roadmap/" aria-label="Inte-Run Road Map">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16b7a4"/><stop offset="1" stop-color="#0a6f64"/></linearGradient></defs>
+      <rect x="8" y="8" width="104" height="104" rx="30" fill="url(#g)"/>
+      <circle cx="82" cy="37" r="11" fill="#fff"/>
+      <path d="M35 88 L57 45 L71 45 L49 88 Z" fill="#fff"/>
+      <path d="M57 88 L79 45 L93 45 L71 88 Z" fill="#fff" opacity=".62"/>
+    </svg>
+    <span class="head-t"><b>Inte-Run</b><span>Development plan</span></span>
+  </a>
+</div></header>
+
+<main id="main">
+<h1>Development plan</h1>
+<p class="meta">Where Inte-Run is, and where it goes next. Updated <time datetime="2026-09-30">30 September 2026</time></p>
+
+<div class="lead">
+  <b>The short version</b>
+  <ul>
+    <li><strong>Where we are:</strong> the app works end to end. Plans, runs with a spoken coach, strength training, Ask Alfie, the Apple Watch, safety checks, and a privacy policy. Build 562 is on your phone through TestFlight.</li>
+    <li><strong>Next, all at once:</strong> you check build 562 on real runs and arrange the reviews; testers try it; Claude builds the <strong>eleven features</strong> that match and beat Runna.</li>
+    <li><strong>Then:</strong> submit to Apple and launch. <strong>After launch:</strong> watch strength, yoga and Pilates, the watch face, Garmin (once Garmin approves), and the coach saying each runner’s name.</li>
+  </ul>
+  <p>The day-to-day tick-list is the <a href="../roadmap/">Road Map</a>. Every stage’s detail is in <code>PLAN.md</code> in the project.</p>
+</div>
+
+<section id="now">
+<h2>1. Where we are</h2>
+<div class="figs">
+  <div class="fig"><b>562</b><span>build on your phone, via TestFlight</span></div>
+  <div class="fig"><b>1,823</b><span>automatic checks, all passing</span></div>
+  <div class="fig"><b>4</b><span>legal and help pages live</span></div>
+  <div class="fig"><b>1</b><span>tester so far: you</span></div>
+</div>
+<div class="grid">
+  <div class="card"><h3>Training plans</h3><p>From your goal and fitness to a week-by-week plan, for 5k to marathon. A safety question comes first. There’s a separate programme within UK Athletics’ limits for runners aged 12 to 17.</p></div>
+  <div class="card"><h3>Runs</h3><p>GPS runs with a spoken coach, a live map, a proper debrief afterwards, the Logbook, and heat advice from the forecast.</p></div>
+  <div class="card"><h3>Strength</h3><p>62 exercises, guided sessions with a rest timer, your own programmes, an estimated one-rep max, and sessions sent to Strava as Weight Training.</p></div>
+  <div class="card"><h3>Ask Alfie</h3><p>A coach that knows your plan. It answers on the phone, with optional online answers once you say yes. Warning signs are always answered on the phone.</p></div>
+  <div class="card"><h3>Apple Watch</h3><p>Runs today’s session on its own, with heart rate, and hands the run back to your phone.</p></div>
+  <div class="card"><h3>Inte-Club and sharing</h3><p>Your own private page of runs and training blocks, plus share cards and stories to post wherever you like.</p></div>
+  <div class="card"><h3>Safety</h3><p>Warning signs before a plan is built, an injury guide, a fuelling guide, and a Wellbeing check-in with UK crisis lines.</p></div>
+  <div class="card"><h3>Privacy</h3><p>Everything stays on the phone apart from a short, listed set of things. There’s a privacy policy, terms and a simple version for 12-year-olds.</p></div>
+</div>
+</section>
+
+<section id="next">
+<h2>2. Where we go next, in order</h2>
+<p>Stages 1 to 3 run side by side: while Claude builds, you check and review. Stage 4 is the list you chose on 30 September: <strong>the features come before the App Store.</strong></p>
+
+<article class="card stage">
+  <h3><span class="n">1</span>Check build 562 on real runs <span class="who you">You</span><span class="who claude">Claude fixes</span></h3>
+  <p>Build 562 finally carries every change that needed an Xcode build, so these can be ticked at last:</p>
+  <ul>
+    <li><strong>A run with the phone locked:</strong> does the coach keep talking, and does the lock-screen distance keep moving? Then read the <em>coach</em> and <em>steps</em> lines in Profile › Your data.</li>
+    <li><strong>A run started from the watch:</strong> the nine watch fixes waiting to be tested on a wrist, such as ending at the distance, the countdown and the cadence.</li>
+    <li><strong>The share picture:</strong> the five checks that need a real iPhone, like saving straight to Photos.</li>
+    <li><strong>Strava:</strong> raise your Strava app’s athlete limit to 10 in Strava’s settings, confirm your Strava subscription, then send one real run.</li>
+  </ul>
+</article>
+
+<article class="card stage">
+  <h3><span class="n">2</span>The reviews <span class="who you">You</span></h3>
+  <ul>
+    <li><strong>A legal read</strong> of the privacy policy, terms, simple version and privacy assessment by someone who knows data protection law. Ask them too whether you need to register with the ICO. Then sign the assessment.</li>
+    <li><strong>A clinical review</strong> of the safety wording: the injury guide’s first-aid advice (a physio), the Wellbeing check-in and crisis lines, Ask Alfie’s limb warning signs, and the youth training limits (sports medicine).</li>
+  </ul>
+  <p>Both must be done before anyone outside family and friends tests the app.</p>
+</article>
+
+<article class="card stage">
+  <h3><span class="n">3</span>Testers <span class="who you">You</span><span class="who claude">Claude fixes</span></h3>
+  <p>Invite 5 to 10 runners you trust as internal testers, add them to <em>Internal Testers</em>, and send them the <a href="../testflight/testers/">tester brief</a>. New builds reach them automatically. Claude fixes what they trip over, and their runs tune the coach.</p>
+</article>
+
+<article class="card stage">
+  <h3><span class="n">4</span>The eleven features that match and beat Runna <span class="who claude">Claude</span></h3>
+  <ol>
+    <li><strong>Add a run by hand</strong>, link a run to a planned session, and automatic personal records.</li>
+    <li><strong>Skip a single session</strong> without rebuilding the week.</li>
+    <li><strong>A time of day</strong> for each session, carried into your calendar.</li>
+    <li><strong>Move a session a week earlier or later.</strong></li>
+    <li><strong>Coming back after time off:</strong> choose how quickly the plan builds up again.</li>
+    <li><strong>Missed a few sessions?</strong> The app offers to realign the plan, and you choose.</li>
+    <li><strong>A B-race:</strong> a smaller race inside your plan. The week before gets lighter and the week after starts easy, and your main race is untouched.</li>
+    <li><strong>Training dials:</strong> how fast your mileage grows, how many hard days, and how long the long run may get, each showing its effect before you save.</li>
+    <li><strong>A plan queue:</strong> draft your next plan, and a hand-over after race day.</li>
+    <li><strong>Daily briefings</strong> in plain words, free and offline.</li>
+    <li><strong>Optional AI briefings</strong> through the server, off until you switch them on.</li>
+  </ol>
+  <p>Also quick: <strong>a Strava club</strong> for Inte-Run runners. You create the club on Strava, and the app gets one row pointing to it.</p>
+  <p>Alongside these, Claude clears the known problems (below) and adds a few safety nets that stop old bugs coming back.</p>
+</article>
+
+<article class="card stage">
+  <h3><span class="n">5</span>Submit to Apple <span class="who you">You</span><span class="who claude">Claude</span></h3>
+  <ul>
+    <li>Claude makes the App Store screenshots and a final build, and checks the submission form end to end.</li>
+    <li>You paste the answers from <code>APPSTORE.md</code> into App Store Connect, with the <a href="../privacy/">privacy</a> and <a href="../support/">support</a> addresses, and press Submit.</li>
+    <li>Expect one rejection. The likeliest questions are already answered in <code>APPSTORE.md</code>: where Strava’s keys are kept, and the screens that update over the air.</li>
+    <li>If more than 10 people will connect Strava, Strava needs to review the app first, with screenshots.</li>
+  </ul>
+</article>
+
+<article class="card stage">
+  <h3><span class="n">6</span>🎉 Launch version 1 <span class="who you">You</span></h3>
+  <p>Release it on the App Store, then set a simple monthly rhythm: listen to runners, pick the next job, ship it.</p>
+</article>
+
+<article class="card stage">
+  <h3><span class="n">7</span>After launch <span class="who claude">Claude</span><span class="who you">your choices</span></h3>
+  <ul>
+    <li><strong>Strength on the Apple Watch.</strong></li>
+    <li><strong>Yoga, Pilates, and Stretch &amp; Stability</strong> sessions.</li>
+    <li><strong>Easier-to-read watch screens</strong>, and <strong>today’s session on the watch face</strong>.</li>
+    <li><strong>The coach says each runner’s own name.</strong> You pick one of three ways first; it can move earlier if you want it in version 1.</li>
+    <li><strong>Garmin:</strong> sessions out to the watch and runs back in, as soon as Garmin approves the application.</li>
+    <li><strong>Bigger rounds, each planned on its own first:</strong> plans for keeping fit without a race; accounts, syncing and Android; finding runners near you; and the money question.</li>
+  </ul>
+</article>
+</section>
+
+<section id="known">
+<h2>3. Known problems to clear before launch</h2>
+<ul>
+  <li>“Ease off” makes a week <em>longer</em>, by 19% when it was measured.</li>
+  <li>Moving a workout has no undo.</li>
+  <li>The long run is still set by time, not distance.</li>
+  <li>Starting a run on the watch can do nothing if the last run was left on screen, and one watch setting can leave the wrist stuck.</li>
+  <li>The goal prediction counts days the plan doesn’t use.</li>
+  <li>After Delete everything, the watch can keep your first name.</li>
+  <li>Choosing “Prefer not to say” for age gets past the age checks.</li>
+</ul>
+</section>
+
+<section id="decisions">
+<h2>4. Decisions only you can make</h2>
+<ul>
+  <li><strong>The coach saying runners’ names:</strong> the phone’s own voice, a voice service recording each name, or the common names recorded ahead.</li>
+  <li><strong>Five coaching questions from September:</strong> hill sprints for run-walk beginners, a re-test as 5 × 1 km at goal pace, a “how long can you be out on a weekday?” question, a “longest run last month” question, and advice for older runners (with your clinical reviewer).</li>
+  <li><strong>Stop publishing the website</strong> so the app is the only version? That ends the “my change hasn’t appeared” confusion.</li>
+  <li><strong>The money question:</strong> free, paid or subscription. If it ever charges or shows adverts, the weather service needs a paid plan too.</li>
+</ul>
+</section>
+
+<section id="risks">
+<h2>5. What could slow us down</h2>
+<ul>
+  <li><strong>Waiting on other people:</strong> the legal read, the clinical review, Garmin’s approval, and Strava’s review past 10 athletes.</li>
+  <li><strong>Apple’s review:</strong> one rejection is normal. The answers are prepared.</li>
+  <li><strong>Your work network</strong> blocks GitHub at times, so saves can wait until you’re home.</li>
+</ul>
+</section>
+
+<div class="others">
+  <a href="../roadmap/">Road Map</a>
+  <a href="../testflight/testers/">Tester brief</a>
+  <a href="../privacy/">Privacy policy</a>
+</div>
+</main>
+
+<footer>Inte-Run · development plan · 30 September 2026</footer>
+</body>
+</html>

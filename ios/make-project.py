@@ -45,7 +45,7 @@ mkdir -p "${DST}"
 # Dev-only pages and the owner's private roadmap never ship.
 # ⚠️ Nor do the privacy policy, terms, simple version and support pages (stage D1). The app opens them
 # on GitHub Pages, so a runner always reads the version that is current, not the one this build froze.
-# Nor the TestFlight guide and tester brief (stage D2): pages for people, which the app never opens.
+# Nor the TestFlight guide and tester brief (stage D2), nor the development plan: pages for people.
 # ⚠️ AND A PERSONAL VOICE PACK STAYS IN THE OWNER'S OWN BUILDS (his ruling, 2026-09-29, stage D2). docs/
 # voices-personal/ holds clips of the coach saying one real person's name, so it must never reach another
 # person's phone. An ARCHIVE -- every TestFlight or App Store build -- runs this phase with ACTION=install,
@@ -63,6 +63,7 @@ rsync -a --delete ${PERSONAL_EXCLUDE} \
   --exclude 'support' \
   --exclude 'legal.css' \
   --exclude 'testflight' \
+  --exclude 'plan' \
   "${SRC}/" "${DST}/"
 echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}${PERSONAL_EXCLUDE:+, personal voice packs left out}"
 

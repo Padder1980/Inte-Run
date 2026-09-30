@@ -566,10 +566,13 @@ password. The Claude-in-Chrome extension — which would have driven his own log
 not connected. So the CLI genuinely cannot do it today, and **an upload is not a distribution: never
 report a build as being with the testers.**
 
-## ✅ D2, PART ONE — THE FIRST TESTFLIGHT UPLOAD THROUGH xcodebuild: BUILD 562 (2026-09-28/29)
+## ✅ D2 — BUILD 562 ON TESTFLIGHT, AND ITS FIRST TESTER (2026-09-28 to 30)
 
 **Build 562 uploaded to App Store Connect on 2026-09-29 at 09:29 ("Upload succeeded … Uploaded package
-is processing").** Archived with the RELEASE Xcode (26.6, `xcode-select`'s default), exported with
+is processing").** ⚠️ **NOT the first TestFlight upload** — build 434 went up the same way in August, with no
+testers (notes/watch-routes.md); a commit message and the first draft of this chapter said otherwise. **562
+is the first build a tester has installed: the owner, 2026-09-30,** into group "Internal Testers" (automatic
+distribution on), over the Xcode copy after exporting a backup, with his data intact. Archived with the RELEASE Xcode (26.6, `xcode-select`'s default), exported with
 `destination upload` through Xcode's own signed-in account — no Transporter, no key, no password. The app
 record for `com.interun.app` exists (the upload would have been refused otherwise). What is NOT done: the
 build is not with any tester. Adding it to a group needs the owner (or the App Store Connect key, still

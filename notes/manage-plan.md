@@ -829,3 +829,55 @@ holiday), so cancelling the skip brings it back on its original day.
 **Tests:** `test/skip-session.test.ts` (13, driving the real lifted functions over a three-week fixture whose
 rest day is never today). Updated: `manage-plan` (its hand-written lift list gained `weekSkips`, `todayIso`),
 `manual-runs` (the sheet's button order). 17 of 17 re-breaks caught, PLAN.md's own among them.
+
+## A TIME OF DAY FOR A SESSION (stage B3, 2026-10-02)
+
+PLAN.md B3: *"A time of day for each session, carried into your calendar."* A planned session's sheet, from
+today on, has **Time of day** (`#sdTime`, the platform's own `<input type="time">`, right under Move to another
+day) with a **Clear**. Any kind of session, the race included. Web-only.
+
+**What a time does — and the one reader, `sessionTimeAt(iso, sid)`, every one of these asks:**
+- **The calendar file** (`buildSessionsIcs`): the session becomes a timed event — `DTSTART` at the time,
+  `DTEND` after the plan's own `durMin`, and `TRIGGER:-PT30M`. Times are **floating** (no Z, no TZID): a
+  runner's 18:00 is 18:00 wherever they are, as REMIND.time already is. `icsFloat` does the arithmetic on UTC
+  fields as a plain calendar, so 23:30 + 45 min ends 00:15 the next day and a clock change cannot shift it.
+  Untimed sessions are the all-day events they always were, alarmed at the morning reminder time.
+- **The reminders**: `reminderSlotsFor(iso, s)` moves slot "a" to 30 minutes before a timed session and leaves
+  slot "b" where the runner put it — ONE function, read by the native schedule (`buildReminderSchedule`) and
+  the Home Screen app's in-page timers (`initReminders`), so the two cannot disagree. A timed reminder's title
+  reads *"Today at 18:00: …"*.
+- **Today's card** eyebrow (*"Today's plan · 18:00"*) and **the plan's day rows** (the time leads the line).
+- The calendar sheet now says what the file does with a time.
+
+⚠️ **THE STORE IS `{ sid: { t, iso } }`, NOT THE SPEC'S `{ sid: "HH:MM" }`.** `TIME_KEY` (`interun_time_v1`,
+declared with the store keys — seedDone reads it). Matched on (week, id) like a B1 link: ids recur across
+rebuilds of different plans, so the stored date ties a time to the week it was set for, and a session dragged
+to another day of that week keeps it. Measured in the test: a time set for "w2-d1-easy" in a plan whose
+week 2 fell a fortnight later is NOT inherited by this plan's "w2-d1-easy".
+
+⚠️⚠️ **PRUNED IN seedDone BY DATE ONLY — NEVER BY WHETHER THE PLAN HOLDS THE SESSION.** A holiday or a B2
+skip takes a session out of the plan while it stands, and cancelling it must bring the session back with
+its time; a prune against plan membership would lose the time on every such cancel (the same reason
+LINK_KEY is never pruned on a rebuild). A time goes a week after the day it was set for.
+
+⚠️ **THE SHEET IS PATCHED, NOT REBUILT, and it saves on `change` only.** A rebuild would throw the runner to
+the top of a long sheet the moment the picker closed; `applySessionTime` updates the note and the Clear
+button in place, re-arms the reminders (`initReminders`) at once, and toasts *"Set for 18:00."*.
+
+⚠️ **FOUND IN THE BROWSER: `.mini-btn` SETS `display: inline-flex`, WHICH BEATS THE BROWSER'S `[hidden]`
+RULE**, so the hidden Clear still showed beside an empty time. `.sd-time .mini-btn[hidden] { display: none; }`
+restores it, and a guard pins the rule. Worth remembering for any `hidden` on a class that sets `display`.
+
+⚠️ **AND A BACKTICK IN A COMMENT FAILED THE BUILD AGAIN** — the old `web/app.html` stayed in place and a
+whole-suite run passed against it. Caught only because the build's own exit code was read.
+
+**The note promises a reminder only while reminders are on** (`sessionTimeNote`): a sentence about a nudge
+the runner has switched off is a sentence about a feature that is not there.
+
+**Not done, deliberately:** an added session (an EXTRA) or a built run cannot be timed — the calendar file
+does not carry those at all, so a time would reach the reminders and nothing else. The watch is not sent
+the time (it would need a Swift change to show it).
+
+**Tests:** `test/session-time.test.ts` (8): parses the real `.ics` and the real schedule items, the week-and-id
+matching, the date-only prune driven through the real `seedDone`, the sheet's wiring, the note, and the time
+on Today and the plan rows. The B1 and B2 tests' lift lists gained the time helpers. 18 of 18 re-breaks caught.

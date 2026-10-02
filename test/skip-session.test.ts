@@ -81,9 +81,10 @@ function fixture() {
 const FNS = ["isoAdd", "todayIso", "dmon", "runDateLabelIso", "esc", "genDay", "effDay", "ovTo", "ovFrom", "doneKey",
   "rawSessionDone", "loadLinks", "saveLinks", "planSessionRef", "linkedRunFor", "loadAdjust", "saveAdjust", "adjPhrase",
   "adjustFor", "weekSkips", "adjDrops", "applyAdjustments", "eased", "weekAdjust", "weekAdjustNote", "plannedBreaksHtml",
-  "skipOfferable", "skipSession", "cancelAdjust", "todayDecision", "sessionEffort", "effortVar"];
+  "skipOfferable", "skipSession", "cancelAdjust", "todayDecision", "sessionEffort", "effortVar",
+  "loadTimes", "hmValid", "sessionTimeAt"];
 const CONSTS = ["DAY_ORDER", "MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "ADJ_MODES", "ADJ_QUALITY",
-  "ADJ_RUN", "SESSION_EFFORT"];
+  "ADJ_RUN", "SESSION_EFFORT", "TIME_KEY"];
 
 function sandbox() {
   const store: Record<string, string> = {};

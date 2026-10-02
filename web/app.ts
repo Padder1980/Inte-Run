@@ -392,6 +392,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .sd-day.on { background: var(--ink); color: var(--surface); border-color: transparent; }
 .sd-day:disabled { cursor: default; }
 .sd-move-n { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
+/* B3 — a session's time of day: the platform's own time picker, and a Clear beside it. */
+.sd-time { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); }
+.sd-time .sel { max-width: 180px; }
+.sd-time .mini-btn { margin-top: 0; }
+/* ⚠️ .mini-btn SETS display: inline-flex, WHICH BEATS THE BROWSER'S OWN [hidden] RULE — so a hidden Clear
+   still showed, offering to clear a time that was never set. Found in the browser, not by reading. */
+.sd-time .mini-btn[hidden] { display: none; }
 .tap { cursor: pointer; } .sess.tap:active, .wk-card.tap:active { opacity: .65; }
 /* Strength exercise breakdown */
 .ex-list { margin-top: 8px; }
@@ -6464,6 +6471,21 @@ const PROG_KEY = "interun_prog_v1";
  */
 const LINK_KEY = "interun_link_v1";
 /**
+ * Stage B3. The time of day the runner gave a planned session: { sid: { t: "HH:MM", iso } } — the
+ * wall-clock time, and the date the session sat on when it was set.
+ *
+ * ⚠️ DECLARED HERE FOR THE REASON LINK_KEY GIVES ABOVE: seedDone prunes it, and seedDone runs at module
+ * top level through recompute.
+ * ⚠️ MATCHED ON (week, id), LIKE A LINK, NEVER ON THE ID ALONE. Ids recur across rebuilds of different
+ * plans, so "w3-d2-easy" in a plan started next month is a different day; the stored date ties the time to
+ * the week it was set for, and a session dragged to another day of that week keeps its time.
+ * ⚠️ PRUNED BY DATE, NEVER BY WHETHER THE PLAN HOLDS THE SESSION. A holiday or a skip takes a session out of
+ * the plan for as long as it stands, and cancelling it must bring the session back WITH its time; a prune
+ * against plan membership would make every such cancel lose it. A time is dropped a week after its date,
+ * when its session can no longer be anywhere ahead.
+ */
+const TIME_KEY = "interun_time_v1";
+/**
  * Whether EXTRA has been initialised yet. Declared up here with the store keys because that is the
  * only place it can be: it exists to tell adoptPlan, which runs at module top level, that EXTRA is
  * still in its temporal dead zone five thousand lines below. See refreshProgExtras.
@@ -7875,6 +7897,40 @@ function untickSession(iso, sid) {
   if (!r || linkedRunFor(r.wk.index, sid)) return;
   if (isoAdd(r.wk.startIso, effDay(r.s)).toISOString().slice(0, 10) >= todayIso()) delete state.done[doneKey(r.wk.index, r.s)];
 }
+// ---- A time of day for a planned session (stage B3) — the store is TIME_KEY, declared with the others ----
+function loadTimes() {
+  try { const v = JSON.parse(localStorage.getItem(TIME_KEY) || "{}"); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; } catch (e) { return {}; }
+}
+function saveTimes(m) {
+  try { Object.keys(m).length ? localStorage.setItem(TIME_KEY, JSON.stringify(m)) : localStorage.removeItem(TIME_KEY); } catch (e) {}
+}
+/** A wall-clock "HH:MM", or "" when it is not one. */
+function hmValid(t) {
+  const m = /^(\\d{1,2}):(\\d{2})$/.exec(String(t || ""));
+  return (m && Number(m[1]) < 24 && Number(m[2]) < 60) ? String(m[1]).padStart(2, "0") + ":" + m[2] : "";
+}
+function hmFromMinutes(n) { const v = Math.max(0, Math.min(1439, Math.round(n))); return String(Math.floor(v / 60)).padStart(2, "0") + ":" + String(v % 60).padStart(2, "0"); }
+/**
+ * The time of day the runner set for the planned session sid sitting on iso, or "".
+ * ⚠️ THE ONE READER, used by the session sheet, the plan's rows, Today, the reminders and the calendar
+ * file, so no two of them can disagree about when a session is. Matched on the week holding iso.
+ */
+function sessionTimeAt(iso, sid) {
+  if (!iso || !sid) return "";
+  const e = loadTimes()[sid];
+  if (!e || !e.iso) return "";
+  const ref = planSessionRef(iso, sid);
+  if (!ref) return "";
+  const end = isoAdd(ref.wk.startIso, 6).toISOString().slice(0, 10);
+  return (e.iso >= ref.wk.startIso && e.iso <= end) ? hmValid(e.t) : "";
+}
+function setSessionTime(sid, iso, t) {
+  if (!sid || !iso) return;
+  const m = loadTimes();
+  const v = hmValid(t);
+  if (v) m[sid] = { t: v, iso: String(iso) }; else delete m[sid];
+  saveTimes(m);
+}
 // Mark every session dated before the real today as done, so the calendar and Today reflect progress
 // up to now. (When the plan starts today, nothing is marked — a fresh start.)
 function seedDone() {
@@ -7982,6 +8038,17 @@ function seedDone() {
     const links = loadLinks();
     Object.keys(links).forEach((rid) => { const l = links[rid]; if (l && l.sid && l.iso) tickSession(l.iso, l.sid); });
   } catch (e) { try { console.warn("run link replay skipped", e); } catch (e2) {} }
+  // ⚠️ B3: SESSION TIMES ARE PRUNED HERE BY DATE ONLY — a week past the day each was set for, when the
+  // session can no longer be ahead of the runner wherever in its week it was dragged. NEVER by whether the
+  // plan still holds the session: a holiday or a skip takes it out of the plan while it stands, and the
+  // runner cancelling it expects the session back with the time they gave it. See TIME_KEY.
+  try {
+    const times = loadTimes();
+    const cut = isoAdd(todayIso(), -7).toISOString().slice(0, 10);
+    let gone = false;
+    Object.keys(times).forEach((sid) => { const e = times[sid]; if (!e || !e.iso || e.iso < cut) { delete times[sid]; gone = true; } });
+    if (gone) saveTimes(times);
+  } catch (e) { try { console.warn("session time prune skipped", e); } catch (e2) {} }
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -8228,9 +8295,11 @@ function todayDecision() {
   // app crying wolf on its own placeholder.
   const cond = (state.wx && state.wx.live) ? currentConditions(sess) : null;
   const risky = !!(cond && (cond.severity === "high" || cond.severity === "severe"));
+  // B3 \u2014 the time the runner gave it, beside the day, from the one reader every other screen uses.
+  const at = sessionTimeAt(isoAdd(curWeek().startIso, state.selDay).toISOString().slice(0, 10), sess.id);
   return {
     kind: risky ? "risk" : "scheduled",
-    eyebrow: onToday ? "Today\u2019s plan" : DAY_ORDER[state.selDay] + " " + dmon(isoAdd(curWeek().startIso, state.selDay)),
+    eyebrow: (onToday ? "Today\u2019s plan" : DAY_ORDER[state.selDay] + " " + dmon(isoAdd(curWeek().startIso, state.selDay))) + (at ? " \u00b7 " + at : ""),
     headline: sess.title,
     implication: risky && cond.advice ? cond.advice
       : (sess.description ? String(sess.description).split(". ")[0].replace(/\.$/, "") + "." : ""),
@@ -8830,17 +8899,31 @@ function notifyToday(slot) {
   const q = randomQuote();
   const quote = "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \— " + q[1] : "");
   markFired(slot);
-  showNotif("Today: " + s.title + more, { body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + quote, tag: "interun-session-" + today + "-" + slot, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
+  // B3 — the same words as the native schedule's title, so the two kinds of reminder read alike.
+  const at = s.id ? sessionTimeAt(today, s.id) : "";
+  showNotif((at ? "Today at " + at + ": " : "Today: ") + s.title + more, { body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + quote, tag: "interun-session-" + today + "-" + slot, icon: "./icon-192.png", badge: "./icon-192.png", data: { url: "./" } });
 }
 // Every upcoming session day, at each configured time. Capped because iOS keeps at most 64 pending
 // notifications per app and silently drops the rest; re-synced on launch and on every change, so
 // roughly six weeks ahead is far past any useful horizon.
 const NATIVE_NOTIFY_CAP = 60;
+/**
+ * The reminder slots for one day: "a" (the main time) and "b" (the optional second), as [slot, "HH:MM"].
+ * ⚠️ B3: A SESSION THE RUNNER GAVE A TIME MOVES SLOT "a" TO 30 MINUTES BEFORE IT — the reminder is about
+ * that run now, and a 07:30 nudge for an 18:00 session is a nudge at the wrong end of the day. Slot "b"
+ * stays where the runner put it. ONE function, read by the native schedule and the in-page timers, so
+ * the phone's reminders and the Home Screen app's cannot disagree about when to speak.
+ */
+function reminderSlotsFor(iso, s) {
+  const slots = [["a", REMIND.time]];
+  if (REMIND.time2) slots.push(["b", REMIND.time2]);
+  const t = s && s.id ? sessionTimeAt(iso, s.id) : "";
+  if (t) slots[0] = ["a", hmFromMinutes(hmMinutes(t) - 30)];
+  return slots;
+}
 function buildReminderSchedule() {
   const out = [];
   if (!REMIND.enabled) return out;
-  const slots = [["a", REMIND.time]];
-  if (REMIND.time2) slots.push(["b", REMIND.time2]);
   const nowMs = Date.now();
   for (let day = 0; day < 90 && out.length < NATIVE_NOTIFY_CAP; day++) {
     const iso = isoAdd(todayIso(), day).toISOString().slice(0, 10);
@@ -8857,6 +8940,9 @@ function buildReminderSchedule() {
     if (s.distKm) bits.push(s.distKm + " km");
     const more = list.length > 1 ? " (+" + (list.length - 1) + " more)" : "";
     const p = iso.split("-").map(Number);
+    const slots = reminderSlotsFor(iso, s);
+    // B3 — a timed session says when, because the reminder now arrives half an hour before it.
+    const at = s.id ? sessionTimeAt(iso, s.id) : "";
     for (let i = 0; i < slots.length && out.length < NATIVE_NOTIFY_CAP; i++) {
       const mins = hmMinutes(slots[i][1]);
       // Local time, deliberately: a reminder is set against the clock on the wall, not UTC.
@@ -8869,7 +8955,7 @@ function buildReminderSchedule() {
         id: "interun-" + iso + "-" + slots[i][0],
         y: when.getFullYear(), mo: when.getMonth() + 1, d: when.getDate(),
         h: when.getHours(), mi: when.getMinutes(),
-        title: "Today: " + s.title + more,
+        title: (at ? "Today at " + at + ": " : "Today: ") + s.title + more,
         body: (bits.length ? bits.join(" \\u00b7 ") + "\\n" : "") + "\\u201C" + q[0] + "\\u201D" + (q[1] ? " \— " + q[1] : ""),
       });
     }
@@ -10090,7 +10176,8 @@ function initReminders() {
   if (!REMIND.enabled || notifPerm() !== "granted") return;
   if (!sessionsForIso(todayIso()).length) return;
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  const slots = [["a", REMIND.time]]; if (REMIND.time2) slots.push(["b", REMIND.time2]);
+  // B3 — the same slots the native schedule uses, so a timed session moves this reminder too.
+  const slots = reminderSlotsFor(todayIso(), sessionsForIso(todayIso())[0]);
   slots.forEach((sl) => {
     const due = hmMinutes(sl[1]);
     if (nowMin >= due) notifyToday(sl[0]);
@@ -10103,6 +10190,18 @@ function icsDate(dt) { return "" + dt.getUTCFullYear() + pad2(dt.getUTCMonth() +
 function icsStamp() { const d = new Date(); return "" + d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) + "T" + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + "Z"; }
 function icsTrigger() { const m = hmMinutes(REMIND.time), h = Math.floor(m / 60), mm = m % 60; return "PT" + (h > 0 ? h + "H" : "") + (mm > 0 || h === 0 ? mm + "M" : ""); }
 function icsEsc(s) { return String(s == null ? "" : s).split(";").join("\\\\;").split(",").join("\\\\,"); }
+/**
+ * A floating local date-time, "YYYYMMDDTHHMMSS", for a date plus a wall-clock time plus some minutes.
+ * ⚠️ FLOATING, ON PURPOSE: no Z and no TZID. A runner's 18:00 is 18:00 wherever they are, which is exactly
+ * what RFC 5545 means by a floating time, and it is how the reminders already treat REMIND.time.
+ * ⚠️ THE ARITHMETIC IS DONE ON UTC FIELDS AS A PLAIN CALENDAR, never through the phone's own timezone, so a
+ * session at 23:30 that runs 45 minutes ends at 00:15 the next day and a clock change cannot shift it.
+ */
+function icsFloat(iso, hm, plusMin) {
+  const p = String(iso).split("-").map(Number), q = String(hm).split(":").map(Number);
+  const d = new Date(Date.UTC(p[0], p[1] - 1, p[2], q[0] || 0, q[1] || 0, 0) + (Number(plusMin) || 0) * 60000);
+  return icsDate(d) + "T" + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + "00";
+}
 function buildSessionsIcs() {
   const stamp = icsStamp(), trig = icsTrigger();
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Inte-Run//Training//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Inte-Run sessions"];
@@ -10112,7 +10211,17 @@ function buildSessionsIcs() {
       if (s.durMin) bits.push(s.durMin + " min");
       if (s.distKm) bits.push(s.distKm + " km");
       if (s.pace) bits.push(s.pace);
-      lines.push("BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + icsDate(dt), "SUMMARY:" + icsEsc("Inte-Run \— " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \\u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title), "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT");
+      // ⚠️ B3: A SESSION THE RUNNER GAVE A TIME IS A TIMED EVENT, ITS LENGTH THE PLAN'S OWN ESTIMATE, AND ITS
+      // ALERT HALF AN HOUR BEFORE IT — the same half hour the phone's reminder moves to. Everything else is
+      // the all-day event it always was, alarmed at the morning reminder time.
+      const at = sessionTimeAt(dt.toISOString().slice(0, 10), s.id);
+      const when = at
+        ? ["DTSTART:" + icsFloat(dt.toISOString().slice(0, 10), at, 0)].concat(s.durMin > 0 ? ["DTEND:" + icsFloat(dt.toISOString().slice(0, 10), at, s.durMin)] : [])
+        : ["DTSTART;VALUE=DATE:" + icsDate(dt)];
+      lines.push.apply(lines, ["BEGIN:VEVENT", "UID:interun-" + wk.index + "-" + (s.id || (icsDate(dt) + "-" + s.type)) + "@interun.app", "DTSTAMP:" + stamp]
+        .concat(when)
+        .concat(["SUMMARY:" + icsEsc("Inte-Run \— " + s.title), "DESCRIPTION:" + icsEsc(bits.join(" \\u00b7 ") || "Training session"), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(s.title),
+          at ? "TRIGGER:-PT30M" : "TRIGGER;RELATED=START:" + trig, "END:VALARM", "END:VEVENT"]));
     });
   });
   lines.push("END:VCALENDAR");
@@ -10158,7 +10267,8 @@ function remindersSheetHtml() {
       ? 'Your phone holds these reminders, so they arrive whether or not Inte-Run is open. You can also add every session to your calendar below.'
       : 'A web app can only notify reliably while it\\u2019s open (or added to your Home Screen). For an alert that reaches you with Inte-Run closed, add your sessions to your calendar below \— it works on any phone.') + '</div>' +
     '<div class="sd-move" style="margin-top:14px"><div class="sd-move-h">Add sessions to your calendar</div>' +
-    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \— Google, iCloud or Outlook. Inte-Run never sees your password.</div>' +
+    // B3 — what the file now does with a time, said where the runner decides to add it.
+    '<div class="sd-desc" style="margin:2px 0 10px">Adds every planned session. A session you\\u2019ve given a time goes in at that time, with an alert half an hour before; the rest go in as all-day events. Your phone asks <b>which calendar</b> to put them in, so choose the account you want there \— Google, iCloud or Outlook. Inte-Run never sees your password.</div>' +
     '<button class="primary" id="rmIcs" style="width:100%">' + ICON.cal + ' Add to my calendar</button>' +
     (canShareFiles() ? '<button class="rm-alt" id="rmShare">Send the file somewhere else \— email it, or AirDrop it to a computer</button>' : "") +
     '<div class="sd-move-n" id="rmCalNote"></div>' +
@@ -12909,6 +13019,18 @@ function sessionSheetHtml(sess, week) {
   // before it writes, so the button never appears for a session the action would refuse.
   const skipBtn = skipOfferable(sess, week)
     ? '<button class="sd-addlink" id="sdSkip">Skip this session</button>' : "";
+  // ⚠️ B3: A TIME OF DAY, OPTIONAL, FOR A SESSION THE PLAN HOLDS FROM TODAY ON — any kind, the race included
+  // (a race has a start time if anything does). The input is the platform's own time picker, so no invalid
+  // time can be entered; the note says what the time will do, and nothing is promised that the reminders
+  // or the calendar file do not actually do.
+  const tRef = sess.type !== "rest" && sIso >= todayIso() ? planSessionRef(sIso, sess.id) : null;
+  const tNow = tRef ? sessionTimeAt(sIso, sess.id) : "";
+  const timeBlock = tRef
+    ? '<div class="sd-move"><div class="sd-move-h" id="sdTimeL">Time of day</div>' +
+        '<div class="sd-time"><input class="sel" id="sdTime" type="time" value="' + esc(tNow) + '" aria-labelledby="sdTimeL">' +
+        '<button class="mini-btn" id="sdTimeClear"' + (tNow ? "" : " hidden") + '>Clear</button></div>' +
+        '<div class="sd-move-n" id="sdTimeNote">' + esc(sessionTimeNote(tNow)) + '</div></div>'
+    : "";
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
@@ -12921,10 +13043,39 @@ function sessionSheetHtml(sess, week) {
     whyThisSession(sess) +
     fuelHtml(sess) +
     moveBlock +
+    timeBlock +
     addLink +
     elsewhere +
     skipBtn +
     startBtn;
+}
+/**
+ * B3 — what a session's time will do, in one sentence. The reminder half is said only while reminders are
+ * on: promising a nudge the runner has switched off would be a sentence about a feature that is not there.
+ */
+function sessionTimeNote(t) {
+  const on = !!(REMIND && REMIND.enabled);
+  if (!t) return "Optional. Give it a time and your calendar shows it then" + (on ? ", with your reminder half an hour before." : ".");
+  return "Your calendar shows it at " + t + (on ? ", and your reminder comes at " + hmFromMinutes(hmMinutes(t) - 30) + "." : ".");
+}
+/**
+ * B3 — save or clear a session's time from its sheet.
+ * ⚠️ THE SHEET IS PATCHED, NOT REBUILT. A rebuild would throw the runner back to the top of a long sheet
+ * the moment the picker closed; the note and the Clear button are the only things that change, so only
+ * they are touched — the input keeps the value it already shows.
+ * ⚠️ AND THE REMINDERS FOLLOW AT ONCE (initReminders re-arms the page's timers, or re-sends the native
+ * schedule), because a time whose reminder still fires at the old hour is the looks-live trap in a clock.
+ */
+function applySessionTime(sess, iso, value) {
+  if (!sess || !sess.id || !iso) return;
+  const v = hmValid(value);
+  setSessionTime(sess.id, iso, v);
+  try { initReminders(); } catch (e) {}
+  const note = $("sdTimeNote"); if (note) note.textContent = sessionTimeNote(v);
+  const clr = $("sdTimeClear"); if (clr) clr.hidden = !v;
+  const inp = $("sdTime"); if (inp && !v) inp.value = "";
+  toast(v ? "Set for " + v + "." : "Time cleared.");
+  render();
 }
 function ensureSheet() {
   if ($("sheetOv")) return;
@@ -12979,6 +13130,11 @@ function wireSheet() {
   // it needs) and rebuilds the plan, after which SHEET_CTX would describe a session that no longer exists.
   const sdSkip = $("sdSkip");
   if (sdSkip && SHEET_CTX && SHEET_CTX.sess) { const ctx = { sess: SHEET_CTX.sess, week: SHEET_CTX.week }; sdSkip.onclick = () => skipSession(ctx.sess, ctx.week); }
+  // B3 — on change only: the platform picker commits once, and nothing re-renders while it is open.
+  const sdTime = $("sdTime");
+  if (sdTime && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess, iso = sheetSessionIso(); sdTime.onchange = () => applySessionTime(ss, iso, sdTime.value); }
+  const sdTimeClear = $("sdTimeClear");
+  if (sdTimeClear && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess, iso = sheetSessionIso(); sdTimeClear.onclick = () => applySessionTime(ss, iso, ""); }
 }
 function openSessionSheet(sess, week) {
   // Adapted before anything is rendered, so the steps, the paces and the duration chip all describe
@@ -14991,7 +15147,8 @@ function weekDetail() {
       // colour alone is insufficient." A past session that was never ticked is MISSED, and saying so
       // is the whole point — a silent gap teaches the runner nothing.
       const status = done ? "done" : s.id === nextId ? "next" : past ? "missed" : "future";
-      const meta = [s.durMin ? s.durMin + " min" : "", s.distKm ? s.distKm + " km" : "", s.pace || ""]
+      // B3 \u2014 a session's time leads its line, because it is the first thing a runner plans the day around.
+      const meta = [sessionTimeAt(riso, s.id), s.durMin ? s.durMin + " min" : "", s.distKm ? s.distKm + " km" : "", s.pace || ""]
         .filter(Boolean).join(" \u00b7 ");
       return uiSessionRow({ day: dn.slice(0, 3).toUpperCase(), title: s.title, meta: meta,
         colour: "var(--eff-" + s.effort + ")", status: status,

@@ -69,9 +69,11 @@ const FNS = [
   "histForget", "runBestRows", "runBestToast", "flagObservations", "runWorkPace", "impliedRecentFromRun", "plannedRpeBandOf",
   "deleteRun", "linkExistingRun", "unlinkExistingRun", "seedDone", "todayDecision", "runVerdict", "perfBestsHtml",
   "commBests", "clubPbText",
+  // B3: todayDecision reads a session's time through these.
+  "loadTimes", "hmValid", "sessionTimeAt",
 ];
 const CONSTS = ["DAY_ORDER", "MONTHS", "MON_SHORT", "PRIMARY_TYPES", "SESSION_LABEL", "ADD_RUN_TYPES", "LINK_KEY",
-  "PACE_MODEL_VERSION", "UNDO_RUN", "COMM_BESTS", "PB_TYPED_KEY"];
+  "PACE_MODEL_VERSION", "UNDO_RUN", "COMM_BESTS", "PB_TYPED_KEY", "TIME_KEY"];
 
 const ISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return ISO(d); };

@@ -162,6 +162,11 @@ test("BLOCKER: a run saved by the wrist reports the wrist, and one saved here re
   // ordering is what delivers it.
   assert.equal(src(api({ sim: true, source: "watch" })), "Simulated",
     "a simulated run is being credited to the watch");
+  // ⚠️ B1: A RUN ADDED BY HAND WAS RECORDED BY NOTHING, and "This iPhone" would be the same false credit
+  // run.watch once gave every wrist run. The value the builder writes is read from the builder.
+  assert.equal(keyExpr(fnBody("buildManualRun"), "manual"), "true", "buildManualRun no longer marks its run manual");
+  assert.equal(src(api({ manual: true })), "Added by hand", "a run added by hand is credited to the phone");
+  assert.equal(src(api({ manual: true, indoor: true })), "Added by hand");
 });
 
 test("BLOCKER: every field the app reads off a run is written by a save path or a run mutator", () => {
@@ -183,8 +188,12 @@ test("BLOCKER: every field the app reads off a run is written by a save path or 
   // fields (t, d) are in both save literals anyway, so the scope costs nothing.
   const phone = new Set(literalKeys(fnBody("liveRunRecord"), "return"));
   const wrist = new Set(literalKeys(fnBody("ingestWatchRun"), "state.logged.unshift("));
+  // ⚠️ AND A THIRD BUILDER SINCE B1 — a run added by hand, built by buildManualRun and committed by
+  // saveManualRun. Derived the same way, so a field only it writes (manual) is a real writer, not an orphan.
+  const hand = new Set(literalKeys(fnBody("buildManualRun"), "const run = {"));
   assert.ok(phone.has("distKm") && phone.has("pband"), "liveRunRecord's literal was not parsed");
   assert.ok(wrist.has("distKm") && wrist.has("source"), "ingestWatchRun's literal was not parsed");
+  assert.ok(hand.has("distKm") && hand.has("manual"), "buildManualRun's literal was not parsed");
   const mutators = new Set([...CODE.matchAll(/\brun\.([A-Za-z_$][\w$]*)\s*=[^=]/g)].map((m) => m[1]!));
   assert.ok(mutators.size >= 3, "the mutator sweep found almost nothing: " + [...mutators]);
   // ⚠️ THE WRITERS' OWN BODIES ARE EXCLUDED FROM THE READ SCAN, and this is derived from the same pair
@@ -192,13 +201,13 @@ test("BLOCKER: every field the app reads off a run is written by a save path or 
   // `run` too — but it is the WIRE PAYLOAD from the wrist, a different shape: it carries `title`, which
   // the record stores as `t`, so counting its reads reported the record as missing a field it has never
   // had. Same conflation the single-letter scope rule handles for the history store's rows.
-  const scan = [fnBody("liveRunRecord"), fnBody("ingestWatchRun")]
+  const scan = [fnBody("liveRunRecord"), fnBody("ingestWatchRun"), fnBody("buildManualRun")]
     .reduce((s, w) => s.split(decomment(w)).join("\n"), CODE);
   assert.ok(scan.length < CODE.length, "the writers' bodies were not removed from the read scan");
   const reads = [...new Set([...scan.matchAll(/\brun\.([A-Za-z_$][\w$]*)/g)].map((m) => m[1]!))]
     .filter((f) => f.length > 1);
   assert.ok(reads.length >= 30, "the read sweep found only " + reads.length + " fields");
-  const orphans = reads.filter((f) => !phone.has(f) && !wrist.has(f) && !mutators.has(f));
+  const orphans = reads.filter((f) => !phone.has(f) && !wrist.has(f) && !hand.has(f) && !mutators.has(f));
   assert.deepEqual(orphans, [],
     "read off a run and written by nothing: " + orphans.join(", ") +
     " — either write it in a save path or stop reading it");

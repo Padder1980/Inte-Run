@@ -217,14 +217,19 @@ test("⚠️ the adaptive engine is WIRED to the work pace, not just able to com
   // ⚠️ Written as a check on runWorkPace alone, this passed with the wiring deliberately reverted —
   // the helper was right and nothing called it. Both consumers of a run's average pace decide whether
   // to re-anchor the runner's whole plan, so both are named here explicitly.
-  for (const fn of ["flagObservations", "currentWeeklyReview"]) {
-    const body = lift(fn);
-    assert.ok(/avgPaceSecPerKm: runWorkPace\(r\)/.test(body),
-      `${fn} feeds the whole outing's average pace again — warm-up minutes included`);
-    assert.ok(!/avgPaceSecPerKm: r\.avgPaceSec/.test(body),
-      `${fn} still reads r.avgPaceSec directly`);
+  // ⚠️ B1 (2026-10-02) ROUTED BOTH THROUGH ONE TEST FOR A RUN ADDED BY HAND, which feeds no pace at all
+  // (one typed time covers the whole outing). The invariant is unchanged and still pinned: where a pace IS
+  // fed, it is runWorkPace(r) — never r.avgPaceSec.
+  const fo = lift("flagObservations"), wr = lift("currentWeeklyReview");
+  assert.match(fo, /const work = typed \? null : runWorkPace\(r\);/,
+    "flagObservations feeds the whole outing's average pace again — warm-up minutes included");
+  assert.match(fo, /avgPaceSecPerKm: work,/, "flagObservations no longer feeds the work pace it computed");
+  assert.match(wr, /avgPaceSecPerKm: r\.manual \? null : runWorkPace\(r\)/,
+    "currentWeeklyReview feeds the whole outing's average pace again — warm-up minutes included");
+  for (const body of [fo, wr]) {
+    assert.ok(!/avgPaceSecPerKm: r\.avgPaceSec/.test(body), "a consumer still reads r.avgPaceSec directly");
   }
   // And the implied fitness estimate, which is what actually moves the plan.
-  assert.match(lift("flagObservations"), /implied5kSeconds: runWorkPace\(r\)/,
+  assert.match(fo, /implied5kSeconds: work \? impliedRecentFromRun\(r\.type, work\) : null/,
     "the implied 5k is still derived from the whole outing");
 });

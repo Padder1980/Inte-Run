@@ -40,7 +40,7 @@ function fnOf(html: string, name: string): string {
  */
 function sandbox() {
   const html = page();
-  const names = ["isoAdd", "todayIso", "logWeekStartIso", "loadHist", "saveHist", "syncHist", "histForget", "logStreakWeeks"];
+  const names = ["isoAdd", "todayIso", "logWeekStartIso", "loadHist", "saveHist", "runOriginOf", "syncHist", "histForget", "logStreakWeeks"];
   const src = names.map((n) => fnOf(html, n)).join("\n");
   const store: Record<string, string> = {};
   const localStorage = {

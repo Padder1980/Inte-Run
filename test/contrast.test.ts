@@ -252,8 +252,16 @@ test("⚠️ every commit point credits the rack", () => {
   // most-repeated defect is a fix applied to one builder and not the other. A runner who records on
   // their watch would otherwise watch their shoes never wear out.
   const html = css();
-  assert.equal((html.match(/shoeCreditRun\(/g) || []).length, 3,
-    "expected the definition plus BOTH commit points (phone and wrist) to credit the rack");
+  // ⚠️ THREE COMMIT POINTS SINCE B1 — a run added by hand is committed in saveManualRun, and a treadmill
+  // run typed into the Logbook wears the shoes it was run in as surely as one the phone recorded.
+  assert.equal((html.match(/shoeCreditRun\(/g) || []).length, 4,
+    "expected the definition plus all three commit points (phone, wrist and a run added by hand) to credit the rack");
+  for (const c of ["saveLiveSession", "ingestWatchRun", "saveManualRun"]) {
+    const at = html.indexOf("function " + c + "(");
+    assert.ok(at > 0, "no commit point " + c);
+    const next = html.indexOf("\nfunction ", at + 10);
+    assert.match(html.slice(at, next), /shoeCreditRun\(/, c + " does not credit the rack");
+  }
   // ⚠️ SCOPED TO deleteRun's BODY. Written against the whole document, /shoeUncreditRun\(run\)/ matched
   // the FUNCTION DECLARATION — `function shoeUncreditRun(run) {` — so the guard passed with the call
   // site deliberately deleted. A regex that matches a definition can never prove a caller exists.

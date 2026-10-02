@@ -78,6 +78,26 @@ export function resolveSportType(v: unknown): SportType | null {
   return (SPORT_TYPES as readonly string[]).includes(String(v)) ? (v as SportType) : null;
 }
 
+/**
+ * HOW A RUN REACHED THE APP, AND SO WHAT THE ACTIVITY MAY TRUTHFULLY SAY ABOUT IT (stage B1, 2026-10-02).
+ *
+ * ⚠️ "Recorded with Inte-Run" IS FALSE OF A RUN SOMEBODY TYPED IN. The app now lets a runner add a run
+ * it never recorded — a treadmill, another watch — and send it to Strava if they switch that on for the
+ * run. Such a run arrives with origin "added" and is labelled "Added by hand in Inte-Run"; anything
+ * else, including every client that has never heard of this field, is "recorded", which is what every
+ * upload before B1 already said.
+ * ⚠️ STILL TWO FIXED SENTENCES, NEVER CLIENT TEXT. The client picks which of two attributions applies;
+ * it cannot write its own, so the rule above the description — that the attribution is never something
+ * a client can drop or replace — still holds.
+ * ⚠️ ADVERTISED ON /strava/status, LIKE SPORT_TYPES, so the app only offers the switch once a Worker
+ * that knows the difference is deployed. An older one would stamp "Recorded with" on a typed-in run.
+ */
+export const UPLOAD_ORIGINS = ["recorded", "added"] as const;
+export type UploadOrigin = (typeof UPLOAD_ORIGINS)[number];
+export function attributionFor(origin: unknown): string {
+  return origin === "added" ? "Added by hand in Inte-Run." : "Recorded with Inte-Run.";
+}
+
 type Stored = {
   access: string;
   refresh: string;
@@ -308,7 +328,8 @@ async function upload(request: Request, env: StravaEnv, headers: Record<string, 
   // distance, a sets-and-volume count) goes in front of it, so the activity carries more than that on
   // its own -- but the attribution itself is never something a client can drop or replace.
   const extra = String(run.description || "").trim().slice(0, 300);
-  const description = extra ? extra + " Recorded with Inte-Run." : "Recorded with Inte-Run.";
+  const attribution = attributionFor(run.origin);
+  const description = extra ? extra + " " + attribution : attribution;
 
   if (run.kind === "gpx") {
     const gpx = String(run.gpx || "");
@@ -417,21 +438,24 @@ async function uploadStatus(url: URL, env: StravaEnv, headers: Record<string, st
  * ever sending a strength session: an old, already-deployed Worker answers with no sportTypes field
  * at all (or one without "WeightTraining"), and a client that checks for it before sending fails
  * SAFE — nothing goes across rather than a strength session landing on Strava mislabelled as a Run.
+ * ⚠️ origins RIDES BESIDE IT FOR THE SAME REASON (B1): it says this Worker labels a run added by hand
+ * "Added by hand in Inte-Run". Without it the app never offers to send one.
  */
 async function status(url: URL, env: StravaEnv, headers: Record<string, string>): Promise<Response> {
-  if (!configured(env)) return Response.json({ connected: false, configured: false, sportTypes: SPORT_TYPES }, { headers });
+  if (!configured(env)) return Response.json({ connected: false, configured: false, sportTypes: SPORT_TYPES, origins: UPLOAD_ORIGINS }, { headers });
   const dk = url.searchParams.get("dk");
-  if (!validDeviceKey(dk)) return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES }, { headers });
+  if (!validDeviceKey(dk)) return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES, origins: UPLOAD_ORIGINS }, { headers });
   const raw = await env.STRAVA!.get("tok:" + (await keyHash(dk)));
-  if (!raw) return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES }, { headers });
+  if (!raw) return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES, origins: UPLOAD_ORIGINS }, { headers });
   let rec: Stored;
-  try { rec = JSON.parse(raw) as Stored; } catch { return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES }, { headers }); }
+  try { rec = JSON.parse(raw) as Stored; } catch { return Response.json({ connected: false, configured: true, sportTypes: SPORT_TYPES, origins: UPLOAD_ORIGINS }, { headers }); }
   return Response.json({
     connected: true,
     configured: true,
     name: rec.athleteName,
     canWrite: /activity:write/.test(rec.scope || ""),
     sportTypes: SPORT_TYPES,
+    origins: UPLOAD_ORIGINS,
   }, { headers });
 }
 

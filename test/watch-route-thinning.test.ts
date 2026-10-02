@@ -305,6 +305,11 @@ function ingest(payload: Record<string, unknown>) {
     // in saveLiveSession — the lift list is hand-written on purpose, so it fails loudly rather than
     // quietly measuring less, and these six tests failed with a ReferenceError until it was here.
     clubMaybeAutoPost: noop,
+    // ⚠️ B1 (2026-10-02): the "New best" toast and the session link, for the same reason — side effects of
+    // the save, guarded where they live (test/manual-runs.test.ts). Added when the calls arrived, and these
+    // tests failed with a ReferenceError until they were here, which is the hand-written list doing its job.
+    runBestToast: noop,
+    linkRunTo: noop,
     maybeAutoPaceCalibrate: () => false,
     maybeTrainingFlags: () => true,
     assessFitnessFromRun: noop,

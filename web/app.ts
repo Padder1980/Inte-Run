@@ -2547,6 +2547,13 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .perf-e { margin: var(--s3) 0 0; padding-top: var(--s3); border-top: 1px solid var(--line); font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
 .perf-a { width: 100%; min-height: var(--tap); margin-top: var(--s3); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-ctl); color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 .perf-sum { margin: var(--s3) 2px 0; font-size: var(--t-meta); line-height: 1.5; color: var(--ink-faint); }
+/* B1 — Best times. The rows are the shared .ui-row; the time is the only new part, and it is the number
+   the row exists to show, so it takes the card size and the tabular figures every other figure here uses. */
+.bt-list { margin-top: var(--s2); }
+.bt-time { flex: none; font-size: var(--t-card); font-weight: 700; color: var(--ink); }
+/* B1 — the Strava switch on Add a run: the label and the app's own .lsw switch, on one line. */
+.ar-stv { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-top: var(--s4); }
+.ar-stv-t { font-size: var(--t-body); font-weight: 650; color: var(--ink); }
 /* The consistency streak: one flame per week, then a line to keep it going. */
 .st-row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .st-flames { display: inline-flex; gap: 2px; }
@@ -6434,6 +6441,26 @@ const SDONE_KEY = "interun_sdone_v1";
  */
 const PROG_KEY = "interun_prog_v1";
 /**
+ * Stage B1. Which planned session each run fulfilled: { runId: { sid, wk, iso } } — the session's id,
+ * its 1-based plan week and the date it sat on when the link was made.
+ *
+ * ⚠️ DECLARED HERE, WITH THE OTHER STORE KEYS, BECAUSE seedDone READS IT, and seedDone runs at module
+ * top level through recompute. A key declared beside its own functions would sit in its temporal dead
+ * zone, throw, and be swallowed by the try around the replay — JOURNAL_KEY's story above.
+ *
+ * ⚠️ IT EXISTS BECAUSE state.done IS NEVER STORED. seedDone rebuilds it from scratch on every launch
+ * and every plan change, ticking everything dated before today whether or not it happened, so a run
+ * finished TODAY was unticked again the next time the app opened. A link is the fact that survives:
+ * this run was that session. Written by all three places a run is committed — the phone, the wrist and
+ * a run added by hand — and replayed by seedDone on (week, session id), never on the id alone, because
+ * ids recur across rebuilds of different plans.
+ *
+ * ⚠️ NOTHING PRUNES IT ON A REBUILD. No undo snapshot (a pause, a cancelled break, a profile save)
+ * includes this store, so a prune in seedDone would be permanent the moment a rebuild made a link look
+ * stale. An unmatched link is inert; one is removed only when its run is deleted, or the runner unlinks it.
+ */
+const LINK_KEY = "interun_link_v1";
+/**
  * Whether EXTRA has been initialised yet. Declared up here with the store keys because that is the
  * only place it can be: it exists to tell adoptPlan, which runs at module top level, that EXTRA is
  * still in its temporal dead zone five thousand lines below. See refreshProgExtras.
@@ -6604,6 +6631,48 @@ function loadHist() {
 }
 function saveHist(rows) { try { localStorage.setItem("interun_hist_v1", JSON.stringify(rows)); } catch (e) {} }
 /**
+ * Why a run's distance is NOT a GPS measurement, or null when it is — the history row's x (stage B1).
+ * The one mapping: syncHist writes it, and every best-time question asks it.
+ *   manual  added by hand in the Logbook or from a session ("I did this run elsewhere")
+ *   sim     the browser demo's simulator, which invents distance and a route
+ *   indoor  a treadmill run, its distance read off the machine
+ *   nogps   an outdoor phone run whose GPS was refused or never arrived (see liveRunRecord)
+ * ⚠️ ORDER MATTERS ONLY FOR IMPOSSIBLE PAIRS. A hand-added treadmill run carries indoor too, and is
+ * "manual" first, because how it reached the app is the stronger statement.
+ */
+function runOriginOf(r) {
+  if (!r) return null;
+  if (r.manual) return "manual";
+  if (r.sim) return "sim";
+  if (r.indoor) return "indoor";
+  if (r.nogps) return "nogps";
+  return null;
+}
+/** Every run the history knows, in the shape the best-time engine reads. */
+function runBestRows() {
+  return (state.hist || []).filter((r) => r && r.i).map((r) =>
+    ({ id: String(r.i), dateIso: String(r.d || ""), km: Number(r.k) || 0, sec: Number(r.s) || 0, origin: r.x || null }));
+}
+/**
+ * "New best" — said once, at the moment a run is saved, and only when it is true (stage B1).
+ * ⚠️ AT THE SAVE POINTS ONLY — the phone's and the wrist's. Never from syncHist, whose first pass after
+ * an update back-fills fifty runs and would announce every best the runner has ever set at once, and
+ * never from a render. A6 put its strength toast at the Finish commit for the same reason.
+ * ⚠️ A RUN ADDED BY HAND NEVER GETS ONE: its distance was typed, so runOriginOf flags it and
+ * RC.newBest refuses it — and a first at a distance is not a record either (see records.ts).
+ */
+function runBestToast(run) {
+  try {
+    if (!run || !run.id) return;
+    const hit = RC.newBest(runBestRows(), { id: String(run.id), dateIso: String(run.dateIso || ""),
+      km: Number(run.distKm) || 0, sec: Number(run.sec) || 0, origin: runOriginOf(run) });
+    if (!hit) return;
+    const d = hit.previousSec - hit.sec;
+    const by = d < 60 ? d + (d === 1 ? " second" : " seconds") : fmtTimeFull(d);
+    toast("New best: " + hit.label + " in " + fmtTimeFull(hit.sec) + ", " + by + " quicker than your last.");
+  } catch (e) {}
+}
+/**
  * Merge every loaded run into the permanent history. Existing rows are REFRESHED rather than
  * skipped, because a run genuinely changes after it is first saved -- a treadmill distance is typed
  * in afterwards, and applyTreadmillDistance edits the record in place.
@@ -6628,11 +6697,30 @@ function syncHist() {
     const km = Math.round((Number(r.distKm) || 0) * 100) / 100;
     const sec = Math.round(Number(r.sec) || 0);
     const ty = String(r.type || "");
-    const el = Math.round(Number(r.elevGain) || 0);
+    // ⚠️ A RUN ADDED BY HAND HAS NO ELEVATION, AND ITS ROW SAYS SO BY LEAVING e OUT rather than writing a
+    // climb of 0 m that nobody measured. Every reader sums Number(e) || 0, so totals are unchanged.
+    const el = r.manual ? undefined : Math.round(Number(r.elevGain) || 0);
+    // ⚠️ B1: x SAYS WHY THIS ROW'S DISTANCE IS NOT A GPS MEASUREMENT. The row outlives its run (that is
+    // the store's whole point), so a best time read from history months later can only know a run was
+    // typed in, on a treadmill or simulated if the row itself carries it. Absent = measured outdoors.
+    // ⚠️ A ROW WHOSE RUN AGED OUT BEFORE THIS SHIPPED CAN NEVER GAIN AN x — its record is gone — so
+    // absent strictly means "measured, or recorded before the flag existed". Nothing earlier could
+    // be added by hand, which is the case that matters.
+    const xo = runOriginOf(r);
     const j = at[r.id];
-    if (j == null) { at[r.id] = rows.length; rows.push({ i: r.id, d: r.dateIso, k: km, s: sec, t: ty, e: el }); dirty = true; continue; }
+    if (j == null) {
+      const row = { i: r.id, d: r.dateIso, k: km, s: sec, t: ty };
+      if (el !== undefined) row.e = el;
+      if (xo) row.x = xo;
+      at[r.id] = rows.length; rows.push(row); dirty = true; continue;
+    }
     const w = rows[j];
-    if (w.d !== r.dateIso || w.k !== km || w.s !== sec || w.t !== ty || w.e !== el) { w.d = r.dateIso; w.k = km; w.s = sec; w.t = ty; w.e = el; dirty = true; }
+    if (w.d !== r.dateIso || w.k !== km || w.s !== sec || w.t !== ty || w.e !== el || w.x !== xo) {
+      w.d = r.dateIso; w.k = km; w.s = sec; w.t = ty;
+      if (el !== undefined) w.e = el; else delete w.e;
+      if (xo) w.x = xo; else delete w.x;
+      dirty = true;
+    }
   }
   // Newest first, matching state.logged, so every reader can stop early.
   if (dirty) { rows.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0)); saveHist(rows); }
@@ -7590,6 +7678,95 @@ function moveSession(week, sess, target) {
   try { syncNativeReminders(); } catch (e) {}
 }
 function doneKey(wIdx, s) { return wIdx + "|" + s.day + "|" + s.title; }
+/**
+ * ⚠️ A RAW SESSION HAS NO .day, so doneKey(week, raw) reads "n|undefined|title" and can never match
+ * what seedDone writes. todayDecision asked exactly that question — selectedSession() is a RAW session —
+ * so "Done for today" was unreachable for as long as it has existed. Resolve the summary twin by id.
+ */
+function rawSessionDone(wk, raw) {
+  const s = wk && raw ? (wk.sessions || []).find((x) => x.id === raw.id) : null;
+  return !!(s && state.done[doneKey(wk.index, s)]);
+}
+// ---- Runs linked to planned sessions (stage B1) — the store is LINK_KEY, declared with the others ----
+function loadLinks() {
+  try { const v = JSON.parse(localStorage.getItem(LINK_KEY) || "{}"); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; } catch (e) { return {}; }
+}
+function saveLinks(m) {
+  try { Object.keys(m).length ? localStorage.setItem(LINK_KEY, JSON.stringify(m)) : localStorage.removeItem(LINK_KEY); } catch (e) {}
+}
+function runLinkOf(runId) { const l = runId ? loadLinks()[runId] : null; return (l && l.sid && l.iso) ? l : null; }
+function linkRunTo(runId, ref) {
+  if (!runId || !ref || !ref.sid || !ref.iso) return;
+  const m = loadLinks();
+  m[runId] = { sid: String(ref.sid), wk: Number(ref.wk) || null, iso: String(ref.iso) };
+  // ⚠️ WHAT LINKING CHANGED ON THE RUN, KEPT SO UNLINKING CAN PUT IT BACK EXACTLY. Only a run linked
+  // after the fact carries one; a run linked as it was saved had nothing to restore.
+  if (ref.was) m[runId].was = ref.was;
+  saveLinks(m);
+}
+function unlinkRun(runId) {
+  const m = loadLinks();
+  const was = m[runId] || null;
+  if (was) { delete m[runId]; saveLinks(m); }
+  return was;
+}
+/**
+ * The plan's summary session a link points at: the week CONTAINING the date, then the id inside it.
+ * ⚠️ BY WEEK, NOT BY EXACT DAY, so a session the runner later drags to another day of the same week is
+ * still the session the run fulfilled. Ids carry their week ("w7-d2-easy"), so within one plan the pair
+ * is unique; across a rebuild into a different plan, the same calendar week holding the same id is the
+ * same prescription in every sense the tick cares about.
+ */
+function planSessionRef(iso, sid) {
+  if (!iso || !sid) return null;
+  for (const wk of PLAN.weeks) {
+    if (iso < wk.startIso || iso > isoAdd(wk.startIso, 6).toISOString().slice(0, 10)) continue;
+    const s = (wk.sessions || []).find((x) => x.id === sid);
+    return s ? { wk: wk, s: s } : null;
+  }
+  return null;
+}
+function tickSession(iso, sid) {
+  const r = planSessionRef(iso, sid);
+  if (r) state.done[doneKey(r.wk.index, r.s)] = true;
+  return r;
+}
+/**
+ * The date a planned session sits on, found by its id. RAW and PLAN weeks share an index, and effDay
+ * honours a reschedule. null for anything the plan does not hold — an added session or a built run —
+ * which is right: those have no week and no tick to give.
+ */
+function plannedSessionIso(sess) {
+  if (!sess || !sess.id) return null;
+  for (let wi = 0; wi < RAW.weeks.length; wi++) {
+    const s = ((RAW.weeks[wi] && RAW.weeks[wi].sessions) || []).find((x) => x.id === sess.id);
+    if (s && PLAN.weeks[wi]) return isoAdd(PLAN.weeks[wi].startIso, effDay(s)).toISOString().slice(0, 10);
+  }
+  return null;
+}
+/** The run already linked to this session, if any — so a fulfilled session is not offered a second run. */
+function linkedRunFor(wkIdx, sid) {
+  const m = loadLinks();
+  for (const rid of Object.keys(m)) {
+    const l = m[rid];
+    if (!l || l.sid !== sid) continue;
+    const r = planSessionRef(l.iso, l.sid);
+    if (r && r.wk.index === wkIdx) return rid;
+  }
+  return null;
+}
+/**
+ * Take a session's tick away when the run behind it goes.
+ * ⚠️ ONLY TODAY AND LATER. seedDone ticks every earlier session whether it happened or not, so removing
+ * a past tick here would be contradicted by the next rebuild; for those, the link going is the change.
+ * ⚠️ AND NOT WHILE ANOTHER RUN STILL FULFILS IT — a run recorded on the watch and the same run added by
+ * hand are two links to one session, and deleting one of them leaves the session done.
+ */
+function untickSession(iso, sid) {
+  const r = planSessionRef(iso, sid);
+  if (!r || linkedRunFor(r.wk.index, sid)) return;
+  if (isoAdd(r.wk.startIso, effDay(r.s)).toISOString().slice(0, 10) >= todayIso()) delete state.done[doneKey(r.wk.index, r.s)];
+}
 // Mark every session dated before the real today as done, so the calendar and Today reflect progress
 // up to now. (When the plan starts today, nothing is marked — a fresh start.)
 function seedDone() {
@@ -7688,6 +7865,15 @@ function seedDone() {
       }));
     }
   } catch (e) { try { console.warn("strength completion replay skipped", e); } catch (e2) {} }
+  // ⚠️ B1: THE SAME REPLAY FOR RUNS, FROM THE LINK STORE. A run finished today used to tick its session
+  // in memory only, so the next launch — or any plan change, since every rebuild calls this — unticked
+  // it again, and Today offered a session the runner had already done. The link is the stored fact.
+  // ⚠️ NEVER PRUNED HERE. See LINK_KEY: a prune in a function every rebuild calls is a permanent
+  // deletion triggered by a plan change, with no undo snapshot that knows about it.
+  try {
+    const links = loadLinks();
+    Object.keys(links).forEach((rid) => { const l = links[rid]; if (l && l.sid && l.iso) tickSession(l.iso, l.sid); });
+  } catch (e) { try { console.warn("run link replay skipped", e); } catch (e2) {} }
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -7900,7 +8086,11 @@ function examplePlanBanner() {
 function todayDecision() {
   const sess = selectedSession();
   const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
-  const doneToday = !!(sess && state.done[doneKey(curWeek().index, sess)]);
+  // ⚠️ rawSessionDone, NOT doneKey(…, sess). sess is a RAW session with no .day, so the old key could
+  // never match and "Done for today" below never once showed.
+  // ⚠️ AND ONLY ON THE REAL TODAY. seedDone ticks every earlier day whether it was run or not, so on a
+  // past day a tick means "in the past", and "Done for today · logged" there would be a claim.
+  const doneToday = !!(sess && onToday && rawSessionDone(curWeek(), sess));
   const nxt = todayNextUp();
 
   if (!sess || sess.type === "rest") {
@@ -8817,6 +9007,16 @@ function runStravaPayload(run) {
   // appearing twice in somebody's training log.
   const externalId = String((run && run.id) || "");
   if (pts.length < 2) {
+    // ⚠️ B1: A RUN ADDED BY HAND SAYS WHERE IT WAS, AND THE ROUTE IS NOT HOW TO TELL. trainer was "no
+    // route", which is right for a recorded run — no route means the phone was indoors — and wrong for a
+    // hand-added one, which never has a route and was as likely run outside. The runner said which.
+    // origin "added" is what the server reads to write "Added by hand" instead of "Recorded with".
+    if (run.manual) {
+      return { kind: "manual", name: name, type: type, startMs: startMs, startLocal: startLocal, externalId: externalId,
+               distanceM: Math.round((Number(run.distKm) || 0) * 1000),
+               elapsedSec: Math.round(Number(run.sec) || 0),
+               trainer: !!run.indoor, origin: "added" };
+    }
     return { kind: "manual", name: name, type: type, startMs: startMs, startLocal: startLocal, externalId: externalId,
              distanceM: Math.round((Number(run.distKm) || 0) * 1000),
              elapsedSec: Math.round(Number(run.sec) || 0),
@@ -9109,12 +9309,20 @@ function ingestWatchRun(run) {
   // who expects their runs to appear in Strava without being asked twice.
   stravaMaybeAutoSend(state.logged[0]);
   // ⚠️ BESIDE THE STRAVA CALL FOR THE SAME REASON, AND THAT REASON IS THE COMMENT ABOVE THIS ONE: a hook
-  // added to the phone's save path and not the wrist's is this project's most-repeated trap, and this is
-  // the one place both arrive. Off unless the runner asked for it, and it never posts the same run twice.
+  // added to the phone's save path and not the wrist's is this project's most-repeated trap. This comment
+  // used to call this "the one place both arrive", which it never was — a phone run is committed in
+  // saveLiveSession — and B1 found that path had no grid hook at all. It has one now, and so does a run
+  // added by hand. Off unless the runner asked for it, and it never posts the same run twice.
   clubMaybeAutoPost(state.logged[0]);
+  runBestToast(state.logged[0]);
   if (planned) {
     const wk = PLAN.weeks.find((w) => w.sessions.indexOf(planned) >= 0);
-    if (wk) state.done[doneKey(wk.index, planned)] = true;
+    if (wk) {
+      state.done[doneKey(wk.index, planned)] = true;
+      // ⚠️ B1: AND KEPT. The tick above is memory only, so a wrist run finished this morning was unticked
+      // by the next launch; the link is what seedDone replays.
+      linkRunTo(run.id, { sid: planned.id, wk: wk.index, iso: iso });
+    }
   }
   // And run the same adaptive checks, so a wrist run can raise a flag like any other.
   const wctx = { title: title, session: planned, completedFull: true, dayOfWeek: null };
@@ -10177,10 +10385,13 @@ function alfieIntents() {
     { k: ["cross train", "cycling", "swim", "elliptical"], a: () => "<p><b>Cross-training</b> is excellent when you can\\u2019t run \— cycling, swimming and the elliptical keep the aerobic engine going with far less impact.</p><p>It isn\\u2019t a like-for-like replacement for running specificity, but during injury or heavy weeks it protects most of your fitness.</p>" },
     { k: ["warm up", "warmup", "cool down", "stretch"], a: () => "<p><b>Warm up</b> before quality: easy jogging, then some dynamic movement, then a few strides. It matters much more before intervals than before an easy run.</p><p><b>Cool down</b> with a few easy minutes. Long static stretching after running is largely optional \— do it if you enjoy it.</p>" },
     { k: ["how am i doing", "progress", "improving", "getting fitter"], a: () => {
-      const runs = (state.logged || []).length;
-      return "<p>" + (runs ? "You\\u2019ve logged <b>" + runs + "</b> run" + (runs === 1 ? "" : "s") + " in the app so far." : "You haven\\u2019t logged a run in the app yet \— once you do, Performance will start showing trends.") + "</p>" +
+      // ⚠️ B1: THE UNCAPPED HISTORY, NOT state.logged. The run store keeps fifty, so this told a runner
+      // with two hundred runs behind them that they had logged fifty. And it now names what Performance
+      // actually shows — best times and fitness estimates — instead of trends it has never drawn.
+      const runs = (state.hist || []).length;
+      return "<p>" + (runs ? "You\\u2019ve logged <b>" + runs + "</b> run" + (runs === 1 ? "" : "s") + " in the app so far." : "You haven\\u2019t logged a run in the app yet \— once you do, your Logbook and best times fill in.") + "</p>" +
         "<p>The honest signals of progress are: the same pace at a lower effort, easier recovery between sessions, and consistency over months. Week-to-week fluctuations are mostly noise.</p>" +
-        "<p class=\\"alf-dim\\">Activities \\u2192 Performance shows your trends and bests.</p>";
+        "<p class=\\"alf-dim\\">Logbook \\u2192 Performance shows your best times, and what your paces are based on.</p>";
     } },
     { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into Inte-Run. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \— for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
   ];
@@ -12568,6 +12779,15 @@ function sessionSheetHtml(sess, week) {
       ? uiActionBar({ state: "start", id: "sdStrength",
           label: sdoneHas(sheetSessionIso(), sess.id) ? "Do it again" : "Start session" }) : "";
   const addLink = '<button class="sd-addlink" id="sdAdd">\\uFF0B Add a different session ' + dayPhraseIso(isoAdd(weekByNo(week).startIso, effDay(sess)).toISOString().slice(0, 10)) + '</button>';
+  // ⚠️ B1: "I DID THIS RUN ELSEWHERE" — on a treadmill or with another watch — opens Add a run with this
+  // session already chosen. Only on a runnable session the PLAN holds (an added or programme session has
+  // no week to be ticked in), dated today or earlier (a future day cannot have been run), and not already
+  // fulfilled: by a linked run, or — today — by one finished since the app opened.
+  const sIso = isoAdd(weekByNo(week).startIso, effDay(sess)).toISOString().slice(0, 10);
+  const sRef = PRIMARY_TYPES[sess.type] ? planSessionRef(sIso, sess.id) : null;
+  const elsewhere = (sRef && sIso <= todayIso() && !linkedRunFor(sRef.wk.index, sess.id) &&
+      !(sIso === todayIso() && state.done[doneKey(sRef.wk.index, sRef.s)]))
+    ? '<button class="sd-addlink" id="sdElsewhere">I did this run elsewhere</button>' : "";
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
@@ -12581,6 +12801,7 @@ function sessionSheetHtml(sess, week) {
     fuelHtml(sess) +
     moveBlock +
     addLink +
+    elsewhere +
     startBtn;
 }
 function ensureSheet() {
@@ -12629,6 +12850,9 @@ function wireSheet() {
     sdStrength.onclick = () => openStrengthPlayer(ss, sheetSessionIso());
   }
   const sdAdd = $("sdAdd"); if (sdAdd) sdAdd.onclick = () => { const iso = sheetSessionIso(); closeSheet(); openAddSessionSheet(iso); };
+  // B1 — in place, keeping SHEET_CTX, so the form's Back returns to this session rather than closing.
+  const sdEl = $("sdElsewhere");
+  if (sdEl && SHEET_CTX && SHEET_CTX.sess) { const ctx = { sess: SHEET_CTX.sess, week: SHEET_CTX.week }; sdEl.onclick = () => openAddRunSheet(ctx); }
 }
 function openSessionSheet(sess, week) {
   // Adapted before anything is rendered, so the steps, the paces and the duration chip all describe
@@ -14681,10 +14905,15 @@ function deleteRunById(id) {
   if (idx < 0) return;
   deleteRun(idx);
 }
-function deleteRun(idx) {
+// quiet: the Undo of "Run added" removes the run through here too — one way a run leaves, not two — but
+// without offering an Undo of its own for a run the runner has just said they did not mean to add.
+function deleteRun(idx, quiet) {
   const run = state.logged[idx];
   if (!run) return;
-  UNDO_RUN = { run: run, idx: idx };
+  // B1: the run's link to its session goes with it, and the undo below brings both back.
+  const link = unlinkRun(run.id);
+  UNDO_RUN = { run: run, idx: idx, link: link };
+  if (link) untickSession(link.iso, link.sid);
   state.logged.splice(idx, 1);
   // ⚠️ AND TAKE THE DISTANCE BACK OFF THE SHOE, or the rack only ever climbs and the one number that
   // says "replace these" becomes fiction after the first mistaken entry.
@@ -14695,12 +14924,14 @@ function deleteRun(idx) {
   saveRuns();
   clearTrainFlag();
   render();
+  if (quiet) { UNDO_RUN = null; return; }
   toastUndo("Run deleted", () => {
     if (!UNDO_RUN) return;
     state.logged.splice(Math.min(UNDO_RUN.idx, state.logged.length), 0, UNDO_RUN.run);
     // ⚠️ Undo must put the mileage back too. The run still carries its shoeId, but shoeCreditRun
     // refuses a run that already has one — so credit it explicitly rather than through that guard.
     shoeRecreditRun(UNDO_RUN.run);
+    if (UNDO_RUN.link) { linkRunTo(UNDO_RUN.run.id, UNDO_RUN.link); tickSession(UNDO_RUN.link.iso, UNDO_RUN.link.sid); }
     saveRuns(); UNDO_RUN = null; render();
   });
 }
@@ -14715,14 +14946,384 @@ function toastUndo(msg, undo) {
   UNDO_T = setTimeout(() => { t.classList.remove("on"); UNDO_RUN = null; }, 6000);
 }
 
+/* ══ B1 · A RUN ADDED BY HAND, AND A RUN TOLD WHICH SESSION IT WAS ══════════════════════════════════
+ * PLAN.md B1, built 2026-10-02: "Ran on a gym treadmill or another watch? Add it (distance, time, date,
+ * type) and say this was my planned session. Nothing is invented — no route, no splits, no heart rate."
+ *
+ * ⚠️ THE THIRD COMMIT POINT, WRITTEN AGAINST THE OTHER TWO. A hook on one save path and not another is
+ * this project's most-repeated defect, and mapping the two that existed found a fresh one (the phone
+ * never posted to the grid). saveManualRun makes the same calls in the same order as saveLiveSession —
+ * the shoe before the record is stored, then saveRuns, then the grid — and leaves out, by name and on
+ * purpose, the three that would put a typed number to work as a measurement: Health (whatever recorded
+ * this run has usually written the workout already), the pace calibration and the fitness hint (both
+ * re-anchor the plan from a pace). test/manual-runs.test.ts holds the three paths against each other.
+ *
+ * ⚠️ STRAVA IS ASKED, PER RUN — the owner's choice, 2026-10-02: "Ask me each time". A run another watch
+ * recorded is usually on Strava already, and a second copy in somebody's feed is theirs to clean up. So
+ * the switch is off unless they turn it on; it needs a start time, because Strava will not take a run
+ * without one and this app does not invent one; and it only appears once the deployed server has said it
+ * labels the activity "Added by hand in Inte-Run" rather than "Recorded with Inte-Run" — A8's handshake,
+ * failing closed (see stravaCanAddedRuns).
+ *
+ * ⚠️ AND IT NEVER JUDGES PACE. One typed time covers the whole outing — warm-up, stops, the lot — so the
+ * debrief, the flags engine, the weekly review and the trends all treat it as a run that happened and
+ * not as a measurement of how fast. How it FELT, against the effort a linked session asked for, is real.
+ */
+// The run types a runner can add, in the order they think of them. SESSION_LABEL has no entry for a
+// race, which is why the label is looked up through addRunTypeLabel rather than read directly.
+const ADD_RUN_TYPES = ["easy", "long", "recovery", "threshold", "vo2", "race"];
+function addRunTypeLabel(t) { return t === "race" ? "Race" : (SESSION_LABEL[t] || "Run"); }
+// The open "Add a run" form. Kept here, never read back out of the DOM, so a field is never rebuilt
+// under the finger and Back to the session loses nothing.
+let ADDRUN = null;
+function dayGap(a, b) { return Math.round((isoAdd(a, 0).getTime() - isoAdd(b, 0).getTime()) / 86400000); }
+/**
+ * The planned sessions a run on this date could have been: the runnable ones in the plan week holding the
+ * date, nearest day first, minus any that another run already fulfils.
+ * ⚠️ RAW SESSIONS, BECAUSE THE STAMPS NEED THE PRESCRIPTION. PLAN.weeks is the display summary with no
+ * steps; sessionStepText and plannedRpeBandOf read RAW — the trap CLAUDE.md records on its own line.
+ */
+function linkCandidatesFor(iso, exceptRunId) {
+  if (!iso) return [];
+  const wi = PLAN.weeks.findIndex((w) => iso >= w.startIso && iso <= isoAdd(w.startIso, 6).toISOString().slice(0, 10));
+  if (wi < 0 || !RAW.weeks[wi]) return [];
+  const wk = PLAN.weeks[wi];
+  return (RAW.weeks[wi].sessions || []).filter((s) => PRIMARY_TYPES[s.type]).map((s) => ({
+      sid: s.id, wk: wk.index, iso: isoAdd(wk.startIso, effDay(s)).toISOString().slice(0, 10),
+      title: s.title, type: s.type, raw: s }))
+    .filter((c) => { const other = linkedRunFor(c.wk, c.sid); return !other || other === exceptRunId; })
+    .sort((a, b) => (Math.abs(dayGap(a.iso, iso)) - Math.abs(dayGap(b.iso, iso))) || (a.iso < b.iso ? -1 : 1));
+}
+function linkCandidateLabel(c) {
+  const d = isoAdd(c.iso, 0);
+  return DAY_ORDER[(d.getUTCDay() + 6) % 7] + " " + dmon(d) + " · " + c.title;
+}
+/**
+ * Open the form. from = null for the Logbook, or { sess, week } from a session's own sheet, which
+ * arrives with that session already chosen and its date filled in.
+ */
+function openAddRunSheet(from) {
+  const today = todayIso();
+  let iso = today, link = "", type = "easy";
+  if (from && from.sess && from.week) {
+    const sIso = isoAdd(weekByNo(from.week).startIso, effDay(from.sess)).toISOString().slice(0, 10);
+    iso = sIso < today ? sIso : today;
+    link = String(from.sess.id); type = from.sess.type;
+  }
+  ADDRUN = { iso: iso, start: "", km: "", h: 0, m: 0, s: 0, type: type, tread: false, link: link, strava: false, back: !!from };
+  ensureSheet();
+  // ⚠️ FROM A SESSION, SHEET_CTX IS LEFT ALONE, so Back rebuilds that session's sheet in place — the rule
+  // every picker that returns somewhere already follows (see reopenSessionSheet).
+  if (!from) SHEET_CTX = null;
+  renderAddRunSheet();
+  $("sheetOv").classList.add("on");
+}
+function renderAddRunSheet() {
+  const d = ADDRUN; if (!d) return;
+  const opt = (v, label, sel) => '<option value="' + esc(String(v)) + '"' + (sel ? " selected" : "") + '>' + esc(label) + '</option>';
+  const nums = (n, sel, pad) => { let o = ""; for (let i = 0; i < n; i++) o += opt(i, pad ? String(i).padStart(2, "0") : String(i), i === sel); return o; };
+  // ⚠️ THE TIME IS THREE WHEELS, THE CONTROL THE OWNER ASKED FOR WHEN HE HIT A TYPED TIME ON HIS PB ROW
+  // ("maybe it's best if it's scroll wheel options for hours: minutes: seconds"). Native selects, so iOS
+  // draws its own picker, and no invalid time can be entered at all. Same classes as those rows.
+  const wheel = (part, n, sel, pad, label) => '<select class="ce-w" id="arT' + part + '" aria-label="' + label + '">' + nums(n, sel, pad) + '</select>';
+  const cands = linkCandidatesFor(d.iso, null);
+  if (d.link && !cands.some((c) => c.sid === d.link)) d.link = "";
+  const linked = cands.find((c) => c.sid === d.link) || null;
+  if (linked) d.type = linked.type;
+  const types = ADD_RUN_TYPES.indexOf(d.type) >= 0 ? ADD_RUN_TYPES : ADD_RUN_TYPES.concat([d.type]);
+  const stv = stravaCanAddedRuns();
+  if (!stv) d.strava = false;
+  $("sheetBody").innerHTML =
+    '<div class="eyebrow">Logbook</div>' +
+    '<h3 class="sheet-h">Add a run</h3>' +
+    '<p class="bk-md">For a run Inte-Run did not record: on a treadmill, or with another watch. Only what you put in is saved, so there is no map, no splits and no heart rate.</p>' +
+    '<div class="adj-dates">' +
+      '<label class="adj-d"><span>Date</span><input class="sel" id="arDate" type="date" value="' + esc(d.iso) + '" max="' + esc(todayIso()) + '"></label>' +
+      '<label class="adj-d"><span>Start time (optional)</span><input class="sel" id="arStart" type="time" value="' + esc(d.start) + '"></label>' +
+    '</div>' +
+    '<div class="adj-dates">' +
+      '<label class="adj-d"><span>Distance in km</span><input class="sel num" id="arKm" inputmode="decimal" placeholder="e.g. 8.05" value="' + esc(d.km) + '"></label>' +
+      '<div class="adj-d"><span id="arTimeL">Time it took</span><div class="ce-pb-w" role="group" aria-labelledby="arTimeL">' +
+        wheel("h", 10, d.h, false, "Hours") + '<i>:</i>' + wheel("m", 60, d.m, true, "Minutes") + '<i>:</i>' + wheel("s", 60, d.s, true, "Seconds") +
+      '</div></div>' +
+    '</div>' +
+    '<div class="adj-dates">' +
+      '<label class="adj-d"><span>Where</span><select class="sel" id="arWhere">' + opt("out", "Outside", !d.tread) + opt("tread", "Treadmill", d.tread) + '</select></label>' +
+      '<label class="adj-d"><span>Type of run</span><select class="sel" id="arType"' + (linked ? " disabled" : "") + '>' +
+        types.map((t) => opt(t, addRunTypeLabel(t), t === d.type)).join("") + '</select></label>' +
+    '</div>' +
+    '<label class="adj-d"><span>Was it a planned session?</span><select class="sel" id="arLink">' +
+      opt("", cands.length ? "No, it was an extra run" : "Nothing was planned that week", !d.link) +
+      cands.map((c) => opt(c.sid, linkCandidateLabel(c), c.sid === d.link)).join("") + '</select></label>' +
+    (stv
+      ? '<div class="ar-stv"><span class="ar-stv-t" id="arStvL">Also send to Strava</span>' +
+          '<button class="lsw' + (d.strava ? " on" : "") + '" id="arStrava" role="switch" aria-checked="' + (d.strava ? "true" : "false") + '" aria-labelledby="arStvL"><span class="lsw-k"></span></button></div>' +
+        '<p class="mp-note">Off unless you turn it on. If another watch recorded this run, it is probably on Strava already. Strava needs the time you started.</p>'
+      : "") +
+    '<div class="wz-err" id="arErr" role="alert" hidden></div>' +
+    '<div class="act-pair"><button class="ap-no" id="arCancel">' + (d.back ? "Back" : "Cancel") + '</button>' +
+      '<button class="ap-yes" id="arSave">Add this run</button></div>' +
+    '<p class="mp-note">Afterwards, its own page asks how hard it felt and has room for a note, like any other run.</p>';
+  wireAddRun();
+}
+function wireAddRun() {
+  const d = ADDRUN; if (!d) return;
+  // ⚠️ EVERY FIELD WRITES ADDRUN AS IT CHANGES, AND ONLY THE DATE AND THE SESSION RE-RENDER. Those two
+  // change what the session list and the type can be; a re-render on a keystroke would rebuild the
+  // distance box under the finger, which this app has paid for twice.
+  const dt = $("arDate"); if (dt) dt.onchange = () => {
+    const v = String(dt.value || "");
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(v)) return;
+    d.iso = v > todayIso() ? todayIso() : v;
+    renderAddRunSheet();
+  };
+  const st = $("arStart"); if (st) st.oninput = st.onchange = () => { d.start = String(st.value || ""); };
+  const km = $("arKm"); if (km) km.oninput = () => { d.km = km.value; };
+  ["h", "m", "s"].forEach((p) => { const w = $("arT" + p); if (w) w.onchange = () => { d[p] = Number(w.value) || 0; }; });
+  const wh = $("arWhere"); if (wh) wh.onchange = () => { d.tread = wh.value === "tread"; };
+  const ty = $("arType"); if (ty) ty.onchange = () => { d.type = ty.value; };
+  const lk = $("arLink"); if (lk) lk.onchange = () => { d.link = lk.value; renderAddRunSheet(); };
+  const sv = $("arStrava"); if (sv) sv.onclick = () => {
+    d.strava = !d.strava;
+    sv.classList.toggle("on", d.strava); sv.setAttribute("aria-checked", d.strava ? "true" : "false");
+  };
+  const cancel = $("arCancel"); if (cancel) cancel.onclick = () => {
+    const back = d.back; ADDRUN = null;
+    if (back && SHEET_CTX) reopenSessionSheet(); else closeSheet();
+  };
+  const save = $("arSave"); if (save) save.onclick = submitAddRun;
+}
+/**
+ * The form's answers as a run record, or the one sentence that says what is wrong with them.
+ * ⚠️ A SUBSET OF liveRunRecord'S FIELDS, NEVER A NEW SHAPE, so every reader of a run already knows it.
+ * What was not measured is null — route, splits, elevation, heart rate, cadence — and the pace band is
+ * null even when the run is linked: there is one typed time for the whole outing and no kilometre to
+ * judge, so runAnalysis and the flags engine are never handed a band they would misread.
+ * ⚠️ THE ID IS "man-", NEVER "run-". runStartExactMs reads a "run-" id as the instant the run began, so a
+ * "run-" id stamped at the moment of saving would put an invented start time on the debrief and in Strava.
+ * startMs is set only from a time the runner gave.
+ */
+function buildManualRun(d) {
+  const iso = String((d && d.iso) || "");
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(iso)) return { error: "Pick the date you ran." };
+  if (iso > todayIso()) return { error: "That date has not happened yet." };
+  const km = Number(String(d.km == null ? "" : d.km).trim().replace(",", "."));
+  if (!isFinite(km) || km <= 0) return { error: "Put in how far you ran, in kilometres, for example 8.05." };
+  if (km > 300) return { error: "That is further than one run can be. Check the distance." };
+  const sec = (Number(d.h) || 0) * 3600 + (Number(d.m) || 0) * 60 + (Number(d.s) || 0);
+  if (!(sec > 0)) return { error: "Set how long it took, on the three wheels." };
+  const pace = Math.round(sec / km);
+  // ⚠️ A TYPO, NOT A RUN. 2:30 a kilometre is quicker than the 5 km world record and 30:00 is a slow walk;
+  // outside that, the distance or the time was mistyped, and saying so beats storing a run nobody did.
+  if (pace < 150 || pace > 1800) return { error: "That works out at " + fmtPace(pace) + " a kilometre, which can’t be right. Check the distance and the time." };
+  let startMs = null;
+  if (d.start) {
+    const m = /^(\\d{1,2}):(\\d{2})$/.exec(String(d.start));
+    if (!m) return { error: "That start time does not look right." };
+    const p = iso.split("-").map(Number);
+    // ⚠️ LOCAL, ON PURPOSE. The runner gave a wall-clock time on a calendar day, and the instant that
+    // names is a local one; the date itself stays the string they picked, never rebuilt from this.
+    startMs = new Date(p[0], p[1] - 1, p[2], Number(m[1]), Number(m[2]), 0, 0).getTime();
+    if (startMs > Date.now()) return { error: "That start time has not happened yet." };
+  }
+  if (d.strava && startMs == null) return { error: "Strava needs the time you started. Add it, or turn Strava off for this run." };
+  const cand = d.link ? linkCandidatesFor(iso, null).find((c) => c.sid === d.link) || null : null;
+  const type = cand ? cand.type : (d.type || "easy");
+  const hhmm = startMs != null ? String(d.start).padStart(5, "0") : "";
+  const run = {
+    id: "man-" + Date.now(),
+    manual: true,
+    t: cand ? cand.title : (d.tread ? "Treadmill run" : addRunTypeLabel(type)),
+    d: runDateLabelIso(iso) + (hhmm ? " · " + hhmm : ""),
+    dateIso: iso,
+    startMs: startMs,
+    dist: km.toFixed(2) + " km", time: fmtPace(sec), pace: fmtPace(pace) + " /km",
+    distKm: Number(km.toFixed(2)), sec: sec, avgPaceSec: pace,
+    route: null, splits: null, elevGain: null, type: type,
+    rpe: null,
+    steps: cand ? sessionStepText(cand.raw) : null,
+    rband: cand ? plannedRpeBandOf(cand.raw) : null,
+    pband: null, pwin: null, pmix: null,
+    anchor: profile.recentTimeS, pmodel: PACE_MODEL_VERSION,
+    avgHr: null, maxHr: null, cadence: null, hrSeries: null, zoneSec: null,
+    indoor: d.tread || undefined,
+  };
+  return { run: run, link: cand ? { sid: cand.sid, wk: cand.wk, iso: cand.iso } : null };
+}
+/**
+ * THE THIRD COMMIT POINT. See the block comment above for what it calls, and what it refuses to.
+ * ⚠️ IN DATE ORDER, NOT AT THE FRONT. state.logged is newest-first by insertion, and state.logged[0] is
+ * read as "the latest run" (the club story, the newest flags evidence, the top of Recent runs). A run
+ * from last Tuesday added today is not the latest run.
+ */
+function saveManualRun(rec, link, sendStrava) {
+  if (!rec || !rec.manual) return;
+  // ⚠️ Credited BEFORE the record is stored — the phone's order, not the wrist's — so the shoeId is on
+  // the copy that is saved.
+  shoeCreditRun(rec, null);
+  let at = state.logged.findIndex((r) => r && r.dateIso && r.dateIso <= rec.dateIso);
+  if (at < 0) at = state.logged.length;
+  state.logged.splice(at, 0, rec);
+  saveRuns();
+  if (link) { linkRunTo(rec.id, link); tickSession(link.iso, link.sid); }
+  clubMaybeAutoPost(rec);
+  // ⚠️ NEVER stravaMaybeAutoSend. "Send new runs automatically" was a promise about runs this app
+  // recorded; a run another device recorded goes only when the runner turned the switch on for it.
+  if (sendStrava && stravaCanSendAdded(rec)) stravaSendRun(rec, () => { try { renderUnlessTyping(); } catch (e) {} });
+  // ⚠️ NO healthSendRun, NO maybeAutoPaceCalibrate, NO assessFitnessFromRun — by name. See above.
+  // The flags engine is asked again, because a linked run's effort is real evidence (flagObservations).
+  maybeTrainingFlags();
+}
+function submitAddRun() {
+  const d = ADDRUN; if (!d) return;
+  const res = buildManualRun(d);
+  if (res.error) {
+    const err = $("arErr");
+    if (err) { err.textContent = res.error; err.hidden = false; }
+    return;
+  }
+  const sent = !!d.strava;
+  ADDRUN = null;
+  closeSheet();
+  saveManualRun(res.run, res.link, sent);
+  // ⚠️ STRAIGHT TO THE RUN'S OWN PAGE. The effort question and the notes box live there, as for every
+  // run — asking them again in the form would be a second copy of each, and two copies drift.
+  state.viewRunId = res.run.id;
+  state.viewRunIdx = (state.logged || []).findIndex((r) => r && r.id === res.run.id);
+  state.screen = "runview";
+  render();
+  // ⚠️ NO UNDO ONCE IT HAS GONE TO STRAVA: taking it out of Inte-Run would leave the copy over there,
+  // and an Undo that half-undoes is worse than none. It can still be deleted like any run.
+  if (sent) { toast("Run added. Sending it to Strava."); return; }
+  const id = res.run.id;
+  toastUndo("Run added", () => {
+    const i = (state.logged || []).findIndex((r) => r && r.id === id);
+    if (state.screen === "runview" && state.viewRunId === id) state.screen = null;
+    if (i >= 0) deleteRun(i, true); else render();
+  });
+}
+/**
+ * Tell a run which session it was, after the fact — a free run from the wrist, or a run added by hand
+ * without one. The run is stamped with what that session asked for, exactly as a run started FROM it is,
+ * and what the stamps replaced travels in the link so unlinking can put it back.
+ * ⚠️ A RUN ADDED BY HAND GETS THE PRESCRIPTION AND THE EFFORT BAND, NEVER THE PACE BAND — see buildManualRun.
+ */
+function linkExistingRun(run, sid) {
+  if (!run || !sid) return null;
+  const c = linkCandidatesFor(run.dateIso, run.id).find((x) => x.sid === sid);
+  if (!c) return null;
+  const was = { type: run.type, steps: run.steps == null ? null : run.steps, rband: run.rband == null ? null : run.rband,
+    pband: run.pband == null ? null : run.pband, pwin: run.pwin == null ? null : run.pwin, pmix: run.pmix == null ? null : run.pmix };
+  run.type = c.type;
+  run.steps = sessionStepText(c.raw);
+  run.rband = plannedRpeBandOf(c.raw);
+  if (!run.manual) {
+    const ps = paceStampFor(c.raw);
+    run.pband = ps.pband; run.pwin = ps.pwin; run.pmix = ps.pmix;
+  }
+  linkRunTo(run.id, { sid: c.sid, wk: c.wk, iso: c.iso, was: was });
+  tickSession(c.iso, c.sid);
+  saveRuns();
+  return c;
+}
+function unlinkExistingRun(run) {
+  if (!run) return;
+  const l = unlinkRun(run.id);
+  if (!l) return;
+  if (l.was) {
+    run.type = l.was.type; run.steps = l.was.steps; run.rband = l.was.rband;
+    run.pband = l.was.pband; run.pwin = l.was.pwin; run.pmix = l.was.pmix;
+  } else if (run.manual) { run.steps = null; run.rband = null; }
+  untickSession(l.iso, l.sid);
+  saveRuns();
+}
+function openLinkRunSheet(run) {
+  if (!run) return;
+  const cands = linkCandidatesFor(run.dateIso, run.id);
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = '<div class="eyebrow">Your plan</div>' +
+    '<h3 class="sheet-h">Which session was this?</h3>' +
+    '<p class="bk-md">Pick the planned session this run was. It is ticked off, and the run is read against what that session asked for.' +
+      (run.manual ? ' A run added by hand is compared on effort only: there are no kilometres to judge its pace by.' : "") + '</p>' +
+    '<div class="rd-meta">' + (cands.length ? cands.map((c) =>
+      '<button class="rd-meta-r" data-linkto="' + esc(c.sid) + '"><span class="rd-meta-ic" aria-hidden="true">' + ICON.cal + '</span>' +
+        '<span class="rd-meta-k">' + esc(linkCandidateLabel(c)) + '</span>' +
+        '<span class="rd-meta-c" aria-hidden="true">' + ICON.chevDown + '</span></button>').join("")
+      : '<div class="rd-meta-r"><span class="rd-meta-k">Nothing in your plan that week is free to link.</span></div>') + '</div>';
+  document.querySelectorAll("[data-linkto]").forEach((b) => b.onclick = () => {
+    const c = linkExistingRun(run, b.dataset.linkto);
+    closeSheet();
+    render();
+    if (c) toast("Linked to " + c.title + ".");
+  });
+  $("sheetOv").classList.add("on");
+}
+/**
+ * BEST TIMES — the card the Logbook's button has promised since it was drawn, and the first thing on
+ * Performance now (B1). One row per distance the runner has actually covered; nothing for the rest.
+ *
+ * ⚠️ TWO KINDS OF NUMBER, NAMED APART, by the owner's own vocabulary on the club profile: "Best" is the
+ * quickest the app has measured them covering about that far, training runs included; "PB" is a race
+ * time they typed in themselves. Where both exist the row shows the measured best and names the typed
+ * PB beside it, rather than silently choosing one of two answers to the question.
+ * ⚠️ ONLY MEASURED RUNS. RC.runBests refuses anything added by hand, on a treadmill, without GPS or
+ * simulated, and the footnote says so, because a runner who added a quick treadmill 5 km will look for it.
+ * ⚠️ IT NEVER TOUCHES A PACE. A quicker 5 km here does not re-anchor the plan; that stays the runner's call.
+ */
+const PB_TYPED_KEY = { "5k": "k5", "10k": "k10", half: "half", marathon: "mar" };
+function perfBestsHtml() {
+  let bests = [], dists = [];
+  try { bests = RC.runBests(runBestRows()); dists = RC.BEST_DISTANCES; } catch (e) { bests = []; dists = []; }
+  let pbs = {};
+  try { pbs = loadClubProf().pbs || {}; } catch (e) { pbs = {}; }
+  const rows = dists.map((dist) => {
+    const b = bests.find((x) => x.distance === dist.id) || null;
+    const typed = PB_TYPED_KEY[dist.id] ? clubPbText(pbs[PB_TYPED_KEY[dist.id]]) : "";
+    if (!b && !typed) return "";
+    const time = b ? fmtTimeFull(b.sec) : typed;
+    const meta = b
+      ? b.km.toFixed(2) + " km · " + runDateLabelIso(b.dateIso) + (typed ? " · race PB " + typed : "")
+      : "A race time you entered";
+    const word = b ? "Best" : "PB";
+    const inner = '<span class="ui-row-mid"><span class="ui-row-t">' + esc(dist.label) + '</span>' +
+        '<span class="ui-row-m">' + esc(meta) + '</span></span>' +
+      '<span class="ui-row-st">' + word + '</span>' +
+      '<span class="bt-time num">' + esc(time) + '</span>';
+    // ⚠️ A ROW OPENS ITS RUN ONLY WHILE THE RUN IS STILL KEPT. The best outlives the 50-run store (it is
+    // read from the uncapped history), and a row that opened "Run not found" would be a dead end.
+    const open = b && (state.logged || []).some((r) => r && r.id === b.runId);
+    return open
+      ? '<button class="ui-row" data-pbrun="' + esc(b.runId) + '" aria-label="' + esc(dist.label + ", " + word + " " + time) + '">' + inner +
+          '<span class="ui-row-ch" aria-hidden="true">›</span></button>'
+      : '<div class="ui-row">' + inner + '</div>';
+  }).filter(Boolean);
+  const foot = 'Your quickest run of about each distance (within 3%), training runs included. Runs added by hand, on a treadmill or without GPS do not count, because their distance was not measured.';
+  return '<div class="card perf-c">' +
+    '<div class="ui-eyebrow">Best times</div>' +
+    (rows.length ? '<div class="bt-list">' + rows.join("") + '</div>'
+      : '<p class="perf-m">Record a run of about 5 km, 5 miles, 10 km, 10 miles, a half or a marathon, and your quickest time for each appears here.</p>') +
+    '<p class="perf-e">' + esc(foot) + '</p></div>';
+}
+/** The best this run holds right now, if any — for the line on the run's own page. */
+function runHeldBest(run) {
+  try {
+    if (!run || !run.id) return null;
+    return RC.runBests(runBestRows()).find((b) => b.runId === String(run.id)) || null;
+  } catch (e) { return null; }
+}
+
 // ============ ACTIVITIES ===================================================
 function viewActivities() {
   const t = (k, lab) => '<button data-at="' + k + '"' + (state.actTab === k ? ' class="on"' : '') + '>' + lab + '</button>';
   const tabs = '<div class="subtabs">' + t("workouts", "Runs") + t("strength", "Strength") + t("performance", "Performance") + '</div>';
   if (state.actTab === "workouts") {
     // Only real, completed runs — no fabricated history. Blank until the user runs a session.
+    // ⚠️ B1: THE WAY IN FOR A RUN INTE-RUN DID NOT RECORD, ON BOTH STATES OF THIS SCREEN. The empty state
+    // returns early, so a button added only below the list would be missing for exactly the runner who
+    // has done all their running somewhere else so far.
+    const addRun = '<button class="sd-addlink" id="lgAdd">\\uFF0B Add a run you did without Inte-Run</button>';
     if (!state.logged.length) {
-      return tabs + '<div class="empty-acts"><div class="ea-ic">' + ICON.today + '</div><div class="ea-h">No runs yet</div><div class="ea-b">Start a session from the <b>Today</b> tab. Once you finish, your runs — with route maps and splits — will appear here.</div></div>';
+      return tabs + '<div class="empty-acts"><div class="ea-ic">' + ICON.today + '</div><div class="ea-h">No runs yet</div><div class="ea-b">Start a session from the <b>Today</b> tab. Once you finish, your runs — with route maps and splits — will appear here.</div></div>' + addRun;
     }
     const shown = logbookFiltered();
     LOG_MONTH = "";
@@ -14751,12 +15352,15 @@ function viewActivities() {
       '<div class="pf-sec"><span>Recent runs</span>' +
       (shown.length > 6 ? '<button class="pf-edit" id="lgAll">' + (state.logAll ? "Show less" : "View all") + '</button>' : "") +
       '</div>' +
-      '<div class="card pf-card lg-list">' + list + '</div>' + none +
+      '<div class="card pf-card lg-list">' + list + '</div>' + none + addRun +
       // "Personal bests & trends" in the mockup. It goes to the Performance tab, which is the screen
       // that already answers it -- a new destination would be a promise with nothing behind it.
+      // ⚠️ B1: AND IT SAYS WHAT IS THERE NOW. Performance showed no bests and no trends at all while this
+      // button promised both; it shows best times since B1, and still no trends, and the app's own word for
+      // a measured time is "Best" — "PB" is the race time a runner types in (see perfBestsHtml).
       '<button class="hub-safety" id="lgTrends">' +
-        '<span class="hub-sb"><span class="hub-st">Personal bests &amp; trends</span>' +
-        '<span class="hub-sd">What has actually changed, and what it rests on</span></span>' +
+        '<span class="hub-sb"><span class="hub-st">Best times &amp; fitness</span>' +
+        '<span class="hub-sd">Your quickest runs, and what your paces are based on</span></span>' +
         '<span class="pf-edit">Explore</span><span class="sd-chev" aria-hidden="true">\u203A</span></button>';
   }
   if (state.actTab === "strength") return tabs + viewStrengthHistory();
@@ -15253,8 +15857,11 @@ function streakRow(streak) {
  * trust the day it finds something real.
  */
 function progressSnapshot() {
+  // ⚠️ B1: NEVER A RUN ADDED BY HAND. This is a claim about pace at the same effort, and a typed time
+  // covers the whole outing — warm-up, stops, the lot — so it would move the headline without the
+  // runner having changed at all.
   const easy = (state.logged || [])
-    .filter((r) => r && r.dateIso && r.avgPaceSec > 0 && logFilterOf(r) === "easy")
+    .filter((r) => r && r.dateIso && r.avgPaceSec > 0 && !r.manual && logFilterOf(r) === "easy")
     .sort((a, b) => (a.dateIso < b.dateIso ? -1 : 1));
   if (easy.length < 6) return "";
   const half = Math.floor(easy.length / 2);
@@ -15742,7 +16349,9 @@ function viewPerformance() {
         meaning: "How well you hold pace late in long runs." });
   // FITNESS.summary is the engine's own honest one-liner, and it was rendered nowhere.
   const sum = FITNESS.summary ? '<div class="perf-sum">' + esc(FITNESS.summary) + '</div>' : "";
-  return pace + base + dur + sum;
+  // ⚠️ B1: BEST TIMES FIRST. They are the one thing on this screen measured from the runner's own runs
+  // rather than estimated from a single input, and three screens have been sending people here for them.
+  return perfBestsHtml() + pace + base + dur + sum;
 }
 // ⚠️ masCard() and the whole "Maximal Aerobic Speed" vocabulary were REMOVED on 2026-08-02 with the
 // move to a 2 km trial. It was already unreferenced -- MAS had been taken off Performance because it
@@ -19565,14 +20174,17 @@ function openClubPostRunSheet(run) {
 }
 /**
  * THE AUTOMATIC PATH.
- * ⚠️ ONE CALL SITE, AT SAVE, AND ONLY WHEN THE RUNNER ASKED FOR IT. Anything else — a render, a
- * migration, a re-ingest — would post the same run again, which is why it also checks the run is not
- * already up there rather than trusting the caller to fire once.
+ * ⚠️ CALLED AT SAVE ONLY — once in each of the three commit points (the phone, the wrist, a run added by
+ * hand), and ONLY WHEN THE RUNNER ASKED FOR IT. Anything else — a render, a migration, a re-ingest —
+ * would post the same run again, which is why it also checks the run is not already up there rather
+ * than trusting the caller to fire once. (It said "one call site" until B1 found the phone had none.)
  * ⚠️ AND IT NEVER SPEAKS UP ON FAILURE. This runs behind a save the runner has already finished; a toast
  * about a grid picture arriving over the debrief of the run they just did is noise about the wrong thing.
  */
 function clubMaybeAutoPost(run) {
-  if (!run || !clubAuto()) return;
+  // ⚠️ run.sim FIRST, now the phone's path calls this too: the browser demo's simulator invents a run
+  // through central London, and the grid is the one screen a runner shows to somebody else.
+  if (!run || run.sim || !clubAuto()) return;
   if (clubRunPosted(run)) return;
   try { clubPostRun(run, clubAutoStyle()); } catch (e) {}
 }
@@ -20213,21 +20825,17 @@ function commProfile() {
  * might show somebody else — so the chip says Best, and names the distance it was measured over.
  * ⚠️ AND THE TOLERANCE IS TIGHT. A 5.4 km run is not a 5 km time, so only runs within 3% of the
  * distance count; anything wider would flatter the number.
+ * ⚠️ B1 MOVED THE RULE INTO THE ENGINE (src/progress/records.ts) RATHER THAN COPYING IT. Performance now
+ * shows best times too, and a second copy of this loop is how the club chip and the Performance card
+ * would one day quote two different 5 km times. RC.runBests is the one definition; it also stopped this
+ * chip counting simulated, hand-added, treadmill and no-GPS runs, which it used to.
  */
-const COMM_BESTS = [{ km: 5, label: "5 km" }, { km: 10, label: "10 km" },
-  { km: 21.0975, label: "Half" }, { km: 42.195, label: "Marathon" }];
+// The club's four chips, matched to the typed PBs' rows (CLUB_PB_ROWS) by their short label.
+const COMM_BESTS = ["5k", "10k", "half", "marathon"];
 function commBests() {
-  const rows = (state.hist || []).filter((r) => Number(r.k) > 0 && Number(r.s) > 0);
-  const out = [];
-  for (const b of COMM_BESTS) {
-    let best = null;
-    for (const r of rows) {
-      if (Math.abs(Number(r.k) - b.km) / b.km > 0.03) continue;
-      if (best == null || Number(r.s) < best) best = Number(r.s);
-    }
-    if (best != null) out.push({ label: b.label, time: fmtTimeFull(best) });
-  }
-  return out;
+  let all = [];
+  try { all = RC.runBests(runBestRows()); } catch (e) { all = []; }
+  return all.filter((b) => COMM_BESTS.indexOf(b.distance) >= 0).map((b) => ({ label: b.short, time: fmtTimeFull(b.sec) }));
 }
 const COMM_MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
@@ -21614,6 +22222,18 @@ function stravaCanWeightTraining() {
   const c = stravaCfg();
   return stravaActive() && Array.isArray(c.sportTypes) && c.sportTypes.indexOf("WeightTraining") !== -1;
 }
+/**
+ * ⚠️ B1's HANDSHAKE, A8's PATTERN. A run added by hand may only go to Strava through a server that has
+ * said, in its own /strava/status reply, that it labels such a run "Added by hand in Inte-Run". An older
+ * deployment answers with no origins at all and would stamp it "Recorded with Inte-Run" — untrue of a
+ * run this app never recorded — so until the new Worker is deployed the switch simply is not there.
+ */
+function stravaCanAddedRuns() {
+  const c = stravaCfg();
+  return stravaActive() && Array.isArray(c.origins) && c.origins.indexOf("added") !== -1;
+}
+/** And this run in particular: Strava will not take a run without a start, and none is ever invented. */
+function stravaCanSendAdded(run) { return !!run && stravaCanAddedRuns() && runStartExactMs(run) != null; }
 /** Is this someone who is expected to configure a server by hand? Same gate as the Mapbox field:
  *  a TestFlight tester must never be shown a box asking for a URL they have never heard of. */
 /**
@@ -21651,6 +22271,9 @@ function stravaRefresh() {
     // A8 -- what this Worker understands, straight off its own reply. Absent (an old deployment) or
     // malformed both read as "nothing", which is what stravaCanWeightTraining() treats as "not yet".
     c.sportTypes = (r.json && Array.isArray(r.json.sportTypes)) ? r.json.sportTypes : [];
+    // B1 -- the same, for how the server labels a run: "added" means it knows a hand-added run is not
+    // "Recorded with Inte-Run". Absent reads as "not yet", and stravaCanAddedRuns stays false.
+    c.origins = (r.json && Array.isArray(r.json.origins)) ? r.json.origins : [];
     // The pending flag only exists to explain the gap while the runner is away in Safari. It clears
     // when they come back connected, and it times out either way so it can never stick.
     if (c.connected || !c.pending || Date.now() - Number(c.pending) > 600000) c.pending = 0;
@@ -21712,6 +22335,9 @@ function stravaDisconnect() {
  */
 function stravaSendRun(run, onDone) {
   if (!run || !stravaActive()) return;
+  // ⚠️ B1: A RUN ADDED BY HAND, ONLY THROUGH A SERVER THAT LABELS IT TRUTHFULLY AND ONLY WITH A REAL
+  // START. Every button that leads here already hides itself; this is the floor under all of them.
+  if (run.manual && !stravaCanSendAdded(run)) return;
   const key = stravaCfg().key;
   const payload = runStravaPayload(run);
   const finish = () => { saveRuns(); if (onDone) onDone(); };
@@ -21780,6 +22406,9 @@ function stravaCheckPending(run, onDone) {
  */
 function stravaRunButtonHtml(run) {
   if (!stravaActive()) return "";
+  // B1: absent, not disabled, for a hand-added run that cannot go — the same rule as the line above.
+  // One that already went keeps its "On Strava" link whatever the server says now.
+  if (run && run.manual && !run.strava && !stravaCanSendAdded(run)) return "";
   const s = (run && run.strava) || {};
   if (s.state === "done") {
     return '<a class="card stv-done" href="https://www.strava.com/activities/' + esc(s.id) + '" target="_blank" rel="noopener">' +
@@ -29593,6 +30222,14 @@ function runVerdict(run, a) {
              "If it changes how you run, stop and check the injury guide."],
       chips: chips.slice(0, 3), well: [], watch: ["You reported discomfort during or after this run"] };
   }
+  // 2a — B1: a run added by hand. Inte-Run never measured it, so the honest verdict names why there is
+  // none rather than blaming missing splits, which would read as a recording that went wrong.
+  if (run.manual) {
+    return { confidence: conf, state: "insufficientData", headline: "Added by hand",
+      body: ["Inte-Run did not record this run, so there are no kilometre splits and nothing to judge the pace against.",
+             "The distance and time you gave count towards your week."],
+      chips: chips.slice(0, 3), well: [], watch: [] };
+  }
   // 2 — not enough clean evidence to judge. Say so rather than inventing a verdict.
   if (!a.n) {
     return { confidence: conf, state: "insufficientData", headline: "Logged",
@@ -29696,18 +30333,25 @@ function rdHeroHtml(run) {
   // bounding box — the only framing available before layout — and the map then re-frames it in
   // Mercator a second later, which is the jump. wire() knows the real size and can use the map's own
   // framing immediately, so the line lands once and stays put.
+  // ⚠️ B1: "No route recorded" ON A RUN ADDED BY HAND READS AS A RECORDING THAT FAILED. Nothing was
+  // recorded, by design, so the panel says what the run is.
   const inner = pres.hidden || !pres.route
     ? '<div class="rd-noroute">' + ICON.timer + '<span>' +
-        (pres.hidden ? "Map hidden" : run.indoor ? "Indoor session" : "No route recorded") + '</span></div>'
+        (pres.hidden ? "Map hidden" : run.manual ? (run.indoor ? "Treadmill run, added by hand" : "Added by hand")
+          : run.indoor ? "Indoor session" : "No route recorded") + '</span></div>'
     : "";
   // ⚠️ TWO LAYERS BECAUSE TWO THINGS OWN AN OPACITY HERE, AND THEY CANNOT SHARE ONE ELEMENT. The
   // scroll transition writes .rd-map's opacity INLINE on every frame; the arrival reveal wants a
   // transitioned class. Inline always wins, so putting both on one element left the reveal dead and
   // the visible result decided by whichever ran last. It also cannot be solved by transitioning the
   // scroll opacity — that has to track the finger with no easing at all.
+  // ⚠️ B1: AND THE PANEL IS SHOWN, NOT JUST DRAWN. .rd-mapin starts at opacity 0 and only wire()'s map
+  // path adds ov-ready — so on every run with no route (a treadmill, a hidden map, a run added by hand)
+  // "Indoor session" / "Map hidden" / "No route recorded" sat in the page at opacity 0 and the hero was a
+  // blank grey box. With no map to wait for there is nothing to fade in after, so it is ready at once.
   return '<div class="rd-hero" id="rdHero">' +
     '<div class="rd-map" id="rdMap" data-route="' + (pres.route ? "1" : "0") + '">' +
-      '<div class="rd-mapin" id="rdMapIn">' + inner + '</div></div>' +
+      '<div class="rd-mapin' + (inner ? " ov-ready" : "") + '" id="rdMapIn">' + inner + '</div></div>' +
     '<div class="rd-fade"></div>' +
     (pres.redacted ? '<div class="rd-privtag">Start and finish hidden</div>' : "") +
     '</div>';
@@ -29790,6 +30434,10 @@ function rdIdentityHtml(run) {
   if (when) rows.push('<div class="rd-id-r"><span class="rd-id-ic">' + ICON.cal + '</span><span class="rd-id-t">' + esc(when) + '</span></div>');
   const place = run.place;
   if (place) rows.push('<div class="rd-id-r"><span class="rd-id-ic">' + RD_PIN + '</span><span class="rd-id-t">' + esc(place) + '</span></div>');
+  // B1: the best this run holds right now — read from the same RC.runBests as Performance and the club
+  // chips, so the three cannot disagree about which run it was.
+  const held = runHeldBest(run);
+  if (held) rows.push('<div class="rd-id-r"><span class="rd-id-ic">' + ICON.trendUp + '</span><span class="rd-id-t">Your ' + esc(held.label) + ' best</span></div>');
   // ⚠️ ONLY WHEN THE RUN GENUINELY REACHED STRAVA. The activity id is already stored by the upload;
   // offering the link on a run that was never sent would be a dead end wearing Strava's colours.
   if (run.strava && run.strava.state === "done" && run.strava.id) {
@@ -29944,10 +30592,21 @@ function rdEvidenceHtml(run, a, v) {
   return out;
 }
 function rdPlanHtml(run, a) {
+  // ⚠️ B1: A LINK THE RUNNER MADE CAN BE TAKEN BACK. Only theirs — one made in "Add a run", or made
+  // afterwards from this section. A run the phone or the wrist recorded AS a session was that session;
+  // offering to unlink every one of them would put a control on every run page that answers nothing.
+  const link = runLinkOf(run.id);
+  const unlink = (link && (run.manual || link.was))
+    ? '<button class="mini-btn" id="rdUnlink">Not this session? Unlink it</button>' : "";
   // Lead with what the session was FOR. An unplanned run gets no invented target.
   if (!run.steps) {
+    // ⚠️ B1: AND A FREE RUN CAN BE TOLD WHICH SESSION IT WAS. Offered only when the plan holds a session
+    // in that run's week for it to be — a button with nothing to pick from is the looks-live trap.
+    const can = linkCandidatesFor(run.dateIso, run.id).length > 0;
     return '<h2 class="rd-sec">Plan</h2><div class="rd-plan"><div class="rd-plan-p">' +
-      'This was a free run — there was no prescribed session to compare it with.</div></div>';
+      (run.manual ? 'This run is not linked to a planned session.'
+        : 'This was a free run — there was no prescribed session to compare it with.') + '</div>' +
+      (can ? '<button class="mini-btn" id="rdLink">Link it to a planned session</button>' : "") + unlink + '</div>';
   }
   const rows = [];
   if (a.band) {
@@ -29971,6 +30630,7 @@ function rdPlanHtml(run, a) {
   return '<h2 class="rd-sec">What the plan asked for</h2>' +
     '<div class="rd-plan">' + steps +
       (body ? '<div class="rd-cmp-h"><span></span><span>Planned</span><span>Actual</span></div>' + body : "") +
+      unlink +
     '</div>';
 }
 function rdNextHtml(run) {
@@ -30064,7 +30724,12 @@ function rdSplitsHtml(run, a) {
 function rdTrendsHtml(run, a) {
   // ⚠️ COMPARABLE SESSIONS, NOT A NOVELTY SCORE. Runs of the same TYPE are the only fair comparison;
   // measuring an easy run against an interval session says nothing about either.
-  const same = (state.logged || []).filter((r) => r.type === run.type && r.avgPaceSec > 0 && r.id !== run.id).slice(0, 6);
+  // ⚠️ B1: A RUN ADDED BY HAND IS NEITHER COMPARED NOR A COMPARISON. Its pace is one typed time over the
+  // whole outing; set beside measured runs it would read as a change in the runner that never happened.
+  if (run.manual) {
+    return '<div class="rd-panel"><div class="rd-empty">This run was added by hand, so its pace is not compared with your recorded runs.</div></div>';
+  }
+  const same = (state.logged || []).filter((r) => r.type === run.type && r.avgPaceSec > 0 && !r.manual && r.id !== run.id).slice(0, 6);
   if (!same.length) {
     return '<div class="rd-panel"><div class="rd-empty">Once you have logged a few more ' +
       esc((SESSION_LABEL[run.type] || "similar").toLowerCase()) + ' sessions, they will be compared here.</div></div>';
@@ -30126,8 +30791,11 @@ function rdMetaHtml(run) {
   // and wrong about the one thing the runner most wants confirmed. Same class as #saveSetup, CLASS,
   // MASTERS and PLAN.notes — computed or read, and never connected — and it becomes visible on every
   // run the moment the watch is the recommended recorder.
-  row(ICON.phone, "Source", run.sim ? "Simulated" : run.source === "watch" ? "Apple Watch" : "This iPhone", null);
-  row(ICON.person, "Route privacy", PRIVACY.map ? "Map hidden" : PRIVACY.ends ? "Start and finish hidden" : "Full route", "priv");
+  // ⚠️ B1: run.manual FIRST — a run typed into the Logbook was recorded by nothing, and "This iPhone"
+  // would be the same false credit run.watch once gave every wrist run.
+  row(ICON.phone, "Source", run.manual ? "Added by hand" : run.sim ? "Simulated" : run.source === "watch" ? "Apple Watch" : "This iPhone", null);
+  // A run added by hand has no route, so a control over who may see it governs nothing.
+  if (!run.manual) row(ICON.person, "Route privacy", PRIVACY.map ? "Map hidden" : PRIVACY.ends ? "Start and finish hidden" : "Full route", "priv");
   row(ICON.phone, "Stored", "On this iPhone", null);
   return '<h2 class="rd-sec">Details</h2><div class="rd-meta">' + rows.join("") + '</div>' + runNoteHtml(run);
 }
@@ -38242,6 +38910,11 @@ function liveRunRecord(sm) {
     // recorded before today is absent. A stored false would be indistinguishable in the readers but
     // would bloat every record for nothing.
     indoor: (LIVE.indoor && !LIVE.gpsDenied) || undefined,
+    // ⚠️ B1: AND THE OTHER HALF OF THAT SAME PAIR, WHICH NOTHING RECORDED. A run whose GPS was refused is
+    // rightly not "indoor", but its distance was typed in afterwards or never known, so it is not a
+    // measurement either — and without this it would read, to a best time, exactly like a run the
+    // phone tracked. undefined when false, for the reason indoor gives above.
+    nogps: (LIVE.indoor && LIVE.gpsDenied) || undefined,
   };
 }
 /**
@@ -38424,9 +39097,20 @@ function saveLiveSession() {
     // ⚠️ AND THE SAME ORDERING FOR HEALTH, for the same reason: the run is the runner's, and a refused
     // permission or an older build must never cost them the record of it.
     healthSendRun(state.logged[0]);
+    // ⚠️ B1: THE GRID HOOK WAS ONLY EVER ON THE WRIST'S PATH. Its own comment called ingestWatchRun "the
+    // one place both arrive", which is not true — a phone run arrives here — so "Post every run" put
+    // every watch run on the grid and no phone run at all, under a note promising every run.
+    clubMaybeAutoPost(state.logged[0]);
+    runBestToast(state.logged[0]);
   }
-  const wk0 = PLAN.weeks[0]; const dn = DAY_ORDER[LIVE.session.dayOfWeek];
-  if (LIVE.completedFull && wk0) { const m = wk0.sessions.find((s) => s.day === dn && s.title === LIVE.session.title); if (m) state.done[doneKey(wk0.index, m)] = true; }
+  // ⚠️ B1: THE WEEK THE SESSION IS IN, NOT PLAN.weeks[0]. This searched week one only — matched on day
+  // name and title — so from the second week of any plan a finished phone run ticked nothing at all.
+  // The session is found by its id inside its own week, and the link makes the tick outlive a relaunch.
+  if (LIVE.completedFull && LIVE.session && LIVE.session.id) {
+    const iso = plannedSessionIso(LIVE.session);
+    const ref = iso ? tickSession(iso, LIVE.session.id) : null;
+    if (ref && sm.meaningful && sm.runId) linkRunTo(sm.runId, { sid: LIVE.session.id, wk: ref.wk.index, iso: iso });
+  }
   sm.saved = true;
   // A simulated run (browser demo) must never steer the plan — its pace is an invention.
   if (LIVE.mode === "sim") return;
@@ -38940,11 +39624,22 @@ function runWorkPace(r) {
 function flagObservations() {
   const out = [];
   const runs = state.logged || [];
+  const links = loadLinks();
   for (let i = 0; i < runs.length && out.length < 12; i++) {
     const r = runs[i];
+    // ⚠️ B1: A RUN ADDED BY HAND IS SKIPPED, NOT A STOP. Unlinked, it says nothing about how the plan is
+    // going — and as the boundary below it would cut off every real run behind it, which is what a
+    // missing pmodel did before this line existed ("Nothing logged against this plan yet").
+    if (r.manual && !links[r.id]) continue;
     if (r.anchor && r.anchor !== profile.recentTimeS) break;
     // Runs judged under an older pace model are history, not evidence.
     if ((r.pmodel || 1) !== PACE_MODEL_VERSION) break;
+    // ⚠️ AND LINKED, IT IS EFFORT EVIDENCE ONLY. Its time is one typed number for the whole outing,
+    // warm-up and all, with no kilometres to find the work in — the exact input that once read two
+    // well-run easy runs as grounds to slow the plan by two minutes a kilometre. How it FELT against
+    // the effort the session asked for is real; its pace is not a measurement.
+    const typed = !!r.manual;
+    const work = typed ? null : runWorkPace(r);
     out.push({
       id: r.id || r.t + "|" + r.d, type: r.type || "easy", distKm: Number(r.distKm) || 0,
       // WARM-UP MINUTES ARE NOT THE SESSION. avgPaceSec is the whole outing, and every run now
@@ -38953,11 +39648,11 @@ function flagObservations() {
       // measured as grounds for re-anchoring the plan two minutes per kilometre slower. runWorkPace
       // is the mean of the kilometres the band actually applies to, and falls back to the whole
       // outing only for runs logged before the window existed.
-      avgPaceSecPerKm: runWorkPace(r),
-      plannedPaceSecPerKm: r.pband || null,
+      avgPaceSecPerKm: work,
+      plannedPaceSecPerKm: typed ? null : (r.pband || null),
       reportedRpe: r.rpe || null,
       plannedRpe: r.rband || null,
-      implied5kSeconds: runWorkPace(r) ? impliedRecentFromRun(r.type, runWorkPace(r)) : null,
+      implied5kSeconds: work ? impliedRecentFromRun(r.type, work) : null,
     });
   }
   return out;
@@ -39053,9 +39748,11 @@ let EASE_OFFER_WEEK = null;
 function currentWeeklyReview() {
   const wkStart = reviewWeekStartIso();
   if (loadReviewSeen() === wkStart) return null;      // already answered this week
+  // ⚠️ B1: A RUN ADDED BY HAND COUNTS AS A RUN THIS WEEK, AND ITS PACE IS NOT EVIDENCE — the same rule
+  // flagObservations states: one typed time covers the whole outing, so it says nothing about the work.
   const runs = (state.logged || []).filter((r) => r && r.dateIso && r.dateIso >= wkStart).map((r) => ({
     id: r.id, type: r.type || "easy", distKm: Number(r.distKm) || 0, dateIso: r.dateIso,
-    avgPaceSecPerKm: runWorkPace(r), plannedPaceSecPerKm: r.pband || null,
+    avgPaceSecPerKm: r.manual ? null : runWorkPace(r), plannedPaceSecPerKm: r.manual ? null : (r.pband || null),
     reportedRpe: r.rpe || null, plannedRpe: r.rband || null,
     avgHr: r.avgHr || null, zoneSec: r.zoneSec || null,
   }));
@@ -39987,6 +40684,12 @@ function wireRunDebrief() {
   const share = $("rdShare");
   if (share) share.onclick = () => openShareStudio(viewedRun());
 
+  // B1 — telling a run which session it was, and taking that back.
+  const rdLink = $("rdLink");
+  if (rdLink) rdLink.onclick = () => openLinkRunSheet(viewedRun());
+  const rdUnlink = $("rdUnlink");
+  if (rdUnlink) rdUnlink.onclick = () => { unlinkExistingRun(viewedRun()); render(); toast("Unlinked from your plan."); };
+
   // ⚠️ THE OVERFLOW WAS DRAWN AND WIRED TO NOTHING. It shipped as a button that looked live, sat in
   // the top-right corner where every iOS app puts its actions, and did nothing at all when tapped —
   // reported within the hour. The id-must-resolve guard only proves an id EXISTS; nothing proved a control
@@ -40210,6 +40913,14 @@ function wire() {
   const lbf = $("lbFilterBtn"); if (lbf) lbf.onclick = () => { state.logFilterOpen = !state.logFilterOpen; render(); };
   const lgAll = $("lgAll"); if (lgAll) lgAll.onclick = () => { state.logAll = !state.logAll; render(); };
   const lgT = $("lgTrends"); if (lgT) lgT.onclick = () => { state.actTab = "performance"; render(); };
+  // B1 — the Logbook's way in for a run Inte-Run did not record, and a best time opening its run.
+  const lgAdd = $("lgAdd"); if (lgAdd) lgAdd.onclick = () => openAddRunSheet(null);
+  document.querySelectorAll("[data-pbrun]").forEach((b) => b.onclick = () => {
+    const id = b.dataset.pbrun || null;
+    const idx = (state.logged || []).findIndex((r) => r && r.id === id);
+    if (idx < 0) return;
+    state.viewRunId = id; state.viewRunIdx = idx; state.screen = "runview"; render();
+  });
   const lgS = $("lgSnap"); if (lgS) lgS.onclick = () => { state.actTab = "performance"; render(); };
   document.querySelectorAll("[data-ovstat]").forEach((b) => b.onclick = () => openRunStat(b.dataset.ovstat));
   const shAdd = $("shoeAdd"); if (shAdd) shAdd.onclick = () => { state.screen = null; state.tab = "support"; state.support = "shoes"; render(); };

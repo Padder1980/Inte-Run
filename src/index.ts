@@ -92,6 +92,20 @@ export {
   type AchievementResult,
   detectAchievements,
 } from "./progress/achievements.ts";
+export {
+  BEST_DISTANCES,
+  BEST_TOLERANCE,
+  BEST_FASTEST_SEC_PER_KM,
+  bestEligible,
+  bestDistanceOf,
+  runBests,
+  newBest,
+  type BestDistance,
+  type BestDistanceId,
+  type BestRun,
+  type RunBest,
+  type NewBest,
+} from "./progress/records.ts";
 
 // View models (presentation-agnostic summaries for any UI)
 export {

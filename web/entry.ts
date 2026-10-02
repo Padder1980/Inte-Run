@@ -37,6 +37,8 @@ export { rangeText } from "../src/science/estimate.ts";
 export { assessReadiness } from "../src/readiness/readiness.ts";
 export { assessLongRunSpike, returnToRunningPlan } from "../src/adapt/load-guardrails.ts";
 export { assessTrainingFlags } from "../src/adapt/training-flags.ts";
+// B1 — best times. ONE definition, read by the Inte-Club chips and the Performance card alike.
+export { BEST_DISTANCES, runBests, newBest, bestEligible } from "../src/progress/records.ts";
 export type { RunObservation, TrainingFlag, TrainingFlagsResult } from "../src/adapt/training-flags.ts";
 export { assessConditions, heatPaceFactor, dewPointFrom } from "../src/environment/weather.ts";
 export { adaptSessionForHeat } from "../src/adapt/heat.ts";

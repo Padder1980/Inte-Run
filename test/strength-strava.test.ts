@@ -19,7 +19,7 @@ import { stravaAllowedAt } from "../src/domain/youth.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
-import { SPORT_TYPES, resolveSportType } from "../alfie-proxy/src/strava.ts";
+import { SPORT_TYPES, resolveSportType, UPLOAD_ORIGINS, attributionFor } from "../alfie-proxy/src/strava.ts";
 
 const APP = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 const WORKER = readFileSync(new URL("../alfie-proxy/src/strava.ts", import.meta.url), "utf8");
@@ -111,9 +111,18 @@ test("BLOCKER: an unrecognised sport type is refused (400), driven directly agai
 
 test("a client-supplied description keeps the app's own attribution; a blank one falls back to it alone", () => {
   const body = wfnOf("upload");
-  assert.match(body, /"Recorded with Inte-Run\."/, "the attribution line is gone entirely");
-  assert.match(body, /extra \? extra \+ " Recorded with Inte-Run\." : "Recorded with Inte-Run\."/,
+  // ⚠️ B1 MADE IT ONE OF TWO FIXED SENTENCES, CHOSEN BY attributionFor — never client text. A run the app
+  // recorded says "Recorded with Inte-Run"; one the runner added by hand says so instead, because the
+  // first sentence is untrue of it. The client picks which; it can never write its own.
+  assert.match(body, /const attribution = attributionFor\(run\.origin\);/, "the attribution line is gone entirely");
+  assert.match(body, /extra \? extra \+ " " \+ attribution : attribution/,
     "a supplied description line does not keep the app's own attribution alongside it");
+  assert.equal(attributionFor(undefined), "Recorded with Inte-Run.", "a client that never heard of origin lost the old line");
+  assert.equal(attributionFor("recorded"), "Recorded with Inte-Run.");
+  assert.equal(attributionFor("added"), "Added by hand in Inte-Run.", "a hand-added run is still called recorded");
+  // Anything else falls back to the old sentence, so client text can never become the attribution.
+  assert.equal(attributionFor("Uploaded by a bot."), "Recorded with Inte-Run.");
+  assert.deepEqual([...UPLOAD_ORIGINS], ["recorded", "added"]);
 });
 
 // -------------------------------------------------------------------------------------------------
@@ -129,6 +138,10 @@ test("BLOCKER: every /strava/status reply carries sportTypes, whatever the conne
   const withSportTypes = (body.match(/sportTypes: SPORT_TYPES/g) || []).length;
   assert.ok(replies >= 4, "expected at least four distinct replies from status() (not configured / bad key / not linked / bad record / connected)");
   assert.equal(withSportTypes, replies, "a /strava/status reply is missing sportTypes — a client asking that branch cannot learn what this Worker supports");
+  // ⚠️ AND origins BESIDE IT ON EVERY REPLY (B1): it is how the app learns this Worker labels a run
+  // added by hand truthfully. A branch without it would hide the app's Strava switch for that runner.
+  const withOrigins = (body.match(/origins: UPLOAD_ORIGINS/g) || []).length;
+  assert.equal(withOrigins, replies, "a /strava/status reply is missing origins — the app cannot tell this Worker labels a hand-added run");
 });
 
 // -------------------------------------------------------------------------------------------------

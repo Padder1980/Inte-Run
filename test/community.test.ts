@@ -156,8 +156,10 @@ test("BLOCKER: the runner's own pane is built from real data, and the grid is wh
   assert.match(v, /clubPosts\(\)/, "the grid is not built from what the runner posted");
   assert.ok(!/commMonths|state\.hist/.test(v), "the grid is still filling itself from the run history");
   const auto = nocomment(fn("clubMaybeAutoPost"));
-  assert.match(auto, /if \(!run \|\| !clubAuto\(\)\) return/,
-    "runs are posted to the grid whether or not the runner asked for it");
+  // ⚠️ AND NEVER A SIMULATED RUN (B1). The phone's path calls this now, and the phone is where the browser
+  // demo's simulator saves its invented run through central London.
+  assert.match(auto, /if \(!run \|\| run\.sim \|\| !clubAuto\(\)\) return/,
+    "runs are posted to the grid whether or not the runner asked for it, or a simulated run can reach it");
   assert.match(auto, /clubRunPosted\(run\)/, "the same run can be posted twice by the automatic path");
   assert.match(nocomment(page()), /function clubAuto\(\) \{ return loadClubProf\(\)\.autoPost === true; \}/,
     "automatic posting is not off by default, so the app decides rather than the runner");
@@ -1207,12 +1209,23 @@ test("BLOCKER: a run reaches the grid by being asked for, and the picture is cho
   assert.match(edit, /CLUB_TILE_STYLES\.map/, "the automatic path offers no choice of picture");
   assert.match(edit, /clubAuto\(\)\s*\n?\s*\?[\s\S]{0,200}CLUB_TILE_STYLES/,
     "the style picker shows even when automatic posting is off, so it governs nothing");
-  // ⚠️ ONE CALL SITE AT SAVE, beside the Strava one, because that is the one place the phone and the
-  // wrist both arrive — a hook on one and not the other is this project's most-repeated trap.
+  // ⚠️ ONE CALL AT EACH COMMIT POINT, AND NOWHERE ELSE. This guard used to demand exactly one call site,
+  // "the one place the phone and the wrist both arrive" — but there never was one: a phone run is committed
+  // in saveLiveSession and a wrist run in ingestWatchRun, and B1 found the phone's path had no grid hook at
+  // all, under a switch promising "every run you finish". So the commit points are named, and each must
+  // post exactly once: a hook on one and not the other is this project's most-repeated trap.
+  const COMMITS = ["saveLiveSession", "ingestWatchRun", "saveManualRun"];
   const calls = (nocomment(app).match(/clubMaybeAutoPost\(/g) || []).length;
-  assert.equal(calls, 2, "clubMaybeAutoPost has " + calls + " mentions; expected its definition and one call");
-  assert.match(nocomment(app), /stravaMaybeAutoSend\(state\.logged\[0\]\);\s*\n[\s\S]{0,400}clubMaybeAutoPost\(state\.logged\[0\]\)/,
-    "the automatic post is not on the shared save path");
+  assert.equal(calls, 1 + COMMITS.length,
+    "clubMaybeAutoPost has " + calls + " mentions; expected its definition and one call in each commit point");
+  for (const c of COMMITS) {
+    assert.equal((nocomment(fn(c)).match(/clubMaybeAutoPost\(/g) || []).length, 1, c + " does not post to the grid exactly once");
+  }
+  // Beside the Strava call on the two paths that have one, so the two automatic hooks move together.
+  for (const c of ["saveLiveSession", "ingestWatchRun"]) {
+    assert.match(nocomment(fn(c)), /stravaMaybeAutoSend\(state\.logged\[0\]\);\s*\n[\s\S]{0,400}clubMaybeAutoPost\(state\.logged\[0\]\)/,
+      "the automatic post is not beside the Strava call in " + c);
+  }
 });
 
 test("BLOCKER: every field the club profile can store survives being read back", () => {

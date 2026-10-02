@@ -44,8 +44,13 @@ test("⚠️ a run carries Strava's own dedupe handle", () => {
   // Strava answers "duplicate of activity N" and the app can treat that as already-done.
   const src = fn("runStravaPayload");
   assert.match(src, /externalId = String\(\(run && run\.id\) \|\| ""\)/, "external_id is not the run's own id");
-  assert.equal((src.match(/externalId: externalId/g) || []).length, 2,
-    "both the GPX and the manual shape must carry it — one of them does not");
+  // ⚠️ EVERY SHAPE, COUNTED AGAINST THE SHAPES THEMSELVES rather than a number. B1 added a third (a run
+  // added by hand, which says where it was run and which origin it has); a fixed count of two would have
+  // been "fixed" by bumping it, which guards nothing.
+  const shapes = (src.match(/kind: "/g) || []).length;
+  assert.ok(shapes >= 3, "expected the GPX, the manual and the hand-added shapes; found " + shapes);
+  assert.equal((src.match(/externalId: externalId/g) || []).length, shapes,
+    "every payload shape must carry it — one of them does not");
 });
 
 test("⚠️ the device key is unguessable, and it is not a Strava token", () => {
@@ -124,13 +129,25 @@ test("⚠️ nothing is sent to Strava on its own, and nothing is offered that c
   // switched on. What is asserted below is that the studio's call is downstream of resolving the tapped
   // node to the Strava button, which is what makes it a tap rather than a third automatic path.
   const studio = fn("studioClick");
+  // ⚠️ AND A FOURTH SINCE B1, WHICH IS STILL THE RUNNER'S OWN CHOICE. A run added by hand goes only when
+  // its own "Also send to Strava" switch was on for that run (the owner's ruling, 2026-10-02: "Ask me each
+  // time") — never through the automatic setting, which was a promise about runs this app recorded. So
+  // the call must sit in saveManualRun, gated on its sendStrava argument, and that argument must come
+  // from the form's switch, which starts off.
+  const manual = fn("saveManualRun");
   const callers = html.split("\n")
     .map((l) => l.trim())
     .filter((l) => l.includes("stravaSendRun(") && !l.startsWith("function stravaSendRun"));
-  assert.ok(callers.length >= 3, "expected the two buttons and the opt-in path to call it");
+  assert.ok(callers.length >= 4, "expected the two buttons, the opt-in path and a run added by hand to call it");
   for (const l of callers)
-    assert.ok(l.includes("stvSend.onclick") || optIn.includes(l) || studio.includes(l),
+    assert.ok(l.includes("stvSend.onclick") || optIn.includes(l) || studio.includes(l) || manual.includes(l),
       "an upload is triggered from somewhere that is neither a button nor the opt-in path: " + l.slice(0, 100));
+  assert.match(manual, /if \(sendStrava && stravaCanSendAdded\(rec\)\) stravaSendRun\(rec,/,
+    "a run added by hand reaches Strava without its own switch, or without the server's handshake");
+  assert.ok(!/stravaMaybeAutoSend\(/.test(manual), "a run added by hand rides the automatic setting");
+  assert.match(fn("submitAddRun"), /const sent = !!d\.strava;[\s\S]*saveManualRun\(res\.run, res\.link, sent\)/,
+    "the hand-added run's Strava choice is not the form's own switch");
+  assert.match(fn("openAddRunSheet"), /strava: false/, "the Strava switch on Add a run does not start off");
   assert.match(html, /stvSend\.onclick = \(\) => stravaSendRun/, "the send button is not what triggers a send");
   assert.match(studio, /closest\("#stvSend, #stvCheck"\)[\s\S]*?stravaSendRun\(STUDIO\.run/,
     "the studio sends without first resolving the tap to its own Strava button");

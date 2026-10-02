@@ -209,12 +209,15 @@ node --test            # the suite (about 1,800 tests)
 
 ## Where things stand (keep this to a few lines)
 
-As of 2026-09-28: strength A1–A8, the 12–17 programme Y1–Y6 and **D1** (the privacy policy, terms, a simple
+As of 2026-10-02: strength A1–A8, the 12–17 programme Y1–Y6 and **D1** (the privacy policy, terms, a simple
 version and a support page, at `docs/privacy/`, `terms/`, `simple/`, `support/`) are built. The published pages
 are held to the code by `test/privacy-copy.test.ts`: change what leaves the phone, and they change too. D3c
 (the Wellbeing check-in, UK crisis lines, Alfie's limb warning signs) is built too, awaiting clinical review. D2: build
-562 is on TestFlight and on his phone (archive with the RELEASE Xcode). **Next is the development plan, `docs/plan/`:**
-features first (S, B1–B11), then D4 submit — his ruling of 2026-09-30. `PLAN.md` holds the full list and the Road Map is the live status; update both when a stage lands.
+562 is on TestFlight and on his phone (archive with the RELEASE Xcode). **The development plan is `docs/plan/`:**
+features first (S, B1–B11), then D4 submit — his ruling of 2026-09-30. **B1 is built (2026-10-02):** a run added by
+hand, a run linked to its session (`interun_link_v1`, now written by all three commit points), best times; its
+Strava switch waits on his Worker deploy. Next is B2. `PLAN.md` holds the full list and the Road Map is the live
+status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
 
@@ -249,4 +252,5 @@ features first (S, B1–B11), then D4 submit — his ruling of 2026-09-30. `PLAN
 | Strength A1–A4: the set-log store, the exercise library, preferences, swap | `notes/strength-a1-a4.md` |
 | Strength A5–A8: the guided player and rest timer, e1RM and records, programmes, Strava weight training | `notes/strength-a5-a8.md` |
 | The 12–17 programme: the safety step, goal and plan ceilings, youth strength, Strava's age rules (and `YOUTH.md`) | `notes/youth-programme.md` |
+| Adding a run by hand (`saveManualRun`, the third commit point), linking a run to its session (`interun_link_v1`, the seedDone replay), best times (`src/progress/records.ts`), Done for today | `notes/manual-runs-and-records.md` |
 | Privacy defaults (Children's Code), Delete everything, what leaves the phone (`PRIVACY_FLOWS`), the App Store answers (and `DPIA.md`, `APPSTORE.md`), the published privacy policy, terms and simple version, the under-13 consent lock | `notes/privacy-and-app-store.md` |

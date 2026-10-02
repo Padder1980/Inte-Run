@@ -581,8 +581,9 @@ type Mark = { adj: Adj; days: string[]; count: number; tag: string; phrase: stri
 function weekMark(rows: Adj[]) {
   // ⚠️ `adjPhrase` JOINED THIS LIST WHEN THE STORE GAINED A THIRD KIND. A hand-written lift list goes
   // stale on the next change by construction — and that is the ACCEPTABLE kind of stale, because it
-  // fails loudly with a ReferenceError rather than quietly measuring less.
-  const src = ["weekAdjust", "weekAdjustNote", "adjPhrase", "adjustFor", "isoAdd", "runDateLabelIso", "esc"]
+  // fails loudly with a ReferenceError rather than quietly measuring less. `weekSkips` and `todayIso`
+  // joined it with B2's fourth kind, a single skipped session, exactly that way.
+  const src = ["weekAdjust", "weekAdjustNote", "adjPhrase", "adjustFor", "weekSkips", "todayIso", "isoAdd", "runDateLabelIso", "esc"]
     .map((n) => fn(n)).join("\n") + "\n" +
     ["ADJ_MODES", "MON_SHORT"].map((n) => constSrc(n)).join("\n") + "\n" +
     "function loadAdjust() { return ROWS; }\n";

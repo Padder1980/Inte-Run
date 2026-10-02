@@ -768,3 +768,64 @@ or superseded bindings.
 ⚠️ **The plan drag still refuses in silence** — only the calendar's got the new toast.
 ⚠️ **Twelve of the guards lens's findings are unaddressed**, most of them "the guard asserts the
 implementation rather than the invariant". Worth a pass of its own.
+
+## SKIP A SINGLE SESSION (stage B2, 2026-10-02)
+
+PLAN.md B2: *"Skip a single session without rebuilding the week."* A planned session's sheet has **Skip this
+session** (`#sdSkip`, between "I did this run elsewhere" and Start, which stays last). One tap: the session
+leaves the plan, the rest of the week stays exactly as prescribed, the toast says *"Skipped. It won't count
+as missed."* with Undo, and Manage plan › Planned breaks lists it with a Cancel. Web-only.
+
+**The store is the break store.** A skip is a row in `interun_adjust_v1`:
+`{ id: "skip-<ms>", kind: "skip", mode: "skip", from, to, sid, t, ty }` — one day (`from === to`), the
+session's id, and its title and type (it is no longer in the plan to be read from). So it inherits adoptPlan's
+ordering (applied inside `applyAdjustments`, before the reminder and watch syncs), the Planned breaks list
+and its Cancel, and the week marking, for free.
+
+⚠️ **`adjDrops` ANSWERS FOR IT AFTER THE RACE GUARD** — `if (a.mode === "skip") return s.id === a.sid;` sits
+below `if (s.type === "race") return false;`. PLAN.md's own re-break (move it above) is guarded. The sheet
+never offers Skip on the race either (`skipOfferable`), so there is no button that does nothing.
+
+⚠️⚠️ **`adjustFor` NEVER RETURNS A SKIP.** It resolves ONE row per day, so a skip listed first (newest-first
+order) would have hidden a holiday's level for every other session that day, and a skip on a Monday would
+have hidden a "make this week easier" row from `eased()`, which asks about the week's first day. Skips are
+found by **`weekSkips(startIso, rows)` — the one definition of skip membership** (by the week, then by id,
+exactly like a B1 link) — and applied as well as the windows, not instead: windows first, then skips, then
+easing (easing eases what is left). The guard that pins `adjustFor`'s askers is unchanged; a new guard pins
+`weekSkips`'s callers to `applyAdjustments`, `weekAdjust` and `todayDecision`.
+
+⚠️⚠️ **A SKIP OUTLIVES ITS DAY, AND THAT IS WHAT MAKES IT A SKIP RATHER THAN A MISS.** `easeWeekEvidence`
+counts misses as RAW's runnable sessions in the last four plan weeks with no run on their date. `saveAdjust`
+used to drop every row whose `to` had passed, which would have put the skipped session back into RAW the
+next time anything was written — and counted it as missed, the one thing the toast promises it will not be.
+Skips are now kept **42 days** (`SKIP_KEEP_DAYS`, declared beside `ADJUST_KEY`), and **capped apart from the
+windows** (40 skips, 12 windows): one shared cap of twelve would have let a run of skips push a holiday
+booked months ahead out of the store in silence.
+
+⚠️ **ONLY TODAY OR LATER, AND NEVER ONE ALREADY DONE.** `skipOfferable` refuses a past day (turning a miss
+into a skip after the fact would launder the evidence the coach reads), a session a B1 link fulfils, today's
+session once a run has ticked it, an added session or built run (not in the PLAN, removed directly), and a
+programme session. The sheet and `skipSession` ask the same function, so the two cannot disagree.
+
+⚠️ **IT LEAVES THE RUNNER WHERE THEY WERE.** `saveAdjustDraft` and `cancelAdjust` reset the Plan screen to this
+week (they are booked from Manage plan); `skipSession` does not, because it is made from the session in front
+of the runner and jumping the Plan screen under their finger would lose their place.
+
+**What the runner reads afterwards:**
+- the week's row gets the dashed "altered" border and a **Skipped** tag (a window's tag wins when both);
+- the opened week says *"Skipped · 4 Oct — 80′ long run is off the plan, and it won't count as a missed
+  session. You can put it back from Manage plan › Planned breaks."* — the way back named only while it
+  exists;
+- Planned breaks lists upcoming and today's skips (not earlier ones, which stay in the store for the
+  evidence but are no longer "planned"), in **the session's own effort colour** (`effortVar(sessionEffort)`),
+  and Cancel's toast says *"Session put back."*;
+- Today, on a day a skip emptied, says **"Skipped today"** — not "Recovery day", which would be the app
+  claiming the runner's decision as its own design.
+
+**Known edge, not fixed:** a session the runner had dragged to another day and then skipped loses its
+reschedule (`seedDone` prunes `dayOverride` entries for ids the plan no longer holds, as it does for a
+holiday), so cancelling the skip brings it back on its original day.
+
+**Tests:** `test/skip-session.test.ts` (13, driving the real lifted functions over a three-week fixture whose
+rest day is never today). Updated: `manage-plan` (its hand-written lift list gained `weekSkips`, `todayIso`),
+`manual-runs` (the sheet's button order). 17 of 17 re-breaks caught, PLAN.md's own among them.

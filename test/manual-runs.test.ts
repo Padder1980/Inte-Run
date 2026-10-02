@@ -580,8 +580,9 @@ test("BLOCKER: every new control does something — the looks-live-does-nothing 
   // ⚠️ AND BOTH STATES OF THE LOGBOOK OFFER IT — the empty state returns early.
   const acts = decomment(fnBody("viewActivities"));
   assert.ok((acts.match(/\+ addRun/g) || []).length >= 2, "the Logbook's empty state has no way to add a run");
-  // Start stays the last thing in the session sheet (the design rule test/design-system.test.ts holds).
-  assert.match(decomment(fnBody("sessionSheetHtml")), /addLink \+\s*elsewhere \+\s*startBtn;/);
+  // Start stays the last thing in the session sheet (the design rule test/design-system.test.ts holds);
+  // B2's Skip sits between this stage's button and it.
+  assert.match(decomment(fnBody("sessionSheetHtml")), /addLink \+\s*elsewhere \+\s*skipBtn \+\s*startBtn;/);
 });
 
 test("a run added by hand only offers Strava through the handshake, and says where it was run", () => {

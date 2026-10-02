@@ -6364,6 +6364,9 @@ const SHOES_KEY = "interun_shoes_v1";
  */
 const JOURNAL_KEY = "interun_journals_v1";
 const ADJUST_KEY = "interun_adjust_v1";
+// B2: how long a skip is kept after its day (see saveAdjust). Declared with the key it governs, so no
+// caller can ever reach it in its temporal dead zone.
+const SKIP_KEEP_DAYS = 42;
 /**
  * ⚠️ DECLARED HERE WITH THE OTHER STORE KEYS, NOT BESIDE THE CODE THAT USES IT. journalSync runs at boot
  * from inside adoptPlan; its key was first declared five thousand lines later, so the read landed in the
@@ -7024,7 +7027,16 @@ function saveAdjust(rows) {
   // is applied to the plan at adopt time, so a window that has ended can only make the next rebuild
   // slower and the store bigger. The runs done during it are in the logbook, which is the record.
   const today = todayIso();
-  const live = rows.filter((r) => r && r.to && r.to >= today).slice(0, 12);
+  // ⚠️⚠️ B2: A SKIP OUTLIVES ITS DAY, AND THAT IS WHAT MAKES IT A SKIP RATHER THAN A MISS. easeWeekEvidence
+  // judges the last four plan weeks by asking which of RAW's runnable sessions have a run on their date,
+  // so a skip pruned the day after would put the session back into RAW and count it as missed — the one
+  // thing the runner was told it would not be. Kept six weeks, past the four-week window with a margin.
+  const keep = isoAdd(today, -SKIP_KEEP_DAYS).toISOString().slice(0, 10);
+  // ⚠️ AND COUNTED APART FROM THE WINDOWS. One shared cap of twelve would let a run of skips push a
+  // holiday booked months ahead out of the store in silence, under the newest-first order.
+  const wins = rows.filter((r) => r && r.mode !== "skip" && r.to && r.to >= today).slice(0, 12);
+  const skips = rows.filter((r) => r && r.mode === "skip" && r.sid && r.to && r.to >= keep).slice(0, 40);
+  const live = rows.filter((r) => wins.indexOf(r) >= 0 || skips.indexOf(r) >= 0);
   try { localStorage.setItem(ADJUST_KEY, JSON.stringify(live)); } catch (e) {}
 }
 /** The adjustment covering a date, or null. The newest wins where two overlap. */
@@ -7040,13 +7052,30 @@ function saveAdjust(rows) {
 function adjPhrase(r) {
   if (!r) return "";
   if (r.mode === "recovery") return "one easier week";
+  if (r.mode === "skip") return "one session skipped";
   const m = ADJ_MODES.find((x) => x.id === r.mode);
   return m ? m.p : r.mode;
 }
 function adjustFor(iso, rows) {
   const list = rows || loadAdjust();
-  for (const r of list) if (r && r.from && r.to && iso >= r.from && iso <= r.to) return r;
+  // ⚠️ B2: A SKIP IS NOT A WINDOW, AND IT MUST NEVER BE THE ANSWER HERE. This returns ONE row per day,
+  // so a skip row on the day of a holiday would hide the holiday's level for every other session that
+  // day — and a skip on a Monday would hide a "make this week easier" row from eased(), which asks about
+  // the week's first day. Skips are found by weekSkips, and applied as well as the windows, not instead.
+  for (const r of list) if (r && r.mode !== "skip" && r.from && r.to && iso >= r.from && iso <= r.to) return r;
   return null;
+}
+/**
+ * B2 — the sessions skipped in the plan week that starts on startIso. THE ONE DEFINITION of which skips
+ * belong to a week, read by applyAdjustments (which removes them) and weekAdjust (which marks them).
+ * ⚠️ BY THE WEEK, THEN BY ID — the same rule a B1 link follows. Ids carry their week ("w7-d2-easy"), so
+ * within one plan the pair is unique, and a rebuild into a different plan leaves a skip inert rather than
+ * taking out a session the runner never chose.
+ */
+function weekSkips(startIso, rows) {
+  if (!startIso) return [];
+  const end = isoAdd(startIso, 6).toISOString().slice(0, 10);
+  return (rows || loadAdjust()).filter((r) => r && r.mode === "skip" && r.sid && r.from && r.from >= startIso && r.from <= end);
 }
 const ADJ_QUALITY = { threshold: 1, vo2: 1, "race-specific": 1 };
 const ADJ_RUN = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1 };
@@ -7067,6 +7096,10 @@ function adjDrops(a, s) {
   // (see easeWeekIn); deleting anything as well would double the cut.
   if (a.mode === "recovery") return false;
   if (s.type === "race") return false;
+  // ⚠️ B2: A SKIP TAKES ONE SESSION, BY ITS ID — AND ONLY AFTER THE RACE GUARD ABOVE, which is the whole
+  // point of where this line sits. The race is what the block exists to reach; a skip row naming it
+  // must still leave it in the plan, exactly as a "not running" holiday over race day does.
+  if (a.mode === "skip") return s.id === a.sid;
   if (!ADJ_RUN[s.type]) return !!a.dropNonRun;
   if (a.mode === "none") return true;
   if (a.mode === "easy") return !!ADJ_QUALITY[s.type] || s.type === "long";
@@ -7107,6 +7140,17 @@ function applyAdjustments() {
       const before = wk.sessions.length;
       wk.sessions = wk.sessions.filter((x) => !(x.dayIndex === d && adjDrops(a, x)));
       if (raw) raw.sessions = raw.sessions.filter((x) => !(x.dayOfWeek === d && adjDrops(a, x)));
+      if (wk.sessions.length !== before) { touched = true; removed += before - wk.sessions.length; }
+    }
+    // ⚠️ B2: THEN THE SKIPS, BY ID, WHATEVER DAY THE SESSION NOW SITS ON — after the windows (a holiday may
+    // already have taken it, and then there is nothing to do) and before the easing below, for the reason
+    // that ordering already states: easing eases what is LEFT. adjDrops answers, so the race guard holds.
+    const skips = weekSkips(wk.startIso, rows);
+    if (skips.length) {
+      const gone = (x) => skips.some((r) => adjDrops(r, x));
+      const before = wk.sessions.length;
+      wk.sessions = wk.sessions.filter((x) => !gone(x));
+      if (raw) raw.sessions = raw.sessions.filter((x) => !gone(x));
       if (wk.sessions.length !== before) { touched = true; removed += before - wk.sessions.length; }
     }
     if (touched && raw) {
@@ -7281,6 +7325,70 @@ function saveAdjustDraft() {
   closeSheet();
   const word = a.kind === "holiday" ? "Holiday added." : "Eased off.";
   toastUndo(word, () => {
+    const t2 = todayTicks();
+    try { localStorage.setItem(ADJUST_KEY, before); } catch (e) {}
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); render();
+  });
+  render();
+}
+
+/**
+ * B2 — MAY THIS SESSION BE SKIPPED? Asked by the session sheet before it offers the button, and again by
+ * skipSession before it writes anything, so the two cannot disagree.
+ * ⚠️ NEVER THE RACE (adjDrops would keep it anyway; offering a button that does nothing is the looks-live
+ * trap). ⚠️ ONLY A SESSION THE PLAN HOLDS — an added session or a built run has no week and is removed
+ * directly; a programme session is dated rather than placed. ⚠️ ONLY TODAY OR LATER: an earlier day has
+ * happened, and turning a miss into a skip after the fact would quietly launder the very evidence the
+ * coach reads. ⚠️ AND NOT ONE ALREADY DONE — by a linked run, or today by one finished since launch.
+ */
+function skipOfferable(sess, week) {
+  if (!sess || !sess.id || sess.type === "race" || sess.type === "rest") return false;
+  try { if (progExtraOf(sess)) return false; } catch (e) {}
+  const wk = PLAN.weeks.find((w) => w.index === week);
+  if (!wk) return false;
+  const iso = isoAdd(wk.startIso, effDay(sess)).toISOString().slice(0, 10);
+  if (iso < todayIso()) return false;
+  const ref = planSessionRef(iso, sess.id);
+  if (!ref) return false;
+  if (linkedRunFor(ref.wk.index, sess.id)) return false;
+  if (iso === todayIso() && state.done[doneKey(ref.wk.index, ref.s)]) return false;
+  return true;
+}
+/**
+ * B2 — SKIP ONE SESSION, AND NOTHING ELSE MOVES. PLAN.md: "Skip a single session without rebuilding
+ * the week." The rest of the week stays exactly as prescribed; the week's own figures follow (they are
+ * re-derived from RAW, as for any break), and the session is gone from Today, the plan, the calendar
+ * file, the reminders and the watch, because applyAdjustments runs inside adoptPlan before the syncs.
+ *
+ * ⚠️ IT IS A ROW IN THE BREAK STORE, SO IT INHERITS THE REST FOR FREE: the Planned breaks list with its
+ * Cancel, the week marking on the Plan screen, and adoptPlan's ordering. And it is the same commit as
+ * saveAdjustDraft — snapshot the store as a string BEFORE the rebuild, keep today's ticks across
+ * seedDone, restore and rebuild again if recompute throws, and hand the snapshot back through Undo.
+ * ⚠️ UNLIKE A BREAK, IT LEAVES THE RUNNER WHERE THEY WERE. A break resets the plan view to this week
+ * because it is booked from Manage plan; a skip is made from the session in front of them, and jumping
+ * the Plan screen to another week under their finger would lose their place for nothing.
+ * ⚠️ AND IT WILL NOT COUNT AS A MISS, which is the promise the toast makes: the session leaves RAW, and
+ * every miss count (easeWeekEvidence) asks RAW. saveAdjust keeps the row six weeks for that reason.
+ */
+function skipSession(sess, week) {
+  if (!skipOfferable(sess, week)) return;
+  const wk = PLAN.weeks.find((w) => w.index === week);
+  const iso = isoAdd(wk.startIso, effDay(sess)).toISOString().slice(0, 10);
+  const before = JSON.stringify(loadAdjust());
+  const rows = loadAdjust();
+  rows.unshift({ id: "skip-" + Date.now(), kind: "skip", mode: "skip", from: iso, to: iso,
+    sid: String(sess.id), t: String(sess.title || ""), ty: String(sess.type || "") });
+  saveAdjust(rows);
+  const ticks = todayTicks();
+  try { recompute(); } catch (e) {
+    try { localStorage.setItem(ADJUST_KEY, before); } catch (e2) {}
+    try { recompute(); } catch (e2) {}
+    toast("That did not work — your plan is unchanged."); return;
+  }
+  computeToday(); seedDone(); restoreTicks(ticks);
+  closeSheet();
+  toastUndo("Skipped. It won’t count as missed.", () => {
     const t2 = todayTicks();
     try { localStorage.setItem(ADJUST_KEY, before); } catch (e) {}
     try { recompute(); } catch (e) {}
@@ -8094,6 +8202,15 @@ function todayDecision() {
   const nxt = todayNextUp();
 
   if (!sess || sess.type === "rest") {
+    // \u26a0\ufe0f B2: A DAY EMPTIED BY A SKIP IS NOT A RECOVERY DAY THE PLAN CHOSE. Saying "Your training is working
+    // while you recover" over a session the runner has just dropped would be the app claiming its own
+    // design for their decision. Read through weekSkips, the one definition, and only on the real today.
+    const sk = onToday ? weekSkips(curWeek().startIso, loadAdjust()).filter((r) => r.from === todayIso()) : [];
+    if (sk.length) {
+      return { kind: "rest", eyebrow: "Today\u2019s plan", headline: "Skipped today",
+        implication: (sk[0].t || "Today\u2019s session") + " is off today\u2019s plan, and it won\u2019t count as a missed session.",
+        action: nxt ? "Preview " + (nxt.whenWord || "the next run") : null, actionId: "todayPreview" };
+    }
     return { kind: "rest", eyebrow: "Today\u2019s plan", headline: "Recovery day",
       implication: "Your training is working while you recover. Keep today easy and arrive fresh for the next one.",
       action: nxt ? "Preview " + (nxt.whenWord || "the next run") : null, actionId: "todayPreview" };
@@ -12788,6 +12905,10 @@ function sessionSheetHtml(sess, week) {
   const elsewhere = (sRef && sIso <= todayIso() && !linkedRunFor(sRef.wk.index, sess.id) &&
       !(sIso === todayIso() && state.done[doneKey(sRef.wk.index, sRef.s)]))
     ? '<button class="sd-addlink" id="sdElsewhere">I did this run elsewhere</button>' : "";
+  // ⚠️ B2: SKIP THIS ONE SESSION, AND NOTHING ELSE MOVES. skipOfferable is the same test skipSession runs
+  // before it writes, so the button never appears for a session the action would refuse.
+  const skipBtn = skipOfferable(sess, week)
+    ? '<button class="sd-addlink" id="sdSkip">Skip this session</button>' : "";
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
@@ -12802,6 +12923,7 @@ function sessionSheetHtml(sess, week) {
     moveBlock +
     addLink +
     elsewhere +
+    skipBtn +
     startBtn;
 }
 function ensureSheet() {
@@ -12853,6 +12975,10 @@ function wireSheet() {
   // B1 — in place, keeping SHEET_CTX, so the form's Back returns to this session rather than closing.
   const sdEl = $("sdElsewhere");
   if (sdEl && SHEET_CTX && SHEET_CTX.sess) { const ctx = { sess: SHEET_CTX.sess, week: SHEET_CTX.week }; sdEl.onclick = () => openAddRunSheet(ctx); }
+  // B2 — the session and its week are captured now, because skipSession closes the sheet (clearing nothing
+  // it needs) and rebuilds the plan, after which SHEET_CTX would describe a session that no longer exists.
+  const sdSkip = $("sdSkip");
+  if (sdSkip && SHEET_CTX && SHEET_CTX.sess) { const ctx = { sess: SHEET_CTX.sess, week: SHEET_CTX.week }; sdSkip.onclick = () => skipSession(ctx.sess, ctx.week); }
 }
 function openSessionSheet(sess, week) {
   // Adapted before anything is rendered, so the steps, the paces and the duration chip all describe
@@ -14001,7 +14127,11 @@ function planActionsHtml() {
  * menu is a section that teaches the runner to scroll past this part of the screen.
  */
 function plannedBreaksHtml() {
-  const rows = loadAdjust();
+  // ⚠️ B2: A SKIP FROM AN EARLIER DAY IS KEPT IN THE STORE (so it never counts as a miss) BUT IS NOT A
+  // PLANNED BREAK ANY MORE, so it is not listed — a Cancel on yesterday's skip would put a session back
+  // into a day that has gone, as a miss. Upcoming and today's skips are listed, each with its Cancel.
+  const today0 = todayIso();
+  const rows = loadAdjust().filter((r) => r && (r.mode !== "skip" || r.from >= today0));
   const paused = profile.startDateIso && profile.startDateIso > todayIso();
   if (!rows.length && !paused) return "";
   const item = (icon, colour, title, sub, action, label) =>
@@ -14022,6 +14152,17 @@ function plannedBreaksHtml() {
   for (const r of rows) {
     const span = r.from === r.to ? runDateLabelIso(r.from)
       : runDateLabelIso(r.from) + " to " + runDateLabelIso(r.to);
+    // B2 — a skipped session names itself, because it is no longer in the plan to be recognised by.
+    if (r.mode === "skip") {
+      // ⚠️ THE SESSION'S OWN EFFORT COLOUR, FROM sessionEffort — THE ONE MAPPING. A booked break wears the
+      // colour of the menu row that made it; a skip was made from the session, so it wears the colour that
+      // session has on every other screen, and a skipped long run is the long run's colour here too.
+      out += item("cal", effortVar(sessionEffort(r.ty)), "Skipped",
+        esc(span) + " · " + esc(r.t || "one session"),
+        'data-pbdel="' + esc(r.id || "") + '"',
+        "Cancel this skip and put the session back");
+      continue;
+    }
     out += item(r.kind === "holiday" ? "wxSun" : r.kind === "recovery" ? "timer" : "heart",
       r.kind === "holiday" ? "var(--base)" : r.kind === "recovery" ? "var(--taper)" : "var(--ease)",
       r.kind === "holiday" ? "Going away" : r.kind === "recovery" ? "Easier week" : "Taking it easier",
@@ -14042,6 +14183,8 @@ function plannedBreaksHtml() {
  */
 function cancelAdjust(id) {
   const before = JSON.stringify(loadAdjust());
+  // B2: the toast names what came back — a single session, or a break's worth of them.
+  const was = loadAdjust().find((r) => r && r.id === id);
   const rows = loadAdjust().filter((r) => r && r.id !== id);
   saveAdjust(rows);
   const ticks = todayTicks();
@@ -14052,7 +14195,7 @@ function cancelAdjust(id) {
   }
   computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks);
-  toastUndo("Break cancelled.", () => {
+  toastUndo(was && was.mode === "skip" ? "Session put back." : "Break cancelled.", () => {
     const t2 = todayTicks();
     try { localStorage.setItem(ADJUST_KEY, before); } catch (e) {}
     try { recompute(); } catch (e) {}
@@ -14703,10 +14846,16 @@ function weekAdjust(w) {
     if (!hit) hit = a;
     if (a === hit) days.push(iso);
   }
-  if (!hit) return null;
+  // ⚠️ B2: AND THE SESSIONS SKIPPED IN THIS WEEK, WHICH NO WINDOW COVERS (adjustFor never returns a skip).
+  // A week that has lost a session to a skip is as altered as one a holiday emptied, and with no mark it
+  // would read as untouched with a session already gone — the defect this marking exists to prevent.
+  // A window still names the tag when there is one; the note lists both.
+  const skips = weekSkips(w.startIso, rows);
+  if (!hit && !skips.length) return null;
+  if (!hit) return { adj: null, days: [], count: 0, tag: "Skipped", phrase: "", skips: skips };
   return { adj: hit, days: days, count: days.length,
     tag: hit.kind === "holiday" ? "Holiday" : hit.kind === "recovery" ? "Easier week" : "Easier",
-    phrase: adjPhrase(hit) };
+    phrase: adjPhrase(hit), skips: skips };
 }
 /**
  * The sentence inside an opened week. Names the change, the days, and what came out.
@@ -14716,18 +14865,30 @@ function weekAdjust(w) {
 function weekAdjustNote(w) {
   const a = weekAdjust(w);
   if (!a) return "";
-  const first = a.days[0], last = a.days[a.days.length - 1];
-  const span = first === last
-    ? runDateLabelIso(first)
-    : runDateLabelIso(first) + " to " + runDateLabelIso(last);
-  const whole = a.count === 7;
-  return '<div class="wk-adj">' +
-    '<b>' + (a.adj.kind === "holiday" ? "Going away" : "Taking it easier") + ' \u00b7 ' + esc(span) + '</b>' +
-    '<span>' + (whole ? "The whole week" : a.count + (a.count === 1 ? " day" : " days") + " of this week") +
-    ' \u2014 ' + esc(a.phrase) + '.' +
-    (a.adj.dropNonRun ? " Strength and mobility are out too." : "") +
-    ' You can undo this from Manage plan \u203a ' +
-    (a.adj.kind === "holiday" ? "Going away" : "Not feeling 100%") + '.</span></div>';
+  let out = "";
+  if (a.adj) {
+    const first = a.days[0], last = a.days[a.days.length - 1];
+    const span = first === last
+      ? runDateLabelIso(first)
+      : runDateLabelIso(first) + " to " + runDateLabelIso(last);
+    const whole = a.count === 7;
+    out += '<div class="wk-adj">' +
+      '<b>' + (a.adj.kind === "holiday" ? "Going away" : "Taking it easier") + ' \u00b7 ' + esc(span) + '</b>' +
+      '<span>' + (whole ? "The whole week" : a.count + (a.count === 1 ? " day" : " days") + " of this week") +
+      ' \u2014 ' + esc(a.phrase) + '.' +
+      (a.adj.dropNonRun ? " Strength and mobility are out too." : "") +
+      ' You can undo this from Manage plan \u203a ' +
+      (a.adj.kind === "holiday" ? "Going away" : "Not feeling 100%") + '.</span></div>';
+  }
+  // \u26a0\ufe0f B2: ONE LINE PER SKIP, NAMING THE SESSION \u2014 it is no longer in the week to be seen, so the note is
+  // the only place left that says what was there. The way back is named only while it exists: a skip
+  // from an earlier day stays (so it is not a miss) but is no longer offered under Planned breaks.
+  for (const r of (a.skips || [])) {
+    out += '<div class="wk-adj"><b>Skipped \u00b7 ' + esc(runDateLabelIso(r.from)) + '</b>' +
+      '<span>' + esc(r.t || "A session") + ' is off the plan, and it won\u2019t count as a missed session.' +
+      (r.from >= todayIso() ? ' You can put it back from Manage plan \u203a Planned breaks.' : "") + '</span></div>';
+  }
+  return out;
 }
 /**
  * The paused stretch, as a row above the week list.

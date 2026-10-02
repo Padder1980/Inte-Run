@@ -216,7 +216,8 @@ are held to the code by `test/privacy-copy.test.ts`: change what leaves the phon
 562 is on TestFlight and on his phone (archive with the RELEASE Xcode). **The development plan is `docs/plan/`:**
 features first (S, B1–B11), then D4 submit — his ruling of 2026-09-30. **B1 is built (2026-10-02):** a run added by
 hand, a run linked to its session (`interun_link_v1`, now written by all three commit points), best times; its
-Strava switch waits on his Worker deploy. Next is B2. `PLAN.md` holds the full list and the Road Map is the live
+Strava switch waits on his Worker deploy. **B2 is built too:** skip one session (a row in the break store).
+Next is B3. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -234,7 +235,7 @@ status; update both when a stage lands.
 | The coaching-book (Hudson) work: hill sprints, honest RPE bands, block lengths (`MAX_STRUCTURED_WEEKS`), two hard days, beginner quality, the no-recovery-week tier | `notes/plan-coaching-book.md` |
 | Profile answers → plan: `applyProfile`, status and experience, stated volume, age and max HR, running-day choices, `profileImpact` | `notes/plan-profile.md` |
 | The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment | `notes/plan-adaptation.md` |
-| Manage plan: pause, holiday / not 100%, week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
+| Manage plan: pause, holiday / not 100%, skip one session (B2), week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
 | The native iPhone app: WebHost, the over-the-air web layer, the keyboard pan, viewport and status bar, installing, TestFlight, the toolchain, Apple Health | `notes/ios-native.md` |
 | The Apple Watch app: payload, companion, mirroring, Live Activities, starting runs from the phone, the watch redesign | `notes/watch.md` |
 | The 2026-08-21 watch batch: the companion screen, pace derivation, cadence, count-in beats, wrist controls | `notes/watch-batch.md` |

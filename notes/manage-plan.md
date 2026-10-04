@@ -881,3 +881,159 @@ the time (it would need a Swift change to show it).
 **Tests:** `test/session-time.test.ts` (8): parses the real `.ics` and the real schedule items, the week-and-id
 matching, the date-only prune driven through the real `seedDone`, the sheet's wiring, the note, and the time
 on Today and the plan rows. The B1 and B2 tests' lift lists gained the time helpers. 18 of 18 re-breaks caught.
+
+## MOVE A SESSION A WEEK EARLIER OR LATER (stage B4, 2026-10-04)
+
+PLAN.md B4: *"Move a session a week earlier or later."* A planned run's sheet, from today on, has **Move to another
+week** under Move to another day: **‹ A week earlier** and **A week later ›**. Each opens the other week's seven days
+in place (dates on the buttons, the ones that cannot take it greyed, the reasons said once underneath, and what it
+does to both weeks' distance). One tap moves it; the toast says *"Moved to Thu 15 Oct."* with Undo. Web-only.
+
+**The store is the day-override store.** A week-move is `{ to, from, wk }` in `interun_dayov_v1`: the day it goes to,
+the day the plan put it on in ITS week, and the week offset (±1) from that week. The offset is from where the PLAN put
+it, never from where it sits: moved a week later and then a week earlier is HOME — an ordinary same-week override, or
+none at all on its own day — never two moves that cancel. So a session is at most one week from where the plan put
+it, and a moved session is offered *‹ Back to week N* (the way back) while the other direction says *"A session can
+move one week from where your plan put it."*
+
+### ⚠️⚠️ FOUND UNDER IT, AND B4 COULD NOT WORK WITHOUT IT: SESSION IDS SHIFTED A WEEK EVERY MONDAY
+
+`applyProfile` builds the plan from **today** on every launch (a past `startDateIso` is replaced by today), so once a
+block has begun it is a week shorter every Monday and **every later week's number drops by one**. Ids were
+`w{week number}-d{day}-{type}`, so the session that was `w3-d1-threshold` on Sunday was `w2-d1-threshold` on the
+Monday, and `w3-d1-threshold` then named a session a week LATER. Measured on a 12-week half (2026-10-02): the strength
+session on Tue 20 Oct was `w4-d1-strength`, then `w3-…` from Monday 5 Oct, then `w2-…` from Monday 12 Oct.
+**Everything filed against an id was hit:**
+- **a same-week drag repeated itself** — this week's Tuesday run dragged to Thursday: next Monday, next week's
+  Tuesday run carries the same id, the `from` check passes, and it is dragged to Thursday too (until the template
+  changes or the collision belt intervenes);
+- **a drag made for a future week jumped a week later** each Monday, and the real session lost it;
+- **a B2 skip of a future week's session came back** after the Monday (the row's sid named the next week's session);
+- **a B3 time set for a future week vanished** after the Monday (its iso check stopped it being misapplied — but it
+  was lost);
+- **swaps (A4)** are keyed `sessionId|exercise` with no date, so a swap on a future session jumped weeks too.
+A week-move keyed on such an id would have scrambled itself every Monday.
+
+**The fix is at the root: an id names its calendar week.** `sessionIdFor(weekStartIso, dow, type)` in
+`src/plan/generate-plan.ts` gives `2026-10-12-d1-threshold` (the week's MONDAY, normalised, because a one-week plan's
+only week starts on the start day). A week's Monday is counted back from race week and does not move when the block
+shrinks, so an id names one calendar session for the life of the plan. All four id sites use it (finalize, the race,
+race-week rest fillers, the shakeout). Measured: 170 of 170 ids kept across a Monday on a 20-week plan; on a 12-week
+plan 73 of 93 — the other 20 are sessions the shrinking block genuinely re-planned (a different type that day), which
+correctly get a new id. Unique within a plan (0 duplicates), and PLAN's ids still equal RAW's. Exported through
+`RC.sessionIdFor`; `RC.HARD_BEFORE_RACE` too (below).
+
+**Nothing the runner set is lost in the change.** `legacySid(id, iso)` carries an old `w3-d1-…` id to the new form, and
+every store keyed on a session id is read through it, in its loader:
+- **rows with their own date are carried by that date, exactly** — skips (`from`), times (`iso`), links (`iso`), heat
+  decisions (`day`), heat declines (the value), finished strength sessions (`d`), the set log (`d`, inside `slogAll`);
+- **the two with no date — dragged days and swapped exercises — go by the live plan's numbering**, which is exactly
+  where the old code was applying them (so the runner sees nothing move), and **are written back at once**: read again
+  after the next Monday, the same old key would land a week later;
+- `migrateSlog` (v1 → v2, already run for anyone since A1) resolves v1's old ids the same way.
+⚠️ The loaders call it from inside `adoptPlan` (applyCrossWeekMoves reads the override store at boot), so `legacySid`
+is a function declaration that reads only `PLAN` (declared above the first `recompute()`) and `RC`.
+⚠️ **`slogAll`'s `SLOG` is a `let` declared ~4,000 lines below the first `recompute()`**, so `migrateSlog` throws in
+its temporal dead zone at boot and only runs on the next rebuild. Not changed here (it is idempotent and runs on the
+first later rebuild), but it is why the set log is carried inside `slogAll` rather than by a boot-time migration.
+Verified in the browser: an old drag, time and skip planted in the stores all landed on the right session at launch.
+
+### ⚠️⚠️ THE REBUILD: applyCrossWeekMoves, BEFORE THE BREAKS — the other way round from PLAN.md's sketch
+
+`applyCrossWeekMoves()` runs in `adoptPlan` right after `normalizeWeekStarts()` and **before** `applyAdjustments()`.
+It moves RAW's session into the other week with `dayOfWeek` set to its new day, re-derives both weeks with
+`RC.weekVolumeMeters` (and the quality count), and re-projects PLAN's two weeks with `RC.weekView`, adopting only the
+session-derived fields (sessions, distanceKm, quality, longRunMin — never startIso, for easeWeekIn's reason).
+⚠️ **WHY BEFORE THE BREAKS:** a move says where a session IS; a break applies to wherever sessions are. After them (the
+spec), a holiday booked over the week a session was moved OUT of took it before it could move — lost from both weeks
+— and a skip of a moved session, dated in its new week, found nothing there to take, so the session reappeared.
+⚠️ **IT READS THE STORE** (`loadDayOverride()`), never `state.dayOverride`: it runs from the first `recompute()`, above
+`state`'s declaration. ⚠️ **AND `PRIMARY_TYPES` MOVED UP** beside `let PLAN, RAW…`: it was a `const` a hundred lines
+below the first `recompute()`, so reading it from here would have thrown in its dead zone and the try in `adoptPlan`
+would have swallowed every week-move on every launch. `XWEEK` is declared there too. Both pinned by a guard.
+⚠️ **ORDER-FREE.** Every move the plan can still recognise is lifted out first, then placed; one that cannot be placed
+goes home and the placements are tried again (a fixpoint, at most one pass per move). So "Tuesday's run went to next
+week and Monday's came into the Tuesday it left" holds whichever id sorts first — the test builds that chain so the
+dependent move sorts FIRST. When two moves genuinely collide, the earlier-sorted one goes home.
+⚠️ **ATOMIC:** every touched week is worked out before any is written, so a throw part-way leaves the engine's plan as
+built. A throw sets `XWEEK = null` — "not known" — and then effDay reads no week-move and seedDone prunes none, so a
+fault can never delete one.
+**`XWEEK`** (`{ sid: { home, at, t } }`) is derived on every rebuild, never stored: which stored moves the plan as it
+stands could honour. The title is kept because a break may since have taken the session out of the plan.
+
+### xwRefusal — THE ONE SET OF RULES, read by the rebuild AND the sheet
+
+`xwRefusal(s, home, ti, to, ov, rows, weeks)` returns why a run may not go to day `to` of week `ti`, or "". The rebuild
+applies a stored move only on "", and the sheet offers a day only on "", so a day the sheet offers is a day the next
+launch will honour. PLAN.md's refusals plus three:
+- **taken** — a day already holding a run (by its effective day, through any same-week drag; a run a booked break or
+  skip will take does NOT occupy its day — `xwDropped` asks the same `adjustFor`/`weekSkips`/`adjDrops` the break
+  code does, so a day a holiday emptied is free exactly when it is free on screen). Within a week a drag swaps two
+  runs; across weeks a swap would move a second session a week the runner never touched. A strength-only day is free.
+- **race** — nothing into or out of race week (the last week).
+- **eve** — `RC.HARD_BEFORE_RACE` (exported from the engine; the app keeps no copy, guarded) may not land the day
+  before the race. Only a Monday race puts its eve in another week, so only that is reachable by a week-move.
+- **far** — one week from where the plan put it.
+- **eased** (not in PLAN.md) — a week the runner made easier takes nothing in and gives nothing up: easing demotes
+  that week's hardest session, so a move in or out would change which one, after they chose.
+- **start** — a part-week's days before the plan begins do not exist.
+- **type** — runs only (PRIMARY_TYPES), never the race. Strength and mobility move within their week; a programme's
+  sessions are dated.
+The sheet adds what changes with time: **past** (a day that has gone) and **break** (a booked break would take it
+straight back out — moving a run into a holiday you are not running on would toast "Moved" over nothing).
+`xwOfferable` is B2's `skipOfferable` narrowed to runs: from today on, not the race, not already done.
+
+### Everything else that reads a day-override, and what changed
+
+- **effDay** ignores a week-move the last rebuild did not apply (its `to` is a weekday in ANOTHER week; read in the
+  session's own week it would drag it there). `xwDayOf(ov, s)` is the same rule over any map, and also reads a stale
+  same-week drag (from ≠ the plan's day) as the plan's day, as seedDone is about to prune it.
+- **seedDone**: a session in `XWEEK` counts as live even when a break then took it (a skipped moved session would
+  otherwise lose its move and reappear in its OLD week, where no skip names it — measured, fixed, guarded); a week-move
+  not in `XWEEK` is pruned (only when XWEEK is known); the `from` check skips week-moves (the moved session's
+  dayOfWeek is now its new day, so that check would delete every move the moment it was applied).
+- **moveSession** (the sheet's day picker, both drags, the trial clash) keeps a moved session's `{ from, wk }` through
+  a same-week drag or swap (otherwise the next rebuild found no week-move and snapped it back, drag discarded), and
+  refuses — with a toast — a day the rebuild would refuse for it (a long run moved into the week before a Monday race,
+  then dragged onto race eve, would otherwise snap back silently on the next launch).
+- **The time of day (B3) goes with it**: re-dated to the new day by the move; Undo restores the time store too.
+- **The pause's Undo** restored `state.dayOverride` and rebuilt WITHOUT saving it. `applyCrossWeekMoves` reads the store,
+  so that rebuild ran without the week-moves and seedDone then pruned them as unapplied — an Undo that deleted the
+  runner's moves. It saves first now, as the profile-save Undo always did; a guard sweeps every `state.dayOverride =`
+  that is followed by a rebuild.
+- **The Plan screen**: both weeks get the dashed border and a **Moved** tag (a window's or a skip's tag wins), and the
+  opened week says *"Moved in · Thu 15 Oct — … was moved here from week 2. Open it to move it back."* /
+  *"Moved out — … is now on Thu 15 Oct, in week 3. Open it there to move it back."* ⚠️ Found in the browser: a moved
+  session later skipped in its new week left its OLD week reading as untouched with its threshold gone — that week
+  now says *"… was moved to week 3, then taken off the plan there."*
+- **Today**, on a day a week-move emptied: *"Moved to Sat 10 Oct — 80′ long run is in week 2 now, so today is free."*
+  (B2's rule: not "Recovery day".)
+- **The calendar drag still stays inside its week**, by design, but its refusal now says how: *"…To move it a week,
+  tap it and choose a week earlier or later."*
+- The commit is the standing one: store (and times) snapshot as strings → write → `recompute()` → computeToday,
+  seedDone, restoreTicks → checked that it LANDED (XWEEK) before saying "Moved" → `toastUndo`. It leaves the runner
+  where they were, like a skip.
+
+### Also found and fixed: Today's card ate the last letter of a description
+
+`todayDecision` trimmed a description's first sentence with `.replace(/\.$/, "")` written with ONE backslash, so the
+page shipped `/.$/` — remove the last character, whatever it is — and the long run's card read "…under accumulated
+fatigu." Seen in the browser while checking Today after a move. A sweep of the whole page template found it was the
+only single-backslash regex escape; `test/template-escapes.test.ts` now holds the count at zero.
+
+### Not done, and known
+
+- Same-week moves of an ordinary session onto race eve are still allowed (pre-existing; only a moved session is held
+  to the week-move rules on a drag).
+- The picker observes two long runs in a week ("Week 5 would then have two long runs."), but not two hard days in a row.
+- The calendar file's UID still carries `wk.index`, which shifts weekly, so re-importing the file can duplicate future
+  events (pre-existing; the ids are stable now, so dropping `wk.index` from the UID is a one-line follow-up that
+  changes every UID once).
+- Swaps on a future session made before this change were carried by the plan's numbering on the first launch — where
+  they were then applying — which is the best an undated row allows.
+
+**Tests:** `test/move-week.test.ts` (15) drives the real lifted functions over a five-week plan built with the engine's
+own `weekView`, starting next Monday so no day has passed whichever day the suite runs; plus the engine-id test over
+two real plans a week apart. `test/template-escapes.test.ts` (2). Fixtures moved to the real id form in six test files;
+lift lists gained the new helpers in six; the who-asks guards in `manage-plan` and `skip-session` name the new askers
+and check they delegate. **23 of 23 re-breaks caught** — PLAN.md's own (skip the re-projection) among them — and 2 of 2 for the regex guard.

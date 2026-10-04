@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { sessionIdFor } from "../src/plan/generate-plan.ts";
 
 /**
  * STAGE B3 (2026-10-02) — a time of day for a planned session, carried into the calendar file and the
@@ -54,17 +55,20 @@ const TODAY_DOW = (new Date(TODAY + "T00:00:00Z").getUTCDay() + 6) % 7;
 const THIS_MON = addDays(TODAY, -TODAY_DOW);
 const NEXT_MON = addDays(THIS_MON, 7);
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// A session id in the engine's real form: the week's Monday, the day and the type ("2026-10-12-d1-easy").
+const ID = (w: number, d: number, t: string) => (w === 1 ? THIS_MON : NEXT_MON) + "-d" + d + "-" + t;
 
 /** Two plan weeks, this one and the next, one 45-minute session a day. */
 function fixture() {
-  const mk = (w: number) => DAYS.map((dn, d) => ({ id: "w" + w + "-d" + d + "-easy", day: dn, dayIndex: d, type: "easy",
+  const mk = (w: number) => DAYS.map((dn, d) => ({ id: ID(w, d, "easy"), day: dn, dayIndex: d, type: "easy",
     title: "Easy " + dn, durMin: 45, distKm: 8, pace: "6:00/km" }));
   return { PLAN: { weeks: [THIS_MON, NEXT_MON].map((startIso, wi) => ({ index: wi + 1, startIso, sessions: mk(wi + 1) })) } };
 }
 
 const FNS = ["isoAdd", "todayIso", "pad2", "icsDate", "icsStamp", "icsTrigger", "icsEsc", "icsFloat", "buildSessionsIcs",
   "hmMinutes", "hmFromMinutes", "hmValid", "loadTimes", "saveTimes", "sessionTimeAt", "setSessionTime", "planSessionRef",
-  "effDay", "genDay", "ovTo", "ovFrom", "reminderSlotsFor", "buildReminderSchedule", "sessionsForIso", "sessionTimeNote"];
+  "effDay", "genDay", "ovTo", "ovFrom", "reminderSlotsFor", "buildReminderSchedule", "sessionsForIso", "sessionTimeNote",
+  "legacySid", "sidKeys"];
 const CONSTS = ["TIME_KEY", "NATIVE_NOTIFY_CAP", "PRIMARY_TYPES"];
 
 function sandbox(remind: Record<string, unknown> = { enabled: true, time: "07:30", time2: "" }) {
@@ -77,7 +81,7 @@ function sandbox(remind: Record<string, unknown> = { enabled: true, time: "07:30
   const { PLAN } = fixture();
   const state: any = { dayOverride: {} };
   const env: Record<string, unknown> = {
-    PLAN, state, localStorage, REMIND: remind, EXTRA: [],
+    PLAN, state, localStorage, REMIND: remind, EXTRA: [], RC: { sessionIdFor },
     randomQuote: () => ["Run", ""], extraSession: () => null,
   };
   const src = CONSTS.map(constStmt).join("\n") + "\n" + FNS.map(fnBody).join("\n");
@@ -115,33 +119,33 @@ test("a time is the platform's own HH:MM, normalised, and anything else is no ti
 test("BLOCKER: a session's time is matched on its week and id — a drag keeps it, another week never borrows it", () => {
   const { api, state } = sandbox();
   const tue = addDays(NEXT_MON, 1);
-  api.setSessionTime("w2-d1-easy", tue, "18:00");
-  assert.equal(api.sessionTimeAt(tue, "w2-d1-easy"), "18:00");
+  api.setSessionTime(ID(2, 1, "easy"), tue, "18:00");
+  assert.equal(api.sessionTimeAt(tue, ID(2, 1, "easy")), "18:00");
   // Dragged to Thursday of the same week: the session keeps the time the runner gave it.
-  state.dayOverride["w2-d1-easy"] = { to: 3, from: 1 };
-  assert.equal(api.sessionTimeAt(addDays(NEXT_MON, 3), "w2-d1-easy"), "18:00", "a dragged session lost its time");
+  state.dayOverride[ID(2, 1, "easy")] = { to: 3, from: 1 };
+  assert.equal(api.sessionTimeAt(addDays(NEXT_MON, 3), ID(2, 1, "easy")), "18:00", "a dragged session lost its time");
   // The same id asked about in a different week (a different plan's week 2, say) has no time.
-  assert.equal(api.sessionTimeAt(addDays(THIS_MON, 1), "w2-d1-easy"), "", "a time leaked to another week");
-  // ⚠️ AND THE CASE THAT NEEDS THE DATE: a time set for "w2-d1-easy" in a plan whose week 2 fell a fortnight
+  assert.equal(api.sessionTimeAt(addDays(THIS_MON, 1), ID(2, 1, "easy")), "", "a time leaked to another week");
+  // ⚠️ AND THE CASE THAT NEEDS THE DATE: a time set for ID(2, 1, "easy") in a plan whose week 2 fell a fortnight
   // later. This plan's week 2 holds an id of that name too — and must not inherit a time set for another day.
   const other = sandbox();
-  other.api.setSessionTime("w2-d1-easy", addDays(NEXT_MON, 15), "06:00");
-  assert.equal(other.api.sessionTimeAt(addDays(NEXT_MON, 1), "w2-d1-easy"), "", "a time set in another plan's week was borrowed by id alone");
+  other.api.setSessionTime(ID(2, 1, "easy"), addDays(NEXT_MON, 15), "06:00");
+  assert.equal(other.api.sessionTimeAt(addDays(NEXT_MON, 1), ID(2, 1, "easy")), "", "a time set in another plan's week was borrowed by id alone");
   // Clearing removes it.
-  api.setSessionTime("w2-d1-easy", tue, "");
-  assert.equal(api.sessionTimeAt(tue, "w2-d1-easy"), "");
+  api.setSessionTime(ID(2, 1, "easy"), tue, "");
+  assert.equal(api.sessionTimeAt(tue, ID(2, 1, "easy")), "");
   // A rubbish value is refused rather than stored.
-  api.setSessionTime("w2-d2-easy", addDays(NEXT_MON, 2), "99:99");
+  api.setSessionTime(ID(2, 2, "easy"), addDays(NEXT_MON, 2), "99:99");
   assert.deepEqual(api.loadTimes(), {}, "an impossible time was stored");
 });
 
 test("BLOCKER: the calendar file — a timed session is a timed event with the plan's length and a 30-minute alert", () => {
   const { api } = sandbox();
   const wed = addDays(NEXT_MON, 2), sun = addDays(NEXT_MON, 6);
-  api.setSessionTime("w2-d2-easy", wed, "18:00");
-  api.setSessionTime("w2-d6-easy", sun, "23:30");
+  api.setSessionTime(ID(2, 2, "easy"), wed, "18:00");
+  api.setSessionTime(ID(2, 6, "easy"), sun, "23:30");
   const ev = events(api.buildSessionsIcs());
-  const timed = ev["w2-d2-easy"]!;
+  const timed = ev[ID(2, 2, "easy")]!;
   assert.equal(line(timed, "DTSTART"), "DTSTART:" + compact(wed) + "T180000", "the timed session does not start at its time");
   assert.equal(line(timed, "DTEND"), "DTEND:" + compact(wed) + "T184500", "the event does not last the plan's 45 minutes");
   assert.equal(line(timed, "TRIGGER"), "TRIGGER:-PT30M", "the alert is not half an hour before");
@@ -149,9 +153,9 @@ test("BLOCKER: the calendar file — a timed session is a timed event with the p
   // ⚠️ FLOATING TIME: no Z and no TZID, so 18:00 is 18:00 on whatever phone opens it.
   assert.ok(!/Z$|TZID/.test(line(timed, "DTSTART")!), "the start carries a timezone");
   // ⚠️ AND MIDNIGHT IS CROSSED AS A CALENDAR, NOT A CLOCK: 23:30 + 45 min ends 00:15 the next day.
-  assert.equal(line(ev["w2-d6-easy"]!, "DTEND"), "DTEND:" + compact(addDays(sun, 1)) + "T001500");
+  assert.equal(line(ev[ID(2, 6, "easy")]!, "DTEND"), "DTEND:" + compact(addDays(sun, 1)) + "T001500");
   // Everything else is the all-day event it always was, alarmed at the morning reminder time.
-  const plain = ev["w2-d0-easy"]!;
+  const plain = ev[ID(2, 0, "easy")]!;
   assert.equal(line(plain, "DTSTART"), "DTSTART;VALUE=DATE:" + compact(NEXT_MON));
   assert.equal(line(plain, "DTEND"), null, "an all-day event grew an end time");
   assert.equal(line(plain, "TRIGGER"), "TRIGGER;RELATED=START:PT7H30M");
@@ -160,7 +164,7 @@ test("BLOCKER: the calendar file — a timed session is a timed event with the p
 test("BLOCKER: the reminder schedule — slot a moves to 30 minutes before a timed session, and says when", () => {
   const { api } = sandbox({ enabled: true, time: "07:30", time2: "20:00" });
   const wed = addDays(NEXT_MON, 2);
-  api.setSessionTime("w2-d2-easy", wed, "18:00");
+  api.setSessionTime(ID(2, 2, "easy"), wed, "18:00");
   const items = api.buildReminderSchedule();
   const p = wed.split("-").map(Number);
   const forDay = items.filter((x: any) => x.y === p[0] && x.mo === p[1] && x.d === p[2]);
@@ -187,22 +191,23 @@ test("BLOCKER: a time is pruned only a week after its day — never because a br
   const { PLAN } = fixture();
   // ⚠️ THE SESSION THIS TIME BELONGS TO IS NOT IN THE PLAN — a holiday or a skip took it out. Its time
   // must survive, so cancelling the break brings the session back as the runner left it.
-  PLAN.weeks[1]!.sessions = PLAN.weeks[1]!.sessions.filter((s) => s.id !== "w2-d2-easy");
+  PLAN.weeks[1]!.sessions = PLAN.weeks[1]!.sessions.filter((s) => s.id !== ID(2, 2, "easy"));
   const state: any = { done: {}, dayOverride: {}, heatAdapt: {} };
   const names = ["isoAdd", "todayIso", "doneKey", "effDay", "genDay", "ovTo", "ovFrom", "loadLinks", "tickSession",
-    "planSessionRef", "loadTimes", "saveTimes", "seedDone"];
-  const src = ["LINK_KEY", "TIME_KEY", "PRIMARY_TYPES"].map(constStmt).join("\n") + "\n" + names.map(fnBody).join("\n");
+    "planSessionRef", "loadTimes", "saveTimes", "seedDone", "legacySid", "sidKeys", "xwDir"];
+  const src = ["LINK_KEY", "TIME_KEY", "PRIMARY_TYPES", "XWEEK"].map(constStmt).join("\n") + "\n" + names.map(fnBody).join("\n");
   const env: Record<string, unknown> = { PLAN, RAW: { weeks: [{ sessions: [] }, { sessions: [] }] }, state, localStorage, EXTRA: [],
-    saveDayOverride: () => {}, saveHeatAdapt: () => {}, loadSwaps: () => ({}), saveSwaps: () => {}, loadSdone: () => [] };
+    saveDayOverride: () => {}, saveHeatAdapt: () => {}, loadSwaps: () => ({}), saveSwaps: () => {}, loadSdone: () => [],
+    RC: { sessionIdFor } };
   const keys = Object.keys(env);
   const seedDone = new Function(...keys, src + "\nreturn seedDone;")(...keys.map((k) => env[k]));
   store["interun_time_v1"] = JSON.stringify({
-    "w2-d2-easy": { t: "18:00", iso: addDays(NEXT_MON, 2) },      // session out of the plan for now
+    [ID(2, 2, "easy")]: { t: "18:00", iso: addDays(NEXT_MON, 2) },      // session out of the plan for now
     "old-1": { t: "06:00", iso: addDays(TODAY, -8) },              // a week and a day ago: gone
     "edge": { t: "06:00", iso: addDays(TODAY, -7) },               // exactly a week: kept
   });
   seedDone();
-  assert.deepEqual(Object.keys(JSON.parse(store["interun_time_v1"])).sort(), ["edge", "w2-d2-easy"],
+  assert.deepEqual(Object.keys(JSON.parse(store["interun_time_v1"])).sort(), ["edge", ID(2, 2, "easy")].sort(),
     "a time was pruned for a session a break took out, or an old one was kept");
 });
 
@@ -211,7 +216,8 @@ test("BLOCKER: the sheet offers a time from today on, saves on change only, and 
   assert.match(sheet, /const tRef = sess\.type !== "rest" && sIso >= todayIso\(\) \? planSessionRef\(sIso, sess\.id\) : null;/,
     "the time is offered on a rest day, a past day, or a session the plan does not hold");
   assert.match(sheet, /<input class="sel" id="sdTime" type="time"/, "the time is not the platform's own picker");
-  assert.match(sheet, /moveBlock \+\s*timeBlock \+\s*addLink/, "the time is not beside Move to another day");
+  // B4's "Move to another week" row sits between them: it belongs with moving the session.
+  assert.match(sheet, /moveBlock \+\s*xwRowHtml\(sess, week\) \+\s*timeBlock \+\s*addLink/, "the time is not beside Move to another day");
   const wire = decomment(fnBody("wireSheet"));
   assert.match(wire, /sdTime\.onchange = \(\) => applySessionTime\(ss, iso, sdTime\.value\)/, "the time input saves nothing");
   assert.ok(!/sdTime\.oninput/.test(wire), "the time saves on every turn of the wheel");

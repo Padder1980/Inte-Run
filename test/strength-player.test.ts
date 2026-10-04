@@ -19,7 +19,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
-import { generatePlan } from "../src/plan/generate-plan.ts";
+import { generatePlan, sessionIdFor } from "../src/plan/generate-plan.ts";
 import { holdSecondsFor } from "../src/strength/builder.ts";
 import { exerciseById } from "../src/strength/library.ts";
 import { suggestLoad } from "../src/strength/progression.ts";
@@ -299,25 +299,27 @@ test("BLOCKER: advancing past the final set finishes the session rather than sta
 // 4. Completion — the store, and the tick that has to survive a relaunch
 // ------------------------------------------------------------------------------------------------
 
-function loadSdoneApi() {
+function loadSdoneApi(seed?: Record<string, string>) {
   // sdoneSave (A8) is lifted alongside the others -- it is the counterpart to sdoneMark that persists
   // a mutation made on a row AFTER it was returned, which is what a Strava send result needs.
-  const body = [constOf("SDONE_KEY"), fnOf("loadSdone"), fnOf("saveSdone"), fnOf("sdoneMark"), fnOf("sdoneHas"), fnOf("sdoneSave")].join("\n");
-  const store: Record<string, string> = {};
+  // legacySid is lifted too: loadSdone carries a row written under the old week-number id across by the
+  // row's own date (stage B4), and a lift without it would throw on the first such row.
+  const body = [constOf("SDONE_KEY"), fnOf("legacySid"), fnOf("loadSdone"), fnOf("saveSdone"), fnOf("sdoneMark"), fnOf("sdoneHas"), fnOf("sdoneSave")].join("\n");
+  const store: Record<string, string> = Object.assign({}, seed || {});
   const localStorage = {
     getItem: (k: string) => (k in store ? store[k]! : null),
     setItem: (k: string, v: string) => { store[k] = v; },
     removeItem: (k: string) => { delete store[k]; },
   };
   // eslint-disable-next-line no-new-func
-  const factory = new Function("localStorage", body + "\nreturn { loadSdone, sdoneMark, sdoneHas, sdoneSave };");
-  return { ...factory(localStorage), raw: store };
+  const factory = new Function("localStorage", "RC", "PLAN", body + "\nreturn { loadSdone, sdoneMark, sdoneHas, sdoneSave };");
+  return { ...factory(localStorage, { sessionIdFor }, undefined), raw: store };
 }
 
 test("BLOCKER: finishing is idempotent on (date, session) — a second finish updates one row rather than adding another", () => {
   const S = loadSdoneApi();
-  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 4, ex: 8, min: 45 });
-  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 9, ex: 8, min: 45 });
+  S.sdoneMark("2026-10-01", "2026-09-28-d3-strength", { sets: 4, ex: 8, min: 45 });
+  S.sdoneMark("2026-10-01", "2026-09-28-d3-strength", { sets: 9, ex: 8, min: 45 });
   const rows = S.loadSdone();
   assert.equal(rows.length, 1, "a second finish added a second row — every count on the Strength tab doubles");
   assert.equal(rows[0].sets, 9, "the second finish was skipped rather than updating the fuller attempt");
@@ -327,11 +329,11 @@ test("BLOCKER: the same session id on a DIFFERENT date is a different row, becau
   // ⚠️ w3d2-strength recurs in every rebuilt plan. Keyed on the id alone, finishing week 3's strength
   // day reads as having already finished week 7's — the identity lesson the set log learned first.
   const S = loadSdoneApi();
-  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 4, ex: 8, min: 45 });
-  S.sdoneMark("2026-11-05", "w1-d3-strength", { sets: 4, ex: 8, min: 45 });
+  S.sdoneMark("2026-10-01", "2026-09-28-d3-strength", { sets: 4, ex: 8, min: 45 });
+  S.sdoneMark("2026-11-05", "2026-09-28-d3-strength", { sets: 4, ex: 8, min: 45 });
   assert.equal(S.loadSdone().length, 2, "two dates collapsed into one row");
-  assert.equal(S.sdoneHas("2026-10-01", "w1-d3-strength"), true);
-  assert.equal(S.sdoneHas("2026-10-02", "w1-d3-strength"), false, "a completion leaked onto a neighbouring date");
+  assert.equal(S.sdoneHas("2026-10-01", "2026-09-28-d3-strength"), true);
+  assert.equal(S.sdoneHas("2026-10-02", "2026-09-28-d3-strength"), false, "a completion leaked onto a neighbouring date");
 });
 
 test("BLOCKER: seedDone re-derives the tick from the store, matched on date AND id", () => {
@@ -359,9 +361,9 @@ test("BLOCKER: sdoneMark stamps the session's title once, and a re-finish naming
   // t is what strengthStravaPayload reads for the activity's name -- a re-finish (Finish tapped twice,
   // or the same session reopened) passes no title at all, and must not erase the one already recorded.
   const S = loadSdoneApi();
-  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 4, ex: 8, min: 45, t: "Push day" });
+  S.sdoneMark("2026-10-01", "2026-09-28-d3-strength", { sets: 4, ex: 8, min: 45, t: "Push day" });
   assert.equal(S.loadSdone()[0].t, "Push day");
-  S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 9, ex: 8, min: 45 });
+  S.sdoneMark("2026-10-01", "2026-09-28-d3-strength", { sets: 9, ex: 8, min: 45 });
   assert.equal(S.loadSdone()[0].t, "Push day", "a re-finish with no title blanked the one already stored");
 });
 
@@ -377,13 +379,13 @@ test("BLOCKER: sdoneSave persists a mutation made on a row returned earlier by s
   // row under test at index 0: a date-only match found the right row purely by array position, and a
   // real re-break of this exact fault (dropping the session-id half of the comparison) did not fail.
   const S = loadSdoneApi();
-  const row = S.sdoneMark("2026-10-01", "w1-d3-strength", { sets: 4, ex: 8, min: 45 });
+  const row = S.sdoneMark("2026-10-01", "2026-09-28-d3-strength", { sets: 4, ex: 8, min: 45 });
   const other = S.sdoneMark("2026-10-01", "other-session", { sets: 1, ex: 1, min: 10 });
   row.strava = { state: "done", id: "999" };
   S.sdoneSave(row);
   const rows = S.loadSdone();
   assert.equal(rows.length, 2, "sdoneSave changed the number of rows in the store");
-  const mine = rows.filter((r: any) => r.s === "w1-d3-strength");
+  const mine = rows.filter((r: any) => r.s === "2026-09-28-d3-strength");
   const others = rows.filter((r: any) => r.s === "other-session");
   assert.equal(mine.length, 1, "the target row's own identity did not survive the save");
   assert.equal(others.length, 1, "a same-date row lost its identity -- sdoneSave overwrote the wrong row");
@@ -528,4 +530,12 @@ test("the player replaces the sheet body in place and never opens a second overl
   assert.match(open, /\$\("sheetBody"\)\.innerHTML/, "the player no longer renders into the sheet body");
   assert.doesNotMatch(open, /ensureSheet\(|sheetOv|classList\.add\("on"\)/,
     "the player opens an overlay of its own");
+});
+
+test("BLOCKER: a finished session stored under the old week-number id is carried across by its own date", () => {
+  // ⚠️ BY THE ROW'S DATE, NOT THE PLAN'S NUMBERING: "w1-d3-strength" finished on Thu 1 Oct 2026 was the
+  // Thursday of the week of 28 Sep whatever week 1 was at the time, so it is exact for every old row.
+  const S = loadSdoneApi({ interun_sdone_v1: JSON.stringify([{ d: "2026-10-01", s: "w1-d3-strength", at: 1 }]) });
+  assert.equal(S.sdoneHas("2026-10-01", "2026-09-28-d3-strength"), true, "an old row no longer ticks its session");
+  assert.equal(S.loadSdone()[0].s, "2026-09-28-d3-strength");
 });

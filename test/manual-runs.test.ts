@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { BEST_DISTANCES, runBests, newBest, bestEligible } from "../src/progress/records.ts";
 import { paceRatioMid } from "../src/science/paces.ts";
+import { sessionIdFor } from "../src/plan/generate-plan.ts";
 
 /**
  * STAGE B1 (2026-10-02) — a run added by hand, a run linked to the session it fulfilled, best times.
@@ -71,9 +72,13 @@ const FNS = [
   "commBests", "clubPbText",
   // B3: todayDecision reads a session's time through these.
   "loadTimes", "hmValid", "sessionTimeAt",
+  // The loaders carry an id written in the old week-number form across (stage B4).
+  "legacySid", "sidKeys",
+  // B4: seedDone asks which overrides are week-moves, and which ones the rebuild applied.
+  "xwDir",
 ];
 const CONSTS = ["DAY_ORDER", "MONTHS", "MON_SHORT", "PRIMARY_TYPES", "SESSION_LABEL", "ADD_RUN_TYPES", "LINK_KEY",
-  "PACE_MODEL_VERSION", "UNDO_RUN", "COMM_BESTS", "PB_TYPED_KEY", "TIME_KEY"];
+  "PACE_MODEL_VERSION", "UNDO_RUN", "COMM_BESTS", "PB_TYPED_KEY", "TIME_KEY", "XWEEK"];
 
 const ISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return ISO(d); };
@@ -93,7 +98,7 @@ function fixturePlan() {
   const titles = ["Easy 40 min with strides", "Tempo 3 x 10 min at threshold", "Easy 35 min", "Intervals 6 x 800 m",
     "Easy 45 min", "Easy 30 min", "Long run 95 min building to steady"].map((t, d) => (d === REST ? "Rest" : t));
   const mk = (wIdx: number) => types.map((t, d) => ({
-    id: "w" + wIdx + "-d" + d + "-" + t, dayOfWeek: d, type: t, title: titles[d],
+    id: (wIdx === 1 ? LAST_MON : THIS_MON) + "-d" + d + "-" + t, dayOfWeek: d, type: t, title: titles[d],
     estimatedDurationSeconds: 2400, targetRpe: t === "easy" || t === "long" ? { min: 3, max: 4 } : { min: 7, max: 8 },
     steps: [{ kind: "steady", durationSeconds: 2400, targetPaceSecPerKm: { minSecPerKm: 330, maxSecPerKm: 360 }, targetRpe: { min: 3, max: 4 } }],
   }));
@@ -121,7 +126,7 @@ function sandbox(over: Record<string, unknown> = {}): Box {
   const toasts: string[] = [];
   const rec = (name: string) => (...a: any[]) => { calls.push(name); return undefined; };
   const never = (name: string) => () => { throw new Error(name + " must never be called here"); };
-  const RC = { runBests, newBest, BEST_DISTANCES, bestEligible, paceRatioMid };
+  const RC = { runBests, newBest, BEST_DISTANCES, bestEligible, paceRatioMid, sessionIdFor };
   const env: Record<string, unknown> = {
     state, PLAN, RAW, profile, localStorage, RC,
     EXTRA: [], TODAY_IN_PLAN: true, TODAY_DOW,
@@ -154,7 +159,8 @@ function sandbox(over: Record<string, unknown> = {}): Box {
   return { api, state, store, calls, PLAN, RAW, profile, toasts };
 }
 const form = (o: Record<string, unknown> = {}) => ({ iso: TODAY, start: "", km: "5.02", h: 0, m: 27, s: 30, type: "easy", tread: false, link: "", strava: false, back: false, ...o });
-const todaysRunId = () => "w2-d" + TODAY_DOW + "-" + TYPES[TODAY_DOW];
+// In the engine's real id form: this week's Monday, the day and the type ("2026-10-05-d4-easy").
+const todaysRunId = () => THIS_MON + "-d" + TODAY_DOW + "-" + TYPES[TODAY_DOW];
 
 /* ------------------------------------------------------------------------------------------------ *
  * 1. The record                                                                                      *

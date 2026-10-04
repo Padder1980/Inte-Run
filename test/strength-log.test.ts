@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { generatePlan } from "../src/plan/generate-plan.ts";
+import { generatePlan, sessionIdFor } from "../src/plan/generate-plan.ts";
 import { exerciseById, exerciseIds } from "../src/plan/session-templates.ts";
 import { buildPlanSummary } from "../src/view/plan-summary.ts";
 import type { Athlete, Goal, Session } from "../src/domain/types.ts";
@@ -74,13 +74,15 @@ function sandbox(seed: Record<string, string> = {}) {
     fnOf(block, "slogFor"),
     fnOf(block, "slogBest"),
     fnOf(block, "migrateSlog"),
+    // slogAll and migrateSlog carry an id written in the old week-number form across (stage B4).
+    fnOf(block, "legacySid"),
     fnOf(block, "genDay"),
     fnOf(block, "isoAdd"),
     "return { slogAll, slogFlush, slogWrite, slogForSession, slogFor, slogBest, migrateSlog, store, KEY: SLOG2_KEY, MAX: SLOG_MAX_ROWS };",
   ].join("\n");
-  const make = new Function("localStorage", "clearTimeout", "setTimeout", "PLAN", "RAW", "store", src);
+  const make = new Function("localStorage", "clearTimeout", "setTimeout", "PLAN", "RAW", "store", "RC", src);
   return (PLAN: unknown, RAW: unknown) =>
-    make(ls, () => {}, () => 0, PLAN, RAW, store) as {
+    make(ls, () => {}, () => 0, PLAN, RAW, store, { sessionIdFor }) as {
       slogAll: () => { rows: any[]; bests: Record<string, { w: number; d: string }>; meta: any };
       slogFlush: () => void;
       slogWrite: (d: string, s: string, x: string, i: number, f: string, v: string) => void;
@@ -209,9 +211,12 @@ test("BLOCKER: the migration carries v1 rows across, stamps them, and runs exact
   const target = strengthSessions(p)[1]!;
   const idx = 2;
   const ex = target.s.exercises![idx]!;
+  // ⚠️ v1 WAS ONLY EVER WRITTEN WITH THE OLD WEEK-NUMBER ID ("w3-d2-strength"), so that is the form the
+  // fixture must carry — the live plan's ids now name the week's Monday, and migrateSlog has to bridge them.
+  const v1id = "w" + target.wk + "-d" + target.s.dayOfWeek + "-strength";
   const v1 = JSON.stringify({
-    [target.s.id + "|" + idx + "|0"]: { w: "35", r: "8" },
-    [target.s.id + "|" + idx + "|1"]: { w: "37.5", r: "6" },
+    [v1id + "|" + idx + "|0"]: { w: "35", r: "8" },
+    [v1id + "|" + idx + "|1"]: { w: "37.5", r: "6" },
     ["w99d9-strength|0|0"]: { w: "99", r: "1" },   // unresolvable: was already invisible in v1
   });
   const box = sandbox({ interun_slog: v1 })(summary(), p);
@@ -221,6 +226,7 @@ test("BLOCKER: the migration carries v1 rows across, stamps them, and runs exact
   assert.equal(rows.length, 2, "the migration did not carry both sets across");
   assert.ok(rows.every((r) => r.m === 1), "carried rows are not stamped as migrated");
   assert.ok(rows.every((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.d)), "a carried row has no date");
+  assert.ok(rows.every((r) => r.s === target.s.id), "a carried row kept the old id instead of the live plan's");
   assert.equal(box.slogAll().meta.migrated, 2);
   assert.equal(box.slogAll().meta.skipped, 1, "the unresolvable row was not counted");
   assert.ok(box.slogAll().meta.migratedAt, "no migratedAt stamp");

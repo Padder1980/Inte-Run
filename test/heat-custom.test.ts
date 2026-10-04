@@ -24,7 +24,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { generatePlan } from "../src/plan/generate-plan.ts";
+import { generatePlan, HARD_BEFORE_RACE, sessionIdFor } from "../src/plan/generate-plan.ts";
+import { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
+import { weekView } from "../src/view/plan-summary.ts";
 import { MAX_STRUCTURED_WEEKS } from "../src/plan/periodization.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
 import { assessConditions } from "../src/environment/weather.ts";
@@ -166,6 +168,8 @@ class MemStore {
  */
 const RC: any = {
   assessConditions, adaptSessionForHeat, buildWarmup, buildWorkout, listWorkouts, fuellingFor,
+  // B4: the session sheet's "Move to another week" row asks the engine for these.
+  HARD_BEFORE_RACE, sessionIdFor, sessionVolumeMeters, weekVolumeMeters, weekView,
 };
 
 type Env = {

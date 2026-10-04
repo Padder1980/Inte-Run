@@ -583,10 +583,12 @@ function weekMark(rows: Adj[]) {
   // stale on the next change by construction — and that is the ACCEPTABLE kind of stale, because it
   // fails loudly with a ReferenceError rather than quietly measuring less. `weekSkips` and `todayIso`
   // joined it with B2's fourth kind, a single skipped session, exactly that way.
-  const src = ["weekAdjust", "weekAdjustNote", "adjPhrase", "adjustFor", "weekSkips", "todayIso", "isoAdd", "runDateLabelIso", "esc"]
+  // B4 added weekMoves (the sessions moved in or out, from XWEEK, which no week here has) and DAY_ORDER.
+  const src = ["weekAdjust", "weekAdjustNote", "adjPhrase", "adjustFor", "weekSkips", "todayIso", "isoAdd", "runDateLabelIso", "esc",
+    "weekMoves"]
     .map((n) => fn(n)).join("\n") + "\n" +
-    ["ADJ_MODES", "MON_SHORT"].map((n) => constSrc(n)).join("\n") + "\n" +
-    "function loadAdjust() { return ROWS; }\n";
+    ["ADJ_MODES", "MON_SHORT", "DAY_ORDER"].map((n) => constSrc(n)).join("\n") + "\n" +
+    "function loadAdjust() { return ROWS; }\nconst XWEEK = {}, PLAN = { weeks: [] };\n";
   return new Function("ROWS", src + "return { weekAdjust: weekAdjust, note: weekAdjustNote };")(rows) as
     { weekAdjust: (w: unknown) => Mark; note: (w: unknown) => string };
 }
@@ -724,13 +726,17 @@ test("BLOCKER: one definition of whether a week is altered, read by both the row
   // decision rather than a surprise. It answers one question — is this plan week covered by a stored
   // "make this week easier" row — by DELEGATING to adjustFor and adding a mode test. It does not
   // re-implement the range comparison, which is the thing that must stay in one place.
-  assert.deepEqual(askers.sort(), ["applyAdjustments", "eased", "weekAdjust"],
+  // ⚠️ B4's TWO ARE ASKERS FOR THE SAME REASON: xwDropped asks "would a booked break take this run off its
+  // day" so a day a holiday emptied is free to a week-move exactly when it is free on screen, and xwTargets
+  // asks whether a break would take the moved run straight back out. Both delegate to adjustFor + adjDrops.
+  assert.deepEqual(askers.sort(), ["applyAdjustments", "eased", "weekAdjust", "xwDropped", "xwTargets"],
     "a stored window's membership is decided by: " + askers.join(", "));
-  // ...and it must genuinely delegate rather than re-derive the range.
-  const easedBody = body("eased");
-  assert.match(easedBody, /adjustFor\(/, "eased does not ask adjustFor");
-  assert.ok(!/>=\s*\w+\.from|<=\s*\w+\.to/.test(easedBody),
-    "eased re-implements the window range test instead of delegating to adjustFor");
+  // ...and each must genuinely delegate rather than re-derive the range.
+  for (const n of ["eased", "xwDropped", "xwTargets"]) {
+    const b = body(n);
+    assert.match(b, /adjustFor\(/, n + " does not ask adjustFor");
+    assert.ok(!/>=\s*\w+\.from|<=\s*\w+\.to/.test(b), n + " re-implements the window range test instead of delegating to adjustFor");
+  }
   // ⚠️ `adjustPreviewCount` RANGE-TESTS INLINE AND THAT IS NOT A SECOND DEFINITION: it is handed ONE
   // draft window that is not in the store yet, so there is nothing for adjustFor to search. Stated here
   // rather than left as a silent exception, and pinned so it cannot quietly grow into a search.

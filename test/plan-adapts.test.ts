@@ -139,9 +139,12 @@ test("BLOCKER: a reschedule is perishable — it survives a rebuild and dies whe
   assert.equal(api.ovFrom(st.dayOverride[sess.id]), 6, "the from-field is not read back");
   // moveSession must record it, or staleness can never be detected.
   const mv = nocomment(fn("moveSession"));
-  assert.match(mv, /state\.dayOverride\[sess\.id\] = \{ to: target, from: genDay\(sess\) \}/,
+  // B4: both writes go through ovFor, which records genDay for an ordinary session and keeps a session
+  // moved here from another week on the day the plan gave it in ITS week (with the week offset).
+  assert.match(mv, /return \(xwDir\(o\) && XWEEK && XWEEK\[s\.id\]\) \? \{ to: to, from: ovFrom\(o\), wk: xwDir\(o\) \} : \{ to: to, from: genDay\(s\) \};/,
     "a reschedule no longer records the day the plan had put the session on");
-  assert.match(mv, /state\.dayOverride\[occ\.id\] = \{ to: cur, from: genDay\(occ\) \}/,
+  assert.match(mv, /state\.dayOverride\[sess\.id\] = ovFor\(sess, target\)/, "the moved session is not recorded through ovFor");
+  assert.match(mv, /state\.dayOverride\[occ\.id\] = ovFor\(occ, cur\)/,
     "the session displaced by a swap does not record where it came from, so its override never expires");
   // And seedDone drops the stale ones, then resolves any collision the plan has created.
   const seed = nocomment(fn("seedDone"));

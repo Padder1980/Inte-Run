@@ -6,7 +6,10 @@ export { buildPlanSummary, weekView } from "../src/view/plan-summary.ts";
 export { easeWeek } from "../src/adapt/missed-sessions.ts";
 export type { PlanSummary } from "../src/view/plan-summary.ts";
 export { parseDuration } from "../src/domain/units.ts";
-export { generatePlan } from "../src/plan/generate-plan.ts";
+// ⚠️ HARD_BEFORE_RACE and sessionIdFor: the race-eve set and the one definition of a session's id, so the
+// app refuses a week-move onto race eve with the engine's own list (stage B4) and can carry an id written
+// in the old week-number form across to the calendar-week form without a second copy of the format.
+export { generatePlan, HARD_BEFORE_RACE, sessionIdFor } from "../src/plan/generate-plan.ts";
 export { LiveSession } from "../src/live/session-runtime.ts";
 export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session-runtime.ts";
 // Spoken-coaching catalogue + selection (drives the app's audio controller).

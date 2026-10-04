@@ -137,6 +137,9 @@ node --test            # the suite (about 1,800 tests)
   Mondays and resyncs iOS reminders and the watch). `applyProfile` is pure; `adoptPlan` and `recompute` commit.
 - **`PLAN.weeks` is a display summary with no steps, exercises or pace bands; the prescription is
   `RAW.weeks`** (`rawSessionsForIso()`). Reading the wrong one fails silently.
+- **A session id names its calendar week** (`2026-10-12-d1-threshold`, `RC.sessionIdFor`). The plan is rebuilt from
+  today, so a block loses a week every Monday: anything keyed on a week NUMBER slips a week. A store keyed on a session
+  id reads old `w3-d1-…` ids through `legacySid` (notes/manage-plan.md, B4).
 - **Dates are UTC** (`todayIso()`, `isoAdd()`). Never build an ISO date from a Date changed with local setters;
   `new Date(iso + "T00:00:00")` has no Z.
 - Code that measures or scrolls a rendered screen goes in `wire()`, not `buildNav()` (which runs once at boot,
@@ -209,7 +212,7 @@ node --test            # the suite (about 1,800 tests)
 
 ## Where things stand (keep this to a few lines)
 
-As of 2026-10-02: strength A1–A8, the 12–17 programme Y1–Y6 and **D1** (the privacy policy, terms, a simple
+As of 2026-10-04: strength A1–A8, the 12–17 programme Y1–Y6 and **D1** (the privacy policy, terms, a simple
 version and a support page, at `docs/privacy/`, `terms/`, `simple/`, `support/`) are built. The published pages
 are held to the code by `test/privacy-copy.test.ts`: change what leaves the phone, and they change too. D3c
 (the Wellbeing check-in, UK crisis lines, Alfie's limb warning signs) is built too, awaiting clinical review. D2: build
@@ -217,7 +220,9 @@ are held to the code by `test/privacy-copy.test.ts`: change what leaves the phon
 features first (S, B1–B11), then D4 submit — his ruling of 2026-09-30. **B1 is built (2026-10-02):** a run added by
 hand, a run linked to its session (`interun_link_v1`, now written by all three commit points), best times; its
 Strava switch waits on his Worker deploy. **B2 and B3 are built too:** skip one session (a row in the break store), and a
-session's time of day (`interun_time_v1`, into the calendar file and the reminders). Next is B4. `PLAN.md` holds the full list and the Road Map is the live
+session's time of day (`interun_time_v1`, into the calendar file and the reminders). **B4 is built (2026-10-04):** move a
+run a week earlier or later (`{ to, from, wk }` in `interun_dayov_v1`, applied by `applyCrossWeekMoves` before the
+breaks); it made session ids name their calendar week (below). Next is B5. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -235,7 +240,7 @@ status; update both when a stage lands.
 | The coaching-book (Hudson) work: hill sprints, honest RPE bands, block lengths (`MAX_STRUCTURED_WEEKS`), two hard days, beginner quality, the no-recovery-week tier | `notes/plan-coaching-book.md` |
 | Profile answers → plan: `applyProfile`, status and experience, stated volume, age and max HR, running-day choices, `profileImpact` | `notes/plan-profile.md` |
 | The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment | `notes/plan-adaptation.md` |
-| Manage plan: pause, holiday / not 100%, skip one session (B2), a session's time of day (B3), week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
+| Manage plan: pause, holiday / not 100%, skip one session (B2), a session's time of day (B3), move a session a week (B4) and session ids that name their calendar week, week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
 | The native iPhone app: WebHost, the over-the-air web layer, the keyboard pan, viewport and status bar, installing, TestFlight, the toolchain, Apple Health | `notes/ios-native.md` |
 | The Apple Watch app: payload, companion, mirroring, Live Activities, starting runs from the phone, the watch redesign | `notes/watch.md` |
 | The 2026-08-21 watch batch: the companion screen, pace derivation, cadence, count-in beats, wrist controls | `notes/watch-batch.md` |

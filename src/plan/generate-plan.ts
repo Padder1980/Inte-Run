@@ -1616,7 +1616,7 @@ function buildWeek(
     }
   }
 
-  const finalized = finalize(sessions, dayOf, index);
+  const finalized = finalize(sessions, dayOf, startDateIso);
   const plannedDistanceMeters = finalized.reduce((m, s) => m + sessionVolumeMeters(s), 0);
   const qualitySessionCount = countQuality(finalized);
 
@@ -1688,12 +1688,12 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
     return true;
   });
   if (clearedEve && eve && !kept.some((s) => s.dayOfWeek === eve.dow)) {
-    kept.push(shakeoutSession(paces, last.index, eve.dow));
+    kept.push(shakeoutSession(paces, last.startDateIso, eve.dow));
   }
 
   const race: Session = {
     ...raceDay(paces, goal.distance, label),
-    id: `w${last.index}-d${raceDow}-race`,
+    id: sessionIdFor(last.startDateIso, raceDow, "race"),
     dayOfWeek: raceDow,
     source: "generated",
   };
@@ -1703,7 +1703,7 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
     if (kept.some((s) => s.dayOfWeek === d)) continue;
     filler.push({
       ...restDay(),
-      id: `w${last.index}-d${d}-rest`,
+      id: sessionIdFor(last.startDateIso, d, "rest"),
       dayOfWeek: d,
       source: "generated",
     });
@@ -1727,7 +1727,7 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
       // run) simply go, so the day holds one easy jog rather than a jog plus a lift.
       if (replaced) return [];
       replaced = true;
-      return [shakeoutSession(paces, w.index, eve.dow)];
+      return [shakeoutSession(paces, w.startDateIso, eve.dow)];
     });
     w.plannedDistanceMeters = Math.round(
       w.sessions.reduce((m, s) => m + sessionVolumeMeters(s), 0),
@@ -1739,18 +1739,23 @@ function applyRaceDay(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces): v
 }
 
 /** The day before a goal race: legs turned over, nothing taken out of them. */
-function shakeoutSession(paces: TrainingPaces, weekIndex: number, dow: number): Session {
+function shakeoutSession(paces: TrainingPaces, weekStartIso: string, dow: number): Session {
   return {
     ...easyRun(paces, 20),
     title: "Pre-race shakeout",
-    id: `w${weekIndex}-d${dow}-shakeout`,
+    id: sessionIdFor(weekStartIso, dow, "shakeout"),
     dayOfWeek: dow,
     source: "generated",
   };
 }
 
-/** Session types that must not sit the day before a goal race. */
-const HARD_BEFORE_RACE = new Set<SessionType>([
+/**
+ * Session types that must not sit the day before a goal race.
+ * ⚠️ EXPORTED SO THE APP HAS NO SECOND COPY. Moving a session a week earlier or later (stage B4) can
+ * land one on race eve, and the app refuses exactly this set there — a list typed out again in the app
+ * is the one that goes stale when a type is added here.
+ */
+export const HARD_BEFORE_RACE: ReadonlySet<SessionType> = new Set<SessionType>([
   "threshold", "vo2", "race-specific", "long", "strength",
 ]);
 
@@ -1779,11 +1784,31 @@ function applyPartialFirstWeek(weeks: PlannedWeek[], startIso: string): void {
   w0.focus = `Partial first week — picking up from ${DAY_LABEL[startDOW]}. Full weeks begin Monday.`;
 }
 
-function finalize(contents: SessionContent[], dayOf: number[], weekIndex: number): Session[] {
+/**
+ * A planned session's id: its calendar week's Monday, its day and its type — "2026-11-02-d1-threshold".
+ *
+ * ⚠️⚠️ THE CALENDAR WEEK, NEVER THE WEEK'S NUMBER IN THE BLOCK. The app rebuilds the plan from today on
+ * every launch, so once a block has begun it is a week shorter every Monday and every later week's
+ * number drops by one: the session that was "w3-d1-threshold" on Sunday was "w2-d1-threshold" on the
+ * Monday, and "w3-d1-threshold" then named a session a week later. Everything the app files against an
+ * id — a day the runner dragged a session to, a skip, a time of day, a linked run, a swapped exercise —
+ * pointed at the wrong week or at nothing. Measured 2026-10-02 on a 12-week half: the strength session on
+ * Tue 20 Oct was w4-d1-strength that day, w3-d1-strength from Monday 5 Oct and w2-d1-strength from Monday
+ * 12 Oct. A week's Monday is
+ * counted back from race week and does not move when the block shrinks, so an id now names one calendar
+ * session for the life of the plan.
+ * ⚠️ UNIQUE WITHIN A PLAN for the same reason the number was: a week holds at most one session of a type
+ * on a day. Normalised to the Monday, because a one-week plan's only week starts on the start day.
+ */
+export function sessionIdFor(weekStartIso: string, dow: number, type: string): string {
+  return `${addDays(weekStartIso, -dayOfWeekMondayZero(weekStartIso))}-d${dow}-${type}`;
+}
+
+function finalize(contents: SessionContent[], dayOf: number[], weekStartIso: string): Session[] {
   return contents
     .map((c, i) => ({
       ...c,
-      id: `w${weekIndex}-d${dayOf[i]}-${c.type}`,
+      id: sessionIdFor(weekStartIso, dayOf[i]!, c.type),
       dayOfWeek: dayOf[i]!,
       source: "generated" as const,
     }))
@@ -2126,7 +2151,7 @@ function buildBeginnerWeek(
     }
   }
 
-  const finalized = finalize(sessions, dayOf, index);
+  const finalized = finalize(sessions, dayOf, startDateIso);
   const plannedDistanceMeters = finalized.reduce((m, s) => m + sessionVolumeMeters(s), 0);
   return {
     index,

@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { EQUIPMENT, EXERCISES, alternativesFor, canDo, exerciseById, swapCandidatesFor } from "../src/strength/library.ts";
+import { sessionIdFor } from "../src/plan/generate-plan.ts";
 
 const APP = readFileSync(new URL("../web/app.html", import.meta.url), "utf8");
 /**
@@ -122,7 +123,7 @@ test("an unrecognised exercise id returns no candidates rather than throwing", (
  * as gps-distance.test.ts lifting onGpsPos. A hand-written re-implementation would agree with itself
  * and prove nothing about the shipped function.
  */
-function loadWithSwaps(): { withSwaps: (sess: unknown) => unknown; swapKey: (s: string, f: string) => string; setSwap: (s: string, f: string, t: string) => void; loadSwaps: () => Record<string, string> } {
+function loadWithSwaps(plan?: unknown, seed?: Record<string, string>): { withSwaps: (sess: unknown) => unknown; swapKey: (s: string, f: string) => string; setSwap: (s: string, f: string, t: string) => void; loadSwaps: () => Record<string, string> } {
   // ⚠️ SWAP_KEY MUST BE LIFTED TOO, OR THE WHOLE HARNESS "WORKS" WHILE PERSISTING NOTHING. loadSwaps
   // and saveSwaps both read localStorage under SWAP_KEY inside a try/catch — omit the constant and
   // every call throws ReferenceError, which the catch silently swallows, so loadSwaps always answers
@@ -134,21 +135,24 @@ function loadWithSwaps(): { withSwaps: (sess: unknown) => unknown; swapKey: (s: 
   const body = [
     keyMatch![0]!,
     fnOf("swapKey"),
+    // The loader carries a key in the old week-number id form across (stage B4) — lifted, not stubbed.
+    fnOf("legacySid"),
+    fnOf("sidKeys"),
     fnOf("loadSwaps"),
     fnOf("saveSwaps"),
     fnOf("setSwap"),
     fnOf("withSwaps"),
   ].join("\n");
-  const RC = { exerciseById } as const;
+  const RC = { exerciseById, sessionIdFor } as const;
   // eslint-disable-next-line no-new-func
-  const factory = new Function("RC", "localStorage", body + "\nreturn { withSwaps, swapKey, setSwap, loadSwaps };");
-  const store: Record<string, string> = {};
+  const factory = new Function("RC", "localStorage", "PLAN", body + "\nreturn { withSwaps, swapKey, setSwap, loadSwaps };");
+  const store: Record<string, string> = Object.assign({}, seed || {});
   const fakeLocalStorage = {
     getItem: (k: string) => (k in store ? store[k]! : null),
     setItem: (k: string, v: string) => { store[k] = v; },
     removeItem: (k: string) => { delete store[k]; },
   };
-  return factory(RC, fakeLocalStorage);
+  return factory(RC, fakeLocalStorage, plan);
 }
 
 const FULL_EXERCISE = () => ({
@@ -160,7 +164,7 @@ const FULL_EXERCISE = () => ({
 
 test("BLOCKER: withSwaps hands back a session unchanged (bar slotId) when there is no swap for it", () => {
   const { withSwaps } = loadWithSwaps();
-  const sess = { id: "w1-d1-strength", exercises: [FULL_EXERCISE()] };
+  const sess = { id: "2026-09-28-d1-strength", exercises: [FULL_EXERCISE()] };
   const out = withSwaps(sess) as { exercises: Array<Record<string, unknown>> };
   const e = out.exercises[0]!;
   assert.equal(e.id, "squat");
@@ -172,8 +176,8 @@ test("BLOCKER: withSwaps hands back a session unchanged (bar slotId) when there 
 
 test("BLOCKER: a swap moves ONLY identity — sets, reps, rest, load, contacts and superset stay exactly as prescribed", () => {
   const { withSwaps, setSwap } = loadWithSwaps();
-  setSwap("w1-d1-strength", "squat", "stepUp");
-  const sess = { id: "w1-d1-strength", exercises: [FULL_EXERCISE()] };
+  setSwap("2026-09-28-d1-strength", "squat", "stepUp");
+  const sess = { id: "2026-09-28-d1-strength", exercises: [FULL_EXERCISE()] };
   const out = withSwaps(sess) as { exercises: Array<Record<string, unknown>> };
   const e = out.exercises[0]!;
   const target = exerciseById("stepUp")!;
@@ -193,33 +197,33 @@ test("BLOCKER: the second-swap defect, pinned exactly — swapping the DISPLAYED
   // is safe) — it has to be reproduced the way the runner actually hits it: read slotId off the
   // DISPLAYED exercise (as the Swap button does), and use THAT as the key for the next swap.
   const { withSwaps, setSwap, loadSwaps } = loadWithSwaps();
-  setSwap("w1-d1-strength", "squat", "stepUp");
-  const sess = { id: "w1-d1-strength", exercises: [FULL_EXERCISE()] };
+  setSwap("2026-09-28-d1-strength", "squat", "stepUp");
+  const sess = { id: "2026-09-28-d1-strength", exercises: [FULL_EXERCISE()] };
   const displayed = (withSwaps(sess) as { exercises: Array<{ id: string; slotId: string }> }).exercises[0]!;
   assert.equal(displayed.id, "stepUp");
   // The runner taps Swap again and picks "boxSquat". The button must key this off displayed.slotId
   // ("squat"), not displayed.id ("stepUp") — that is the entire fix.
-  setSwap("w1-d1-strength", displayed.slotId, "boxSquat");
+  setSwap("2026-09-28-d1-strength", displayed.slotId, "boxSquat");
   const store = loadSwaps();
-  assert.deepEqual(Object.keys(store), ["w1-d1-strength|squat"],
+  assert.deepEqual(Object.keys(store), ["2026-09-28-d1-strength|squat"],
     "a second swap on an already-swapped exercise created a second, unreachable key");
-  assert.equal(store["w1-d1-strength|squat"], "boxSquat", "the second swap did not overwrite the first");
+  assert.equal(store["2026-09-28-d1-strength|squat"], "boxSquat", "the second swap did not overwrite the first");
   const redisplayed = (withSwaps(sess) as { exercises: Array<{ id: string }> }).exercises[0]!;
   assert.equal(redisplayed.id, "boxSquat");
 });
 
 test("BLOCKER: swapping back to the original exercise clears the key rather than storing a no-op", () => {
   const { setSwap, loadSwaps } = loadWithSwaps();
-  setSwap("w1-d1-strength", "squat", "stepUp");
+  setSwap("2026-09-28-d1-strength", "squat", "stepUp");
   assert.equal(Object.keys(loadSwaps()).length, 1);
-  setSwap("w1-d1-strength", "squat", "squat");
+  setSwap("2026-09-28-d1-strength", "squat", "squat");
   assert.deepEqual(loadSwaps(), {}, "reverting to the original left a stored identity mapping behind");
 });
 
 test("an id the catalogue no longer resolves falls back to the original rather than inventing a stand-in or throwing", () => {
   const { withSwaps, setSwap } = loadWithSwaps();
-  setSwap("w1-d1-strength", "squat", "not-a-real-id");
-  const sess = { id: "w1-d1-strength", exercises: [FULL_EXERCISE()] };
+  setSwap("2026-09-28-d1-strength", "squat", "not-a-real-id");
+  const sess = { id: "2026-09-28-d1-strength", exercises: [FULL_EXERCISE()] };
   const out = withSwaps(sess) as { exercises: Array<Record<string, unknown>> };
   assert.equal(out.exercises[0]!.id, "squat", "an unresolvable target produced something other than the original");
   assert.equal(out.exercises[0]!.slotId, "squat");
@@ -231,8 +235,8 @@ test("BLOCKER: withSwaps is idempotent — applying it to its own output changes
   // payload) accidentally re-applying withSwaps to an already-resolved session, which is exactly the
   // second-swap defect one layer further out. Found only by testing the chain, not by reading the code.
   const { withSwaps, setSwap } = loadWithSwaps();
-  setSwap("w1-d1-strength", "squat", "stepUp");
-  const sess = { id: "w1-d1-strength", exercises: [FULL_EXERCISE()] };
+  setSwap("2026-09-28-d1-strength", "squat", "stepUp");
+  const sess = { id: "2026-09-28-d1-strength", exercises: [FULL_EXERCISE()] };
   const once = withSwaps(sess) as { exercises: Array<Record<string, unknown>> };
   const twice = withSwaps(once) as { exercises: Array<Record<string, unknown>> };
   assert.deepEqual(twice.exercises[0], once.exercises[0], "a second application changed the result");
@@ -255,9 +259,9 @@ test("a session with no exercises, or none at all, passes through withSwaps unha
   const { withSwaps } = loadWithSwaps();
   assert.equal(withSwaps(null), null);
   assert.equal(withSwaps(undefined), undefined);
-  const mobility = { id: "w1-d3-mobility", exercises: [] };
+  const mobility = { id: "2026-09-28-d3-mobility", exercises: [] };
   assert.equal(withSwaps(mobility), mobility);
-  const noField = { id: "w1-d5-easy" };
+  const noField = { id: "2026-09-28-d5-easy" };
   assert.equal(withSwaps(noField), noField);
 });
 
@@ -370,4 +374,17 @@ test("a swap key is discovered by backup export through the interun_ prefix, wit
   const swapKeyConst = /const SWAP_KEY = "([^"]+)"/.exec(APP);
   assert.ok(swapKeyConst, "SWAP_KEY is not declared as a plain string literal");
   assert.match(swapKeyConst![1]!, /^interun_/, "the swap store key does not carry the backup-discoverable prefix");
+});
+
+test("BLOCKER: a swap stored under the old week-number id is carried to the calendar-week id, and written back at once", () => {
+  // ⚠️ A SWAP KEY HAS NO DATE, so the live plan's numbering is the only thing that says which week
+  // "w1-d1-strength" meant — exactly where the old code applied it. It must be WRITTEN BACK on that first
+  // read: the same old key read again after the next Monday, when week 1 is a different week, would land a
+  // week later. Mutating the plan between two reads is that Monday.
+  const plan = { weeks: [{ index: 1, startIso: "2026-09-28" }, { index: 2, startIso: "2026-10-05" }] };
+  const { loadSwaps } = loadWithSwaps(plan, { interun_swap_v1: JSON.stringify({ "w1-d1-strength|squat": "stepUp" }) });
+  assert.deepEqual(loadSwaps(), { "2026-09-28-d1-strength|squat": "stepUp" }, "the old key was not carried to the week it named");
+  plan.weeks[0]!.startIso = "2026-10-05";   // the next Monday: week 1 is now another calendar week
+  assert.deepEqual(loadSwaps(), { "2026-09-28-d1-strength|squat": "stepUp" },
+    "the carried key was not written back, so the next Monday moved the swap a week later");
 });

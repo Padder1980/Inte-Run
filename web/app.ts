@@ -392,6 +392,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .sd-day.on { background: var(--ink); color: var(--surface); border-color: transparent; }
 .sd-day:disabled { cursor: default; }
 .sd-move-n { font-size: 11.5px; color: var(--ink-faint); margin-top: 8px; }
+/* B4 — Move to another week: two buttons under the day picker (earlier on the left, later on the right, even
+   when it is alone), then the other week's seven days, each with its date because the week is not this one.
+   The buttons are 44px tall (--tap); a disabled one keeps its words legible and says why underneath. */
+.sd-xw { margin-top: 16px; }
+.sd-xw-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.sd-wkbtn { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--line); border-radius: 10px; min-height: var(--tap); padding: 0 10px; cursor: pointer; box-shadow: 0 1px 2px rgba(20,32,27,.05); }
+.sd-wkbtn:active { transform: translateY(1px); }
+.sd-wkbtn:disabled { color: var(--ink-faint); background: var(--surface-2); box-shadow: none; cursor: default; transform: none; }
+#sdWeekNext { grid-column: 2; }
+.sd-xwdays { margin-top: 14px; }
+.sd-xwday { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: var(--tap); padding: 6px 0; }
+.sd-xwd { font-size: 15px; font-weight: 700; color: var(--ink); }
+.sd-xwday:disabled { opacity: .42; }
 /* B3 — a session's time of day: the platform's own time picker, and a Clear beside it. */
 .sd-time { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); }
 .sd-time .sel { max-width: 180px; }
@@ -6476,15 +6489,60 @@ const LINK_KEY = "interun_link_v1";
  *
  * ⚠️ DECLARED HERE FOR THE REASON LINK_KEY GIVES ABOVE: seedDone prunes it, and seedDone runs at module
  * top level through recompute.
- * ⚠️ MATCHED ON (week, id), LIKE A LINK, NEVER ON THE ID ALONE. Ids recur across rebuilds of different
- * plans, so "w3-d2-easy" in a plan started next month is a different day; the stored date ties the time to
- * the week it was set for, and a session dragged to another day of that week keeps its time.
+ * ⚠️ MATCHED ON (week, id), LIKE A LINK, NEVER ON THE ID ALONE. An id names its session's calendar week
+ * (see legacySid), but the stored date is what ties the time to the week the session sits in: a session
+ * dragged to another day of that week keeps its time, and one moved to another week (B4) has its time
+ * re-dated by the move.
  * ⚠️ PRUNED BY DATE, NEVER BY WHETHER THE PLAN HOLDS THE SESSION. A holiday or a skip takes a session out of
  * the plan for as long as it stands, and cancelling it must bring the session back WITH its time; a prune
  * against plan membership would make every such cancel lose it. A time is dropped a week after its date,
  * when its session can no longer be anywhere ahead.
  */
 const TIME_KEY = "interun_time_v1";
+/**
+ * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
+ * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
+ * or null when id is not an old one.
+ *
+ * ⚠️⚠️ WHY EVERY STORE KEYED ON A SESSION ID IS READ THROUGH THIS. The plan is rebuilt from today on every
+ * launch, so a block that has begun is a week shorter every Monday and every later week's number drops
+ * by one. An old id therefore named a DIFFERENT calendar week after each Monday: a day the runner had
+ * dragged a session to reappeared on the next week's session, a skip came back, a time of day vanished.
+ * The engine's id now names the calendar week (RC.sessionIdFor is the one definition of the format), and
+ * each store's loader passes what it holds through here, so nothing the runner set is lost in the change.
+ * ⚠️ A ROW THAT CARRIES ITS OWN DATE IS CARRIED BY THAT DATE, EXACTLY — the date says which calendar week
+ * the session sat in, whenever the row was written. Only the two stores with no date (dragged days and
+ * swapped exercises) fall back to the live plan's numbering, which is precisely where the old code was
+ * applying them, so the runner sees nothing move; those two are written straight back, because the same
+ * old key read again after the next Monday would land a week later.
+ * ⚠️ A FUNCTION DECLARATION AND NOTHING ELSE: loaders call it from inside adoptPlan, which recompute()
+ * runs at module top level, so it must not reach anything declared with const or let below that call.
+ * PLAN is declared above it.
+ */
+function legacySid(id, iso) {
+  const m = /^w(\\d+)-d(\\d)-(.+)$/.exec(String(id == null ? "" : id));
+  if (!m) return null;
+  let day = "";
+  if (iso && /^\\d{4}-\\d{2}-\\d{2}/.test(String(iso))) day = String(iso).slice(0, 10);
+  else if (PLAN && PLAN.weeks) { const w = PLAN.weeks.find((x) => x.index === Number(m[1])); if (w && w.startIso) day = w.startIso; }
+  if (!day) return null;
+  try { return RC.sessionIdFor(day, Number(m[2]), m[3]); } catch (e) { return null; }
+}
+/**
+ * An id-keyed map with every old key carried across (see legacySid). dateOf(value) gives a value's own
+ * date, or "" when it has none. A key already in the new form wins over an old one naming the same
+ * session: it was written by the code that is running now.
+ */
+function sidKeys(map, dateOf, keyOf) {
+  const out = {}, legacy = [];
+  let changed = false;
+  Object.keys(map || {}).forEach((k) => {
+    const n = keyOf ? keyOf(k, map[k]) : legacySid(k, dateOf ? dateOf(map[k]) : "");
+    if (n == null) out[k] = map[k]; else legacy.push([n, k]);
+  });
+  legacy.forEach((p) => { changed = true; if (!(p[0] in out)) out[p[0]] = map[p[1]]; });
+  return { map: out, changed: changed };
+}
 /**
  * Whether EXTRA has been initialised yet. Declared up here with the store keys because that is the
  * only place it can be: it exists to tell adoptPlan, which runs at module top level, that EXTRA is
@@ -6880,6 +6938,24 @@ const storedProfile = loadProfile();
 const FIRST_RUN = !storedProfile;
 let profile = storedProfile || Object.assign({}, DEFAULT_PROFILE);
 let PLAN, RAW, FITNESS, CLASS, MASTERS;
+// Sessions the runner actually goes out and RUNS — the ones that get a Start button, reach the
+// watch, and can be rescheduled. "race" is in: race day is a run, it is trackable, and the whole
+// plan exists to reach it. ("race-specific" is a rehearsal in training, not the race.)
+// ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), AND IT HAS TO BE. applyCrossWeekMoves (stage B4) runs
+// inside adoptPlan and asks which sessions are runs; left where it was, a hundred lines below that call,
+// the read would sit in the const's temporal dead zone, throw, and the try around it would swallow every
+// week-move on every launch — JOURNAL_KEY's story, a fourth time.
+const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1, race: 1 };
+/**
+ * B4 — the week-moves applied to the live plan by the last adoptPlan: { sessionId: { home, at, t } }, the
+ * 0-based index of the week the plan put the session in and of the week it now sits in, and its title (a
+ * break may since have taken it out of the plan, and its old week still has to say what went).
+ * ⚠️ DERIVED ON EVERY REBUILD, NEVER STORED: the stored fact is the override ({ to, from, wk }); this says
+ * which overrides the plan as it stands could honour. seedDone prunes a week-move that is not in it, and
+ * effDay ignores one, so an override the plan refused cannot drag its session to a day in the wrong week.
+ * ⚠️ A let ABOVE THE FIRST recompute() FOR THE REASON PRIMARY_TYPES GIVES.
+ */
+let XWEEK = {};
 // ⚠️ Everything that MUST happen when a freshly generated plan replaces the live one. Never assign
 // PLAN from an applyProfile() result by hand — go through here. Assigning the fields is not enough:
 // applyProfile starts a pro-rata first week on the START DATE, so week 0's startIso is whatever day
@@ -7041,8 +7117,12 @@ const ADJ_MODES = [
     s: "Clear the running out of these days entirely" },
 ];
 function loadAdjust() {
-  try { const a = JSON.parse(localStorage.getItem(ADJUST_KEY) || "[]"); return Array.isArray(a) ? a : []; }
-  catch (e) { return []; }
+  let a;
+  try { a = JSON.parse(localStorage.getItem(ADJUST_KEY) || "[]"); } catch (e) { return []; }
+  if (!Array.isArray(a)) return [];
+  // A skip names its session by id; carried to the calendar-week form by its own date (see legacySid).
+  a.forEach((r) => { if (r && r.mode === "skip" && r.sid) { const n = legacySid(r.sid, r.from); if (n) r.sid = n; } });
+  return a;
 }
 function saveAdjust(rows) {
   // ⚠️ PAST WINDOWS ARE DROPPED ON EVERY WRITE, not kept for a history nobody asked for. An adjustment
@@ -7090,9 +7170,10 @@ function adjustFor(iso, rows) {
 /**
  * B2 — the sessions skipped in the plan week that starts on startIso. THE ONE DEFINITION of which skips
  * belong to a week, read by applyAdjustments (which removes them) and weekAdjust (which marks them).
- * ⚠️ BY THE WEEK, THEN BY ID — the same rule a B1 link follows. Ids carry their week ("w7-d2-easy"), so
- * within one plan the pair is unique, and a rebuild into a different plan leaves a skip inert rather than
- * taking out a session the runner never chose.
+ * ⚠️ BY THE WEEK, THEN BY ID — the same rule a B1 link follows. Ids carry their calendar week
+ * ("2026-11-02-d1-easy", see legacySid), so within one plan the pair is unique, and a rebuild into a
+ * different plan leaves a skip inert rather than taking out a session the runner never chose. A session
+ * moved to another week (B4) is matched in the week it now sits in, which is where its skip is dated.
  */
 function weekSkips(startIso, rows) {
   if (!startIso) return [];
@@ -7229,6 +7310,358 @@ function easeWeekIn(wk, raw) {
     wk.focus = v.focus;
     return true;
   } catch (e) { return false; }
+}
+
+
+// ---- Move a session a week earlier or later (stage B4) -------------------------------------
+/**
+ * Is this override a move to another week? -1 or 1 when it is, 0 when it is a same-week drag or nothing.
+ * Stored as { to, from, wk }: the day it goes to, the day the plan put it on, and the week offset from
+ * the week the plan put it in. One week either way, never more (see xwRefusal's "far").
+ */
+function xwDir(o) { return (o && typeof o === "object" && (o.wk === 1 || o.wk === -1)) ? o.wk : 0; }
+/**
+ * The day a session sits on, given an override map — effDay's rule over any map, so the rebuild can ask it
+ * before state exists (state is declared below the first recompute()).
+ * ⚠️ A WEEK-MOVE THE PLAN DID NOT APPLY MOVES NOTHING. Its "to" is a day in ANOTHER week; read here it would
+ * drag the session to that weekday inside its own week. Only a move in XWEEK (applied by the last rebuild)
+ * has a "to" that means this week. And a same-week drag whose from no longer matches the plan is stale —
+ * seedDone prunes it — so it is read as the plan's own day here too, or a rebuild would count a day as
+ * taken by a run that is about to snap back.
+ */
+function xwDayOf(ov, s) {
+  const o = ov ? ov[s.id] : null;
+  if (!o) return genDay(s);
+  if (xwDir(o)) return (XWEEK && XWEEK[s.id]) ? ovTo(o) : genDay(s);
+  const f = ovFrom(o);
+  if (f != null && f !== genDay(s)) return genDay(s);
+  const t = ovTo(o);
+  return t != null ? t : genDay(s);
+}
+/** The goal race's date, from the plan itself (the race session in the last week), or "". */
+function xwRaceIso() {
+  if (!RAW || !RAW.weeks || !PLAN || !PLAN.weeks) return "";
+  const li = RAW.weeks.length - 1;
+  const r = RAW.weeks[li] && (RAW.weeks[li].sessions || []).find((x) => x.type === "race");
+  return (r && PLAN.weeks[li]) ? isoAdd(PLAN.weeks[li].startIso, r.dayOfWeek).toISOString().slice(0, 10) : "";
+}
+/**
+ * Would a break the runner booked take session x out of the plan week starting on startIso? The same two
+ * questions applyAdjustments asks — the window over its own day, then the week's skips — through the same
+ * adjDrops, so a day a holiday has emptied is free here exactly when it is free on screen.
+ */
+function xwDropped(x, startIso, rows) {
+  if (!rows || !rows.length || !startIso) return false;
+  const a = adjustFor(isoAdd(startIso, genDay(x)).toISOString().slice(0, 10), rows);
+  if (a && adjDrops(a, x)) return true;
+  return weekSkips(startIso, rows).some((r) => adjDrops(r, x));
+}
+/**
+ * B4 — WHY session s may NOT go to day "to" of plan week ti (0-based), or "" when it may. home is the
+ * 0-based week the plan put it in. THE ONE DEFINITION: the rebuild applies a stored move only when this
+ * says "", and the session sheet offers a day only when this says "" — so a day the sheet offers is a day
+ * the next launch will honour, and the two cannot disagree. (The sheet adds only what changes with time:
+ * a day that has passed, and a break booked over the day.)
+ * weeks, when given, is the rebuild's own trial layout (session arrays by week); otherwise RAW's.
+ *
+ * ⚠️ THE REFUSALS ARE PLAN.md's, AND EACH HAS A REASON:
+ *   "race"  — nothing moves into or out of race week. Its sessions are the taper's last word and the race.
+ *   "eve"   — the engine's own HARD_BEFORE_RACE set may not land the day before the race (RC.HARD_BEFORE_RACE,
+ *             one definition; only reachable for a Monday race, whose eve is in the week before).
+ *   "taken" — a day that already holds a run takes no second one. Within a week a drag SWAPS two runs; across
+ *             weeks a swap would move a second session a week the runner never touched.
+ *   "far"   — one week from where the plan put it, either way. A session moved a week can come back, or go
+ *             one further only by first coming back.
+ *   "eased" — a week the runner made easier takes nothing in and gives nothing up: easing demotes that
+ *             week's hardest session, so a move would change which one, after they chose.
+ *   "start" — a part-week's days before the plan begins do not exist.
+ */
+function xwRefusal(s, home, ti, to, ov, rows, weeks) {
+  if (!s || !PRIMARY_TYPES[s.type] || s.type === "race") return "type";
+  if (!RAW || !RAW.weeks || !PLAN || !PLAN.weeks) return "edge";
+  if (!(ti >= 0 && ti < RAW.weeks.length && PLAN.weeks[ti]) || !(home >= 0 && home < RAW.weeks.length)) return "edge";
+  if (!(to >= 0 && to <= 6)) return "edge";
+  if (Math.abs(ti - home) > 1) return "far";
+  const last = RAW.weeks.length - 1;
+  if (ti !== home && (ti === last || home === last)) return "race";
+  if (ti !== home && rows && (eased(PLAN.weeks[ti], rows) || eased(PLAN.weeks[home], rows))) return "eased";
+  const iso = isoAdd(PLAN.weeks[ti].startIso, to).toISOString().slice(0, 10);
+  if (RAW.weeks[ti].startDateIso && iso < RAW.weeks[ti].startDateIso) return "start";
+  const race = xwRaceIso();
+  if (race && RC.HARD_BEFORE_RACE.has(s.type) && iso === isoAdd(race, -1).toISOString().slice(0, 10)) return "eve";
+  const list = weeks ? weeks[ti] : RAW.weeks[ti].sessions;
+  const start = PLAN.weeks[ti].startIso;
+  if ((list || []).some((x) => x.id !== s.id && PRIMARY_TYPES[x.type] && xwDayOf(ov, x) === to && !xwDropped(x, start, rows))) return "taken";
+  return "";
+}
+/**
+ * B4 — APPLY THE STORED WEEK-MOVES TO THE PLAN THAT HAS JUST BEEN BUILT. RAW's session is moved into the
+ * other week with dayOfWeek set to its new day, both weeks' counted distance is re-derived by the engine's
+ * own RC.weekVolumeMeters, and PLAN's two weeks are re-projected by RC.weekView — the engine's one
+ * projection — so the two shapes cannot disagree (PLAN.md's re-break: skip the re-projection and they do).
+ *
+ * ⚠️ INSIDE adoptPlan, BEFORE applyAdjustments — the other way round from PLAN.md's sketch, deliberately.
+ * A move says where the session IS; a break then applies to wherever sessions are. Run after, a holiday
+ * booked over the week a session was moved OUT of took it before it could move (lost from both weeks), and
+ * a skip of a moved session, dated in its new week, found nothing there to take and let it reappear.
+ * Before the syncs too, for the reason applyAdjustments gives: iOS and the wrist must hear the week as it is.
+ * ⚠️ READS THE STORE, NOT state.dayOverride: this runs from the first recompute(), above state's declaration.
+ * ⚠️ AND IT IS ORDER-FREE. Every move the plan can still recognise is lifted out first, then placed; one
+ * that cannot be placed goes home and the placements are tried again, so "Tuesday's run went to next week
+ * and Monday's came into this Tuesday" holds whichever id sorts first. A move refused here is not in
+ * XWEEK, and seedDone prunes it: the plan changed under it, and the runner is told by its absence on the
+ * day they put it — the same contract a same-week drag has always had.
+ */
+function applyCrossWeekMoves() {
+  XWEEK = {};
+  if (!PLAN || !PLAN.weeks || !RAW || !RAW.weeks) return 0;
+  const ov = loadDayOverride();
+  const ids = Object.keys(ov).filter((k) => xwDir(ov[k])).sort();
+  if (!ids.length) return 0;
+  const rows = loadAdjust();
+  const orig = RAW.weeks.map((w) => (w.sessions || []).slice());
+  const cand = [];
+  ids.forEach((sid) => {
+    const o = ov[sid];
+    const home = orig.findIndex((list) => list.some((x) => x.id === sid));
+    if (home < 0) return;
+    const s = orig[home].find((x) => x.id === sid);
+    // ⚠️ THE PLAN HAS MOVED IT SINCE — a new long-run day, say. The move answered a question about a week
+    // that no longer exists; seedDone prunes it, exactly as it prunes a stale same-week drag.
+    if (ovFrom(o) != null && ovFrom(o) !== s.dayOfWeek) return;
+    cand.push({ sid: sid, o: o, home: home, s: s, ti: home + xwDir(o), moved: Object.assign({}, s, { dayOfWeek: ovTo(o) }), ok: true });
+  });
+  // The week lists as they would be with every candidate still ok placed, and the rest left at home — natives
+  // in their original order, arrivals after them, sorted by day (a stable sort, so nothing else reorders).
+  const layout = () => orig.map((list, wi) => list.filter((x) => !cand.some((c) => c.ok && c.s === x))
+    .concat(cand.filter((c) => c.ok && c.ti === wi).map((c) => c.moved))
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek));
+  let lay = layout();
+  for (let pass = 0; pass <= cand.length; pass++) {
+    XWEEK = {};
+    cand.forEach((c) => { if (c.ok) XWEEK[c.sid] = { home: c.home, at: c.ti, t: String(c.s.title || "") }; });
+    const bad = cand.find((c) => c.ok && xwRefusal(c.moved, c.home, c.ti, ovTo(c.o), ov, rows, lay));
+    if (!bad) break;
+    bad.ok = false;
+    lay = layout();
+  }
+  const placed = cand.filter((c) => c.ok);
+  if (!placed.length) { XWEEK = {}; return 0; }
+  // ⚠️ EVERY WEEK IS WORKED OUT BEFORE ANY IS WRITTEN, so a throw part-way (adoptPlan catches it) leaves the
+  // plan exactly as the engine built it rather than with one week moved and its partner not.
+  const touched = {};
+  placed.forEach((c) => { touched[c.home] = 1; touched[c.ti] = 1; });
+  const next = Object.keys(touched).map((k) => {
+    const wi = Number(k);
+    const raw = Object.assign({}, RAW.weeks[wi], { sessions: lay[wi] });
+    raw.plannedDistanceMeters = RC.weekVolumeMeters(raw.sessions);
+    raw.qualitySessionCount = raw.sessions.filter((x) => ADJ_QUALITY[x.type]).length;
+    return { wi: wi, raw: raw, v: RC.weekView(raw) };
+  });
+  next.forEach((n) => {
+    RAW.weeks[n.wi] = n.raw;
+    // ⚠️ ONLY THE SESSION-DERIVED FIELDS, for the reason easeWeekIn gives: startIso and its two labels on the
+    // live PLAN are normalizeWeekStarts' Monday, not the engine's own, and must not be overwritten.
+    const wk = PLAN.weeks[n.wi];
+    wk.sessions = n.v.sessions; wk.distanceKm = n.v.distanceKm; wk.quality = n.v.quality; wk.longRunMin = n.v.longRunMin;
+  });
+  return placed.length;
+}
+/** Where the plan put a session that has been moved to another week: its week (0-based) and day, or null. */
+function xwHomeOf(sid) {
+  const m = XWEEK && XWEEK[sid];
+  const o = m && state.dayOverride[sid];
+  return (m && o) ? { home: m.home, at: m.at, from: ovFrom(o) } : null;
+}
+/**
+ * B4 — MAY THIS SESSION MOVE TO ANOTHER WEEK AT ALL? A run the plan holds (not the race), from today on,
+ * not already done. skipOfferable already asks every one of those questions for B2, so this IS it, narrowed
+ * to runs: strength and mobility can move within their week, and a programme's sessions are dated.
+ */
+function xwOfferable(sess, week) {
+  return !!(sess && PRIMARY_TYPES[sess.type] && sess.type !== "race" && skipOfferable(sess, week));
+}
+/**
+ * B4 — the days of the week before (dir -1) or after (dir 1) the week this session now sits in, each with
+ * the reason it cannot take the session ("" when it can). week is the 1-based week it sits in.
+ * ⚠️ xwRefusal IS THE RULE; this adds only what changes with the clock and the calendar — a day that has
+ * passed, and a booked break that would take the session straight back out (moving a run into a holiday
+ * you are not running on would toast "Moved" over a session that then exists nowhere).
+ */
+function xwTargets(sess, week, dir) {
+  const cur = Number(week) - 1;
+  const ti = cur + dir;
+  const out = { ti: ti, home: cur, days: [], any: false, block: "" };
+  if (!PLAN || !PLAN.weeks || !RAW || !RAW.weeks || !PLAN.weeks[cur]) { out.block = "edge"; return out; }
+  const h = xwHomeOf(sess.id);
+  if (h) out.home = h.home;
+  if (!(ti >= 0 && ti < PLAN.weeks.length)) { out.block = "edge"; return out; }
+  const rows = loadAdjust();
+  const today = todayIso();
+  for (let d = 0; d < 7; d++) {
+    const iso = isoAdd(PLAN.weeks[ti].startIso, d).toISOString().slice(0, 10);
+    let why = xwRefusal(sess, out.home, ti, d, state.dayOverride, rows);
+    if (!why && iso < today) why = "past";
+    if (!why) { const a = adjustFor(iso, rows); if (a && adjDrops(a, sess)) why = "break"; }
+    out.days.push({ d: d, iso: iso, why: why });
+  }
+  out.any = out.days.some((x) => !x.why);
+  // A reason that holds for every day is the WEEK's reason, said once instead of on seven buttons.
+  const w0 = out.days[0] ? out.days[0].why : "";
+  if (["race", "far", "eased", "edge", "type"].indexOf(w0) >= 0 && out.days.every((x) => x.why === w0)) out.block = w0;
+  return out;
+}
+
+
+/**
+ * B4 — MOVE ONE SESSION TO A DAY OF THE WEEK BEFORE OR AFTER. PLAN.md: "Move a session a week earlier or
+ * later." The rest of both weeks stays as prescribed; the session is re-placed by the rebuild
+ * (applyCrossWeekMoves), so Today, the plan, the calendar file, the reminders and the watch all follow.
+ *
+ * ⚠️ THE SAME COMMIT AS EVERY OTHER PLAN CHANGE (PLAN.md's standing rule): snapshot the stores this writes
+ * BEFORE the rebuild, recompute, computeToday + seedDone + restoreTicks, and hand the snapshot back through
+ * Undo. Never PLAN by hand.
+ * ⚠️ THE OFFSET IS FROM WHERE THE PLAN PUT IT, NOT FROM WHERE IT SITS. A session moved a week later and then
+ * moved a week earlier is HOME: its override becomes an ordinary same-week one (or none at all, on its own
+ * day) — never a pair of moves that cancel.
+ * ⚠️ ITS TIME OF DAY GOES WITH IT (B3). A time is filed against the week it was set in; left there, the
+ * runner's 18:00 would vanish from the session the moment it moved.
+ * ⚠️ AND IT LEAVES THE RUNNER WHERE THEY WERE, as a skip does — it is made from the session in front of them.
+ */
+function moveSessionToWeek(sess, week, dir, day) {
+  if (!xwOfferable(sess, week)) return false;
+  const t = xwTargets(sess, week, dir);
+  const pick = t.days.find((x) => x.d === day);
+  if (!pick || pick.why) return false;
+  const cur = Number(week) - 1;
+  const h = xwHomeOf(sess.id);
+  const home = h ? h.home : cur;
+  const from = h ? h.from : genDay(sess);
+  const off = t.ti - home;
+  const before = JSON.stringify(state.dayOverride || {});
+  const beforeTimes = (() => { try { return localStorage.getItem(TIME_KEY); } catch (e) { return null; } })();
+  const fromIso = isoAdd(PLAN.weeks[cur].startIso, effDay(sess)).toISOString().slice(0, 10);
+  const at = sessionTimeAt(fromIso, sess.id);
+  if (off === 0 && day === from) delete state.dayOverride[sess.id];
+  else state.dayOverride[sess.id] = off === 0 ? { to: day, from: from } : { to: day, from: from, wk: off };
+  saveDayOverride();
+  if (at) setSessionTime(sess.id, pick.iso, at);
+  const restore = () => {
+    try { state.dayOverride = JSON.parse(before); } catch (e) { state.dayOverride = {}; }
+    saveDayOverride();
+    try { if (beforeTimes == null) localStorage.removeItem(TIME_KEY); else localStorage.setItem(TIME_KEY, beforeTimes); } catch (e) {}
+  };
+  const ticks = todayTicks();
+  try { recompute(); } catch (e) {
+    restore();
+    try { recompute(); } catch (e2) {}
+    computeToday(); seedDone(); restoreTicks(ticks);
+    toast("That did not work — your plan is unchanged."); return false;
+  }
+  computeToday(); seedDone(); restoreTicks(ticks);
+  // ⚠️ CHECKED, NOT ASSUMED. The sheet asked xwRefusal and the rebuild asks it again over the same plan, so the
+  // two agree — but if a future change ever makes them differ, the runner must not be told "Moved" over a
+  // session that stayed where it was.
+  const landed = off === 0 ? !(XWEEK && XWEEK[sess.id]) : !!(XWEEK && XWEEK[sess.id] && XWEEK[sess.id].at === t.ti);
+  if (!landed) {
+    restore();
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(ticks);
+    toast("That did not work — your plan is unchanged."); render(); return false;
+  }
+  closeSheet();
+  toastUndo("Moved to " + dayLabelIso(pick.iso) + ".", () => {
+    const t2 = todayTicks();
+    restore();
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); render();
+  });
+  render();
+  return true;
+}
+/** The words for why a day (or a whole week) cannot take the session. One table, read by the picker. */
+const XW_WHY = {
+  taken: "Days that already have a run can’t take a second one.",
+  past: "Days that have gone can’t be picked.",
+  start: "Your plan hasn’t started on the earlier days.",
+  eve: "The day before your race can’t take a hard session.",
+  "break": "Days in a break you’ve booked are greyed out, because the break would take it straight back out.",
+};
+/** A whole week that cannot take it, in one sentence for the sheet. */
+function xwBlockText(t, dir) {
+  if (t.block === "race") return t.ti === PLAN.weeks.length - 1 ? "Race week keeps its own sessions, so nothing moves into it." : "Race week’s sessions stay in race week.";
+  if (t.block === "eased") return eased(PLAN.weeks[t.ti], loadAdjust())
+    ? "You made week " + (t.ti + 1) + " easier, so nothing moves into it."
+    : "You made this week easier, so nothing moves out of it.";
+  if (t.block === "far") return "A session can move one week from where your plan put it.";
+  if (!t.any) return "Every day in week " + (t.ti + 1) + " already has a run, or has gone.";
+  return "";
+}
+/**
+ * The second step of the sheet: the seven days of the other week, each a button, the ones that cannot take
+ * the session greyed with the reasons said once underneath, and what the move does to both weeks' distance.
+ * ⚠️ IT REPLACES THE SHEET BODY IN PLACE, like the swap picker, so Back returns to the session.
+ * ⚠️ THE DISTANCE IS THE ENGINE'S: RC.sessionVolumeMeters out of one week and into the other, against the
+ * RC.weekVolumeMeters each week reports now — the figure the week rows show, worked out the same way.
+ */
+function xwPickerHtml(sess, week, dir) {
+  const t = xwTargets(sess, week, dir);
+  const cur = Number(week) - 1;
+  const tw = PLAN.weeks[t.ti];
+  if (!tw) return "";
+  const homeBack = t.ti === t.home && cur !== t.home;
+  const days = t.days.map((x) => {
+    const dt = isoAdd(x.iso, 0);
+    return '<button class="sd-day sd-xwday" data-xwday="' + x.d + '"' + (x.why ? " disabled" : "") +
+      ' aria-label="' + esc(DAY_ORDER[x.d] + " " + dmon(dt) + (x.why ? ", not available" : "")) + '">' +
+      DAY_ORDER[x.d] + '<span class="sd-xwd">' + dt.getUTCDate() + '</span></button>';
+  }).join("");
+  const seen = {};
+  const why = t.days.map((x) => x.why).filter((w) => XW_WHY[w] && !seen[w] && (seen[w] = 1)).map((w) => XW_WHY[w]).join(" ");
+  const vol = RC.sessionVolumeMeters(sess);
+  const km = (m) => (Math.round(m / 100) / 10).toFixed(1);
+  const curM = RC.weekVolumeMeters(RAW.weeks[cur].sessions), tM = RC.weekVolumeMeters(RAW.weeks[t.ti].sessions);
+  const effect = "Week " + (cur + 1) + " goes from " + km(curM) + " to " + km(curM - vol) + " km, and week " + (t.ti + 1) +
+    " from " + km(tM) + " to " + km(tM + vol) + " km.";
+  const twoLong = sess.type === "long" && (RAW.weeks[t.ti].sessions || []).some((x) => x.type === "long")
+    ? " Week " + (t.ti + 1) + " would then have two long runs." : "";
+  const end = isoAdd(tw.startIso, 6);
+  return '<button class="mini-btn pi-ghost" id="xwBack">‹ Back to session</button>' +
+    '<div class="sheet-h" style="margin-top:14px">' + (homeBack ? "Back to week " + (t.ti + 1) : "Move to week " + (t.ti + 1)) + '</div>' +
+    '<p class="q-hint" style="margin:4px 2px 0">' + esc(sess.title) + ' · ' + esc(dmon(isoAdd(tw.startIso, 0)) + " to " + dmon(end)) + '</p>' +
+    '<div class="sd-days sd-xwdays">' + days + '</div>' +
+    (why ? '<div class="sd-move-n">' + esc(why) + '</div>' : "") +
+    '<p class="mp-note">' + esc(effect + twoLong) + ' Pick a day to move it; you can undo straight after.</p>';
+}
+function openXwPicker(dir) {
+  if (!SHEET_CTX || !SHEET_CTX.sess) return;
+  const ctx = { sess: SHEET_CTX.sess, week: SHEET_CTX.week };
+  $("sheetBody").innerHTML = xwPickerHtml(ctx.sess, ctx.week, dir);
+  const back = $("xwBack");
+  if (back) back.onclick = () => reopenSessionSheet();
+  document.querySelectorAll("[data-xwday]").forEach((b) => {
+    b.onclick = () => { if (!b.disabled) moveSessionToWeek(ctx.sess, ctx.week, dir, Number(b.dataset.xwday)); };
+  });
+}
+/**
+ * The session sheet's "Move to another week" row: a week earlier and a week later, each only when that week
+ * exists in the plan; a week that cannot take it shows its button disabled with the one reason underneath,
+ * rather than a button that does nothing. For a session already moved, it says where it came from.
+ */
+function xwRowHtml(sess, week) {
+  if (!xwOfferable(sess, week)) return "";
+  const back = xwTargets(sess, week, -1), fwd = xwTargets(sess, week, 1);
+  if (back.block === "edge" && fwd.block === "edge") return "";
+  const h = xwHomeOf(sess.id);
+  const label = (t, dir) => (t.ti === t.home && h) ? (dir < 0 ? "‹ Back to week " : "Back to week ") + (t.ti + 1) + (dir > 0 ? " ›" : "")
+    : (dir < 0 ? "‹ A week earlier" : "A week later ›");
+  const btn = (t, dir, id) => t.block === "edge" ? "" :
+    '<button class="sd-wkbtn" id="' + id + '"' + (t.any ? "" : " disabled") + '>' + label(t, dir) + '</button>';
+  const notes = [h ? "Moved here from week " + (h.home + 1) + "." : "", back.block === "edge" ? "" : xwBlockText(back, -1),
+    fwd.block === "edge" ? "" : xwBlockText(fwd, 1)].filter(Boolean);
+  return '<div class="sd-xw"><div class="sd-move-h">Move to another week</div>' +
+    '<div class="sd-xw-btns">' + btn(back, -1, "sdWeekBack") + btn(fwd, 1, "sdWeekNext") + '</div>' +
+    (notes.length ? '<div class="sd-move-n">' + esc(notes.join(" ")) + '</div>' : "") + '</div>';
 }
 
 
@@ -7558,6 +7991,10 @@ function applyEaseWeek(i) {
 function adoptPlan(out) {
   PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters;
   normalizeWeekStarts();
+  // ⚠️ B4: THE WEEK-MOVES FIRST, THEN THE BREAKS — a move says where a session is, and a break applies to
+  // wherever sessions are (see applyCrossWeekMoves). A throw leaves XWEEK null, which means "not known":
+  // effDay then reads no week-move, and seedDone prunes none, so a fault here can never delete one.
+  try { applyCrossWeekMoves(); } catch (e) { XWEEK = null; try { console.warn("week moves skipped", e); } catch (e2) {} }
   // ⚠️ BEFORE THE TWO SYNCS, DELIBERATELY. Run after them, iOS would hold reminders for sessions the
   // runner has just told us they will not be doing, and the wrist would hold them too.
   try { applyAdjustments(); } catch (e) {}
@@ -7733,7 +8170,15 @@ function planDefaultWeek() {
 const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, heatAdapt: loadHeatAdapt(), heatHour: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
-function loadDayOverride() { try { return JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; } }
+function loadDayOverride() {
+  let m;
+  try { m = JSON.parse(localStorage.getItem("interun_dayov_v1") || "{}") || {}; } catch (e) { return {}; }
+  // ⚠️ NO DATE, SO CARRIED BY THE LIVE PLAN'S NUMBERING AND WRITTEN BACK AT ONCE (see legacySid): read
+  // again after the next Monday, the same old key would be carried a week later.
+  const c = sidKeys(m, null);
+  if (c.changed) { try { localStorage.setItem("interun_dayov_v1", JSON.stringify(c.map)); } catch (e) {} }
+  return c.map;
+}
 function saveDayOverride() { try { Object.keys(state.dayOverride).length ? localStorage.setItem("interun_dayov_v1", JSON.stringify(state.dayOverride)) : localStorage.removeItem("interun_dayov_v1"); } catch (e) {} }
 /**
  * ⚠️ AN OVERRIDE NOW RECORDS WHERE IT MOVED THE SESSION **FROM**, AND THAT IS WHAT MAKES IT
@@ -7745,7 +8190,14 @@ function saveDayOverride() { try { Object.keys(state.dayOverride).length ? local
 function ovTo(o) { return o == null ? null : (typeof o === "object" ? o.to : o); }
 function ovFrom(o) { return (o && typeof o === "object" && o.from != null) ? o.from : null; }
 function genDay(s) { return s.dayOfWeek != null ? s.dayOfWeek : s.dayIndex; }
-function effDay(s) { const t = ovTo(state.dayOverride[s.id]); return t != null ? t : genDay(s); }
+function effDay(s) {
+  const o = state.dayOverride[s.id];
+  // ⚠️ B4: A WEEK-MOVE'S "to" IS A DAY IN ANOTHER WEEK. Unless the last rebuild applied it (XWEEK), the session
+  // is still in its own week, and reading "to" here would drag it to that weekday there. See xwDayOf.
+  if (o && (o.wk === 1 || o.wk === -1) && !(XWEEK && XWEEK[s.id])) return genDay(s);
+  const t = ovTo(o);
+  return t != null ? t : genDay(s);
+}
 
 /**
  * HEAT ADAPTATION — the runner's DECISION, never the adapted session.
@@ -7759,10 +8211,10 @@ function effDay(s) { const t = ovTo(state.dayOverride[s.id]); return t != null ?
  * Shape: { sessionId: { day: "2026-08-17", hour: 14 } }, mirroring dayOverride's flat id-keyed map,
  * applied through the one accessor below and never by mutating a session.
  */
-function loadHeatAdapt() { try { return JSON.parse(localStorage.getItem("interun_heat_v1") || "{}") || {}; } catch (e) { return {}; } }
+function loadHeatAdapt() { try { return sidKeys(JSON.parse(localStorage.getItem("interun_heat_v1") || "{}") || {}, (v) => (v && v.day) || "").map; } catch (e) { return {}; } }
 function saveHeatAdapt() { try { Object.keys(state.heatAdapt).length ? localStorage.setItem("interun_heat_v1", JSON.stringify(state.heatAdapt)) : localStorage.removeItem("interun_heat_v1"); } catch (e) {} }
 /** Declined-for-today, so a "keep as planned" is not re-asked every render. Cleared by the date changing. */
-function loadHeatDeclined() { try { return JSON.parse(localStorage.getItem("interun_heatno_v1") || "{}") || {}; } catch (e) { return {}; } }
+function loadHeatDeclined() { try { return sidKeys(JSON.parse(localStorage.getItem("interun_heatno_v1") || "{}") || {}, (v) => (typeof v === "string" ? v : "")).map; } catch (e) { return {}; } }
 function saveHeatDeclined(m) { try { localStorage.setItem("interun_heatno_v1", JSON.stringify(m)); } catch (e) {} }
 
 /** The stored decision for a session, or null. */
@@ -7788,20 +8240,38 @@ function heatApplied(s) {
     return out && out.changedSteps ? out.session : s;
   } catch (e) { return s; }
 }
-// Sessions the runner actually goes out and RUNS — the ones that get a Start button, reach the
-// watch, and can be rescheduled. "race" is in: race day is a run, it is trackable, and the whole
-// plan exists to reach it. ("race-specific" is a rehearsal in training, not the race.)
-const PRIMARY_TYPES = { easy: 1, long: 1, recovery: 1, threshold: 1, vo2: 1, strides: 1, "race-specific": 1, race: 1 };
+// PRIMARY_TYPES (the sessions the runner goes out and RUNS) is declared beside PLAN — see there.
 // Move a session to a target day; if a run already sits there, the two swap days.
 function moveSession(week, sess, target) {
   const cur = effDay(sess);
   if (target === cur) return;
   const wk = RAW.weeks[week - 1]; if (!wk) return;
-  if (PRIMARY_TYPES[sess.type]) {
-    const occ = wk.sessions.find((s) => s.id !== sess.id && PRIMARY_TYPES[s.type] && effDay(s) === target);
-    if (occ) state.dayOverride[occ.id] = { to: cur, from: genDay(occ) };
+  // ⚠️⚠️ B4: A SESSION MOVED HERE FROM ANOTHER WEEK KEEPS WHERE IT CAME FROM. Its override is { to, from, wk }
+  // with from = the day the plan put it on in ITS OWN week. Overwritten the ordinary way — { to, from:
+  // genDay } — the wk would be lost and from would be the day it was moved TO, so the next rebuild would
+  // find no week-move, and the session would snap back to the other week with the drag discarded.
+  const ovFor = (s, to) => {
+    const o = state.dayOverride[s.id];
+    return (xwDir(o) && XWEEK && XWEEK[s.id]) ? { to: to, from: ovFrom(o), wk: xwDir(o) } : { to: to, from: genDay(s) };
+  };
+  let occ = null;
+  if (PRIMARY_TYPES[sess.type]) occ = wk.sessions.find((s) => s.id !== sess.id && PRIMARY_TYPES[s.type] && effDay(s) === target);
+  // ⚠️ AND IT MAY ONLY LAND WHERE A WEEK-MOVE MAY. The rebuild applies a week-move only on a day xwRefusal
+  // allows; a drag onto any other (the day before a Monday race, for a long run) would be undone, silently,
+  // on the next launch. Refused here instead, and said.
+  const relocated = [sess, occ].filter((s) => s && xwDir(state.dayOverride[s.id]) && XWEEK && XWEEK[s.id]);
+  for (const s of relocated) {
+    const to = s === sess ? target : cur;
+    const ov2 = Object.assign({}, state.dayOverride);
+    if (occ) { ov2[occ.id] = ovFor(occ, cur); }
+    ov2[sess.id] = ovFor(sess, target);
+    if (xwRefusal(s, XWEEK[s.id].home, week - 1, to, ov2, loadAdjust())) {
+      toast(s.title + " was moved here from another week, and it can\u2019t go on that day.");
+      return;
+    }
   }
-  state.dayOverride[sess.id] = { to: target, from: genDay(sess) };
+  if (occ) state.dayOverride[occ.id] = ovFor(occ, cur);
+  state.dayOverride[sess.id] = ovFor(sess, target);
   saveDayOverride();
   // A moved session changes "what am I doing today" - the watch and reminders must follow.
   try { syncWatch(); } catch (e) {}
@@ -7819,7 +8289,12 @@ function rawSessionDone(wk, raw) {
 }
 // ---- Runs linked to planned sessions (stage B1) — the store is LINK_KEY, declared with the others ----
 function loadLinks() {
-  try { const v = JSON.parse(localStorage.getItem(LINK_KEY) || "{}"); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; } catch (e) { return {}; }
+  let v;
+  try { v = JSON.parse(localStorage.getItem(LINK_KEY) || "{}"); } catch (e) { return {}; }
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  // A link names its session by id; carried to the calendar-week form by the link's own date (legacySid).
+  Object.keys(v).forEach((rid) => { const l = v[rid]; if (l && l.sid) { const n = legacySid(l.sid, l.iso); if (n) l.sid = n; } });
+  return v;
 }
 function saveLinks(m) {
   try { Object.keys(m).length ? localStorage.setItem(LINK_KEY, JSON.stringify(m)) : localStorage.removeItem(LINK_KEY); } catch (e) {}
@@ -7843,9 +8318,10 @@ function unlinkRun(runId) {
 /**
  * The plan's summary session a link points at: the week CONTAINING the date, then the id inside it.
  * ⚠️ BY WEEK, NOT BY EXACT DAY, so a session the runner later drags to another day of the same week is
- * still the session the run fulfilled. Ids carry their week ("w7-d2-easy"), so within one plan the pair
- * is unique; across a rebuild into a different plan, the same calendar week holding the same id is the
- * same prescription in every sense the tick cares about.
+ * still the session the run fulfilled. Ids carry their calendar week ("2026-11-02-d1-easy", see
+ * legacySid), so within one plan the pair is unique; across a rebuild into a different plan, the same
+ * calendar week holding the same id is the same prescription in every sense the tick cares about. A
+ * session moved a week earlier or later (B4) sits in its new week's list, so it is found there.
  */
 function planSessionRef(iso, sid) {
   if (!iso || !sid) return null;
@@ -7899,7 +8375,10 @@ function untickSession(iso, sid) {
 }
 // ---- A time of day for a planned session (stage B3) — the store is TIME_KEY, declared with the others ----
 function loadTimes() {
-  try { const v = JSON.parse(localStorage.getItem(TIME_KEY) || "{}"); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; } catch (e) { return {}; }
+  let v;
+  try { v = JSON.parse(localStorage.getItem(TIME_KEY) || "{}"); } catch (e) { return {}; }
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  return sidKeys(v, (e) => (e && e.iso) || "").map;
 }
 function saveTimes(m) {
   try { Object.keys(m).length ? localStorage.setItem(TIME_KEY, JSON.stringify(m)) : localStorage.removeItem(TIME_KEY); } catch (e) {}
@@ -7941,7 +8420,16 @@ function seedDone() {
   const liveIds = {};
   PLAN.weeks.forEach((wk) => wk.sessions.forEach((s) => { liveIds[s.id] = 1; }));
   let ovChanged = false;
-  Object.keys(state.dayOverride).forEach((k) => { if (!liveIds[k]) { delete state.dayOverride[k]; ovChanged = true; } });
+  // ⚠️ B4: A SESSION THE REBUILD MOVED TO ANOTHER WEEK COUNTS AS LIVE EVEN WHEN A BREAK THEN TOOK IT OUT.
+  // Skip a moved session and the skip (dated in its new week) removes it from PLAN; pruning its move for
+  // that would put it back in its OLD week on the next launch, where no skip names it — the skipped run
+  // reappearing a week earlier. XWEEK records the move before any break is applied.
+  Object.keys(state.dayOverride).forEach((k) => { if (!liveIds[k] && !(XWEEK && XWEEK[k])) { delete state.dayOverride[k]; ovChanged = true; } });
+  // ⚠️ B4: AND A WEEK-MOVE THE REBUILD COULD NOT APPLY IS GONE — the plan changed under it (the day now holds
+  // a run, the week became race week or an easier week). Its "to" means a day in another week, so kept, it
+  // would wait to drag the session somewhere it was never put. Only when the rebuild said what it applied:
+  // XWEEK is null after a throw, and a fault must never cost the runner their moves.
+  if (XWEEK) Object.keys(state.dayOverride).forEach((k) => { if (xwDir(state.dayOverride[k]) && !XWEEK[k]) { delete state.dayOverride[k]; ovChanged = true; } });
   // ⚠️⚠️ AND AN OVERRIDE WHOSE SESSION THE PLAN HAS SINCE MOVED IS STALE, WHICH IS THE WHOLE OF HIS
   // REPORT "I also set my preference to Sunday long run and it didn't deliever". The engine honours
   // the chosen day perfectly — measured, every experience level and every day of the week, with no day
@@ -7950,6 +8438,10 @@ function seedDone() {
   // to sit. A reschedule is an answer about one arrangement of the week; change the arrangement and it
   // is an answer to a question nobody asked.
   RAW.weeks.forEach((wk) => (wk.sessions || []).forEach((s) => {
+    // ⚠️ B4: NOT FOR A WEEK-MOVE. Its from is the day in its OWN week, and the rebuild has already checked it
+    // there (applyCrossWeekMoves) — the moved session's dayOfWeek is now the day it was moved TO, so this
+    // comparison would delete every week-move the moment it was applied.
+    if (xwDir(state.dayOverride[s.id])) return;
     const from = ovFrom(state.dayOverride[s.id]);
     if (from != null && from !== genDay(s)) { delete state.dayOverride[s.id]; ovChanged = true; }
   }));
@@ -8278,6 +8770,14 @@ function todayDecision() {
         implication: (sk[0].t || "Today\u2019s session") + " is off today\u2019s plan, and it won\u2019t count as a missed session.",
         action: nxt ? "Preview " + (nxt.whenWord || "the next run") : null, actionId: "todayPreview" };
     }
+    // \u26a0\ufe0f B4: AND A DAY EMPTIED BY A WEEK-MOVE SAYS WHERE THE SESSION WENT, for B2's reason \u2014 the day is free
+    // because the runner moved its session, not because the plan made it a recovery day.
+    const mv = onToday ? xwMovedFrom(todayIso()) : null;
+    if (mv) {
+      return { kind: "rest", eyebrow: "Today\u2019s plan", headline: "Moved to " + dayLabelIso(mv.iso),
+        implication: mv.title + " is in week " + (mv.at + 1) + " now, so today is free.",
+        action: nxt ? "Preview " + (nxt.whenWord || "the next run") : null, actionId: "todayPreview" };
+    }
     return { kind: "rest", eyebrow: "Today\u2019s plan", headline: "Recovery day",
       implication: "Your training is working while you recover. Keep today easy and arrive fresh for the next one.",
       action: nxt ? "Preview " + (nxt.whenWord || "the next run") : null, actionId: "todayPreview" };
@@ -8302,7 +8802,7 @@ function todayDecision() {
     eyebrow: (onToday ? "Today\u2019s plan" : DAY_ORDER[state.selDay] + " " + dmon(isoAdd(curWeek().startIso, state.selDay))) + (at ? " \u00b7 " + at : ""),
     headline: sess.title,
     implication: risky && cond.advice ? cond.advice
-      : (sess.description ? String(sess.description).split(". ")[0].replace(/\.$/, "") + "." : ""),
+      : (sess.description ? String(sess.description).split(". ")[0].replace(/\\.$/, "") + "." : ""),
     // ⚠️ IT OPENS THE PREVIEW; IT DOES NOT START THE RUN (owner, 2026-08-21): "I want ... today's
     // session to be a button that enters the session preview rather than an automatic start button".
     // Starting from here skipped the one screen that says what the session is, what the heat has done
@@ -11211,7 +11711,9 @@ function calDragEnd() {
   // finger was over a day of ANOTHER week or over no day at all -- dropped on the week header, the
   // totals row or off the list entirely -- and telling somebody about weeks when they dropped on
   // nothing is a correction for a rule they did not break.
-  if (d.target == null) toast(d.wrongWeek ? "Drop it on a day in that same week." : "Drop it on a day.");
+  // B4: a drag still stays inside its week (a week is a training structure, and a thumb is not the place to
+  // reshape two of them) — but there IS now a way to move it a week, so the refusal names it.
+  if (d.target == null) toast(d.wrongWeek ? "Drop it on a day in that same week. To move it a week, tap it and choose a week earlier or later." : "Drop it on a day.");
 }
 function calDragCancel() { calDragTeardown(); DRAG = null; CAL_DRAGGED = true; }
 
@@ -11957,6 +12459,8 @@ function slogAll() {
     const v = JSON.parse(localStorage.getItem(SLOG2_KEY) || "null");
     SLOG = v && Array.isArray(v.rows) ? { rows: v.rows, bests: v.bests || {}, meta: v.meta || {} } : { rows: [], bests: {}, meta: {} };
   } catch (e) { SLOG = { rows: [], bests: {}, meta: {} }; }
+  // Each row's session id carried to the calendar-week form by the row's own date (see legacySid).
+  SLOG.rows.forEach((r) => { if (r && r.s) { const n = legacySid(r.s, r.d); if (n) r.s = n; } });
   return SLOG;
 }
 function slogFlush() {
@@ -12040,11 +12544,14 @@ function migrateSlog() {
     const rec = v1[keys[n]] || {};
     if (rec.w == null && rec.r == null) continue;
     const wk = Number((sid.match(/^w(\\d+)/) || [])[1]);
+    // v1 keys carry the OLD id form (the week's number); the live plan's ids name the week's Monday, so
+    // the key is carried across by the plan's numbering — the way v1's own reader resolved it (legacySid).
+    const nsid = legacySid(sid, "") || sid;
     const week = wk && PLAN && PLAN.weeks ? PLAN.weeks.find((w) => w.index === wk) : null;
-    const raw = wk && RAW && RAW.weeks && RAW.weeks[wk - 1] ? RAW.weeks[wk - 1].sessions.find((z) => z.id === sid) : null;
+    const raw = wk && RAW && RAW.weeks && RAW.weeks[wk - 1] ? RAW.weeks[wk - 1].sessions.find((z) => z.id === nsid) : null;
     const ex = raw && raw.exercises ? raw.exercises[exIdx] : null;
     if (!ex || !ex.id || !week) { skipped++; continue; }
-    const row = { d: isoAdd(week.startIso, genDay(raw)).toISOString().slice(0, 10), s: sid, x: ex.id, i: setIdx, at: Date.now(), m: 1 };
+    const row = { d: isoAdd(week.startIso, genDay(raw)).toISOString().slice(0, 10), s: nsid, x: ex.id, i: setIdx, at: Date.now(), m: 1 };
     if (rec.w != null) row.w = rec.w;
     if (rec.r != null) row.r = rec.r;
     s.rows.push(row);
@@ -12055,7 +12562,14 @@ function migrateSlog() {
   slogFlush();
 }
 // ---- Swap an exercise (A4) --------------------------------------------------------------------
-function loadSwaps() { try { return JSON.parse(localStorage.getItem(SWAP_KEY) || "{}") || {}; } catch (e) { return {}; } }
+function loadSwaps() {
+  let m;
+  try { m = JSON.parse(localStorage.getItem(SWAP_KEY) || "{}") || {}; } catch (e) { return {}; }
+  // ⚠️ NO DATE, LIKE A DRAGGED DAY: carried by the live plan's numbering and written back at once (legacySid).
+  const c = sidKeys(m, null, (k) => { const i = k.indexOf("|"); const n = i > 0 ? legacySid(k.slice(0, i), "") : null; return n ? n + k.slice(i) : null; });
+  if (c.changed) { try { localStorage.setItem(SWAP_KEY, JSON.stringify(c.map)); } catch (e) {} }
+  return c.map;
+}
 function saveSwaps(m) { try { Object.keys(m).length ? localStorage.setItem(SWAP_KEY, JSON.stringify(m)) : localStorage.removeItem(SWAP_KEY); } catch (e) {} }
 function swapKey(sessId, fromId) { return sessId + "|" + fromId; }
 function setSwap(sessId, fromId, toId) {
@@ -12178,7 +12692,14 @@ function reopenSessionSheet() {
   wireSheet();
 }
 // ---- Finished strength sessions (A5) ----------------------------------------------------------
-function loadSdone() { try { const v = JSON.parse(localStorage.getItem(SDONE_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function loadSdone() {
+  let v;
+  try { v = JSON.parse(localStorage.getItem(SDONE_KEY) || "[]"); } catch (e) { return []; }
+  if (!Array.isArray(v)) return [];
+  // Each row's session id carried to the calendar-week form by the row's own date (see legacySid).
+  v.forEach((r) => { if (r && r.s) { const n = legacySid(r.s, r.d); if (n) r.s = n; } });
+  return v;
+}
 function saveSdone(rows) { try { rows.length ? localStorage.setItem(SDONE_KEY, JSON.stringify(rows)) : localStorage.removeItem(SDONE_KEY); } catch (e) {} }
 /**
  * Record that one strength session was finished.
@@ -13043,6 +13564,7 @@ function sessionSheetHtml(sess, week) {
     whyThisSession(sess) +
     fuelHtml(sess) +
     moveBlock +
+    xwRowHtml(sess, week) +
     timeBlock +
     addLink +
     elsewhere +
@@ -13135,6 +13657,9 @@ function wireSheet() {
   if (sdTime && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess, iso = sheetSessionIso(); sdTime.onchange = () => applySessionTime(ss, iso, sdTime.value); }
   const sdTimeClear = $("sdTimeClear");
   if (sdTimeClear && SHEET_CTX && SHEET_CTX.sess) { const ss = SHEET_CTX.sess, iso = sheetSessionIso(); sdTimeClear.onclick = () => applySessionTime(ss, iso, ""); }
+  // B4 — the week before and the week after open the day picker for that week, in place (see openXwPicker).
+  const sdWeekBack = $("sdWeekBack"); if (sdWeekBack) sdWeekBack.onclick = () => openXwPicker(-1);
+  const sdWeekNext = $("sdWeekNext"); if (sdWeekNext) sdWeekNext.onclick = () => openXwPicker(1);
 }
 function openSessionSheet(sess, week) {
   // Adapted before anything is rendered, so the steps, the paces and the duration chip all describe
@@ -14559,6 +15084,10 @@ function applyPause(kind) {
     profile.raceDate = before.raceDate; profile.returning = before.returning;
     profile.startDateIso = before.startDateIso;
     try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
+    // ⚠️ B4: WRITTEN BACK BEFORE THE REBUILD. applyCrossWeekMoves reads the STORE (it has to: it runs before state
+    // exists at boot), so a restore held only in memory rebuilt without the week-moves, and seedDone then pruned
+    // them as unapplied — an Undo that deleted the runner's moves. The profile-save Undo has always saved first.
+    saveDayOverride();
     try { recompute(); } catch (e) {}
     computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
   });
@@ -14990,7 +15519,9 @@ function weekSummaryRow(w, isRace) {
  */
 function weekAdjust(w) {
   const rows = loadAdjust();
-  if (!rows.length || !w || !w.startIso) return null;
+  // B4: and the sessions moved into or out of this week by the runner, from what the rebuild applied.
+  const moves = weekMoves(w);
+  if ((!rows.length && !moves.length) || !w || !w.startIso) return null;
   let hit = null;
   const days = [];
   for (let d = 0; d < 7; d++) {
@@ -15007,11 +15538,54 @@ function weekAdjust(w) {
   // would read as untouched with a session already gone — the defect this marking exists to prevent.
   // A window still names the tag when there is one; the note lists both.
   const skips = weekSkips(w.startIso, rows);
-  if (!hit && !skips.length) return null;
-  if (!hit) return { adj: null, days: [], count: 0, tag: "Skipped", phrase: "", skips: skips };
+  if (!hit && !skips.length && !moves.length) return null;
+  if (!hit) return { adj: null, days: [], count: 0, tag: skips.length ? "Skipped" : "Moved", phrase: "", skips: skips, moves: moves };
   return { adj: hit, days: days, count: days.length,
     tag: hit.kind === "holiday" ? "Holiday" : hit.kind === "recovery" ? "Easier week" : "Easier",
-    phrase: adjPhrase(hit), skips: skips };
+    phrase: adjPhrase(hit), skips: skips, moves: moves };
+}
+/**
+ * B4 — the sessions the runner moved into or out of this plan week, as the last rebuild applied them (XWEEK).
+ * ⚠️ A WEEK THAT GAINED OR LOST A SESSION IS AS ALTERED AS ONE A SKIP EMPTIED: its distance changed because of
+ * the runner's choice, and with no mark it would read as the plan's own design.
+ * ⚠️ A MOVED SESSION A BREAK HAS SINCE TAKEN OUT (a skip in its new week, say) is still listed in the week it
+ * LEFT — found in the browser: that week read as untouched with its threshold gone. Its new week is not given
+ * a line for it; the break's own line says what happened there.
+ */
+function weekMoves(w) {
+  const out = [];
+  if (!w || !XWEEK || !PLAN || !PLAN.weeks) return out;
+  const wi = PLAN.weeks.indexOf(w);
+  if (wi < 0) return out;
+  Object.keys(XWEEK).forEach((sid) => {
+    const m = XWEEK[sid];
+    if (!m || (m.home !== wi && m.at !== wi)) return;
+    const aw = PLAN.weeks[m.at];
+    const s = aw && (aw.sessions || []).find((x) => x.id === sid);
+    if (!s) {
+      const o = state.dayOverride[sid];
+      if (m.home === wi && aw && o) out.push({ sid: sid, title: m.t || "A session", dir: "out", home: m.home, at: m.at, gone: true,
+        iso: isoAdd(aw.startIso, ovTo(o)).toISOString().slice(0, 10) });
+      return;
+    }
+    out.push({ sid: sid, title: s.title, dir: m.at === wi ? "in" : "out", home: m.home, at: m.at,
+      iso: isoAdd(aw.startIso, effDay(s)).toISOString().slice(0, 10) });
+  });
+  return out;
+}
+/** B4 — the session the runner moved out of the day iso into another week, or null. Read by Today. */
+function xwMovedFrom(iso) {
+  if (!XWEEK || !PLAN || !PLAN.weeks) return null;
+  for (const sid of Object.keys(XWEEK)) {
+    const m = XWEEK[sid], o = state.dayOverride[sid];
+    const hw = PLAN.weeks[m.home], aw = PLAN.weeks[m.at];
+    const f = ovFrom(o);
+    if (!hw || !aw || f == null) continue;
+    if (isoAdd(hw.startIso, f).toISOString().slice(0, 10) !== iso) continue;
+    const s = (aw.sessions || []).find((x) => x.id === sid);
+    if (s) return { sid: sid, title: s.title, at: m.at, iso: isoAdd(aw.startIso, effDay(s)).toISOString().slice(0, 10) };
+  }
+  return null;
 }
 /**
  * The sentence inside an opened week. Names the change, the days, and what came out.
@@ -15043,6 +15617,20 @@ function weekAdjustNote(w) {
     out += '<div class="wk-adj"><b>Skipped \u00b7 ' + esc(runDateLabelIso(r.from)) + '</b>' +
       '<span>' + esc(r.t || "A session") + ' is off the plan, and it won\u2019t count as a missed session.' +
       (r.from >= todayIso() ? ' You can put it back from Manage plan \u203a Planned breaks.' : "") + '</span></div>';
+  }
+  // B4: one line per session moved in or out, naming it and the other week. The way back (its own sheet) is
+  // named only while the session is still ahead — a past one can no longer be moved.
+  const dl = (iso) => DAY_ORDER[(isoAdd(iso, 0).getUTCDay() + 6) % 7] + " " + runDateLabelIso(iso);
+  for (const m of (a.moves || [])) {
+    const back = m.iso >= todayIso();
+    out += m.dir === "in"
+      ? '<div class="wk-adj"><b>Moved in \u00b7 ' + esc(dl(m.iso)) + '</b><span>' + esc(m.title) + ' was moved here from week ' +
+        (m.home + 1) + '.' + (back ? ' Open it to move it back.' : "") + '</span></div>'
+      : m.gone
+        ? '<div class="wk-adj"><b>Moved out</b><span>' + esc(m.title) + ' was moved to week ' + (m.at + 1) +
+          ', then taken off the plan there.</span></div>'
+        : '<div class="wk-adj"><b>Moved out</b><span>' + esc(m.title) + ' is now on ' + esc(dl(m.iso)) + ', in week ' + (m.at + 1) + '.' +
+          (back ? ' Open it there to move it back.' : "") + '</span></div>';
   }
   return out;
 }

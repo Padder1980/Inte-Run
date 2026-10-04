@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { weekVolumeMeters } from "../src/domain/steps.ts";
+import { sessionIdFor } from "../src/plan/generate-plan.ts";
 
 /**
  * STAGE B2 (2026-10-02) — skip a single session without rebuilding the week.
@@ -59,6 +60,8 @@ const THIS_MON = addDays(TODAY, -TODAY_DOW);
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // Last week, this week, next week. Next week ends on race day, so the race guard has a real target.
 const STARTS = [addDays(THIS_MON, -7), THIS_MON, addDays(THIS_MON, 7)];
+// A session id in the engine's real form: the week's Monday, the day and the type ("2026-10-05-d1-easy").
+const ID = (w: number, d: number, t: string) => STARTS[w - 1] + "-d" + d + "-" + t;
 // ⚠️ THE REST DAY IS NEVER TODAY, so "today's session" exists whichever day the suite runs on.
 const REST = [1, 2, 3, 4, 5, 6].find((d) => d > TODAY_DOW) ?? [1, 2, 3, 4, 5, 6].find((d) => d !== TODAY_DOW)!;
 const TYPES = ["easy", "threshold", "easy", "vo2", "easy", "strength", "long"].map((t, d) => (d === REST ? "rest" : t));
@@ -66,7 +69,7 @@ const TYPES = ["easy", "threshold", "easy", "vo2", "easy", "strength", "long"].m
 function fixture() {
   const mk = (w: number) => TYPES.map((t, d) => {
     const type = w === 3 && d === 6 ? "race" : t;
-    return { id: "w" + w + "-d" + d + "-" + type, dayOfWeek: d, type,
+    return { id: ID(w, d, type), dayOfWeek: d, type,
       title: type === "race" ? "Race day: half marathon" : "Session " + DAYS[d] + " " + type,
       estimatedDurationSeconds: 2400, estimatedDistanceMeters: 8000, trainingDistanceMeters: 7000, steps: [] };
   });
@@ -82,9 +85,9 @@ const FNS = ["isoAdd", "todayIso", "dmon", "runDateLabelIso", "esc", "genDay", "
   "rawSessionDone", "loadLinks", "saveLinks", "planSessionRef", "linkedRunFor", "loadAdjust", "saveAdjust", "adjPhrase",
   "adjustFor", "weekSkips", "adjDrops", "applyAdjustments", "eased", "weekAdjust", "weekAdjustNote", "plannedBreaksHtml",
   "skipOfferable", "skipSession", "cancelAdjust", "todayDecision", "sessionEffort", "effortVar",
-  "loadTimes", "hmValid", "sessionTimeAt"];
+  "loadTimes", "hmValid", "sessionTimeAt", "legacySid", "sidKeys", "weekMoves", "xwDir"];
 const CONSTS = ["DAY_ORDER", "MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "ADJ_MODES", "ADJ_QUALITY",
-  "ADJ_RUN", "SESSION_EFFORT", "TIME_KEY"];
+  "ADJ_RUN", "SESSION_EFFORT", "TIME_KEY", "XWEEK"];
 
 function sandbox() {
   const store: Record<string, string> = {};
@@ -100,7 +103,7 @@ function sandbox() {
   const box: any = { store, state, PLAN, RAW, toasts, calls: [] as string[] };
   const env: Record<string, unknown> = {
     state, PLAN, RAW, localStorage, profile: { startDateIso: "" },
-    RC: { weekVolumeMeters, easeWeek: () => ({ triggered: false }), weekView: () => ({}) },
+    RC: { weekVolumeMeters, sessionIdFor, easeWeek: () => ({ triggered: false }), weekView: () => ({}) },
     TODAY_IN_PLAN: true, TODAY_DOW, ICON: { cal: "", wxSun: "", timer: "", heart: "" },
     progExtraOf: () => null,
     // ⚠️ recompute IS adoptPlan's part that matters here: a fresh plan, then applyAdjustments over it.
@@ -128,14 +131,14 @@ const futureDay = () => [1, 2, 3, 4, 5, 6].map((n) => TODAY_DOW + n).find((d) =>
 
 test("BLOCKER: a skip takes one session by id — and never the race, however it is asked", () => {
   const { api } = sandbox();
-  const race = { id: "w3-d6-race", type: "race" };
+  const race = { id: ID(3, 6, "race"), type: "race" };
   // ⚠️ PLAN.md's OWN RE-BREAK: move the skip branch above the race guard, and this fails.
-  assert.equal(api.adjDrops({ mode: "skip", sid: "w3-d6-race" }, race), false, "a skip took the race");
-  assert.equal(api.adjDrops({ mode: "skip", sid: "w2-d1-threshold" }, { id: "w2-d1-threshold", type: "threshold" }), true);
-  assert.equal(api.adjDrops({ mode: "skip", sid: "w2-d1-threshold" }, { id: "w2-d2-easy", type: "easy" }), false,
+  assert.equal(api.adjDrops({ mode: "skip", sid: ID(3, 6, "race") }, race), false, "a skip took the race");
+  assert.equal(api.adjDrops({ mode: "skip", sid: ID(2, 1, "threshold") }, { id: ID(2, 1, "threshold"), type: "threshold" }), true);
+  assert.equal(api.adjDrops({ mode: "skip", sid: ID(2, 1, "threshold") }, { id: ID(2, 2, "easy"), type: "easy" }), false,
     "a skip took a session it does not name");
   // A skip of a strength session is a skip like any other: the runner chose it, and nothing else asks.
-  assert.equal(api.adjDrops({ mode: "skip", sid: "w2-d5-strength" }, { id: "w2-d5-strength", type: "strength" }), true);
+  assert.equal(api.adjDrops({ mode: "skip", sid: ID(2, 5, "strength") }, { id: ID(2, 5, "strength"), type: "strength" }), true);
   assert.match(decomment(fnBody("adjDrops")), /if \(s\.type === "race"\) return false;[\s\S]*if \(a\.mode === "skip"\)/,
     "the skip branch is not after the race guard");
 });
@@ -143,13 +146,13 @@ test("BLOCKER: a skip takes one session by id — and never the race, however it
 test("BLOCKER: a skip is never the answer to 'which window covers this day'", () => {
   const { api } = sandbox();
   const day = addDays(THIS_MON, 2);
-  const skip = { id: "s", mode: "skip", kind: "skip", from: day, to: day, sid: "w2-d2-easy" };
+  const skip = { id: "s", mode: "skip", kind: "skip", from: day, to: day, sid: ID(2, 2, "easy") };
   const hol = { id: "h", mode: "none", kind: "holiday", from: day, to: day };
   // The skip is FIRST in the list, which is the order a fresh skip takes (newest first).
   assert.equal(api.adjustFor(day, [skip, hol]), hol, "a skip hid the holiday covering the same day");
   assert.equal(api.adjustFor(day, [skip]), null, "a skip answered as a window");
   // And a skip on a Monday must not hide a "make this week easier" row from eased().
-  const mon = { id: "s2", mode: "skip", kind: "skip", from: THIS_MON, to: THIS_MON, sid: "w2-d0-easy" };
+  const mon = { id: "s2", mode: "skip", kind: "skip", from: THIS_MON, to: THIS_MON, sid: ID(2, 0, "easy") };
   const rec = { id: "r", mode: "recovery", kind: "recovery", from: THIS_MON, to: addDays(THIS_MON, 6) };
   assert.equal(api.eased({ startIso: THIS_MON }, [mon, rec]), true, "a Monday skip hid the easier week");
 });
@@ -182,7 +185,7 @@ test("a skip and a holiday on the same day BOTH apply, and a skip naming the rac
   store["interun_adjust_v1"] = JSON.stringify([
     { id: "s", kind: "skip", mode: "skip", from: iso, to: iso, sid: s.id },
     { id: "h", kind: "holiday", mode: "full", from: iso, to: iso },  // "everything as planned" — removes nothing
-    { id: "r", kind: "skip", mode: "skip", from: addDays(STARTS[2]!, 6), to: addDays(STARTS[2]!, 6), sid: "w3-d6-race" },
+    { id: "r", kind: "skip", mode: "skip", from: addDays(STARTS[2]!, 6), to: addDays(STARTS[2]!, 6), sid: ID(3, 6, "race") },
   ]);
   api.applyAdjustments();
   assert.ok(!RAW.weeks[1].sessions.some((x: any) => x.id === s.id), "a holiday on the same day shadowed the skip");
@@ -191,7 +194,7 @@ test("a skip and a holiday on the same day BOTH apply, and a skip naming the rac
 
 test("BLOCKER: a skip outlives its day — six weeks — so the session never comes back as a miss", () => {
   const { api, store } = sandbox();
-  const row = (id: string, from: string) => ({ id, kind: "skip", mode: "skip", from, to: from, sid: "w1-d0-easy" });
+  const row = (id: string, from: string) => ({ id, kind: "skip", mode: "skip", from, to: from, sid: ID(1, 0, "easy") });
   api.saveAdjust([row("recent", addDays(TODAY, -10)), row("edge", addDays(TODAY, -42)), row("old", addDays(TODAY, -43))]);
   const kept = JSON.parse(store["interun_adjust_v1"]).map((r: any) => r.id);
   assert.deepEqual(kept, ["recent", "edge"], "a skip was pruned inside the miss window, or kept past it");
@@ -277,15 +280,15 @@ test("the Plan screen marks a week that lost a session to a skip, and names it",
   assert.match(note, /put it back from Manage plan/, "an upcoming skip does not name its way back");
   assert.equal(api.weekAdjust({ startIso: STARTS[2], index: 3 }), null, "another week was marked");
   // A skip from an earlier day says nothing about putting it back — it is no longer listed there.
-  store["interun_adjust_v1"] = JSON.stringify([{ id: "o", kind: "skip", mode: "skip", from: STARTS[0], to: STARTS[0], sid: "w1-d0-easy", t: "Easy" }]);
+  store["interun_adjust_v1"] = JSON.stringify([{ id: "o", kind: "skip", mode: "skip", from: STARTS[0], to: STARTS[0], sid: ID(1, 0, "easy"), t: "Easy" }]);
   assert.ok(!/put it back/.test(api.weekAdjustNote({ startIso: STARTS[0], index: 1 })), "a past skip offers a way back that is not there");
 });
 
 test("Planned breaks lists an upcoming skip with its Cancel, in the session's own colour, and not a past one", () => {
   const { api, store } = sandbox();
   store["interun_adjust_v1"] = JSON.stringify([
-    { id: "up", kind: "skip", mode: "skip", from: TODAY, to: TODAY, sid: "w2-d0-easy", t: "Long run 90 min", ty: "long" },
-    { id: "gone", kind: "skip", mode: "skip", from: addDays(TODAY, -3), to: addDays(TODAY, -3), sid: "w1-d0-easy", t: "Old one", ty: "easy" },
+    { id: "up", kind: "skip", mode: "skip", from: TODAY, to: TODAY, sid: ID(2, 0, "easy"), t: "Long run 90 min", ty: "long" },
+    { id: "gone", kind: "skip", mode: "skip", from: addDays(TODAY, -3), to: addDays(TODAY, -3), sid: ID(1, 0, "easy"), t: "Old one", ty: "easy" },
   ]);
   const html = api.plannedBreaksHtml();
   assert.match(html, /Skipped/, "the skip is not listed");
@@ -294,7 +297,7 @@ test("Planned breaks lists an upcoming skip with its Cancel, in the session's ow
   assert.ok(!/Old one/.test(html), "a skip from an earlier day is offered as a planned break");
   assert.match(html, /--pc: var\(--eff-hard\)|--pc: var\(--eff-moderate\)|--pc: var\(--eff-/, "the colour is not an effort colour");
   // Only skips from earlier days: nothing to list, and no empty heading.
-  store["interun_adjust_v1"] = JSON.stringify([{ id: "gone", kind: "skip", mode: "skip", from: addDays(TODAY, -3), to: addDays(TODAY, -3), sid: "w1-d0-easy" }]);
+  store["interun_adjust_v1"] = JSON.stringify([{ id: "gone", kind: "skip", mode: "skip", from: addDays(TODAY, -3), to: addDays(TODAY, -3), sid: ID(1, 0, "easy") }]);
   assert.equal(api.plannedBreaksHtml(), "", "a list of nothing was rendered");
 });
 
@@ -337,6 +340,23 @@ test("BLOCKER: the session sheet offers Skip through the same test the action ru
   // ⚠️ adoptPlan's ordering covers it: the one place skips are applied is applyAdjustments.
   const callers = [...decomment(SRC).matchAll(/function (\w+)\s*\([^)]*\)\s*\{/g)].map((m) => m[1]!)
     .filter((n) => { try { return /weekSkips\(/.test(decomment(fnBody(n)).replace(/^function \w+\s*\([^)]*\)/, "")); } catch { return false; } });
-  assert.deepEqual(callers.sort(), ["applyAdjustments", "todayDecision", "weekAdjust"],
+  // B4: xwDropped asks too — a run a skip has taken does not occupy its day for a week-move — and it reads
+  // the same weekSkips through the same adjDrops, so it is one more reader of the one definition.
+  assert.deepEqual(callers.sort(), ["applyAdjustments", "todayDecision", "weekAdjust", "xwDropped"],
     "skip membership is decided somewhere new: " + callers.join(", "));
+});
+
+test("BLOCKER: a skip stored under the old week-number id is carried across by its own date, and still takes its session", () => {
+  // ⚠️ THE DEFECT THIS FIXES: the plan is rebuilt from today, so after a Monday an old id named the session a
+  // week LATER and the skipped session came back. The row's own date says which week it meant, exactly.
+  const box = sandbox();
+  const { api, RAW, store } = box;
+  const d = futureDay() ?? TODAY_DOW;
+  const s = sess(box, 1, d);
+  const iso = addDays(THIS_MON, d);
+  // Written this week by the old code, when this week was "week 2" of the block.
+  store["interun_adjust_v1"] = JSON.stringify([{ id: "o", kind: "skip", mode: "skip", from: iso, to: iso, sid: "w2-d" + d + "-" + s.type }]);
+  assert.equal(api.loadAdjust()[0].sid, s.id, "the old id was not carried to the calendar-week form");
+  api.applyAdjustments();
+  assert.ok(!RAW.weeks[1].sessions.some((x: any) => x.id === s.id), "an old skip no longer takes its session");
 });

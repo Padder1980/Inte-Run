@@ -530,3 +530,12 @@ Two bugs fixed alongside, both pre-existing and both made likelier by the new fo
 Known and deliberately not fixed: a handful of five-day build weeks with two quality sessions sit
 just under the pyramidal easy-fraction floor (measured 6 of 35, unchanged by this work). That is a
 periodisation question about two-quality weeks, not a session-library one.
+
+## SESSION IDS NAME THEIR CALENDAR WEEK (2026-10-04)
+
+`sessionIdFor(weekStartIso, dow, type)` in `src/plan/generate-plan.ts` is the one definition of a planned session's id:
+`2026-10-12-d1-threshold` — the week's Monday, the day, the type. It replaced `w{week number}-d{day}-{type}`, because the
+app rebuilds the plan from today and a block that has begun is a week shorter every Monday, so a week's NUMBER drops by one
+each Monday and every id built from it named a different week afterwards. All four id sites use it (finalize, the race,
+race-week rest fillers, the shakeout). `HARD_BEFORE_RACE` is exported beside it for the app's week-move. Full story, the
+measurements and how stored old ids are carried across: the B4 chapter at the end of `notes/manage-plan.md`.

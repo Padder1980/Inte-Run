@@ -4,7 +4,7 @@
 // can render without reaching back into engine internals.
 
 import type { Athlete, Goal, PlannedWeek, Session } from "../domain/types.ts";
-import { generatePlan } from "../plan/generate-plan.ts";
+import { generatePlan, type GenerateOptions } from "../plan/generate-plan.ts";
 import { assessFeasibility } from "../plan/feasibility.ts";
 import { isoToday } from "../plan/dates.ts";
 import { formatDuration, metresToKm } from "../domain/units.ts";
@@ -35,6 +35,8 @@ export type WeekView = {
   quality: number;
   longRunMin: number;
   sessions: SessionView[];
+  /** Stage B7: the week is shaped around a smaller race inside the plan (see PlannedWeek). */
+  secondaryRace?: PlannedWeek["secondaryRace"];
 };
 
 export type PlanSummary = {
@@ -170,6 +172,9 @@ export function weekView(w: PlannedWeek): WeekView {
       rpe: rpeLabel(s),
       optional: s.optional ?? false,
     })),
+    // ⚠️ ONLY WHEN THERE IS ONE: a key holding undefined is a different object to a strict comparison, and every
+    // week of every plan without a B-race must project exactly as it did.
+    ...(w.secondaryRace ? { secondaryRace: w.secondaryRace } : {}),
   };
 }
 
@@ -186,8 +191,8 @@ function athleteSummary(a: Athlete): string {
 }
 
 /** Run the engine and shape the result into a serialisable summary for any UI to render. */
-export function buildPlanSummary(athlete: Athlete, goal: Goal): PlanSummary {
-  const plan = generatePlan(athlete, goal);
+export function buildPlanSummary(athlete: Athlete, goal: Goal, options: GenerateOptions = {}): PlanSummary {
+  const plan = generatePlan(athlete, goal, options);
   const feas = assessFeasibility(athlete, goal);
   const weeks = plan.weeks.map(weekView);
   const peakKm = Math.max(...weeks.map((w) => w.distanceKm), 0);

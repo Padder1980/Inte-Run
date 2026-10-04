@@ -694,3 +694,13 @@ nothing.
 clean apart from the one pre-existing `test/onboarding-wizard.test.ts` Date overload, **1369 pass /
 0 fail under UTC, `TZ=Pacific/Kiritimati` and `TZ=Pacific/Pago_Pago`**, five-rule audit unchanged or
 better (rule 3 transitions 53 → 50), both design ratchets unchanged.
+
+## THE PROGRESSION AUDIT HAS A B-RACE AXIS (stage B7, 2026-10-04)
+
+`tools/audit-progression.mjs`'s last section builds every plan again with a B-race mid-window (the longest distance
+the window allows) and measures both versions on the SAME weeks — transitions into or out of a week the B-race shaped
+are skipped and counted (948). First run: 0 weeks changed outside the fortnight, the goal race's week identical in
+100% of 1,152, 0 taper weeks heavier, 0 hard days newly side by side, rises >1.10 unchanged (8.2% / 14.7%), weeks
+under the intensity floor 21 → 18. It found the eased week's long-run inversion (148 → 217, now 140 with
+`keepLongRunLongest`): the B7 chapter of `notes/plan-engine-models.md`. The baseline sections above it are unchanged
+byte for byte.

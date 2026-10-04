@@ -124,7 +124,9 @@ test("BLOCKER: every control in the menu reaches something that exists", () => {
   // alternative to a scheduled recovery week — "instead, they can just take a day off or replace a hard
   // run with an easy run as necessary" — and it is the only level in this app that SUBSTITUTES rather
   // than deletes. It sits after "ease" because that is the order of increasing commitment.
-  assert.deepEqual(rows, ["pause", "holiday", "ease", "easier", "prefs", "new", "plans"],
+  // "race" (stage B7, PLAN.md: 'Manage-plan row "Add a race"'): a smaller race inside the plan. It sits after the
+  // ways of easing off and before the preferences, because it changes the plan's weeks without changing its goal.
+  assert.deepEqual(rows, ["pause", "holiday", "ease", "easier", "race", "prefs", "new", "plans"],
     "the menu row set changed");
   const ma = nocomment(fn("manageAction"));
   for (const r of rows) assert.ok(new RegExp('id === "' + r + '"').test(ma), "manageAction has no branch for " + r);
@@ -850,7 +852,8 @@ test("BLOCKER: a booked break can always be cancelled, and a pause is one of the
   assert.match(src, /data-pbresume=/, "there is no way to cancel a pause");
   // ⚠️ NOTHING BOOKED RENDERS NOTHING. A permanent empty heading on a menu teaches the runner to scroll
   // past that part of the screen.
-  assert.match(src, /if \(!rows\.length && !paused\) return ""/, "the list renders when nothing is booked");
+  // (Since B7 a B-race is booked too, and lists here with its own Cancel.)
+  assert.match(src, /if \(!rows\.length && !paused && !race\) return ""/, "the list renders when nothing is booked");
   // ⚠️ AND IT IS RENDERED. A builder proves a shape exists; only the caller proves the runner sees it --
   // deleting the call from managePlanHtml escaped every assertion above it, which is the same hole this
   // project has now recorded four times.

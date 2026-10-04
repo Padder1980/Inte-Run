@@ -30,7 +30,9 @@ import {
 } from "../science/intensity-distribution.ts";
 import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
-import { sessionVolumeMeters } from "../domain/steps.ts";
+import { scaleSessionDistance, sessionVolumeMeters } from "../domain/steps.ts";
+import { RACE_DISTANCES_M } from "../domain/units.ts";
+import { easeWeek, keepLongRunLongest } from "../adapt/missed-sessions.ts";
 import { runningDaysFor, runningDayChoices } from "../domain/running-days.ts";
 import { youthLimitsFor } from "../domain/youth.ts";
 import { strengthSessionsFor } from "../domain/strength-days.ts";
@@ -72,9 +74,14 @@ import {
 } from "./session-templates.ts";
 import type { FormatCtx } from "./session-templates.ts";
 
+/** Stage B7: a smaller race inside the plan, on the way to the goal race — a "B-race". */
+export type SecondaryRace = { distance: RaceDistanceKey; dateIso: string };
+
 export type GenerateOptions = {
   intensityModel?: IntensityModel;
   startDateIso?: string;
+  /** A B-race (applySecondaryRace). Absent, or outside secondaryRaceWindow, the plan is exactly what it was. */
+  secondaryRace?: SecondaryRace;
 };
 
 const PEAK_LONG_MIN: Record<Goal["distance"], number> = {
@@ -1090,6 +1097,13 @@ export function generatePlan(
     }
   }
 
+  // ⚠️ B7: A B-RACE IS SHAPED ONTO THE FINISHED PLAN, AFTER THE VOLUME FIT AND THE YOUTH CEILING — NOT INSIDE
+  // buildFull, WHERE PLAN.md SKETCHED IT. Inside, every fitting pass would see the easier week before the race,
+  // and if that week was the plan's biggest the fitted peak would move, the scale with it, and every week of the
+  // block — the goal race's own week included — would come out different. Out here the fit is the plan's own, so
+  // only the weeks around the B-race can change (test/b-race.test.ts holds the goal race's week byte-identical).
+  if (options.secondaryRace) applySecondaryRace(weeks, goal, paces, options.secondaryRace);
+
   return {
     goal,
     athlete,
@@ -1764,6 +1778,162 @@ const RACE_LABELS: Record<string, string> = {
 };
 
 const DAY_LABEL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** A goal race named inside a sentence ("on the way to your half marathon"). */
+const RACE_IN_A_SENTENCE: Record<string, string> = {
+  "1mile": "mile", "5k": "5K", "10k": "10K", half: "half marathon", marathon: "marathon",
+};
+
+/**
+ * B7 — WHERE A SMALLER RACE MAY GO, AND HOW FAR (PLAN.md: "shorter than A; week ≥ 2; ≤ last non-taper week").
+ * Read off the plan's own weeks, so the app's pickers and the generator ask one question.
+ *  - SHORTER THAN THE GOAL RACE: a B-race is a step on the way, never the destination.
+ *  - FROM WEEK 2: week 1 is the run-in, and often a part week.
+ *  - TO THE LAST WEEK BEFORE THE TAPER, which belongs to the goal race — and never within three days of race
+ *    week, so the two days of recovery after it stay out of race week too (a one-week taper's last non-taper
+ *    week ends the day before race week begins). With a two-week taper that is at least 14 days before a Sunday
+ *    goal race: Runna's own "not within 7-10 days of the A race", read here from this plan's taper rather than
+ *    a number typed again.
+ * Null when no day, or no distance, fits.
+ */
+export function secondaryRaceWindow(
+  weeks: PlannedWeek[],
+  goal: Goal,
+): { fromIso: string; toIso: string; distances: RaceDistanceKey[] } | null {
+  const distances = (Object.keys(RACE_DISTANCES_M) as RaceDistanceKey[])
+    .filter((k) => RACE_DISTANCES_M[k] < RACE_DISTANCES_M[goal.distance]);
+  if (weeks.length < 3 || !distances.length) return null;
+  const monday = (iso: string) => addDays(iso, -dayOfWeekMondayZero(iso));
+  let lastBuild = -1;
+  for (let i = weeks.length - 2; i >= 1; i--) if (weeks[i]!.phase !== "taper") { lastBuild = i; break; }
+  if (lastBuild < 1) return null;
+  const fromIso = monday(weeks[1]!.startDateIso);
+  let toIso = addDays(monday(weeks[lastBuild]!.startDateIso), 6);
+  const cap = addDays(monday(goal.raceDateIso), -3);
+  if (cap < toIso) toIso = cap;
+  return toIso >= fromIso ? { fromIso, toIso, distances } : null;
+}
+
+/**
+ * B7 — A SMALLER RACE INSIDE THE PLAN reshapes the weeks around it, from the engine's own parts (PLAN.md B7):
+ *  - THE WEEK BEFORE is the engine's own easier week (easeWeek, reason "race"), unless it is already a recovery
+ *    week, which is lighter than easing would make it;
+ *  - RACE WEEK keeps ONE sharpener (the taper's own session, on the day of its first hard session at least two
+ *    days out), cuts its easy and long running by the B distance's race-week multiplier (the taper's own last
+ *    entry), puts the race on the day at the runner's predicted pace FOR THAT DISTANCE — a 10K before a half is
+ *    not run at half-marathon pace — and keeps anything hard off the day before (the goal race's own rule 3,
+ *    with its shakeout; for a Monday race the eve is the Sunday of the week before);
+ *  - THE DAY AFTER is rest and THE DAY AFTER THAT a 25-minute recovery jog, in whichever week they fall; the rest
+ *    of the next week is the plan's own.
+ * Every week it touches is marked (secondaryRace), for the app and for the progression audit.
+ * ⚠️ ONLY INSIDE secondaryRaceWindow. Outside it, or for a distance not shorter than the goal, NOTHING changes:
+ * the goal race's week and its taper belong to the goal race.
+ * ⚠️ NO HARD DAY IS EVER ADDED NEXT TO ANOTHER. The race takes its own day, the day before holds nothing hard and
+ * the day after holds nothing; the sharpener stays on a day that already held a hard session, and every other
+ * change only takes work away.
+ */
+function applySecondaryRace(weeks: PlannedWeek[], goal: Goal, paces: TrainingPaces, sr: SecondaryRace): void {
+  const win = secondaryRaceWindow(weeks, goal);
+  if (!win || !win.distances.includes(sr.distance) || sr.dateIso < win.fromIso || sr.dateIso > win.toIso) return;
+  const monday = (iso: string) => addDays(iso, -dayOfWeekMondayZero(iso));
+  const weekOf = (iso: string) => weeks.find((w) => monday(w.startDateIso) === monday(iso));
+  const ri = weeks.findIndex((w) => monday(w.startDateIso) === monday(sr.dateIso));
+  if (ri < 1) return;
+  const label = RACE_LABELS[sr.distance] ?? sr.distance;
+  const isQuality = (s: Session) => s.type === "threshold" || s.type === "vo2" || s.type === "race-specific";
+  const gen = (c: SessionContent, w: PlannedWeek, dow: number, type: string): Session =>
+    ({ ...c, id: sessionIdFor(w.startDateIso, dow, type), dayOfWeek: dow, source: "generated" });
+  const touched = new Set<PlannedWeek>();
+  const mark = (w: PlannedWeek, role: "before" | "race" | "after") => {
+    w.secondaryRace = { role, distance: sr.distance, dateIso: sr.dateIso };
+  };
+
+  // The week before: the engine's own easier week.
+  const before = weeks[ri - 1]!;
+  if (!before.isDeload) {
+    const eased = easeWeek(before, "race");
+    if (eased.triggered) {
+      // ⚠️ AND ITS LONG RUN STAYS ITS LONGEST RUN (keepLongRunLongest says why easeWeek alone does not promise it).
+      before.sessions = keepLongRunLongest(eased.week.sessions);
+      before.focus = `Easier week — so you arrive at your ${label} fresh`;
+      touched.add(before);
+    }
+  }
+  mark(before, "before");
+
+  // Race week.
+  const rw = weeks[ri]!;
+  const raceDow = dayOfWeekMondayZero(sr.dateIso);
+  const mults = taperFor(sr.distance).volumeMultiplierByWeek;
+  const mult = mults[mults.length - 1] ?? 0.55;
+  const sharpener = rw.sessions
+    .filter((s) => isQuality(s) && s.dayOfWeek <= raceDow - 2)
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek)[0];
+  const kept: Session[] = [];
+  let clearedEve = false;
+  for (const s of rw.sessions) {
+    if (s.type === "rest" || s.dayOfWeek === raceDow) continue;   // race day is the race; rest days refill below
+    if (isQuality(s)) {                                             // one sharpener, and no other hard work
+      if (s === sharpener) kept.push(gen(taperSession(paces), rw, s.dayOfWeek, "vo2"));
+      continue;
+    }
+    if (s.dayOfWeek === raceDow - 1 && HARD_BEFORE_RACE.has(s.type)) { clearedEve = true; continue; }
+    kept.push(s.type === "long" || AEROBIC_RUN_TYPES.has(s.type)
+      ? { ...scaleSessionDistance(s, mult), estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * mult) }
+      : s);
+  }
+  if (clearedEve && !kept.some((s) => s.dayOfWeek === raceDow - 1)) {
+    kept.push(shakeoutSession(paces, rw.startDateIso, raceDow - 1));
+  }
+  const center = paces.predictedRaceTimes[sr.distance] / (RACE_DISTANCES_M[sr.distance] / 1000);
+  kept.push({
+    ...gen(raceDay({ ...paces, goalRace: { minSecPerKm: center - 3, maxSecPerKm: center + 3 } }, sr.distance, label),
+      rw, raceDow, "race"),
+    title: `${label} race`,
+    description: `A race on the way to your ${RACE_IN_A_SENTENCE[goal.distance] ?? goal.distance}. Warm up, race it at ` +
+      "the pace on this card, and let the next two days bring you back: your main race is still to come.",
+  });
+  rw.sessions = kept;
+  rw.focus = `${label} race on ${DAY_LABEL[raceDow]} — sharpen, race, then recover`;
+  touched.add(rw);
+  mark(rw, "race");
+
+  // The eve of a Monday race is the Sunday of the week before.
+  if (raceDow === 0) {
+    let replaced = false;
+    before.sessions = before.sessions.flatMap((s) => {
+      if (s.dayOfWeek !== 6 || !HARD_BEFORE_RACE.has(s.type)) return [s];
+      if (replaced) return [];
+      replaced = true;
+      return [shakeoutSession(paces, before.startDateIso, 6)];
+    });
+    touched.add(before);
+  }
+
+  // The two days after it, in whichever week they fall: rest, then a 25-minute recovery jog.
+  for (const n of [1, 2]) {
+    const iso = addDays(sr.dateIso, n);
+    const w = weekOf(iso);
+    if (!w) continue;
+    const dow = dayOfWeekMondayZero(iso);
+    w.sessions = w.sessions.filter((s) => s.dayOfWeek !== dow);
+    if (n === 2) w.sessions.push(gen(recoveryRun(paces, 25), w, dow, "recovery"));
+    touched.add(w);
+  }
+  const after = weeks[ri + 1];
+  if (after && ri + 1 < weeks.length - 1) mark(after, "after");
+
+  // Seven days a week from the week's own first day, in order, and its figures re-derived (the one definition).
+  for (const w of touched) {
+    const first = monday(w.startDateIso) === w.startDateIso ? 0 : dayOfWeekMondayZero(w.startDateIso);
+    for (let d = first; d < 7; d++) {
+      if (!w.sessions.some((s) => s.dayOfWeek === d)) w.sessions.push(gen(restDay(), w, d, "rest"));
+    }
+    w.sessions.sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    w.plannedDistanceMeters = Math.round(w.sessions.reduce((m, s) => m + sessionVolumeMeters(s), 0));
+    w.qualitySessionCount = w.sessions.filter(isQuality).length;
+  }
+}
 
 /** Trim week 1 to a pro-rata partial week when the plan starts mid-week (full weeks follow). */
 function applyPartialFirstWeek(weeks: PlannedWeek[], startIso: string): void {

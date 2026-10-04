@@ -539,3 +539,66 @@ app rebuilds the plan from today and a block that has begun is a week shorter ev
 each Monday and every id built from it named a different week afterwards. All four id sites use it (finalize, the race,
 race-week rest fillers, the shakeout). `HARD_BEFORE_RACE` is exported beside it for the app's week-move. Full story, the
 measurements and how stored old ids are carried across: the B4 chapter at the end of `notes/manage-plan.md`.
+
+## A B-RACE: A SMALLER RACE INSIDE THE PLAN (stage B7, 2026-10-04)
+
+PLAN.md B7: *"A secondary race inside the plan reshapes its fortnight through the engine."* `GenerateOptions.secondaryRace
+= { distance, dateIso }` (the app's `profile.bRace`). Absent — or outside the window — the plan is byte-identical
+(guarded across goals and race weekdays, `test/b-race.test.ts`).
+
+**The window** (`secondaryRaceWindow(weeks, goal)`, exported so the app's pickers and the engine ask one question):
+shorter than the goal; from week 2; to the last week before the taper, and never within three days of race week (so
+the two recovery days stay out of it too). With a two-week taper that is at least 14 days before a Sunday goal race —
+Runna's "not within 7–10 days of the A race", read from this plan's taper rather than typed. Measured on a half
+starting 24 Aug for 20 Dec: 31 Aug to 6 Dec, 1 mile / 5K / 10K.
+
+**What it does** (`applySecondaryRace`):
+- the week before: the engine's own easier week (`easeWeek`, new reason **"race"**: "31′ easy (race next week)"),
+  unless it is a recovery week already; and its long run kept the longest run (below);
+- race week: ONE sharpener (`taperSession`, on the day of its first hard session at least two days out), easy and
+  long running × the B distance's race-week multiplier (`taperFor(d)`'s last entry — 0.55 for a 10K), the race on
+  the day at the runner's **predicted pace for that distance** (`paces.predictedRaceTimes`, ±3 s/km, as the goal
+  band is), nothing hard the day before (`HARD_BEFORE_RACE`, the eve resolved as a date, so a Monday race's eve is the
+  Sunday before), rest days refilled;
+- the day after: rest; the day after that: a 25-minute recovery jog — in whichever week they fall;
+- each touched week marked `secondaryRace: { role: "before" | "race" | "after", distance, dateIso }`, projected by
+  `weekView` only when present (a key holding `undefined` is a different object to a strict comparison).
+
+⚠️⚠️ **APPLIED AFTER THE VOLUME FIT AND THE YOUTH CEILING — NOT INSIDE `buildFull`, WHERE PLAN.md SKETCHED IT.** Inside,
+every fitting pass sees the easier week, and if that week was the block's biggest the fitted peak moves, the scale
+with it, and every week — the goal race's included — comes out different. PLAN.md's own test says the A-race week is
+byte-identical, which only the placement after the fit guarantees. Measured on the audit's 1,152 plans: 0 weeks
+outside the fortnight changed, the goal race's week identical in 100%.
+⚠️ **THE TAPER CUT IS MEASURED AGAINST THE PLAN'S DESIGNED PEAK.** A B-race on the last day the window allows takes
+the place of that week's training, which is often the block's biggest: a marathon's cut read 38.6% → 29.3% against
+"the biggest week left" while no taper week got any heavier. The claim tested is PLAN.md's — the taper untouched: no
+taper week heavier, the cut against the designed peak never smaller.
+⚠️ **SOME PLANS SIT UNDER THE 30% TAPER FLOOR WITH NO B-RACE AT ALL** (this grid's 10K at 29.8%; the audit's minimum is
+21%, `notes/plan-audits.md`). `test/generate-plan.test.ts` holds one fixture to 30%; it was never every plan.
+⚠️ **THE PACE IS TODAY'S FITNESS, NOT THE GOAL'S.** For an ambitious goal it can be slower than the goal race pace
+(measured: a 10K at 5:13/km before a half aimed at 4:59/km) — the honest figure, from the runner's own 5 km.
+
+**Found by the audit's new B-race axis, and the trade it forced.** Weeks whose long run is not their longest run rose
+148 → 217 once the week before a B-race was eased: `easeWeek` trims the long run by a fifth and easy running by a
+seventh, and turns the demoted session into an easy run of 70% of ITS length, so a slow 5K runner's "50′ easy" came
+out at 9.6 km beside an 8.2 km long run (worst 1.33×). `keepLongRunLongest` (exported beside `easeWeek`) holds every
+easy run just under the long run on both rulers; the B-race's week calls it, and the axis now reads 148 → 140.
+⚠️ **`easeWeek` ITSELF DOES NOT, ON PURPOSE — THE OWNER'S CALL.** Holding the run under the long run costs time, and in
+13 of 3,360 eased weeks (slow 5K base weeks, where the threshold session outlasts the long run) it pushes "Make a week
+easier" past the book's 30% band that `test/ease-week.test.ts` holds it to (deepest 32.2%). Two of his rules disagree
+there, so "Make a week easier" and the comeback offers (B5, B6) keep their old behaviour: Road Map `pc-easelongest`.
+
+**The app** (`web/app.ts`): Manage plan's **Add a race** row (brass, `rRace`) opens a sheet whose pickers ARE the window
+(`bRaceWindow`: the engine's, from tomorrow, never before the plan's start, and only distances the app knows — the race
+warm-up has no mile row, and the app has never offered a mile as a goal); the preview is the real `applyProfile`
+through `profileImpact` (its lost-moves warning included), quoting the easier week's distance and the race's week,
+held to the adopted plan by a test. One commit, one Undo; Planned breaks lists it with Cancel, and says "no longer
+fits your plan" when a new goal, date or pause leaves it outside the window. `profile.bRace` travels in
+`PLAN_PROF_FIELDS`, survives a profile edit (`draftFromForm` replaces the profile whole), and is dropped by a new plan
+and by `reusePlan`. A race session is read at its own distance (`raceKeyOf`, by the engine's id rule) for its warm-up
+and fuelling, which read the goal for every race before. A week-move refuses any race's eve, a B-race's included.
+
+**Tests:** `test/b-race.test.ts` (8, the real engine over a grid of goals × race weekdays × window positions ×
+distances) and `test/b-race-app.test.ts` (5, the real sheet, save, Undo, Cancel and Planned breaks). **25 of 25
+re-breaks caught**, PLAN.md's own (a B-race in the taper) among them. The progression audit has a B-race axis
+(`tools/audit-progression.mjs`, its last section).

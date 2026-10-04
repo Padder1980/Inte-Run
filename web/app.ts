@@ -6357,7 +6357,7 @@ function futureIso(days) { return isoAdd(todayIso(), days).toISOString().slice(0
 function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), x = s%60; const p = (n) => String(n).padStart(2,"0"); return h>0 ? h+":"+p(m)+":"+p(x) : m+":"+p(x); }
 
 // An example runner to start from — until you make it yours.
-const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, targetSet: true, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, volKm: 0, sex: "", strength: true, returning: false, personalized: false };
+const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, targetSet: true, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, volKm: 0, sex: "", strength: true, returning: false, personalized: false, bRace: null };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
@@ -6534,7 +6534,7 @@ const REALIGN_KEY = "interun_realign_v1";
 const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
   "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
   "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
-  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks"];
+  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks", "bRace"];
 /**
  * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
  * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
@@ -6960,8 +6960,12 @@ function applyProfile(pf) {
   // (blockStartIso), and the days before the start are then held empty (holdBeforeStart).
   const blockFrom = blockStartIso(pf);
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: blockFrom };
-  const plan = RC.buildPlanSummary(ath, goal); // may throw
-  const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
+  // ⚠️ B7: A B-RACE GOES TO THE ENGINE, WHICH SHAPES ITS WEEKS (or, outside secondaryRaceWindow, ignores it). One
+  // options object for both, so the summary and the prescription never disagree about the fortnight around it.
+  const opts = pf.bRace && pf.bRace.distance && pf.bRace.dateIso
+    ? { secondaryRace: { distance: pf.bRace.distance, dateIso: pf.bRace.dateIso } } : {};
+  const plan = RC.buildPlanSummary(ath, goal, opts); // may throw
+  const raw = RC.generatePlan(ath, goal, opts); // raw sessions with steps, for the live runtime
   if (blockFrom < startDateIso) holdBeforeStart(plan, raw, startDateIso);
   // Fitness profile is built from real efforts only (the entered 5 km and/or the 2 km trial); a pure
   // beginner falls back to the seeded baseline so the page still has something to show.
@@ -7436,6 +7440,9 @@ function xwRefusal(s, home, ti, to, ov, rows, weeks) {
   if (PLAN.weeks[ti].beforeStart || (RAW.weeks[ti].startDateIso && iso < RAW.weeks[ti].startDateIso)) return "start";
   const race = xwRaceIso();
   if (race && RC.HARD_BEFORE_RACE.has(s.type) && iso === isoAdd(race, -1).toISOString().slice(0, 10)) return "eve";
+  // B7: and the eve of a B-race, whose week holds a race session too.
+  if (RC.HARD_BEFORE_RACE.has(s.type) && RAW.weeks.some((rw, wi) => PLAN.weeks[wi] && (rw.sessions || []).some((x) =>
+    x.type === "race" && isoAdd(PLAN.weeks[wi].startIso, x.dayOfWeek - 1).toISOString().slice(0, 10) === iso))) return "eve";
   const list = weeks ? weeks[ti] : RAW.weeks[ti].sessions;
   const start = PLAN.weeks[ti].startIso;
   if ((list || []).some((x) => x.id !== s.id && PRIMARY_TYPES[x.type] && xwDayOf(ov, x) === to && !xwDropped(x, start, rows))) return "taken";
@@ -13887,7 +13894,7 @@ function warmupCardFor(sess) {
       // without this a half marathon was handed the same 34-minute preparation as an interval
       // session — against a paper that gives a half 0-15 minutes and a marathon 0-12, and warns
       // explicitly against copying short-race logic into long ones.
-      raceDistance: sess.type === "race" ? (profile.goalDist || null) : null,
+      raceDistance: sess.type === "race" ? raceKeyOf(sess) : null,
       // The daily check-in already asks how the runner feels; it can only ever make this smaller.
       readiness: readinessScore(),
       ageYears: Number(profile.age) || null,
@@ -13976,7 +13983,7 @@ function fuelHtml(sess) {
     st.targetRpe && st.targetRpe.min >= 4 && (st.durationSeconds || 0) >= 600);
   let f;
   try {
-    f = RC.fuellingFor({ durationMinutes: mins, raceDistance: profile.goalDist, sessionType: sess.type, hasRacePaceWork: racePace });
+    f = RC.fuellingFor({ durationMinutes: mins, raceDistance: sess.type === "race" ? raceKeyOf(sess) : profile.goalDist, sessionType: sess.type, hasRacePaceWork: racePace });
   } catch (e) { return ""; }
   if (!f.needed) return "";
   return '<div class="fuel-card' + (f.rehearsal ? " reh" : "") + '">' +
@@ -15425,7 +15432,9 @@ function plannedBreaksHtml() {
   const today0 = todayIso();
   const rows = loadAdjust().filter((r) => r && (r.mode !== "skip" || r.from >= today0));
   const paused = profile.startDateIso && profile.startDateIso > todayIso();
-  if (!rows.length && !paused) return "";
+  // B7: a B-race is booked as well, and its way out lives here with the others.
+  const race = bRaceAhead();
+  if (!rows.length && !paused && !race) return "";
   const item = (icon, colour, title, sub, action, label) =>
     '<div class="pb-row" style="--pc: ' + colour + '">' +
       '<span class="pb-ic" aria-hidden="true">' + (ICON[icon] || "") + '</span>' +
@@ -15440,6 +15449,13 @@ function plannedBreaksHtml() {
         esc(runDateLabelIso(isoAdd(profile.startDateIso, -1).toISOString().slice(0, 10))) +
         " \u00b7 nothing scheduled",
       'data-pbresume="1"', profile.blockFromIso ? "Cancel the pause and carry on from today" : "Cancel the pause and start again from today");
+  }
+  if (race) {
+    // ⚠️ SAID WHEN IT NO LONGER FITS. A new goal, a new date or a pause can leave the race outside the window,
+    // where the engine leaves the plan alone — so the row says so, and its Cancel tidies it away.
+    out += item("rRace", "var(--brass)", esc(B_RACE_NAME[race.distance] || "Race") + " race",
+      esc(runDateLabelIso(race.dateIso)) + " \u00b7 " + (bRacePlaced() ? "the week before is easier" : "no longer fits your plan"),
+      'data-pbrace="1"', "Cancel your race");
   }
   for (const r of rows) {
     const span = r.from === r.to ? runDateLabelIso(r.from)
@@ -15534,6 +15550,10 @@ function managePlanHtml() {
       row("holiday", "Going away", "Keep training your own way while you are there", "wxSun", "var(--base)") +
       row("ease", "Not feeling 100%", "Take the hard edges off the next few sessions", "heart", "var(--ease)") +
       row("easier", "Make a week easier", "Swap one hard session for an easy run", "timer", "var(--taper)") +
+      // B7: --brass, the medal colour, which no other row uses (and declared in all four theme blocks).
+      row("race", bRaceAhead() ? "Your race" : "Add a race", bRaceAhead()
+        ? esc(B_RACE_NAME[bRaceAhead().distance] || "Race") + " on " + esc(runDateLabelIso(bRaceAhead().dateIso)) + " \u2014 change it here"
+        : "A smaller race on the way to your main one", "rRace", "var(--brass)") +
       row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels", "gauge", "var(--accent)") +
       row("new", "Start a new plan", "A different goal or a different date", "plus", "var(--build)") +
       row("plans", "Your plans", planListSub(), "journal", "var(--taper)") +
@@ -15838,6 +15858,7 @@ function manageAction(id) {
   if (id === "holiday") { openAdjustSheet("holiday"); return; }
   if (id === "ease") { openAdjustSheet("ease"); return; }
   if (id === "easier") { openEaseWeekSheet(); return; }
+  if (id === "race") { openRaceSheet(); return; }
   if (id === "prefs") {
     // ⚠️ THE SCOPED PROFILE EDIT, WHICH ALREADY EXISTS. Training preferences in this app ARE the
     // rhythm questions -- days a week, weekly mileage, long-run day, start date -- and there is a
@@ -16000,6 +16021,8 @@ function reusePlan(sig) {
       // whatever pause the old plan picked up from is not this plan's (blockStartIso).
       profile.startDateIso = todayIso();
       profile.blockFromIso = ""; profile.pauseWeeks = 0;
+      // B7: and its old B-race, whose date belonged to the block it was in.
+      profile.bRace = null;
       try { recompute(); } catch (e) {
         for (const k of PLAN_PROF_FIELDS) profile[k] = before[k];
         try { recompute(); } catch (e2) {}
@@ -16085,6 +16108,196 @@ function resumeFromPause() {
     try { recompute(); } catch (e) {}
     computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
   });
+}
+
+// ---- A B-race: a smaller race inside the plan (stage B7) --------------------------------------------------
+/** A B-race's distance as a runner says it: on its button, and inside a sentence. */
+const B_RACE_NAME = { "5k": "5K", "10k": "10K", half: "Half marathon", marathon: "Marathon" };
+const B_RACE_IN_A_SENTENCE = { "5k": "5K", "10k": "10K", half: "half marathon", marathon: "marathon" };
+let RACE_DRAFT = null;
+/**
+ * B7 — WHERE A B-RACE MAY GO NOW: the engine's own window (RC.secondaryRaceWindow: shorter than the goal, from week
+ * 2, never in the taper or within three days of race week), read off the plan as it stands, from tomorrow at the
+ * earliest and never before the plan starts (again, after a pause).
+ * ⚠️ ONLY THE DISTANCES THIS APP KNOWS (B_RACE_NAME). The engine also knows a mile, but nothing here does — the race
+ * warm-up has no mile row and would throw — and the app has never offered a mile as a goal either.
+ */
+function bRaceWindow() {
+  if (!RAW || !RAW.weeks || !profile.raceDate) return null;
+  let w = null;
+  try { w = RC.secondaryRaceWindow(RAW.weeks, { distance: profile.goalDist, raceDateIso: profile.raceDate }); } catch (e) { return null; }
+  if (!w) return null;
+  const distances = w.distances.filter((k) => B_RACE_NAME[k]);
+  let from = w.fromIso;
+  const tomorrow = isoAdd(todayIso(), 1).toISOString().slice(0, 10);
+  if (tomorrow > from) from = tomorrow;
+  if (planStartIso(profile) > from) from = planStartIso(profile);
+  return distances.length && from <= w.toIso ? { fromIso: from, toIso: w.toIso, distances: distances } : null;
+}
+/** The runner's B-race, if it has not happened yet. */
+function bRaceAhead() {
+  const b = profile.bRace;
+  return b && b.distance && b.dateIso && b.dateIso >= todayIso() ? b : null;
+}
+/**
+ * Is the B-race in the plan — placed by the engine — rather than only in the profile? A change of goal or date, or
+ * a pause, can leave it outside the window, where the engine leaves the plan alone; the runner is then told so.
+ */
+function bRacePlaced() {
+  const b = profile.bRace;
+  return !!(b && RAW && RAW.weeks && RAW.weeks.some((w) => w.secondaryRace && w.secondaryRace.role === "race" && w.secondaryRace.dateIso === b.dateIso));
+}
+/**
+ * The race a race session IS: the B-race's own distance on its own day (found by the engine's one id rule), the
+ * goal's on every other. The warm-up and the fuelling advice used to read the goal for every race session, so a
+ * 10K on the way to a half would have been warmed up and fuelled as a half marathon.
+ */
+function raceKeyOf(sess) {
+  const b = profile.bRace;
+  if (sess && sess.type === "race" && b && b.dateIso && b.distance &&
+      sess.id === RC.sessionIdFor(b.dateIso, (isoAdd(b.dateIso, 0).getUTCDay() + 6) % 7, "race")) return b.distance;
+  return profile.goalDist || null;
+}
+/** Open the sheet on the runner's own race, or on the plan's own suggestion: six weeks out (PLAN.md's example). */
+function openRaceSheet() {
+  const w = bRaceWindow();
+  const b = bRaceAhead();
+  if (b) RACE_DRAFT = { distance: b.distance, dateIso: b.dateIso };
+  else if (w) {
+    let d = isoAdd(profile.raceDate, -42).toISOString().slice(0, 10);
+    if (d < w.fromIso) d = w.fromIso;
+    if (d > w.toIso) d = w.toIso;
+    RACE_DRAFT = { distance: w.distances[w.distances.length - 1], dateIso: d };
+  } else RACE_DRAFT = null;
+  renderRaceSheet();
+}
+/**
+ * B7 — THE SHEET: which race, which day, and what that does — worked out by the real applyProfile (pure; never
+ * adopted here) and said in the runner's own weeks before anything is saved (profileImpact, whose lost-moves
+ * warning it repeats). The pickers are the window: only distances it allows, a date between its two days.
+ */
+function renderRaceSheet() {
+  const w = bRaceWindow();
+  const goalName = B_RACE_IN_A_SENTENCE[profile.goalDist] || "race";
+  ensureSheet(); SHEET_CTX = null;
+  if (!w || !RACE_DRAFT) {
+    // ⚠️ SAID, NOT HIDDEN: the row stays on the menu and the sheet says why there is no room, in plan terms.
+    $("sheetBody").innerHTML = '<div class="eyebrow">Add a race</div>' +
+      '<h3 class="sheet-h">There is no room for another race in this plan</h3>' +
+      '<p class="mp-note">A race inside your plan has to be shorter than your ' + esc(goalName) + ', at least a week into ' +
+      'the plan and before your taper starts, because the taper belongs to your ' + esc(goalName) + '. ' +
+      'This plan has no days left that fit.</p>' +
+      '<div class="act-pair"><button class="ap-no" id="raceCancel">Close</button></div>';
+    $("raceCancel").onclick = () => { RACE_DRAFT = null; closeSheet(); };
+    $("sheetOv").classList.add("on");
+    return;
+  }
+  const d = RACE_DRAFT;
+  const name = B_RACE_IN_A_SENTENCE[d.distance] || d.distance;
+  const pf = Object.assign({}, profile, { bRace: { distance: d.distance, dateIso: d.dateIso } });
+  const imp = profileImpact(pf);
+  const lines = [];
+  if (imp && imp.out) {
+    const ws = imp.out.raw.weeks;
+    const at = (role) => ws.findIndex((x) => x.secondaryRace && x.secondaryRace.role === role);
+    const bi = at("before"), ri = at("race");
+    const km = (plan, i) => plan && plan.weeks[i] ? reentryKm(plan.weeks[i].distanceKm || 0) : "";
+    if (ri >= 0) {
+      if (bi >= 0) lines.push("Week " + ws[bi].index + ": easier, so you arrive fresh \u2014 " + km(PLAN, bi) + " \u2192 " + km(imp.out.plan, bi) + " km");
+      lines.push("Week " + ws[ri].index + ": your " + name + " on " + runDateLabelIso(d.dateIso) + ", with one sharp session before it");
+      lines.push("The two days after it: a rest day, then an easy 25-minute jog");
+      lines.push("Your " + goalName + " on " + runDateLabelIso(profile.raceDate) + ", and its taper, stay exactly as they are");
+    }
+  }
+  const dist = (k) => '<button class="po-day' + (d.distance === k ? " on" : "") + '" data-racedist="' + k +
+    '" aria-pressed="' + (d.distance === k) + '">' + esc(B_RACE_NAME[k]) + '</button>';
+  $("sheetBody").innerHTML =
+    '<div class="eyebrow">' + (bRaceAhead() ? "Your race" : "Add a race") + '</div>' +
+    '<h3 class="sheet-h">Which race, and when?</h3>' +
+    '<div class="po-days">' + w.distances.map(dist).join("") + '</div>' +
+    '<div class="adj-dates"><label class="adj-d"><span>Race day</span>' +
+      '<input class="sel" id="raceDate" type="date" value="' + esc(d.dateIso) + '" min="' + esc(w.fromIso) + '" max="' + esc(w.toIso) + '"></label></div>' +
+    '<div class="po-verdict"><b>What this does to your plan</b>' +
+      (lines.length ? lines.map((l) => '<span>' + esc(l) + '.</span>').join("")
+        : '<span>That day does not fit your plan. Pick one between ' + esc(runDateLabelIso(w.fromIso)) + ' and ' + esc(runDateLabelIso(w.toIso)) + '.</span>') +
+    '</div>' +
+    (imp && imp.lost ? '<div class="pi-warn"><b>' + imp.lost + (imp.lost === 1 ? " session you moved" : " sessions you moved") +
+      '</b> to a different day will go back to where the plan put them.</div>' : "") +
+    '<div class="act-pair"><button class="ap-no" id="raceCancel">Cancel</button>' +
+    '<button class="ap-yes" id="raceSave">' + (bRaceAhead() ? "Save" : "Add this race") + '</button></div>' +
+    '<p class="mp-note">A race inside your plan is shorter than your ' + esc(goalName) + ' and falls between ' +
+    esc(runDateLabelIso(w.fromIso)) + ' and ' + esc(runDateLabelIso(w.toIso)) + ': after that your taper starts, and it is ' +
+    'your ' + esc(goalName) + '\u2019s. Nothing is saved until you tap that.</p>';
+  $("raceCancel").onclick = () => { RACE_DRAFT = null; closeSheet(); };
+  $("raceSave").onclick = saveRaceDraft;
+  $("raceDate").onchange = () => {
+    // ⚠️ HELD INSIDE THE WINDOW RATHER THAN REFUSED: a typed date past either end moves to that end, and the
+    // sheet then says what the plan will do with it.
+    let v = $("raceDate").value || RACE_DRAFT.dateIso;
+    if (v < w.fromIso) v = w.fromIso;
+    if (v > w.toIso) v = w.toIso;
+    RACE_DRAFT.dateIso = v;
+    renderRaceSheet();
+  };
+  document.querySelectorAll("[data-racedist]").forEach((b) => {
+    b.onclick = () => { RACE_DRAFT.distance = b.dataset.racedist; renderRaceSheet(); };
+  });
+  $("sheetOv").classList.add("on");
+}
+/**
+ * B7 — ADD (OR CHANGE) THE B-RACE: one commit, one Undo, the standing pattern. The overrides are snapshotted first
+ * and written back before the Undo's rebuild (B4's lesson: applyCrossWeekMoves reads the store).
+ */
+function saveRaceDraft() {
+  const d = RACE_DRAFT;
+  const w = bRaceWindow();
+  if (!d || !w || w.distances.indexOf(d.distance) < 0 || d.dateIso < w.fromIso || d.dateIso > w.toIso) {
+    toast(w ? "Pick a day between " + runDateLabelIso(w.fromIso) + " and " + runDateLabelIso(w.toIso) + "." : "There is no room for another race in this plan.");
+    return;
+  }
+  const before = { bRace: profile.bRace || null, overrides: JSON.stringify(state.dayOverride || {}) };
+  const ticks = todayTicks();
+  profile.bRace = { distance: d.distance, dateIso: d.dateIso };
+  try { recompute(); } catch (e) {
+    profile.bRace = before.bRace;
+    toast("That did not work \u2014 your plan is unchanged."); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  RACE_DRAFT = null;
+  closeSheet();
+  toastUndo("Your " + (B_RACE_IN_A_SENTENCE[d.distance] || d.distance) + " on " + runDateLabelIso(d.dateIso) + " is in your plan.", () => {
+    const t2 = todayTicks();
+    profile.bRace = before.bRace;
+    try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
+    saveDayOverride();
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
+  });
+  render();
+}
+/** B7 — take the B-race out (Planned breaks' Cancel): the plan goes back to its own weeks. One Undo puts it back. */
+function cancelBRace() {
+  const b = profile.bRace;
+  if (!b) return;
+  const before = { bRace: b, overrides: JSON.stringify(state.dayOverride || {}) };
+  const ticks = todayTicks();
+  profile.bRace = null;
+  try { recompute(); } catch (e) {
+    profile.bRace = before.bRace;
+    toast("That did not work \u2014 your plan is unchanged."); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  toastUndo("Your " + (B_RACE_IN_A_SENTENCE[b.distance] || b.distance) + " is out of your plan.", () => {
+    const t2 = todayTicks();
+    profile.bRace = before.bRace;
+    try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
+    saveDayOverride();
+    try { recompute(); } catch (e) {}
+    computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
+  });
+  render();
 }
 
 function viewPlan() {
@@ -16190,7 +16403,10 @@ function viewPlan() {
 function weekSummaryRow(w, isRace) {
   const past = isoAdd(w.startIso, 6).toISOString().slice(0, 10) < todayIso();
   const cur = TODAY_IN_PLAN && w.index === curWeekNo();
-  const badge = isRace ? "Race week" : w.phase === "taper" ? "Taper" : w.isDeload ? "Absorb week" : "";
+  // B7: the week holding a B-race says so, and so does the easier week before it.
+  const sr = w.secondaryRace;
+  const badge = isRace ? "Race week" : sr && sr.role === "race" ? (B_RACE_NAME[sr.distance] || "Race") + " race"
+    : w.phase === "taper" ? "Taper" : w.isDeload ? "Absorb week" : sr && sr.role === "before" ? "Easier" : "";
   const meta = [PHASE_NAME[w.phase] || w.phase,
     w.distanceKm ? w.distanceKm.toFixed(1) + " km" : "",
     w.quality ? w.quality + (w.quality === 1 ? " quality" : " quality") : "",
@@ -26888,6 +27104,9 @@ function draftFromForm() {
   // plan (the wizard) or a new start date lays the block out from that start.
   const keepsBlock = state.screen !== "wizard" && startDateIso === (profile.startDateIso || "") && !!profile.blockFromIso;
   return {
+    // ⚠️ B7: AND AN EDIT KEEPS THE RUNNER'S B-RACE — the same whole-object replacement would drop it. A new plan does
+    // not: its weeks are different, and the race is the runner's to add to it again.
+    bRace: state.screen !== "wizard" && profile.bRace ? profile.bRace : null,
     ...(keepsBlock ? { blockFromIso: profile.blockFromIso, pauseWeeks: Number(profile.pauseWeeks) || 0 } : {}),
     name: wizFieldVal("s_name").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
@@ -43001,6 +43220,7 @@ function wire() {
   // second pass: this markup only exists while the sheet is open, and the sheet's wiring runs once
   // per open.
   document.querySelectorAll("[data-pbresume]").forEach((b) => { b.onclick = () => { closeSheet(); resumeFromPause(); }; });
+  document.querySelectorAll("[data-pbrace]").forEach((b) => { b.onclick = () => { closeSheet(); cancelBRace(); }; });
   document.querySelectorAll("[data-pbdel]").forEach((b) => { b.onclick = () => { closeSheet(); cancelAdjust(b.dataset.pbdel); }; });
   document.querySelectorAll("[data-pausedays]").forEach((b) => {
     b.onclick = () => { PAUSE_DAYS = Number(b.dataset.pausedays) || 7; openPauseSheet(); };

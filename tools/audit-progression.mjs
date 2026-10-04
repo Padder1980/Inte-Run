@@ -10,7 +10,7 @@
 //   3. The PARTIAL FIRST WEEK was included in the frequency and volume trends. It has fewer sessions by
 //      construction, so every plan appeared to "rise" from it and week 1 → 2 was a false volume spike.
 const root = process.argv[2] || process.cwd();
-const { generatePlan } = await import(root + "/src/plan/generate-plan.ts");
+const { generatePlan, secondaryRaceWindow } = await import(root + "/src/plan/generate-plan.ts");
 const { computeDistribution, honoursModel } = await import(root + "/src/science/intensity-distribution.ts");
 
 const RUN_TYPES = new Set(["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific", "race"]);
@@ -218,4 +218,82 @@ for (const d of ["5k","10k","half","marathon"]) {
     (p2(mean(b.mod.base)) + "→" + p2(mean(b.mod.peak))).padEnd(17) +
     (p2(mean(b.rs.base)) + "→" + p2(mean(b.rs.build)) + "→" + p2(mean(b.rs.peak))).padEnd(24) +
     pc(b.over110, b.trans).padEnd(8) + p2(mean(b.deload)).padEnd(9) + pc(b.inv, b.invTot));
+}
+
+// ── THE B-RACE AXIS (stage B7) ───────────────────────────────────────────────────────────────────────────────
+// PLAN.md B7 D: "a B-race axis that skips transitions into/out of secondaryRace weeks; sweep before/after". Every
+// plan above is built again with a B-race at the middle of the window the plan allows (the Sunday nearest it), at
+// the longest distance it allows, and the two versions are measured on the SAME weeks: the transitions that do not
+// touch a week the B-race shaped (the week before, race week, the week after). Those must come out identical — a
+// B-race is allowed to change its own fortnight and nothing else — and the checks that cannot be read off a trend
+// are counted directly: the goal race's week, the taper, hard days side by side.
+{
+  const B = { plans: 0, none: 0, transBase: 0, transB: 0, overMinBase: 0, overMinB: 0, overKmBase: 0, overKmB: 0, skipped: 0,
+    floorBase: 0, floorB: 0, aWeekSame: 0, taperHeavier: 0, adjacentNew: 0, otherWeekChanged: 0, invBase: 0, invB: 0 };
+  const day = (w, d) => { const m = new Date(w.startDateIso + "T00:00:00Z"); m.setUTCDate(m.getUTCDate() - ((m.getUTCDay() + 6) % 7) + d); return m.toISOString().slice(0, 10); };
+  const hardDates = (ws) => { const h = new Set(); for (const w of ws) for (const s of w.sessions) if (s.intensity === "hard" || s.type === "threshold" || s.type === "race-specific") h.add(day(w, s.dayOfWeek)); return h; };
+  const adjacent = (ws) => { const h = hardDates(ws); const out = new Set(); for (const iso of h) { const n = new Date(iso + "T00:00:00Z"); n.setUTCDate(n.getUTCDate() + 1); const nx = n.toISOString().slice(0, 10); if (h.has(nx)) out.add(iso); } return out; };
+  const inverted = (w) => { const long = w.sessions.find((s) => s.type === "long"); if (!long) return false; const others = w.sessions.filter((s) => s !== long && isRun(s)); if (!others.length) return false; const lk = long.trainingDistanceMeters ?? long.estimatedDistanceMeters ?? 0; return Math.max(...others.map((s) => s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0)) > lk; };
+  for (const [, raceDate] of RUNWAYS)
+  for (const distance of ["5k", "10k", "half", "marathon"])
+  for (const days of [3, 4, 5, 6])
+  for (const tenK of [2400, 3000, 3600])
+  for (const experience of ["recreational", "competitive"])
+  for (const vol of [null, 30, 40]) {
+    const athlete = { daysPerWeek: days, recent: { distanceMeters: 10000, timeSeconds: tenK },
+      experience, includeStrength: false, returningFromInjury: false, ...(vol ? { weeklyVolumeKmCurrent: vol } : {}) };
+    const g = { distance, targetTimeSeconds: TT[distance], raceDateIso: raceDate, startDateIso: START };
+    let p, q;
+    try { p = generatePlan(athlete, g); } catch { continue; }
+    const win = secondaryRaceWindow(p.weeks, g);
+    if (!win) { B.none++; continue; }
+    const mid = new Date(win.fromIso + "T00:00:00Z");
+    mid.setUTCDate(mid.getUTCDate() + Math.floor((Date.parse(win.toIso) - Date.parse(win.fromIso)) / 864e5 / 2));
+    mid.setUTCDate(mid.getUTCDate() + ((7 - mid.getUTCDay()) % 7));             // the Sunday on or after the middle
+    let dateIso = mid.toISOString().slice(0, 10);
+    if (dateIso > win.toIso) dateIso = win.toIso;
+    const sr = { distance: win.distances[win.distances.length - 1], dateIso };
+    try { q = generatePlan(athlete, g, { secondaryRace: sr }); } catch { continue; }
+    B.plans++;
+    const shaped = (i) => !!q.weeks[i] && !!q.weeks[i].secondaryRace;
+    q.weeks.forEach((w, i) => { if (!shaped(i) && JSON.stringify(w) !== JSON.stringify(p.weeks[i])) B.otherWeekChanged++; });
+    const last = q.weeks.length - 1;
+    if (JSON.stringify(q.weeks[last]) === JSON.stringify(p.weeks[last])) B.aWeekSame++;
+    q.weeks.forEach((w, i) => { if (w.phase === "taper" && w.plannedDistanceMeters > p.weeks[i].plannedDistanceMeters) B.taperHeavier++; });
+    const was = adjacent(p.weeks); for (const iso of adjacent(q.weeks)) if (!was.has(iso)) B.adjacentNew++;
+    // The trends, on the same weeks for both: never the partial first week, never a week with a race in it, and
+    // never a transition into or out of a week the B-race shaped (skipped, and counted).
+    const minsOf = (w) => w.sessions.reduce((t, x) => t + (x.estimatedDurationSeconds || 0), 0) / 60;
+    for (let i = 2; i < q.weeks.length; i++) {
+      const a = i - 1;
+      const race = (ws, k) => ws[k].sessions.some((s) => s.type === "race");
+      if (race(q.weeks, i) || race(q.weeks, a) || race(p.weeks, i) || race(p.weeks, a)) continue;
+      if (q.weeks[i].isDeload || q.weeks[a].isDeload || q.weeks[i].phase === "taper") continue;
+      if (shaped(i) || shaped(a)) { B.skipped++; continue; }
+      B.transBase++; B.transB++;
+      const rm = (ws) => minsOf(ws[a]) > 0 ? minsOf(ws[i]) / minsOf(ws[a]) : 1;
+      const rk = (ws) => ws[a].plannedDistanceMeters > 0 ? ws[i].plannedDistanceMeters / ws[a].plannedDistanceMeters : 1;
+      if (rm(p.weeks) > 1.10) B.overMinBase++; if (rm(q.weeks) > 1.10) B.overMinB++;
+      if (rk(p.weeks) > 1.10) B.overKmBase++; if (rk(q.weeks) > 1.10) B.overKmB++;
+    }
+    for (let i = 1; i < q.weeks.length; i++) {
+      if (q.weeks[i].sessions.some((s) => s.type === "race")) continue;
+      const dq = computeDistribution(q.weeks[i].sessions), dp = computeDistribution(p.weeks[i].sessions);
+      if (dq && Number.isFinite(dq.easy) && !honoursModel(dq, q.intensityModel)) B.floorB++;
+      if (dp && Number.isFinite(dp.easy) && !p.weeks[i].sessions.some((s) => s.type === "race") && !honoursModel(dp, p.intensityModel)) B.floorBase++;
+      if (inverted(q.weeks[i])) B.invB++;
+      if (!p.weeks[i].sessions.some((s) => s.type === "race") && inverted(p.weeks[i])) B.invBase++;
+    }
+  }
+  console.log("\n── B-RACE AXIS (stage B7) — the same plans with a B-race mid-window ─");
+  console.log("  plans with a B-race placed                      : " + B.plans + "   (no window: " + B.none + ")");
+  console.log("  weeks changed that the B-race did not shape     : " + B.otherWeekChanged + "   (must be 0)");
+  console.log("  goal race's week byte-identical                 : " + pc(B.aWeekSame, B.plans));
+  console.log("  taper weeks made heavier                        : " + B.taperHeavier + "   (must be 0)");
+  console.log("  hard days newly side by side                    : " + B.adjacentNew + "   (must be 0)");
+  console.log("  rises >1.10, training time, without → with      : " + pc(B.overMinBase, B.transBase) + " → " + pc(B.overMinB, B.transB) +
+    "   (" + B.skipped + " transitions into or out of a B-race week skipped)");
+  console.log("  rises >1.10, counted km,    without → with      : " + pc(B.overKmBase, B.transBase) + " → " + pc(B.overKmB, B.transB));
+  console.log("  weeks under the intensity floor, without → with : " + B.floorBase + " → " + B.floorB + "   (race weeks excluded)");
+  console.log("  long run not the longest run, without → with    : " + B.invBase + " → " + B.invB + "   (race weeks excluded)");
 }

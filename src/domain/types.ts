@@ -322,6 +322,12 @@ export type PlannedWeek = {
   sessions: Session[];
   plannedDistanceMeters: number;
   qualitySessionCount: number;
+  /**
+   * Stage B7: this week is shaped around a smaller race inside the plan (a "B-race") — the easier week before
+   * it, the week holding it, or the week after it. Absent on every other week, and on every week of a plan
+   * without one.
+   */
+  secondaryRace?: { role: "before" | "race" | "after"; distance: RaceDistanceKey; dateIso: string };
 };
 
 export type Plan = {

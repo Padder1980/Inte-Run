@@ -139,7 +139,8 @@ test("BLOCKER: the app hands the runner's age to the plan builder", () => {
   const ap = nocomment(fnOf("applyProfile"));
   const handed = ap.indexOf("if (ageA != null) ath.age = ageA;");
   assert.ok(handed > 0, "the age hand-off is gone");
-  for (const call of ["RC.buildPlanSummary(ath, goal)", "RC.generatePlan(ath, goal)"]) {
+  // (Since B7 both calls also carry the same options object — a B-race — so the prefix is what is pinned.)
+  for (const call of ["RC.buildPlanSummary(ath, goal", "RC.generatePlan(ath, goal"]) {
     const at = ap.indexOf(call);
     assert.ok(at > 0, call + " is no longer how the plan is built");
     assert.ok(handed < at, "the age is set after " + call);

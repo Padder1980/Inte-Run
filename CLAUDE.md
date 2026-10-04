@@ -231,7 +231,8 @@ breaks); it made session ids name their calendar week (below). **B5 is built (20
 running out, Today asks how quickly to build back up (`interun_reentry_v1`). **The plan now gets harder** (fixed the same day,
 his ruling): the block was rebuilt from today on every launch, so the runner always lived in week 1; it now stays where
 it began (`notes/plan-profile.md`). **B6 is built (2026-10-04):** missed runs or a gap → Today offers to get back on
-track (`interun_realign_v1`). The same day a pause began picking up where you left off (`blockFromIso`). Next is B7. `PLAN.md` holds the full list and the Road Map is the live
+track (`interun_realign_v1`). The same day a pause began picking up where you left off (`blockFromIso`). **B7 is built
+(2026-10-04):** a B-race (`profile.bRace` → `GenerateOptions.secondaryRace`, shaped after the volume fit). Next is B8. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -243,7 +244,7 @@ status; update both when a stage lands.
 | Route maps (`routeMapFor`, the tile cache, Mapbox/CARTO, attribution), the post-run debrief (`runOverviewHtml`, `liveRunRecord`), the recap story | `notes/debrief-and-maps.md` |
 | The design system (tokens, ladders, ratchets, `ui*` components), the redesign phases, Support, Logbook totals, Performance, the welcome-back screen | `notes/redesign-design-system.md` |
 | The injury and fuelling guides, red-flag screening (`src/safety/escalation.ts`), Training zones / pace calculator / measurements, fuelling on a session | `notes/clinical-guides.md` |
-| Engine models: paces (`paces.ts`), the volume model, long-run distance floors, the beginner long run, taper length, 7-day weeks, race day, the session library, one definition of weekly mileage | `notes/plan-engine-models.md` |
+| Engine models: paces (`paces.ts`), the volume model, long-run distance floors, the beginner long run, taper length, 7-day weeks, race day, a B-race inside the plan (B7), the session library, one definition of weekly mileage | `notes/plan-engine-models.md` |
 | How sessions are built: warm-ups (`warmup.ts`, `withGeneratedWarmup`), the named-time rule, long-run structure, the stretch session, build-your-own-run, distance-set runs and rounding | `notes/plan-sessions.md` |
 | Progression audits (`tools/audit-progression.mjs`), deload depth, race-pace progression, the engine-handoff read-across, taper specificity (`taper.ts`) | `notes/plan-audits.md` |
 | The coaching-book (Hudson) work: hill sprints, honest RPE bands, block lengths (`MAX_STRUCTURED_WEEKS`), two hard days, beginner quality, the no-recovery-week tier | `notes/plan-coaching-book.md` |

@@ -38,10 +38,14 @@ export function countTrailingMisses(outcomes: SessionOutcome[]): number {
 
 const EASY_SCALE = 0.85;
 const LONG_SCALE = 0.8;
+/** How close an easy run may come to the long run (keepLongRunLongest). */
+const LONGEST_MARGIN = 0.95;
+const EASY_RUN_TYPES = new Set(["easy", "recovery", "strides"]);
 const HARDNESS = { vo2: 3, "race-specific": 2, threshold: 1 } as const;
 
-/** Why a week is being eased. Decides the wording only — the arithmetic is identical. */
-export type EaseReason = "missed" | "chosen";
+/** Why a week is being eased. Decides the wording only — the arithmetic is identical.
+ *  "race" (stage B7): the week before a smaller race inside the plan, so the runner arrives at it fresh. */
+export type EaseReason = "missed" | "chosen" | "race";
 
 export function applyMissedSessionAdjustment(
   week: PlannedWeek,
@@ -77,7 +81,9 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
       changes.push(
         reason === "missed"
           ? `Replaced "${s.title}" with an easy run to ease back in after missed sessions.`
-          : `Swapped "${s.title}" for an easy run of about the same effort as the rest of the week.`,
+          : reason === "race"
+            ? `Swapped "${s.title}" for an easy run, so you arrive at your race fresh.`
+            : `Swapped "${s.title}" for an easy run of about the same effort as the rest of the week.`,
       );
       const minutes = Math.round((s.estimatedDurationSeconds / 60) * 0.7) || 35;
       return {
@@ -89,10 +95,14 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
         // not follow its own reason is the stale-derived-fact trap, and it is the text the runner reads.
         title: reason === "missed"
           ? `${minutes}′ easy (eased re-entry)`
-          : `${minutes}′ easy (easier week)`,
+          : reason === "race"
+            ? `${minutes}′ easy (race next week)`
+            : `${minutes}′ easy (easier week)`,
         description: reason === "missed"
           ? "Reintroduce running gently after a break — quality resumes next week."
-          : "An easier week by choice — keep it conversational. Normal training resumes next week.",
+          : reason === "race"
+            ? "An easier week before your race — keep it conversational, so you arrive fresh."
+            : "An easier week by choice — keep it conversational. Normal training resumes next week.",
         intensity: "easy",
         estimatedDurationSeconds: minutes * 60,
         estimatedDistanceMeters: easyPace
@@ -133,7 +143,9 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
   changes.push(
     reason === "missed"
       ? "Trimmed the long run ~20% and easy volume ~15% this week; missed sessions are not added back."
-      : "Trimmed the long run ~20% and easy volume ~15% this week. Next week picks up where it left off.",
+      : reason === "race"
+        ? "Trimmed the long run ~20% and easy volume ~15% this week, so you arrive at your race fresh."
+        : "Trimmed the long run ~20% and easy volume ~15% this week. Next week picks up where it left off.",
   );
 
   const plannedDistanceMeters = weekVolumeMeters(sessions);
@@ -157,9 +169,40 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
       qualitySessionCount,
       focus: reason === "missed"
         ? "Re-entry — ease back after missed sessions"
-        : "Easier week — volume down, nothing added back",
+        : reason === "race"
+          ? "Easier week — so you arrive at your race fresh"
+          : "Easier week — volume down, nothing added back",
     },
   };
+}
+
+/**
+ * Hold every easy run of a week just under its long run, on both rulers this repo measures a run by (the
+ * outing's distance and the training distance) — the owner's rule, "the long run is meant to be the longest run
+ * of the week" (pc-longshort).
+ * ⚠️ WHY IT EXISTS, AND WHY easeWeek DOES NOT CALL IT (YET). An eased week trims the long run by a fifth, easy
+ * running by a seventh, and turns the demoted session into an easy run of 70% of ITS length, so it can come out
+ * with an easy run longer than its long run: measured over the B-race axis of the progression audit, 148 such
+ * weeks became 217 once the week before a B-race was eased. Holding the run under the long run costs time, and in
+ * a handful of weeks (slow 5K base weeks, where the threshold session is longer than the long run) that pushes an
+ * eased week past the book's 30% band that test/ease-week.test.ts holds "Make a week easier" to: 13 of 3,360
+ * weeks over 28%, the deepest 32.2%. Two of the owner's rules disagree there, so "Make a week easier" and the
+ * comeback offers are left as they were for him to decide. The week before a B-race (stage B7) is a race's
+ * run-in, where a deeper cut is the point, and uses it.
+ */
+export function keepLongRunLongest(sessions: Session[]): Session[] {
+  const long = sessions.find((s) => s.type === "long");
+  if (!long) return sessions;
+  return sessions.map((s) => {
+    if (s === long || s.intensity !== "easy" || !EASY_RUN_TYPES.has(s.type)) return s;
+    let f = 1;
+    const cap = (mine: number | undefined, theirs: number | undefined) => {
+      if (mine && theirs && mine > theirs * LONGEST_MARGIN) f = Math.min(f, (theirs * LONGEST_MARGIN) / mine);
+    };
+    cap(s.estimatedDistanceMeters, long.estimatedDistanceMeters);
+    cap(s.trainingDistanceMeters, long.trainingDistanceMeters);
+    return f < 1 ? { ...scaleSessionDistance(s, f), estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * f) } : s;
+  });
 }
 
 function hardestSessionId(week: PlannedWeek): string | undefined {

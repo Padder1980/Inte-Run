@@ -383,3 +383,61 @@ asserts no backtick in any added text.
 `Page.captureScreenshot` hangs in this headless Chrome, so the card's **appearance is unverified**.
 What is covered without eyes: every `var()` resolves (13 tokens, 0 undeclared), both design ratchets
 unchanged, and every colour pairing it uses is already asserted by `test/contrast.test.ts`.
+
+## COMING BACK AFTER TIME OFF: HOW QUICKLY TO BUILD BACK UP (stage B5, 2026-10-04)
+
+PLAN.md B5: *"Coming back after time off: choose how quickly the plan builds up again."* When a **Going away** or
+**Not feeling 100%** break that took running out has ended, Today asks once, in the first week back: **"How quickly
+do you want to build back up?"** — **Slowly** (two easier weeks), **Balanced** (one easier week), **Quickly** (carry
+on as planned). Each answer quotes what it does to the weeks ahead (*"Week 2: 27.9 → 24.5 km · Week 3: 31.5 → 27.2
+km"*, or *"Week 2 stays at 27.9 km"*). One tap acts, with Undo straight after. Web-only.
+
+**Which breaks ask.** A window of kind `holiday` or `ease` at any level but "everything as planned"
+(`REENTRY_MODES`: none / easy / easyspeed) whose last day is behind us, and no more than `REENTRY_ASK_DAYS` (7) ago —
+the first week back, the window in which the answer can still change anything. Never a pause (it asked its own
+question up front), an easier week, a skip, or a holiday run as planned.
+
+⚠️⚠️ **THE BREAK IS RECORDED IN ITS OWN STORE, `interun_reentry_v1`, BECAUSE THE BREAK STORE FORGETS IT.** `saveAdjust`
+drops every window that has ended on every write, so a holiday that ended yesterday was gone the moment the runner
+skipped a session or booked anything, and the question it should raise could never be asked. `reentryCapture(rows)`
+runs **at the top of `saveAdjust`, before its prune**, and **at launch** right after the first `seedDone()`. Driven
+in the browser: the record cleared, a session skipped, the skip's write pruned the ended holiday — and the record was
+written first and the card came back. The newest ended break wins, and the same break keeps its answer (declining is
+remembered, never re-asked).
+
+**The answers are existing mechanisms.** An easier week is exactly the row `applyEaseWeek` writes (`kind/mode
+"recovery"`, Monday to Sunday), so it lands in Planned breaks with its Cancel, in the week marking, and in
+`applyAdjustments` for free. Slowly writes two (distinct ids, or Cancel would take both), Balanced one, Quickly none
+(and does not rebuild). One commit, one Undo; **Undo puts the question back as well as the plan** — an answer taken
+back is no answer.
+**The weeks** are the first plan week that has not started and the one after — the rule the ease offer already uses
+(*"you can only ease a week you have not run"*) — previewed by `easeWeekOptions`, the same function the Manage plan
+control and `applyEaseWeek` go through.
+⚠️ **ONE DECIMAL, FOUND IN THE BROWSER.** Quoted in whole kilometres like the Make a week easier sheet, the card
+promised "28 → 24 km" and the week then read 24.5 km on the Plan screen. `reentryKm` rounds the way plan-summary's
+`km()` does, and a test holds the promise to the plan after the answer (both answers, every week).
+⚠️ **AN ANSWER THAT DOES THE SAME AS A QUICKER ONE IS NOT OFFERED** (two weeks where only one can be eased), and a
+recommended answer that is missing passes to the next QUICKER one: it is missing because its week is already easier
+(the runner eased it) or has nothing to ease, so the step the tier asks for is in the plan or cannot be taken. No
+question at all when every gentler answer would do nothing, while paused, or outside the plan.
+**Recommended by `pauseTierFor`** — the repository's own lines for time away: up to a week, carry on; up to a
+fortnight, one easier week; more, two. The card explains the length in the tier's own `why` (one definition).
+⚠️ **ONE QUESTION AT A TIME.** The card is first in `todayCards()` — it is about the days ahead of someone who has just
+come back; a pace flag or a review built from before the break can wait — and `weeklyReviewCard` returns nothing while
+it is open (PLAN.md's re-break: remove that and two questions render).
+
+### ⚠️⚠️ NOT THE "AFTER TIME OFF" ANSWER — PLAN.md'S SKETCH NAMED THE PAUSE'S REBUILD FOR A LONG BREAK
+
+Measured: because `applyProfile` rebuilds the plan from today on every launch, `returningFromBreak` re-shapes
+**whichever week the runner is in, every week, for as long as it is set** — this week's long run 61 minutes instead of
+80, and four weeks on 48 instead of 60 (5-day half, 40 km/week). It is a brake that never comes off. A pause of more
+than four weeks sets it (`applyPause`, the "reentry" tier) and nothing clears it on its own (only the runner, by hand,
+in the profile). B5's Slowly is two dated easier
+weeks instead: they end, they are listed, and they can be undone. A guard holds `answerReentry` away from `returning`.
+The deeper cause is the next item.
+
+### ⚠️⚠️ FOUND UNDER IT: THE PLAN NEVER PROGRESSES — see `notes/plan-profile.md`, "THE PLAN NEVER GETS HARDER"
+
+**Tests:** `test/reentry.test.ts` (8) drives the real lifted functions over a four-week plan built with the engine's
+own `weekView` and `easeWeek`. `skip-session` and `move-week` lift the capture now (their `saveAdjust` calls it).
+**16 of 16 re-breaks caught**, PLAN.md's own (the review not suppressed) among them.

@@ -512,3 +512,34 @@ raw answer, so a beginner told "6 days" was quoted a goal ~6% more optimistic on
 they will never be given. **Not fixed here**: it is a projection change needing its own sweep and proof,
 and this file already records the same shape of defect being found in that function's day handling once
 before.
+
+## ⚠️⚠️ THE PLAN NEVER GETS HARDER (found 2026-10-04, while building B5 — NOT fixed, the owner decides how)
+
+`applyProfile` builds the block from **today** on every launch: `startDateIso = (pf.startDateIso && pf.startDateIso
+>= todayIso()) ? pf.startDateIso : todayIso()` (and before 2026-07-25 it was `todayIso()` outright). So the week the
+runner is living in is ALWAYS week 1 of a freshly generated block — every launch, every week, since the first version.
+**Measured** (5-day half, 40 km/week, race 28 Feb 2027), the week the runner actually sees, Monday by Monday from
+19 Oct, against the same weeks of a plan whose start stays fixed:
+
+| Monday | rolling (what he gets) | fixed start (as designed) |
+|---|---|---|
+| 19 Oct | 32.4 km, long 80′, base | 32.4 km, long 80′, base |
+| 26 Oct | 31.5 km, long 80′, base | 36.6 km, long 84′, base |
+| 9 Nov | 32.0 km, long 80′, base | 25.8 km, long 60′, base, easier week |
+| 30 Nov | 30.8 km, long 80′, base | 36.4 km, long 102′, base |
+| 14 Dec | 30.9 km, long 80′, base | 40.9 km, long 108′, build |
+| 28 Dec | 37.3 km, long 80′, base | 42.7 km, long 119′, build |
+
+The long run is 80 minutes every single week, the block never leaves "base", and the planned easier weeks never
+arrive. The weeks ahead on the Plan screen ramp correctly — and are regenerated as week 1 when they come.
+⚠️ **The code was written expecting past weeks to exist** — seedDone "ticks every session dated before today",
+easeWeekEvidence reads "the last four plan weeks" — and with the block starting today those loops never find one.
+⚠️ **And the "after time off" answer (`returningFromBreak`) becomes a permanent brake** for the same reason (B5's
+chapter in `notes/plan-adaptation.md`).
+
+**Why it is the owner's decision, not a quiet fix.** Anchoring the block at the date the plan was first built would
+put a runner who started six weeks ago straight into week 7 — a long run of ~100 minutes after six weeks at 80 — the
+load spike the whole engine exists to prevent. The safe fix found so far: **anchor the block at a stored start**,
+written the first time the fixed build runs (so everybody's plan starts counting from that week, with no jump) and
+whenever a plan is adopted from the wizard or a profile save; keep the "start today" behaviour only for a brand-new
+plan and a pause. Session ids already name the calendar week (B4), so nothing stored is disturbed by the change.

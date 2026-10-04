@@ -85,9 +85,11 @@ const FNS = ["isoAdd", "todayIso", "dmon", "runDateLabelIso", "esc", "genDay", "
   "rawSessionDone", "loadLinks", "saveLinks", "planSessionRef", "linkedRunFor", "loadAdjust", "saveAdjust", "adjPhrase",
   "adjustFor", "weekSkips", "adjDrops", "applyAdjustments", "eased", "weekAdjust", "weekAdjustNote", "plannedBreaksHtml",
   "skipOfferable", "skipSession", "cancelAdjust", "todayDecision", "sessionEffort", "effortVar",
-  "loadTimes", "hmValid", "sessionTimeAt", "legacySid", "sidKeys", "weekMoves", "xwDir"];
+  "loadTimes", "hmValid", "sessionTimeAt", "legacySid", "sidKeys", "weekMoves", "xwDir",
+  // B5: saveAdjust records a break that has just ended before its prune can drop it.
+  "reentryCapture", "loadReentry", "saveReentry"];
 const CONSTS = ["DAY_ORDER", "MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "ADJ_MODES", "ADJ_QUALITY",
-  "ADJ_RUN", "SESSION_EFFORT", "TIME_KEY", "XWEEK"];
+  "ADJ_RUN", "SESSION_EFFORT", "TIME_KEY", "XWEEK", "REENTRY_KEY", "REENTRY_MODES", "REENTRY_ASK_DAYS"];
 
 function sandbox() {
   const store: Record<string, string> = {};

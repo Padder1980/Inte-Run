@@ -222,7 +222,10 @@ hand, a run linked to its session (`interun_link_v1`, now written by all three c
 Strava switch waits on his Worker deploy. **B2 and B3 are built too:** skip one session (a row in the break store), and a
 session's time of day (`interun_time_v1`, into the calendar file and the reminders). **B4 is built (2026-10-04):** move a
 run a week earlier or later (`{ to, from, wk }` in `interun_dayov_v1`, applied by `applyCrossWeekMoves` before the
-breaks); it made session ids name their calendar week (below). Next is B5. `PLAN.md` holds the full list and the Road Map is the live
+breaks); it made session ids name their calendar week (below). **B5 is built (2026-10-04):** after a break that took
+running out, Today asks how quickly to build back up (`interun_reentry_v1`). ⚠️ **OPEN, AWAITING HIS RULING: the plan
+never gets harder** — `applyProfile` rebuilds the block from today, so the runner always lives in week 1 (measured, and
+the safe fix, in `notes/plan-profile.md`). Next: that fix if he rules for it, then B6. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -238,8 +241,8 @@ status; update both when a stage lands.
 | How sessions are built: warm-ups (`warmup.ts`, `withGeneratedWarmup`), the named-time rule, long-run structure, the stretch session, build-your-own-run, distance-set runs and rounding | `notes/plan-sessions.md` |
 | Progression audits (`tools/audit-progression.mjs`), deload depth, race-pace progression, the engine-handoff read-across, taper specificity (`taper.ts`) | `notes/plan-audits.md` |
 | The coaching-book (Hudson) work: hill sprints, honest RPE bands, block lengths (`MAX_STRUCTURED_WEEKS`), two hard days, beginner quality, the no-recovery-week tier | `notes/plan-coaching-book.md` |
-| Profile answers → plan: `applyProfile`, status and experience, stated volume, age and max HR, running-day choices, `profileImpact` | `notes/plan-profile.md` |
-| The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment | `notes/plan-adaptation.md` |
+| Profile answers → plan: `applyProfile`, status and experience, stated volume, age and max HR, running-day choices, `profileImpact`, the plan that never gets harder (the rebuild from today) | `notes/plan-profile.md` |
+| The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment, coming back after time off (B5) | `notes/plan-adaptation.md` |
 | Manage plan: pause, holiday / not 100%, skip one session (B2), a session's time of day (B3), move a session a week (B4) and session ids that name their calendar week, week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
 | The native iPhone app: WebHost, the over-the-air web layer, the keyboard pan, viewport and status bar, installing, TestFlight, the toolchain, Apple Health | `notes/ios-native.md` |
 | The Apple Watch app: payload, companion, mirroring, Live Activities, starting runs from the phone, the watch redesign | `notes/watch.md` |

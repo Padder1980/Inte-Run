@@ -957,6 +957,9 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .wu-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; line-height: 1.4; }
 .wk-review .wr-cta { display: flex; gap: 8px; margin-top: 12px; }
 .wk-review .wr-cta button { flex: 1; }
+/* B5 — the coming-back card's three answers are .po-opt rows (the pause sheet's), under the card's text. */
+.re-card .re-opts { margin-top: 12px; }
+.re-card .re-opts .po-opt:last-child { margin-bottom: 0; }
 /* ⚠️ A PAIR OF BUTTONS SIDE BY SIDE MUST BE THE SAME BUTTON. .ctrl and .primary are separate
    components with their own metrics -- 14px against 15px, different padding, and .primary carries a
    margin-top of its own for when it stands alone at the foot of a card. Put them in a row and the
@@ -6500,6 +6503,13 @@ const LINK_KEY = "interun_link_v1";
  */
 const TIME_KEY = "interun_time_v1";
 /**
+ * Stage B5. The break the runner has just come back from, and their answer to "how quickly do you want to
+ * build back up?": { id, kind, mode, from, to, days, answer, answeredIso }. Written by reentryCapture the
+ * moment a break that took running out is seen to have ended — see there for why it cannot simply be read
+ * from the break store, which prunes an ended break on its next write.
+ */
+const REENTRY_KEY = "interun_reentry_v1";
+/**
  * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
  * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
  * or null when id is not an old one.
@@ -7125,6 +7135,8 @@ function loadAdjust() {
   return a;
 }
 function saveAdjust(rows) {
+  // ⚠️ B5: A BREAK THAT HAS JUST ENDED IS RECORDED BEFORE THE PRUNE BELOW CAN DROP IT — see reentryCapture.
+  try { reentryCapture(rows); } catch (e) { try { console.warn("re-entry capture skipped", e); } catch (e2) {} }
   // ⚠️ PAST WINDOWS ARE DROPPED ON EVERY WRITE, not kept for a history nobody asked for. An adjustment
   // is applied to the plan at adopt time, so a window that has ended can only make the next rebuild
   // slower and the store bigger. The runs done during it are in the logbook, which is the record.
@@ -7988,6 +8000,209 @@ function applyEaseWeek(i) {
   render();
 }
 
+// ---- Coming back after time off (stage B5) -------------------------------------------------
+/**
+ * The levels of a break that took running out: every one but "everything as planned". A holiday you kept
+ * running through is not time off, and asking how quickly to build back up after it would be noise.
+ */
+const REENTRY_MODES = { none: 1, easy: 1, easyspeed: 1 };
+/**
+ * How long after a break ends the question stays open: the first week back.
+ * ⚠️ NOT A NEW TRAINING NUMBER. It is the window in which the answer can still change anything — the two
+ * gentler answers ease the first week that has not started and the one after it, and a week into being
+ * back the runner has already answered by running.
+ */
+const REENTRY_ASK_DAYS = 7;
+function loadReentry() {
+  try { const v = JSON.parse(localStorage.getItem(REENTRY_KEY) || "null"); return (v && typeof v === "object" && v.id) ? v : null; }
+  catch (e) { return null; }
+}
+function saveReentry(v) { try { v ? localStorage.setItem(REENTRY_KEY, JSON.stringify(v)) : localStorage.removeItem(REENTRY_KEY); } catch (e) {} }
+/**
+ * B5 — RECORD THE BREAK THE RUNNER HAS JUST COME BACK FROM, the moment it can be seen to have ended: a
+ * "Going away" or "Not feeling 100%" window that took running out, whose last day is behind us, and no
+ * more than REENTRY_ASK_DAYS ago.
+ * ⚠️ CALLED FROM saveAdjust BEFORE ITS PRUNE, AND AT LAUNCH. saveAdjust drops every window that has ended
+ * on every write, so a holiday that ended yesterday is gone the moment the runner skips a session or books
+ * anything — and the question it should raise would never be asked. Capturing at both points is what makes
+ * "when the break ends" true whichever comes first. That is why this is a store of its own (PLAN.md's
+ * interun_reentry_v1) rather than a reading of the break store.
+ * ⚠️ THE NEWEST ENDED BREAK WINS, AND THE SAME BREAK KEEPS ITS ANSWER: declining is remembered, never re-asked.
+ */
+function reentryCapture(rows) {
+  const today = todayIso();
+  const oldest = isoAdd(today, -REENTRY_ASK_DAYS).toISOString().slice(0, 10);
+  let best = null;
+  (rows || []).forEach((r) => {
+    if (!r || !r.id || (r.kind !== "holiday" && r.kind !== "ease") || !REENTRY_MODES[r.mode]) return;
+    if (!r.from || !r.to || r.to >= today || r.to < oldest) return;
+    if (!best || r.to > best.to) best = r;
+  });
+  if (!best) return null;
+  const cur = loadReentry();
+  if (cur && (cur.id === String(best.id) || cur.to > best.to)) return cur;
+  const days = Math.round((isoAdd(best.to, 0).getTime() - isoAdd(best.from, 0).getTime()) / 86400000) + 1;
+  const rec = { id: String(best.id), kind: best.kind, mode: best.mode, from: best.from, to: best.to, days: days, answer: null };
+  saveReentry(rec);
+  return rec;
+}
+/**
+ * The weeks a gentler answer would make easier: the first plan week that has not started, and the one after
+ * it — the rule the weekly review's ease offer already uses ("you can only ease a week you have not run").
+ * Each carries the engine's own preview from easeWeekOptions, the same function the Manage plan control and
+ * applyEaseWeek go through, so the distance the card quotes is the distance the week will have.
+ */
+function reentryWeeks() {
+  const today = todayIso();
+  const opts = easeWeekOptions();
+  const i0 = PLAN.weeks.findIndex((w) => w && w.startIso && w.startIso >= today);
+  if (i0 < 0) return [];
+  return opts.filter((o) => o.i === i0 || o.i === i0 + 1);
+}
+/**
+ * B5 — THE THREE ANSWERS, each mapped to an existing mechanism and quoting the distance it produces.
+ *   Slowly   — the next two weeks a notch easier: two "make a week easier" rows.
+ *   Balanced — the next week a notch easier: one row.
+ *   Quickly  — carry on as planned: nothing changes.
+ * ⚠️ NOT THE "AFTER TIME OFF" PROFILE ANSWER, ALTHOUGH PLAN.md's SKETCH NAMED THE PAUSE'S REBUILD FOR A LONG
+ * BREAK. Measured 2026-10-04: the plan is rebuilt from today on every launch, so returningFromBreak re-shapes
+ * whichever week the runner is in, every week, for as long as it is set — this week's long run 61 minutes
+ * instead of 80, and four weeks on 48 instead of 60. It is a brake that never comes off. An easier week is a
+ * dated row that ends, is listed under Planned breaks with a Cancel, and can be undone.
+ * ⚠️ AN ANSWER THAT WOULD DO THE SAME AS A QUICKER ONE IS NOT OFFERED (two weeks where only one can be eased,
+ * say). A recommended answer that is not offered passes to the next QUICKER one, because the reason it is
+ * missing is that its week is already easier (the runner eased it) or has nothing to ease (a light week, race
+ * week): the step the tier asks for is already in the plan, or cannot be taken. Recommended by pauseTierFor — the
+ * repository's own lines for time away — so a week is "carry on", a fortnight "one notch easier", and more
+ * than that "two easier weeks".
+ */
+function reentryOptions(q) {
+  const easable = (q.weeks || []).filter((o) => !o.why);
+  const first = q.weeks[0];
+  const balanced = first && !first.why ? [first] : [];
+  // ⚠️ THE WORDS COUNT THE WEEKS RATHER THAN NAME THEM. "Next week" is wrong on a Monday, when the first week
+  // that has not started is THIS one; the line under each answer names the weeks and their distance.
+  const words = (n) => n === 0 ? "carry on as planned" : n === 1 ? "one easier week" : "two easier weeks";
+  const out = [
+    { id: "slow", weeks: easable.slice(0, 2), t: "Slowly" },
+    { id: "balanced", weeks: balanced, t: "Balanced" },
+    { id: "quick", weeks: [], t: "Quickly" },
+  ];
+  out.forEach((o) => { o.s = words(o.weeks.length); });
+  // An answer that would do the same as a quicker one is dropped, so every answer on the card does something.
+  const key = (o) => o.weeks.map((w) => w.i).join(",");
+  const seen = {};
+  const opts = out.slice().reverse().filter((o) => { const k = key(o); if (seen[k]) return false; seen[k] = 1; return true; }).reverse();
+  if (opts.length < 2) return [];
+  const want = q.tier.id === "nudge" ? "quick" : q.tier.id === "resume" ? "balanced" : "slow";
+  const order = ["slow", "balanced", "quick"];
+  let rec = null;
+  for (let k = order.indexOf(want); k < order.length && !rec; k++) rec = opts.find((o) => o.id === order[k]) || null;
+  opts.forEach((o) => { o.rec = o === rec; });
+  return opts;
+}
+/**
+ * B5 — the question to ask now, or null. Once per break, only in the first week back, only while the plan
+ * is running (not paused, today inside it), and only when there is a week ahead a gentler answer could
+ * change — a question whose answers would all do the same thing is not a question.
+ */
+function currentReentry() {
+  const r = loadReentry();
+  if (!r || r.answer) return null;
+  const today = todayIso();
+  if (r.to >= today || isoAdd(r.to, REENTRY_ASK_DAYS).toISOString().slice(0, 10) < today) return null;
+  if (!TODAY_IN_PLAN || (profile.startDateIso && profile.startDateIso > today)) return null;
+  const q = { rec: r, tier: pauseTierFor(r.days), weeks: reentryWeeks() };
+  q.options = reentryOptions(q);
+  return q.options.length ? q : null;
+}
+/** One week's line: "Week 5: 37.9 → 31.2 km", or the distance-can-rise wording easeWeekSheetHtml already uses. */
+function reentryWeekLine(o) {
+  const up = o.km1 > o.km0 + 0.05;
+  return "Week " + (o.i + 1) + ": " + (up ? "about the same distance, a lot less hard" : reentryKm(o.km0) + " → " + reentryKm(o.km1) + " km");
+}
+/**
+ * ⚠️ ONE DECIMAL, THE PLAN ROWS' OWN ROUNDING (plan-summary's km()). Found in the browser: quoted in whole
+ * kilometres, as the Make a week easier sheet does, the card promised "28 → 24 km" and the week then read
+ * 24.5 km on the Plan screen. A promise has to read the way the plan will read it.
+ */
+function reentryKm(km) { return (Math.round(Number(km) * 10) / 10).toFixed(1); }
+/**
+ * B5 — the card on Today: where the runner has been, what that length of time means (the pause tiers' own
+ * words), and the three answers with what each does to the coming weeks.
+ * ⚠️ IT IS THE ONE QUESTION. It takes the attention slot above the day's session, and weeklyReviewCard says
+ * nothing while it is up (PLAN.md's re-break: remove that, and two questions render).
+ */
+function reentryCard() {
+  const q = currentReentry();
+  if (!q) return "";
+  const r = q.rec;
+  const lvl = (ADJ_MODES.find((m) => m.id === r.mode) || {}).p || "";
+  const where = (r.kind === "holiday" ? "You were away " : "You took it easier ") +
+    runDateLabelIso(r.from) + " to " + runDateLabelIso(r.to) + " — " + pauseDaysLabel(r.days) + ", " + lvl + ".";
+  const first = q.weeks[0];
+  const stays = first ? "Week " + (first.i + 1) + " stays at " + reentryKm(first.km0 != null ? first.km0 : (PLAN.weeks[first.i].distanceKm || 0)) + " km" : "Nothing changes";
+  const opt = (o) => {
+    const sub = o.weeks.length ? o.weeks.map(reentryWeekLine).join(" · ") : stays;
+    return '<button class="po-opt' + (o.rec ? " rec" : "") + '" data-reentry="' + o.id + '">' +
+      (o.rec ? '<span class="po-rec">Recommended</span>' : "") +
+      '<span class="po-t">' + o.t + ' — ' + esc(o.s) + '</span>' +
+      '<span class="po-b">' + esc(sub) + '</span></button>';
+  };
+  return '<div class="card wk-review re-card"><div class="db-head"><span class="db-ic">' + ICON.alfie + '</span><span>Welcome back</span></div>' +
+    '<div class="db-body"><p>' + esc(where) + '</p><p>' + esc(q.tier.why) + '</p>' +
+    '<p><b>How quickly do you want to build back up?</b></p></div>' +
+    '<div class="re-opts">' + q.options.map(opt).join("") + '</div>' +
+    '<p class="mp-note">An easier week swaps its hardest session for an easy run and trims the long run a little, ' +
+    'the same as Make a week easier. You can undo straight after.</p></div>';
+}
+/**
+ * B5 — act on the answer: write the easier weeks (none for Quickly) and the answer, in ONE commit with ONE
+ * Undo — the standing commit pattern, and the same row applyEaseWeek writes, so each week lands in Planned
+ * breaks with its Cancel and in the week marking for free.
+ * ⚠️ UNDO PUTS THE QUESTION BACK as well as the plan: an answer taken back is no answer, and the card returns.
+ */
+function answerReentry(choice) {
+  const q = currentReentry();
+  if (!q) return;
+  const o = q.options.find((x) => x.id === choice);
+  if (!o) return;
+  const beforeRows = JSON.stringify(loadAdjust());
+  const beforeRec = JSON.stringify(q.rec);
+  if (o.weeks.length) {
+    const rows = loadAdjust();
+    const t0 = Date.now();
+    o.weeks.forEach((w, n) => rows.unshift({ id: "adj-" + (t0 + n), kind: "recovery", from: w.wk.startIso,
+      to: isoAdd(w.wk.startIso, 6).toISOString().slice(0, 10), mode: "recovery", dropNonRun: false }));
+    saveAdjust(rows);
+  }
+  saveReentry(Object.assign({}, q.rec, { answer: choice, answeredIso: todayIso() }));
+  const restore = () => {
+    try { localStorage.setItem(ADJUST_KEY, beforeRows); } catch (e) {}
+    try { saveReentry(JSON.parse(beforeRec)); } catch (e) {}
+  };
+  const ticks = todayTicks();
+  if (o.weeks.length) {
+    try { recompute(); } catch (e) {
+      restore();
+      try { recompute(); } catch (e2) {}
+      computeToday(); seedDone(); restoreTicks(ticks);
+      toast("That did not work — your plan is unchanged."); render(); return;
+    }
+    computeToday(); seedDone(); restoreTicks(ticks);
+  }
+  const msg = !o.weeks.length ? "Carrying on as planned."
+    : o.weeks.length === 1 ? "Week " + (o.weeks[0].i + 1) + " is easier."
+    : "Weeks " + (o.weeks[0].i + 1) + " and " + (o.weeks[1].i + 1) + " are easier.";
+  toastUndo(msg, () => {
+    const t2 = todayTicks();
+    restore();
+    if (o.weeks.length) { try { recompute(); } catch (e) {} computeToday(); seedDone(); restoreTicks(t2); }
+    render();
+  });
+  render();
+}
+
 function adoptPlan(out) {
   PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters;
   normalizeWeekStarts();
@@ -8843,7 +9058,9 @@ function todayNextUp() {
  * ⚠️ AND IT IS THE PREVIEW COPY THAT SURVIVES, NOT THE OTHER WAY ROUND, because that one sits directly
  * above the paces it changes. Reached now by opening the session, which is what the day's own card does.
  */
-function todayCards() { return [trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()]; }
+// ⚠️ B5: THE COMING-BACK QUESTION LEADS. It is about the days ahead of a runner who has just returned; a pace
+// flag or a review built from before the break can wait a week, and weeklyReviewCard steps aside for it.
+function todayCards() { return [reentryCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()]; }
 function todayAttention() {
   return todayCards().find((x) => x && x.trim()) || "";
 }
@@ -40862,6 +41079,9 @@ function weeklyReviewCard() {
   // ⚠️ The pace-change conversation belongs to trainFlagBanner, which owns the accept/decline and the
   // muting. Showing both would ask the same question twice in two voices.
   if (state.trainFlag) return "";
+  // ⚠️ B5: AND NOT WHILE "HOW QUICKLY DO YOU WANT TO BUILD BACK UP?" IS OPEN. One question at a time — the
+  // review's own rule — and its ease-a-week offer would be the same question asked a second way.
+  if (currentReentry()) return "";
   const r = currentWeeklyReview();
   if (!r || r.quiet) return "";
   const lines = r.observations.map((o) => "<p>" + esc(o) + "</p>").join("");
@@ -42408,6 +42628,8 @@ function wire() {
   const wrAddDay = $("wrAddDay"); if (wrAddDay) wrAddDay.onclick = applyAddDay;
   const wrNoDay = $("wrNoDay"); if (wrNoDay) wrNoDay.onclick = declineAddDay;
   const wrEase = $("wrEase"); if (wrEase) wrEase.onclick = applyEaseOffer;
+  // B5 — each answer to "how quickly do you want to build back up?" acts, with an Undo that re-asks.
+  document.querySelectorAll("[data-reentry]").forEach((b) => { b.onclick = () => answerReentry(b.dataset.reentry); });
   const wrNoEase = $("wrNoEase"); if (wrNoEase) wrNoEase.onclick = declineEaseOffer;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;
@@ -42728,6 +42950,8 @@ $("bellBtn").onclick = () => { if (liveRunning()) return; stopTrialRun(); openRe
 $("clubNewBtn").onclick = () => { if (liveRunning()) return; openClubCreate(); };
 migrateRunRoutes();
 seedDone();
+// B5: a break that ended while the app was closed is recorded now, before anything can write the break store.
+try { reentryCapture(loadAdjust()); } catch (e) { try { console.warn("re-entry capture skipped", e); } catch (e2) {} }
 // ---- The shell tracks the visible area, keyboard and all -----------------------------------------
 // Without this the app is 100dvh tall with the keyboard covering the bottom third: #view has no
 // scroll room, so nothing can bring a focused field into view and iOS resorts to panning the whole

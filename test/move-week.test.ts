@@ -108,9 +108,9 @@ const FNS = ["isoAdd", "dmon", "runDateLabelIso", "dayLabelIso", "esc", "genDay"
   "sessionTimeAt", "hmValid", "legacySid", "sidKeys", "loadDayOverride", "saveDayOverride", "skipOfferable",
   "xwDir", "xwDayOf", "xwRaceIso", "xwDropped", "xwRefusal", "applyCrossWeekMoves", "xwHomeOf", "xwOfferable", "xwTargets",
   "moveSessionToWeek", "xwBlockText", "xwPickerHtml", "xwRowHtml", "moveSession", "weekMoves", "xwMovedFrom", "weekAdjust",
-  "weekAdjustNote", "seedDone"];
+  "weekAdjustNote", "seedDone", "reentryCapture", "loadReentry", "saveReentry"];
 const CONSTS = ["DAY_ORDER", "MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "TIME_KEY", "PRIMARY_TYPES",
-  "XWEEK", "ADJ_MODES", "ADJ_QUALITY", "ADJ_RUN", "XW_WHY"];
+  "XWEEK", "ADJ_MODES", "ADJ_QUALITY", "ADJ_RUN", "XW_WHY", "REENTRY_KEY", "REENTRY_MODES", "REENTRY_ASK_DAYS"];
 
 function sandbox(o: Opts = {}, seed: Record<string, string> = {}) {
   const store: Record<string, string> = { ...seed };

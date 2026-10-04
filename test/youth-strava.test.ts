@@ -115,7 +115,7 @@ function athleteHandedOver(age: unknown) {
     generatePlan: () => { throw STOP; },
   };
   // planStartIso joined it on 2026-10-04: the block's start, as stored (test/plan-anchor.test.ts).
-  const applyProfile = lift<(pf: unknown) => unknown>(["applyProfile", "planStartIso"], "applyProfile", {
+  const applyProfile = lift<(pf: unknown) => unknown>(["applyProfile", "planStartIso", "blockStartIso"], "applyProfile", {
     RC, trainingYearsFor: () => 3, resolvedStatus: () => "regular", experienceFor: () => "recreational",
     typeCeilingFor: () => 4, returnKind: () => null, strengthPrefsOf: () => null, progActive: () => false,
     todayIso: () => "2026-09-28", Math,

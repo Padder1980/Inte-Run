@@ -55,7 +55,8 @@ function builder() {
     trainingYearsFor: () => 3, resolvedStatus: (p: any) => p.status, typeCeilingFor: () => undefined,
     experienceFor: () => "recreational", strengthPrefsOf: () => null, progActive: () => false,
   };
-  const src = ["applyProfile", "planStartIso", "returnKind"].map(fnBody).join("\n");
+  // blockStartIso joined it with the pause that picks up where you left off (test/pause-pickup.test.ts).
+  const src = ["applyProfile", "planStartIso", "blockStartIso", "returnKind"].map(fnBody).join("\n");
   const names = Object.keys(env);
   const api = new Function(...names, src + "\nreturn { applyProfile, planStartIso };")(...names.map((n) => env[n]));
   return { api, clock };
@@ -169,7 +170,8 @@ test("BLOCKER: what the launch reads is declared above the first rebuild — so 
   // The launch's own line — the same text inside earlier FUNCTIONS is not the first rebuild, it runs later.
   const first = SRC.indexOf("try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }");
   assert.ok(first > 0, "the launch's first recompute() line has changed shape — update this guard");
-  for (const name of ["ANCHOR_KEY", "PLAN_PROF_FIELDS", "FIRST_RUN"]) {
+  // ADJ_QUALITY: holdBeforeStart reads it inside applyProfile, so a paused plan reads it at launch (test/pause-pickup).
+  for (const name of ["ANCHOR_KEY", "PLAN_PROF_FIELDS", "FIRST_RUN", "ADJ_QUALITY"]) {
     const at = SRC.search(new RegExp("^(?:const|let) " + name + " = ", "m"));
     assert.ok(at > 0 && at < first, name + " is declared below the first recompute(), so launch reads it in its dead zone");
   }

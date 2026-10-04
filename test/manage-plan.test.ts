@@ -183,7 +183,9 @@ test("BLOCKER: the pause recommendation is derived from the length, and moving t
   const sheet = nocomment(fn("pausePlanHtml"));
   // Moving the date is recommended whenever it is offered at all, and is not offered for a short gap.
   assert.match(sheet, /opt\("shift", true,/, "moving the date is no longer the recommendation");
-  assert.match(sheet, /t\.id === "nudge"\s*\n?\s*\?\s*""/,
+  // (Since 2026-10-04 the date also moves when a pause picks up where you left off, and that option replaces this one
+  // at a fortnight: test/pause-pickup.test.ts drives the sheet at every length.)
+  assert.match(sheet, /const shift = t\.id === "nudge"[^?]*\?\s*""/,
     "a gap of a week or less is still being offered a date move, which is silly");
   assert.ok(!/opt\("keep", true/.test(sheet), "keeping the date is being recommended");
 });
@@ -396,11 +398,17 @@ test("BLOCKER: a pause actually empties the window it was given", () => {
   // pausing 28 days moved the race 14 Feb → 14 Mar and grew the plan 25 → 29 weeks while leaving
   // **21 runs inside the 28-day window** and the next fortnight byte-identical.
   const ap = nocomment(fn("applyPause"));
-  assert.match(ap, /profile\.startDateIso = isoAdd\(todayIso\(\), days\)\.toISOString\(\)\.slice\(0, 10\)/,
+  // Since 2026-10-04 every answer's profile changes come from ONE definition, pauseChanges, which the sheet quotes
+  // from too; applyPause applies them. test/pause-pickup.test.ts drives it for every answer at every length.
+  assert.match(nocomment(fn("pauseChanges")), /const back = isoAdd\(today, days\)\.toISOString\(\)\.slice\(0, 10\);/,
     "the pause no longer moves the plan's start date, so the window stays full");
-  // ⚠️ FOR BOTH OPTIONS. Keeping the target date with no start date is the same defect wearing the
-  // other option's clothes.
-  assert.match(ap, /kind === "shift" \|\| kind === "keep"/, "only one of the two options empties the window");
+  assert.match(ap, /const ch = pauseChanges\(kind, days\);[\s\S]*Object\.assign\(profile, ch\);/,
+    "applyPause no longer applies the answer the sheet quoted");
+  // ⚠️ FOR EVERY OPTION. Keeping the target date with no start date is the same defect wearing the
+  // other option's clothes: each answer pauseChanges knows must set the start to the day the runner is back.
+  const pc = nocomment(fn("pauseChanges"));
+  for (const k of ["pickup", "keep", "shift"]) assert.match(pc, new RegExp('kind === "' + k + '"'), "pauseChanges does not know " + k);
+  assert.equal([...pc.matchAll(/startDateIso: back/g)].length, 3, "an answer leaves the start where it was, so the window stays full");
   // And the undo must put the start date back, or a pause cannot be taken off.
   assert.match(ap, /profile\.startDateIso = before\.startDateIso/, "undo does not restore the start date");
   assert.match(ap, /startDateIso: profile\.startDateIso/, "the snapshot does not include the start date");

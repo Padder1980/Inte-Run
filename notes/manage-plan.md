@@ -1037,3 +1037,74 @@ own `weekView`, starting next Monday so no day has passed whichever day the suit
 two real plans a week apart. `test/template-escapes.test.ts` (2). Fixtures moved to the real id form in six test files;
 lift lists gained the new helpers in six; the who-asks guards in `manage-plan` and `skip-session` name the new askers
 and check they delegate. **23 of 23 re-breaks caught** — PLAN.md's own (skip the re-projection) among them — and 2 of 2 for the regex guard.
+
+## A PAUSE PICKS UP WHERE YOU LEFT OFF (2026-10-04, the owner: "make a pause pick up where you left off")
+
+Found the same day, as soon as the block stopped sliding (`notes/plan-profile.md`): the plan finally climbed week by
+week, and a pause threw that away. It set a future start, and the block was built again from that day, so pausing
+a fortnight in week 8 brought the runner back to **week 1 of a shorter plan**, starting from the weekly distance
+they gave when they set it up. "Keep my target date" did the same after even three days.
+
+**What a pause does now** (`pauseChanges`, the one definition: the sheet quotes from it and `applyPause` applies it):
+- **Pick up where you left off** (14–28 days, while a plan is running; recommended at 14): the block AND the target
+  date move later by the weeks away, so the runner comes back to the week they paused in, **from the same day of it**
+  (every pick-up length is whole weeks, so the day back is the same weekday). Driven in the browser: week 6, a
+  fortnight → "picks up on 18 Oct in week 6 … your target date becomes 3 Jan 2027", and afterwards week 6 held
+  only that Sunday's 99-minute long run, week 7 was the plan's own 105 minutes, and the climb went on (111, 117, 123,
+  easier weeks in place).
+- **Start again from week 1** (21–70 days; recommended there): the old rebuild, honestly named. The tiers say a
+  break of two to four weeks is "worth rebuilding the run-in", and past a month the gentler start comes with it.
+  The option used to say "the whole block lands N later", which stopped being true once the block stopped sliding.
+- **Keep my target date**: up to a fortnight, the block stays where it is and the days away are held empty, so the
+  runner carries on from the week the plan has reached ("skipped, not squeezed in"). Longer: week 1 again, to the
+  same date (as before). Never recommended (as before).
+- **Leave my plan alone**: unchanged.
+- **Back early** ("I am back — start now", or Cancel in Planned breaks): after picking up, the block and the target
+  date come back by the whole weeks not taken (`pauseWeeks`), so today is still the week they paused in and the plan
+  is as long as it was. Driven: same day → week 6 today, target 20 Dec again; Undo → the pause exactly as it was.
+
+### How: where the block is laid out from is no longer always where it starts
+
+- ⚠️⚠️ **`profile.blockFromIso`** is the day the block is laid out from, when that is earlier than `startDateIso`.
+  `blockStartIso(pf)` reads it (ignored unless it is before the start). `startDateIso` keeps its meaning, the day
+  the plan starts (again), so **a future start is still the whole of a pause**: `pausedCard`, the paused row,
+  Planned breaks, B5 and B6 all read it unchanged. No pause store (still guarded).
+- ⚠️ **The engine makes this exact.** It counts the block's length from the start's Monday and lays the weeks out
+  backwards from the race's Monday, so moving the start and the race later by the same whole weeks gives the same
+  block, just later. B6's "pick up where you left off" already relied on this.
+- ⚠️⚠️ **THE WEEKS BEFORE THE RESTART ARE HELD, NOT DROPPED** (`holdBeforeStart`, inside `applyProfile` so the sheet's
+  quotes and the adopted plan agree). Their sessions go from PLAN and RAW, a half-held week re-derives its figures
+  (the engine's `weekVolumeMeters`), and a week wholly before the start is flagged `beforeStart`. Dropping them looked
+  simpler and would have broken everything that reads a week by its number as an array position:
+  `RAW.weeks[week - 1]` in `moveSession` and the session sheets, `PLAN.weeks[clash.week - 1]` in the clash check,
+  every "Week " + (i + 1) in the ease offer and B5/B6, the race week as `index === PLAN.weeks.length`. Kept, week N
+  is still `PLAN.weeks[N - 1]`, and only the screens that LIST weeks skip them (`firstShownWeek`): `computeToday`
+  (nobody is "in" a held week, so a pause still reads as `TODAY_IN_PLAN` false), the Plan list and chart and its
+  legend, the calendar, Today's week band (its pages and its scroll offset), `curWeekIdx`, the ease offer, and a
+  week-move (`xwRefusal` "start"; the restart week's RAW `startDateIso` is the restart day, as the engine's own
+  partial first week does).
+- **History**: the weeks before a pause are out of sight afterwards, as every week before today was until the block
+  stopped sliding. Each later pause re-anchors the same way, so any number of pauses works.
+- ⚠️ **Everything that writes the profile was checked**: `draftFromForm` REPLACES the profile, so it now carries
+  `blockFromIso`/`pauseWeeks` while the start is unchanged (else saving a name after a pause started the block again
+  from week 1, `formStartIso`'s own defect one field over); the wizard, a new start date, `reusePlan` and B6's "start
+  again" lay the block out from the start; B6's "pick up" moves `blockFromIso` (moving the start would only hide more
+  weeks); `PLAN_PROF_FIELDS` carries both; every Undo restores both. `applyPause` used to leave the start moved when
+  the rebuild threw; it now puts everything back.
+- Small fixes on the way, both visible during a pause: the paused row's line now wraps (the part that says when you
+  pick up was cut off by the ellipsis at phone width: 418px of text in 271px), and the week band says "Week 6", not
+  "This week", when the runner is not in the plan today.
+
+⚠️⚠️ **FOUND WHILE BUILDING IT: A HELD WEEK IS NOT EVIDENCE.** `addDayEvidence` takes the three weeks before this
+one; held weeks prescribe nothing, so three of them and one run since read as full completion, and the add-a-day
+offer (85% of the last three weeks) would have asked for another running day a week after the runner came back.
+When a pause restarted the plan those weeks did not exist. They are skipped now, which also keeps the ease offer's
+evidence (built from the same weeks) to weeks the runner was actually in.
+⚠️ **Not changed, noticed:** during a pause Today's hero shows "Recovery day" for the selected day of the week the
+plan restarts in. The old pause did the same.
+⚠️ `launch` order: `holdBeforeStart` reads `ADJ_QUALITY` inside `applyProfile`, so a paused plan reads it at launch;
+it is declared above the first `recompute()`, and `test/plan-anchor.test.ts` now lists it.
+
+**Tests:** `test/pause-pickup.test.ts` (8), over the real engine and the real sheet, `applyPause` and
+`resumeFromPause`. **24 of 24 re-breaks caught**, the defect itself among them (lay the block out from the restart
+day and five tests fail). `manage-plan`'s two pause guards were restated for `pauseChanges`.

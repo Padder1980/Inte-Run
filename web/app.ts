@@ -6016,6 +6016,9 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 /* The paused stretch is a row, not a button: there is no week behind it to open. */
 .wk-paused { cursor: default; border-style: dashed; border-color: var(--accent); }
 .wk-paused .wk-n { background: var(--surface-2); color: var(--ink-faint); }
+/* The paused row's line ends with the day and the week the plan picks up in, the part the runner needs, and one
+   line cut it off at phone width (418px of text in 271px). It is an inert row, so it wraps. */
+.wk-paused .wk-m { white-space: normal; }
 .wk-adj { margin: var(--s3) 0 0; padding: var(--s3); border-radius: var(--r-ctl);
   background: var(--surface-2); }
 .wk-adj b { display: block; font-size: var(--t-label); font-weight: 750; letter-spacing: .04em;
@@ -6531,7 +6534,7 @@ const REALIGN_KEY = "interun_realign_v1";
 const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
   "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
   "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
-  "strengthKit", "returning", "age", "sex", "autoPace"];
+  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks"];
 /**
  * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
  * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
@@ -6953,9 +6956,13 @@ function applyProfile(pf) {
   // MAS fractions across would have put a confident physiological label on a number that does not
   // support one.
   const startDateIso = planStartIso(pf);
-  const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso };
+  // ⚠️ A PAUSE THAT PICKS UP WHERE YOU LEFT OFF lays the block out from an earlier day than it starts on
+  // (blockStartIso), and the days before the start are then held empty (holdBeforeStart).
+  const blockFrom = blockStartIso(pf);
+  const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: blockFrom };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
   const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
+  if (blockFrom < startDateIso) holdBeforeStart(plan, raw, startDateIso);
   // Fitness profile is built from real efforts only (the entered 5 km and/or the 2 km trial); a pure
   // beginner falls back to the seeded baseline so the page still has something to show.
   const efforts = [];
@@ -7426,7 +7433,7 @@ function xwRefusal(s, home, ti, to, ov, rows, weeks) {
   if (ti !== home && (ti === last || home === last)) return "race";
   if (ti !== home && rows && (eased(PLAN.weeks[ti], rows) || eased(PLAN.weeks[home], rows))) return "eased";
   const iso = isoAdd(PLAN.weeks[ti].startIso, to).toISOString().slice(0, 10);
-  if (RAW.weeks[ti].startDateIso && iso < RAW.weeks[ti].startDateIso) return "start";
+  if (PLAN.weeks[ti].beforeStart || (RAW.weeks[ti].startDateIso && iso < RAW.weeks[ti].startDateIso)) return "start";
   const race = xwRaceIso();
   if (race && RC.HARD_BEFORE_RACE.has(s.type) && iso === isoAdd(race, -1).toISOString().slice(0, 10)) return "eve";
   const list = weeks ? weeks[ti] : RAW.weeks[ti].sessions;
@@ -7915,7 +7922,7 @@ function easeWeekOptions() {
   const out = [];
   for (let i = 0; i < PLAN.weeks.length; i++) {
     const wk = PLAN.weeks[i], raw = RAW.weeks[i];
-    if (!wk || !raw || !wk.startIso) continue;
+    if (!wk || !raw || !wk.startIso || wk.beforeStart) continue;
     // Only weeks that have not started yet, and never one already eased.
     if (isoAdd(wk.startIso, 6).toISOString().slice(0, 10) < todayIso()) continue;
     if (eased(wk, rows)) { out.push({ i: i, wk: wk, why: "already easier" }); continue; }
@@ -8327,11 +8334,19 @@ function realignPickup(ev) {
   if (stopI < 0) stopI = 0;
   const w = nowI - stopI;
   if (nowI < 0 || w < 1) return null;
-  let start = isoAdd(planStartIso(profile), 7 * w).toISOString().slice(0, 10);
-  if (start > today) start = today;
+  // ⚠️ AFTER A PAUSE THE BLOCK IS LAID OUT FROM AN EARLIER DAY THAN IT STARTED AGAIN ON (blockStartIso). That day is
+  // the one that moves; the day it started again stays, and so do the weeks held before it. Moving the start
+  // instead would hide more weeks and leave the runner exactly where they were.
   const race = isoAdd(profile.raceDate, 7 * w).toISOString().slice(0, 10);
-  const pre = realignPreview({ startDateIso: start, raceDate: race });
-  return pre ? { start: start, race: race, weeks: w, pre: pre } : null;
+  let start = isoAdd(blockStartIso(profile), 7 * w).toISOString().slice(0, 10);
+  let changes;
+  if (start < planStartIso(profile)) changes = { blockFromIso: start, raceDate: race };
+  else {
+    if (start > today) start = today;
+    changes = { startDateIso: start, blockFromIso: "", raceDate: race };
+  }
+  const pre = realignPreview(changes);
+  return pre ? { start: start, race: race, weeks: w, pre: pre, changes: changes } : null;
 }
 /**
  * B6 — the answers by how far the runner has slipped, each mapped to something that already exists and quoting
@@ -8371,7 +8386,8 @@ function realignOptions(ev) {
     if (p) out.push({ id: "pickup", t: "Pick up where you left off", pick: p, rec: tierId === "nudge" || tierId === "resume",
       s: "Back to week " + p.pre.index + " (" + reentryKm(p.pre.km) + " km)" + (race ? ", and your target date moves from " + race + " to " + runDateLabelIso(p.race) : "") + "." });
   }
-  const changes = long ? { startDateIso: todayIso(), returning: "break" } : { startDateIso: todayIso() };
+  const changes = long ? { startDateIso: todayIso(), blockFromIso: "", pauseWeeks: 0, returning: "break" }
+    : { startDateIso: todayIso(), blockFromIso: "", pauseWeeks: 0 };
   const r = realignPreview(changes);
   if (r) out.push({ id: "restart", t: "Start again from this week", changes: changes, rec: !long && tierId === "rebuild",
     s: "Week 1 from this week (" + reentryKm(r.km) + " km)" + (race ? ", still building to " + race + " over " + r.weeks + " weeks" : "") +
@@ -8436,11 +8452,13 @@ function answerRealign(choice) {
   }
   if (choice === "newplan") { startWizard(); return; }
   const beforeRows = JSON.stringify(loadAdjust());
-  const beforeProf = { raceDate: profile.raceDate, startDateIso: profile.startDateIso, returning: profile.returning };
+  const beforeProf = { raceDate: profile.raceDate, startDateIso: profile.startDateIso, returning: profile.returning,
+    blockFromIso: profile.blockFromIso, pauseWeeks: profile.pauseWeeks };
   const beforeOv = JSON.stringify(state.dayOverride || {});
   const restore = () => {
     try { localStorage.setItem(ADJUST_KEY, beforeRows); } catch (e) {}
     profile.raceDate = beforeProf.raceDate; profile.startDateIso = beforeProf.startDateIso; profile.returning = beforeProf.returning;
+    profile.blockFromIso = beforeProf.blockFromIso; profile.pauseWeeks = beforeProf.pauseWeeks;
     try { state.dayOverride = JSON.parse(beforeOv); } catch (e) {}
     saveDayOverride();
     saveRealign(beforeRec);
@@ -8452,7 +8470,7 @@ function answerRealign(choice) {
       mode: "recovery", reason: "missed", dropNonRun: false });
     saveAdjust(rows);
   } else if (choice === "pickup") {
-    profile.raceDate = o.pick.race; profile.startDateIso = o.pick.start;
+    Object.assign(profile, o.pick.changes);
   } else if (choice === "restart") {
     Object.assign(profile, o.changes);
   }
@@ -8646,6 +8664,61 @@ function normalizeWeekStarts() {
  */
 function planStartIso(pf) { return (pf && pf.startDateIso) || todayIso(); }
 /**
+ * WHERE THE BLOCK IS LAID OUT FROM: the day it starts (planStartIso), unless a pause picks up where the runner left
+ * off (2026-10-04, the owner: "make a pause pick up where you left off"). Then profile.blockFromIso is the earlier
+ * day the block is laid out from, and planStartIso stays the day it starts again: a future date while the pause
+ * runs, which is all a pause is (pausedCard). The days before that start are held empty and the weeks wholly before
+ * it are out of sight (holdBeforeStart), so the runner comes back to the week they paused in instead of to a new
+ * week 1 rebuilt from the fitness they began with.
+ * ⚠️ IGNORED UNLESS IT IS BEFORE THE START, so a stale value can never lay a block out later than it begins.
+ */
+function blockStartIso(pf) {
+  const s = planStartIso(pf);
+  return pf && pf.blockFromIso && pf.blockFromIso < s ? pf.blockFromIso : s;
+}
+/**
+ * THE DAYS BEFORE THE PLAN STARTS AGAIN, HELD EMPTY. Only when the block is laid out from an earlier day
+ * (blockStartIso). Sessions dated before the start leave PLAN and RAW alike, and a week that loses some re-derives its
+ * figures from the engine's own weekVolumeMeters, as applyAdjustments does. A week that ends before the start is
+ * flagged beforeStart, and computeToday, the Plan screen, Today's week band, the calendar, the ease offer and a
+ * week-move all pass it by (firstShownWeek).
+ * ⚠️⚠️ KEPT, NOT DROPPED, AND THAT IS THE POINT. Week N stays PLAN.weeks[N - 1]: moveSession, the session sheets and
+ * the clash check read a week by its number that way (RAW.weeks[week - 1]), and every "Week 9" in the ease offer
+ * and the comeback questions is an array position plus one. Drop the weeks before the start and each of those
+ * reads the wrong week, silently.
+ * ⚠️ THE WEEK IT STARTS AGAIN IN STARTS ON THAT DAY (RAW's startDateIso), as the engine's own partial first week
+ * does, so a week-move refuses the days before it for the same reason (xwRefusal's "start").
+ */
+function holdBeforeStart(plan, raw, cutIso) {
+  const pw = (plan && plan.weeks) || [], rw = (raw && raw.weeks) || [];
+  let first = null;
+  pw.forEach((wk, i) => {
+    const r = rw[i];
+    const mon = isoAdd(wk.startIso, -((isoAdd(wk.startIso, 0).getUTCDay() + 6) % 7)).toISOString().slice(0, 10);
+    const on = (d) => isoAdd(mon, d).toISOString().slice(0, 10);
+    if (on(0) >= cutIso) { if (!first) first = wk; return; }
+    wk.sessions = wk.sessions.filter((x) => on(x.dayIndex) >= cutIso);
+    if (r) {
+      r.sessions = r.sessions.filter((x) => on(x.dayOfWeek) >= cutIso);
+      r.plannedDistanceMeters = RC.weekVolumeMeters(r.sessions);
+      r.qualitySessionCount = r.sessions.filter((x) => ADJ_QUALITY[x.type]).length;
+    }
+    wk.distanceKm = r ? Math.round(r.plannedDistanceMeters / 100) / 10 : 0;
+    wk.quality = r ? r.qualitySessionCount : 0;
+    const lr = r && r.sessions.find((x) => x.type === "long");
+    wk.longRunMin = lr ? Math.round((lr.estimatedDurationSeconds || 0) / 60) : 0;
+    if (on(6) < cutIso) { wk.beforeStart = true; if (r) r.beforeStart = true; return; }
+    if (r) r.startDateIso = cutIso;
+    if (!first) first = wk;
+  });
+  if (first && !(plan.defaultWeekIndex >= first.index)) plan.defaultWeekIndex = first.index;
+}
+/** The first week the runner can see: 0, unless a pause holds the weeks before the plan starts again. */
+function firstShownWeek() {
+  const i = PLAN && PLAN.weeks ? PLAN.weeks.findIndex((w) => !w.beforeStart) : 0;
+  return i > 0 ? i : 0;
+}
+/**
  * ONE-TIME, AND ONLY FOR A PLAN FROM BEFORE THE FIX: it counts from the day this build first runs.
  * ⚠️⚠️ NEVER FROM THE START DATE IT WAS BUILT WITH. Until now the block restarted from today on every launch,
  * so a runner who began a month ago has been doing week 1 every week. Their stored start says week 5;
@@ -8672,8 +8745,11 @@ try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); r
 let CURRENT_WEEK = 0, TODAY_DOW = 0, TODAY_IN_PLAN = false;
 function computeToday() {
   const iso = todayIso();
-  CURRENT_WEEK = 0; TODAY_DOW = 0; TODAY_IN_PLAN = false;
-  for (let wi = 0; wi < PLAN.weeks.length; wi++) {
+  // ⚠️ PAUSE: a week held before the plan starts again (holdBeforeStart) is not a week anybody is in, and the
+  // nearest end of a plan that has not started is its first week on show, not its first week.
+  const first = firstShownWeek();
+  CURRENT_WEEK = first; TODAY_DOW = 0; TODAY_IN_PLAN = false;
+  for (let wi = first; wi < PLAN.weeks.length; wi++) {
     for (let i = 0; i < 7; i++) {
       if (isoAdd(PLAN.weeks[wi].startIso, i).toISOString().slice(0, 10) === iso) { CURRENT_WEEK = wi; TODAY_DOW = i; TODAY_IN_PLAN = true; return; }
     }
@@ -9142,7 +9218,7 @@ function rpeOf(s) { let band = s.targetRpe; if (!band) { const w = s.steps.filte
 // The week the top calendar strip is currently showing. selWeek is a 0-based array index into
 // PLAN/RAW.weeks; week 0 is the current ("this") week. Clamped so a regenerated (shorter) plan
 // can't leave us pointing off the end.
-function curWeekIdx() { return Math.max(0, Math.min(state.selWeek, PLAN.weeks.length - 1)); }
+function curWeekIdx() { return Math.max(firstShownWeek(), Math.min(state.selWeek, PLAN.weeks.length - 1)); }
 function curWeek() { return PLAN.weeks[curWeekIdx()]; }
 function curWeekNo() { return curWeek().index; } // 1-based week number, for done keys / data-oweek
 function isCurrentWeek() { return curWeekIdx() === CURRENT_WEEK; }
@@ -9186,10 +9262,16 @@ function wkLabelInner(wi) {
   const w = Math.max(0, Math.min(wi, PLAN.weeks.length - 1));
   const wk = PLAN.weeks[w];
   const range = dmon(isoAdd(wk.startIso, 0)) + " – " + dmon(isoAdd(wk.startIso, 6));
-  return '<b>' + (w === CURRENT_WEEK ? "This week" : "Week " + wk.index) + '</b><span>' + range + '</span>';
+  // "This week" only when the runner is in the plan today: during a pause (or before a plan starts) the week shown
+  // first is the week it starts in, and calling that "this week" put the wrong dates under the right words.
+  return '<b>' + (w === CURRENT_WEEK && TODAY_IN_PLAN ? "This week" : "Week " + wk.index) + '</b><span>' + range + '</span>';
 }
 function weekStrip() {
+  // ⚠️ PAUSE: no page for a week held before the plan starts again, so page p is week firstShownWeek() + p; wire()
+  // positions and reads the band with the same offset.
+  const first = firstShownWeek();
   const pages = PLAN.weeks.map((wk, wi) => {
+    if (wi < first) return "";
     const cur = wi === CURRENT_WEEK;
     const days = DAY_ORDER.map((d, i) => {
       const dt = isoAdd(wk.startIso, i);
@@ -12386,7 +12468,7 @@ function planDragCancel() { if (!DRAG || !DRAG.isPlan) return; planDragTeardown(
 function viewCalendar() {
   const back = '<button class="backbtn" id="calBack">‹ Back</button>';
   const todayIsoStr = todayIso();
-  const weeks = PLAN.weeks.map((w) => {
+  const weeks = PLAN.weeks.slice(firstShownWeek()).map((w) => {
     let doneKm = 0;
     w.sessions.forEach((s) => { if (state.done[doneKey(w.index, s)] && s.distKm) doneKm += s.distKm; });
     const rows = DAY_ORDER.map((dn, i) => {
@@ -15357,7 +15439,7 @@ function plannedBreaksHtml() {
       esc(runDateLabelIso(todayIso())) + " to " +
         esc(runDateLabelIso(isoAdd(profile.startDateIso, -1).toISOString().slice(0, 10))) +
         " \u00b7 nothing scheduled",
-      'data-pbresume="1"', "Cancel the pause and start again from today");
+      'data-pbresume="1"', profile.blockFromIso ? "Cancel the pause and carry on from today" : "Cancel the pause and start again from today");
   }
   for (const r of rows) {
     const span = r.from === r.to ? runDateLabelIso(r.from)
@@ -15505,6 +15587,43 @@ function pauseTierFor(days) {
   return PAUSE_TIERS[PAUSE_TIERS.length - 1];
 }
 
+/**
+ * PAUSE: WHAT EACH ANSWER DOES TO THE PROFILE (2026-10-04). The one definition: the sheet quotes from it and
+ * applyPause applies it. Every answer starts the plan again on the day the runner is back, which is what keeps the
+ * days away empty (a future start IS the pause, see pausedCard).
+ *   pickup: the block AND the target date move later by the weeks away, so the week they come back to is the week
+ *           they paused in, from the same day of it. Whole weeks of 14 to 28 days, while a plan is running.
+ *   keep:   up to a fortnight, the block stays where it is and the days away are held empty: they carry on from the
+ *           week the plan has reached. Longer, the plan starts again from week 1 on the day they are back and runs to
+ *           the same date, the tiers' own "worth rebuilding the run-in".
+ *   shift:  the plan starts again from week 1 on the day they are back, and the target date moves by the break.
+ * ⚠️⚠️ WHY PICKING UP EXISTS. With the block kept where it began (planStartIso) the plan finally climbs week by week,
+ * and a pause that starts it again from week 1 throws that away: pause a fortnight in week 8 and the runner came back
+ * to week 1 of a shorter plan, built from the weekly distance they gave when they set it up. Found and put on the
+ * Road Map the same day; the owner's ruling: "make a pause pick up where you left off".
+ * ⚠️ OVER A MONTH NOTHING PICKS UP: the tiers' own line ("rebuild, and ease back in") and B6's, which offers no picking
+ * up past four weeks either. The gentler start (returning) is the generator's only lever for it.
+ */
+function pauseChanges(kind, days) {
+  const today = todayIso();
+  const back = isoAdd(today, days).toISOString().slice(0, 10);
+  const tier = pauseTierFor(days).id;
+  const live = TODAY_IN_PLAN && !(profile.startDateIso && profile.startDateIso > today);
+  const later = (iso, n) => iso ? isoAdd(iso, n).toISOString().slice(0, 10) : iso;
+  const restart = Object.assign({ startDateIso: back, blockFromIso: "", pauseWeeks: 0 }, tier === "reentry" ? { returning: true } : {});
+  if (kind === "pickup") {
+    const w = days / 7;
+    if (!live || (tier !== "resume" && tier !== "rebuild") || w !== Math.round(w)) return null;
+    return { startDateIso: back, blockFromIso: later(blockStartIso(profile), 7 * w), raceDate: later(profile.raceDate, 7 * w), pauseWeeks: w };
+  }
+  if (kind === "keep") {
+    if (live && (tier === "nudge" || tier === "resume") && profile.raceDate && back < profile.raceDate)
+      return { startDateIso: back, blockFromIso: blockStartIso(profile), pauseWeeks: 0 };
+    return restart;
+  }
+  if (kind === "shift") return Object.assign({}, restart, { raceDate: later(profile.raceDate, days) });
+  return null;
+}
 
 // The pause sheet. It asks how long, says what that length means, and then ends in a CHOICE -- never
 // in a change. Standing instruction, 2026-08-03: the app may observe and it may propose; it may never
@@ -15534,18 +15653,37 @@ function pausePlanHtml() {
   // I first recommended KEEPING the date after a month off, and it is backwards: a month away plus an
   // unchanged target means the block has to be compressed at exactly the moment the runner is least
   // ready for it. Moving the date back by the length of the break restores the block they had.
-  const shift = t.id === "nudge"
+  // ⚠️ PICKING UP WHERE YOU LEFT OFF (pauseChanges) IS RECOMMENDED UP TO A FORTNIGHT, the tier that says "pick the plan
+  // back up", and offered to four weeks, as B6 offers it. From two weeks on, starting again is the tiers' advice, so
+  // that is the recommendation there. Each option quotes the week, the day and the date it means.
+  const pick = pauseChanges("pickup", days);
+  const keepCh = pauseChanges("keep", days);
+  const weekAt = (iso) => {
+    const w = PLAN.weeks.find((x) => x && x.startIso && !x.beforeStart && iso >= x.startIso && iso <= isoAdd(x.startIso, 6).toISOString().slice(0, 10));
+    return w ? w.index : null;
+  };
+  const pickup = pick && PLAN.weeks[CURRENT_WEEK]
+    ? opt("pickup", t.id === "resume", "Pick up where you left off",
+        "Your plan stops now and picks up on <b>" + esc(runDateLabelIso(resumeIso)) + "</b> in <b>week " +
+        PLAN.weeks[CURRENT_WEEK].index + "</b>, where you left off. Nothing is scheduled in between, and your " +
+        "target date becomes <b>" + esc(runDateLabelIso(pick.raceDate)) + "</b>.")
+    : "";
+  const shift = t.id === "nudge" || (t.id === "resume" && pickup)
     ? ""
-    : opt("shift", true, "Move my target date back",
-        "Your plan stops now and picks up on <b>" + esc(runDateLabelIso(resumeIso)) + "</b>. Nothing is " +
-        "scheduled in between, and the whole block lands " + pauseDaysLabel(days) + " later." +
-        (moved ? " Your target date becomes <b>" + esc(runDateLabelIso(moved)) + "</b>." : ""));
+    : opt("shift", true, "Start again from week 1",
+        "Your plan stops now and starts again from week 1 on <b>" + esc(runDateLabelIso(resumeIso)) + "</b>. Nothing is " +
+        "scheduled in between" + (moved ? ", and your target date becomes <b>" + esc(runDateLabelIso(moved)) + "</b>." : ".") +
+        (t.id === "reentry" ? " With a break this long it also starts you further back." : ""));
   // Keeping the date is a real answer -- a booked race does not move -- so it is always offered and
   // never recommended once the break is long enough to have cost something.
-  const keep = opt("keep", t.id === "nudge" ? false : false, "Keep my target date",
-    "Nothing is scheduled until <b>" + esc(runDateLabelIso(resumeIso)) + "</b>, and the plan then runs to " +
-    "the date you already have — so it gets shorter rather than later." +
-    (t.id === "reentry" ? " With a break this long the rebuild also starts you further back." : ""));
+  const skipWeek = keepCh && keepCh.blockFromIso ? weekAt(resumeIso) : null;
+  const keep = opt("keep", false, "Keep my target date", keepCh && keepCh.blockFromIso
+    ? "Nothing is scheduled until <b>" + esc(runDateLabelIso(resumeIso)) + "</b>, and you then carry on with " +
+      (skipWeek ? "<b>week " + skipWeek + "</b>, " : "") + "the week your plan will have reached. What you miss is " +
+      "skipped, not squeezed in, and your target date stays <b>" + esc(runDateLabelIso(raceIso)) + "</b>."
+    : "Nothing is scheduled until <b>" + esc(runDateLabelIso(resumeIso)) + "</b>, and the plan then starts again from " +
+      "week 1 and runs to the date you already have, so it gets shorter rather than later." +
+      (t.id === "reentry" ? " With a break this long the rebuild also starts you further back." : ""));
   const nothing = opt("none", t.id === "nudge", "Leave my plan alone",
     "Nothing is removed and nothing moves. The sessions you are away for stay in the plan and you " +
     "pick up wherever you are when you get back.");
@@ -15556,7 +15694,7 @@ function pausePlanHtml() {
         '" data-pausedays="' + d + '" aria-pressed="' + (d === days) + '">' + pauseDaysLabel(d) + '</button>').join("") +
     '</div>' +
     '<div class="po-verdict"><b>' + t.head + '</b><span>' + t.why + '</span></div>' +
-    shift + keep + nothing +
+    pickup + shift + keep + nothing +
     '<p class="mp-note">Whichever you pick, nothing is saved until you choose it, and you can undo it ' +
     'from the toast straight afterwards.</p>';
 }
@@ -15578,7 +15716,14 @@ function pauseDaysLabel(d) {
 function applyPause(kind) {
   const days = PAUSE_DAYS;
   const before = { raceDate: profile.raceDate, returning: profile.returning,
-    startDateIso: profile.startDateIso, overrides: JSON.stringify(state.dayOverride || {}) };
+    startDateIso: profile.startDateIso, blockFromIso: profile.blockFromIso, pauseWeeks: profile.pauseWeeks,
+    overrides: JSON.stringify(state.dayOverride || {}) };
+  // The profile as it was, for the Undo and for a rebuild that throws (which used to leave the start date moved).
+  const putBack = () => {
+    profile.raceDate = before.raceDate; profile.returning = before.returning;
+    profile.startDateIso = before.startDateIso;
+    profile.blockFromIso = before.blockFromIso; profile.pauseWeeks = before.pauseWeeks;
+  };
   if (kind === "none") { closeSheet(); toast("Nothing changed — pick up with today's session."); return; }
   const ticks = todayTicks();
   // ⚠️⚠️ THE PAUSE HAS TO EMPTY THE WINDOW, AND THE FIRST VERSION DID NOT. It moved the target date and
@@ -15590,28 +15735,30 @@ function applyPause(kind) {
   // ⚠️ THE LEVER IS profile.startDateIso, AND IT ONLY WORKS BECAUSE applyProfile HONOURS A FUTURE ONE:
   // its clamp is pf.startDateIso >= todayIso() ? pf.startDateIso : todayIso(), so it refuses a date
   // in the PAST and accepts one ahead. Setting it to the day the pause ends is what makes the gap real.
-  // ⚠️ AND IT IS SET FOR "keep" AS WELL AS "shift". Keeping the target date with no start date means
-  // rebuilding from today into an unchanged deadline -- which is the same defect wearing the other
-  // option's clothes.
-  if (kind === "shift" || kind === "keep") {
-    profile.startDateIso = isoAdd(todayIso(), days).toISOString().slice(0, 10);
-  }
-  if (kind === "shift" && profile.raceDate) profile.raceDate = isoAdd(profile.raceDate, days).toISOString().slice(0, 10);
+  // ⚠️ AND IT IS SET FOR EVERY ANSWER, through the one definition the sheet quoted (pauseChanges). Keeping the target
+  // date with no start date means rebuilding from today into an unchanged deadline -- which is the same defect
+  // wearing the other option's clothes.
   // Over a month off is this codebase's own long-layoff line, and the generator's only lever for it is
   // the returning flag: measured, it opens week one 6% smaller, shortens the first long run by a
-  // quarter and removes 5 of 28 quality sessions, while leaving the peak alone.
-  if (pauseTierFor(days).id === "reentry") profile.returning = true;
+  // quarter and removes 5 of 28 quality sessions, while leaving the peak alone (pauseChanges sets it).
+  const ch = pauseChanges(kind, days);
+  if (!ch) { toast("That did not work — your plan is unchanged."); return; }
+  const week = kind === "pickup" && PLAN.weeks[CURRENT_WEEK] ? PLAN.weeks[CURRENT_WEEK].index : null;
+  Object.assign(profile, ch);
   try { recompute(); } catch (e) {
-    profile.raceDate = before.raceDate; profile.returning = before.returning;
+    putBack();
     toast("That did not work — your plan is unchanged."); return;
   }
   computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks); saveProfileStore();
   closeSheet();
-  toastUndo(kind === "shift" ? "Target date moved back " + pauseDaysLabel(days) + "." : "Plan rebuilt to your existing date.", () => {
+  const msg = kind === "pickup" ? "Paused. You pick up in week " + week + " on " + runDateLabelIso(ch.startDateIso) + "."
+    : kind === "shift" ? "Target date moved back " + pauseDaysLabel(days) + "."
+    : ch.blockFromIso ? "Paused until " + runDateLabelIso(ch.startDateIso) + ". Your target date stays the same."
+    : "Plan rebuilt to your existing date.";
+  toastUndo(msg, () => {
     const t2 = todayTicks();
-    profile.raceDate = before.raceDate; profile.returning = before.returning;
-    profile.startDateIso = before.startDateIso;
+    putBack();
     try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
     // ⚠️ B4: WRITTEN BACK BEFORE THE REBUILD. applyCrossWeekMoves reads the STORE (it has to: it runs before state
     // exists at boot), so a restore held only in memory rebuilt without the week-moves, and seedDone then pruned
@@ -15849,8 +15996,10 @@ function reusePlan(sig) {
       const ticks = todayTicks();
       for (const k of PLAN_PROF_FIELDS) if (j.prof[k] !== undefined) profile[k] = j.prof[k];
       profile.raceDate = newDate;
-      // The plan built again starts today — a date, never a blank (see planStartIso).
+      // The plan built again starts today — a date, never a blank (see planStartIso) — and is laid out from today:
+      // whatever pause the old plan picked up from is not this plan's (blockStartIso).
       profile.startDateIso = todayIso();
+      profile.blockFromIso = ""; profile.pauseWeeks = 0;
       try { recompute(); } catch (e) {
         for (const k of PLAN_PROF_FIELDS) profile[k] = before[k];
         try { recompute(); } catch (e2) {}
@@ -15881,11 +16030,13 @@ function reusePlan(sig) {
 function pausedCard() {
   const from = profile.startDateIso;
   if (!from || from <= todayIso()) return "";
+  // A pause that picks up where the runner left off comes back to a week past week 1, and says so.
+  const n = PLAN.weeks[firstShownWeek()] ? PLAN.weeks[firstShownWeek()].index : 1;
   const days = Math.max(1, Math.round(
     (isoAdd(from, 0).getTime() - isoAdd(todayIso(), 0).getTime()) / 86400000));
   return '<div class="card pz-card">' +
     '<div class="eyebrow">Paused</div>' +
-    '<div class="pz-t">Your plan picks up on ' + esc(runDateLabelIso(from)) + '</div>' +
+    '<div class="pz-t">Your plan picks up on ' + esc(runDateLabelIso(from)) + (n > 1 ? ', in week ' + n : '') + '</div>' +
     '<div class="pz-s">' + (days === 1 ? "One more day" : days + " more days") +
     ' \u2014 nothing is scheduled until then. Log anything you do run and it still counts.</div>' +
     '<button class="ctrl" id="pzResume">I am back \u2014 start now</button>' +
@@ -15895,19 +16046,42 @@ function pausedCard() {
 // date the pause left. Starting the block today is what un-pauses — written as today, never cleared: the
 // block's start is kept as it is now (planStartIso), so a blank would mean "today" on every later launch.
 function resumeFromPause() {
-  const before = profile.startDateIso;
+  const before = { startDateIso: profile.startDateIso, blockFromIso: profile.blockFromIso, pauseWeeks: profile.pauseWeeks,
+    raceDate: profile.raceDate, overrides: JSON.stringify(state.dayOverride || {}) };
+  const putBack = () => {
+    profile.startDateIso = before.startDateIso; profile.blockFromIso = before.blockFromIso;
+    profile.pauseWeeks = before.pauseWeeks; profile.raceDate = before.raceDate;
+  };
   const ticks = todayTicks();
+  // ⚠️ BACK EARLY FROM A PAUSE THAT PICKS UP WHERE YOU LEFT OFF (pauseChanges): the block and the target date come
+  // back by the whole weeks not taken, so the week that starts today is still the week the runner paused in, and
+  // the plan is as long as it was. Left where the pause put them, today would land weeks before that week.
+  const w = Number(profile.pauseWeeks) || 0;
+  if (w > 0 && profile.blockFromIso && profile.startDateIso) {
+    const mon = (iso) => isoAdd(iso, -((isoAdd(iso, 0).getUTCDay() + 6) % 7)).getTime();
+    const early = Math.max(0, Math.min(w, Math.round((mon(profile.startDateIso) - mon(todayIso())) / 6048e5)));
+    if (early) {
+      profile.blockFromIso = isoAdd(profile.blockFromIso, -7 * early).toISOString().slice(0, 10);
+      if (profile.raceDate) profile.raceDate = isoAdd(profile.raceDate, -7 * early).toISOString().slice(0, 10);
+    }
+  }
+  profile.pauseWeeks = 0;
   profile.startDateIso = todayIso();
   try { recompute(); } catch (e) {
-    profile.startDateIso = before;
+    putBack();
     toast("That did not work \u2014 nothing changed."); return;
   }
   computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks); saveProfileStore();
   render();
-  toastUndo("Back on your plan from today.", () => {
+  const wk = TODAY_IN_PLAN && PLAN.weeks[CURRENT_WEEK] ? PLAN.weeks[CURRENT_WEEK].index : 0;
+  toastUndo("Back on your plan from today" + (wk > 1 ? ", in week " + wk : "") + "." +
+    (profile.raceDate !== before.raceDate ? " Target date: " + runDateLabelIso(profile.raceDate) + "." : ""), () => {
     const t2 = todayTicks();
-    profile.startDateIso = before;
+    putBack();
+    // ⚠️ B4's lesson: the moves are written back before the rebuild, which reads them from the store.
+    try { state.dayOverride = JSON.parse(before.overrides); } catch (e) {}
+    saveDayOverride();
     try { recompute(); } catch (e) {}
     computeToday(); seedDone(); restoreTicks(t2); saveProfileStore(); render();
   });
@@ -15920,13 +16094,15 @@ function viewPlan() {
   // alone, mark where each phase starts, and give every bar an accessible label.
   const phaseNames = PHASE_NAME;
   const phaseSeq = ["base", "build", "peak", "taper"];
-  const phasesInPlan = phaseSeq.filter((ph) => PLAN.weeks.some((w) => w.phase === ph));
+  // ⚠️ PAUSE: the weeks on show. A week held before the plan starts again has nothing in it (holdBeforeStart).
+  const shown = PLAN.weeks.slice(firstShownWeek());
+  const phasesInPlan = phaseSeq.filter((ph) => shown.some((w) => w.phase === ph));
   // ⚠️ THE LEGEND NAMES WHERE EACH PHASE IS, not just what colour it is. The brief asks for
   // "text labels, not colour alone", and a swatch reading "Build" only helps if you can then match
   // that colour to a bar -- which is the exact task colour-blind and low-vision runners cannot do,
   // and which nobody enjoys. The week range is the label the colour was standing in for.
   const phaseRange = (ph) => {
-    const ws = PLAN.weeks.filter((w) => w.phase === ph).map((w) => w.index);
+    const ws = shown.filter((w) => w.phase === ph).map((w) => w.index);
     if (!ws.length) return "";
     const lo = Math.min.apply(null, ws), hi = Math.max.apply(null, ws);
     return lo === hi ? "wk " + lo : "wk " + lo + "\u2013" + hi;
@@ -15938,9 +16114,9 @@ function viewPlan() {
   // The coach's note: the block should visibly END on the race. It does now — race day is a real
   // session in the last week (see applyRaceDay), so the final bar is flagged and the chart closes
   // with a race marker rather than trailing off into an unexplained short week.
-  const raceWeekIdx = PLAN.weeks.length - 1;
-  const bars = PLAN.weeks.map((w, i) => {
-    const phaseStart = i === 0 || PLAN.weeks[i - 1].phase !== w.phase;
+  const raceWeekIdx = shown.length - 1;
+  const bars = shown.map((w, i) => {
+    const phaseStart = i === 0 || shown[i - 1].phase !== w.phase;
     const h = Math.max(6, Math.round(w.distanceKm / peak * 100));
     const isRace = i === raceWeekIdx;
     const aria = "Week " + w.index + ", " + phaseNames[w.phase] + " phase" + (w.isDeload ? ", deload week" : "") + (isRace ? ", RACE WEEK" : "") + ", " + w.distanceKm.toFixed(1) + " kilometres";
@@ -16177,13 +16353,15 @@ function weekAdjustNote(w) {
 function pausedWeekRow() {
   const from = profile.startDateIso;
   if (!from || from <= todayIso()) return "";
+  const n = PLAN.weeks[firstShownWeek()] ? PLAN.weeks[firstShownWeek()].index : 1;
   return '<div class="wk-sum wk-paused" aria-disabled="true">' +
     '<span class="wk-n">\u2014</span>' +
     // ⚠️ NO TAG HERE. The other marked rows carry one because their title is "Week 4" and the word has
     // to go somewhere; this row's title IS the word, and a tag repeating it read "PausedPaused".
     '<span class="wk-b"><span class="wk-t">Paused</span>' +
     '<span class="wk-m">' + esc(runDateLabelIso(todayIso())) + " to " + esc(runDateLabelIso(isoAdd(from, -1).toISOString().slice(0, 10))) +
-    ' \u00b7 nothing scheduled \u00b7 week 1 begins ' + esc(runDateLabelIso(from)) + '</span></span>' +
+    ' \u00b7 nothing scheduled \u00b7 ' + (n > 1 ? 'you pick up in week ' + n + ' on ' : 'week 1 begins ') +
+    esc(runDateLabelIso(from)) + '</span></span>' +
     '</div>';
 }
 
@@ -16191,7 +16369,7 @@ function weekList() {
   const raceIdx = PLAN.weeks.length;
   // state.planWeek of 0 means nothing is open, which is a legitimate state: the chart still shows the
   // shape of the block and every week reads as a one-line summary.
-  return pausedWeekRow() + PLAN.weeks.map((w) =>
+  return pausedWeekRow() + PLAN.weeks.slice(firstShownWeek()).map((w) =>
     w.index === state.planWeek
       ? '<div class="card wk-open' + (weekAdjust(w) ? " adj" : "") + '">' + weekDetail() + '</div>'
       : weekSummaryRow(w, w.index === raceIdx)).join("");
@@ -26704,7 +26882,13 @@ function draftFromForm() {
   const strengthDays = Math.max(0, Math.min(RC.STRENGTH_MAX_PER_WEEK, Number(draft.strength) || 0));
   const startDateIso = formStartIso(wizFieldVal("s_startdate"), state.screen === "wizard", profile.startDateIso || "", todayIso());
   if (startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
+  // ⚠️ PAUSE: AN EDIT KEEPS WHERE THE BLOCK IS LAID OUT FROM (blockStartIso) while the start is unchanged. This
+  // object replaces the profile whole, so a field it leaves out is gone: saving a new name after a pause that
+  // picked up would have started the block again from week 1, formStartIso's own defect one field over. A new
+  // plan (the wizard) or a new start date lays the block out from that start.
+  const keepsBlock = state.screen !== "wizard" && startDateIso === (profile.startDateIso || "") && !!profile.blockFromIso;
   return {
+    ...(keepsBlock ? { blockFromIso: profile.blockFromIso, pauseWeeks: Number(profile.pauseWeeks) || 0 } : {}),
     name: wizFieldVal("s_name").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
     status,
@@ -41241,10 +41425,13 @@ function addDayEvidence(phase) {
       runsBy[r.dateIso] = (runsBy[r.dateIso] || 0) + 1;
     }
     // The three completed weeks before this one, oldest first.
+    // ⚠️ PAUSE: NEVER A WEEK HELD BEFORE THE PLAN STARTED AGAIN (holdBeforeStart). It prescribes nothing, so three
+    // of them and one run since would read as full completion and ask for another day on one session's evidence.
+    // Left out, the first weeks back are simply too few weeks to judge, as they were when a pause restarted the plan.
     const recentWeeks = [];
     for (let i = cur - 3; i < cur; i++) {
       const wk = PLAN.weeks[i];
-      if (!wk || !wk.startIso) continue;
+      if (!wk || !wk.startIso || wk.beforeStart) continue;
       // ⚠️ RAW.weeks carries the prescription; PLAN.weeks is a display summary. PRIMARY_TYPES is the
       // app's own definition of "a run", the same one Today uses to decide what can be started.
       const rawWk = (typeof RAW !== "undefined" && RAW.weeks) ? RAW.weeks[i] : null;
@@ -42929,10 +43116,11 @@ function wire() {
   const band = $("weekband");
   if (band) {
     const pageW = () => (band.firstElementChild ? band.firstElementChild.getBoundingClientRect().width : band.clientWidth) || 1;
-    band.scrollLeft = curWeekIdx() * pageW();
+    const first = firstShownWeek();
+    band.scrollLeft = (curWeekIdx() - first) * pageW();
     band.dataset.shown = String(curWeekIdx());
     band.onscroll = () => {
-      const w = Math.max(0, Math.min(PLAN.weeks.length - 1, Math.round(band.scrollLeft / pageW())));
+      const w = Math.max(first, Math.min(PLAN.weeks.length - 1, first + Math.round(band.scrollLeft / pageW())));
       const lab = $("wkLabel"); if (lab && band.dataset.shown !== String(w)) { lab.innerHTML = wkLabelInner(w); band.dataset.shown = String(w); }
       clearTimeout(wbandScrollT);
       wbandScrollT = setTimeout(() => { if (w !== state.selWeek) { state.selWeek = w; render(); } }, 110);

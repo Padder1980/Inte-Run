@@ -86,7 +86,7 @@ function fixture() {
 const FNS = ["isoAdd", "dmon", "runDateLabelIso", "esc", "loadAdjust", "saveAdjust", "adjustFor", "weekSkips", "adjDrops",
   "applyAdjustments", "eased", "easeWeekIn", "easeWeekOptions", "pauseTierFor", "pauseDaysLabel", "loadReentry", "saveReentry",
   "reentryCapture", "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "reentryCard",
-  "answerReentry", "genDay", "effDay", "ovTo", "planStartIso", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
+  "answerReentry", "genDay", "effDay", "ovTo", "planStartIso", "blockStartIso", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
   "realignGapDays", "realignLongGapDays", "loadRealign", "saveRealign", "realignEvidence", "realignWeekAt", "realignPreview",
   "realignPickup", "realignOptions", "currentRealign", "weeklyReviewCard"];
 const CONSTS = ["MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "REENTRY_KEY", "REENTRY_MODES",

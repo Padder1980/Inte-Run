@@ -86,7 +86,7 @@ function buildPlan(pf: any) {
 
 const FNS = ["isoAdd", "dmon", "runDateLabelIso", "esc", "genDay", "effDay", "ovTo", "ovFrom", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
   "loadAdjust", "saveAdjust", "adjustFor", "weekSkips", "adjDrops", "applyAdjustments", "eased", "easeWeekIn", "easeWeekOptions",
-  "pauseTierFor", "pauseDaysLabel", "planStartIso", "computeToday", "saveDayOverride", "loadReentry", "saveReentry", "reentryCapture",
+  "pauseTierFor", "pauseDaysLabel", "planStartIso", "blockStartIso", "firstShownWeek", "computeToday", "saveDayOverride", "loadReentry", "saveReentry", "reentryCapture",
   "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "realignGapDays", "realignLongGapDays",
   "loadRealign", "saveRealign", "realignEvidence", "realignWeekAt", "realignPreview", "realignPickup", "realignOptions",
   "currentRealign", "realignCard", "answerRealign", "weeklyReviewCard"];

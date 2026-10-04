@@ -491,7 +491,8 @@ Monday to Sunday), never putting the start after today (or the plan would read a
 ten days without a run (last run in week 3, now week 4) → "Back to week 3 (36.8 km), and your target date moves from
 20 Dec to 27 Dec" → exactly that, saved; Undo restored both dates and the question. This is also the "pick up where
 you left off" a PAUSE still lacks (it restarts the remaining block) — the same two writes would give a pause that
-resumes; not done here.
+resumes; not done here. **Done the same day** on his ruling (`blockFromIso`, the last chapter of
+`notes/manage-plan.md`); `realignPickup` now moves `blockFromIso` when a pause has set one.
 
 ⚠️ **AFTER FOUR WEEKS THE "AFTER TIME OFF" ANSWER IS THE RIGHT TOOL**, now that it re-shapes the first weeks of a
 block that has its first weeks AHEAD of it (restarted from this week). It was a permanent brake only while the block

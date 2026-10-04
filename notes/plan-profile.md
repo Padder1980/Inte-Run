@@ -568,8 +568,8 @@ plan and a pause. Session ids already name the calendar week (B4), so nothing st
   the weeks advance from it. ⚠️ **Open:** with progression real, a pause now resets it to the remaining block's
   first week; "pick up where you left off" (shift the block, empty the window) is worth doing with B6, whose
   "extend" option needs exactly that. **B6 (2026-10-04) built it for a lapse** (`realignPickup`: start and target
-  date later by the whole weeks missed); **the pause itself still restarts the remaining block** — Road Map step
-  `pc-pauseresume`, waiting on the owner.
+  date later by the whole weeks missed); **the pause itself still restarted the remaining block** — FIXED the same day on
+  his ruling: a pause now picks up where you left off (`blockFromIso`; the last chapter of `notes/manage-plan.md`).
 - **What became reachable, as designed:** past weeks exist again, so `seedDone` ticks them, and the weekly
   review's two evidence-based offers (an easier week after misses; an extra day when keeping up) can finally
   find their four weeks of evidence. Seen in the browser: "The last few sessions have not happened." with an

@@ -543,3 +543,42 @@ load spike the whole engine exists to prevent. The safe fix found so far: **anch
 written the first time the fixed build runs (so everybody's plan starts counting from that week, with no jump) and
 whenever a plan is adopted from the wizard or a profile save; keep the "start today" behaviour only for a brand-new
 plan and a pause. Session ids already name the calendar week (B4), so nothing stored is disturbed by the change.
+
+### ✅ FIXED THE SAME DAY — HIS RULING: "fix the plan so it gets harder, counting from this week" (2026-10-04)
+
+- **`planStartIso(pf)`** is the one rule: `profile.startDateIso` as it is, past or future; `""` means today.
+  `applyProfile` uses it, so the block stays where it began and the weeks advance through it. Measured in the
+  browser: a plan anchored 7 Sep sits in week 4 on 4 Oct (a built-in easier week, long run 62′) and climbs 80 →
+  85 → 91 → 62 → 98 → 104 → 111 → 75 → 119 → 127 → 136 → 92 → 145, then the taper — the block as designed.
+- **`anchorMigrate()`** runs ONCE, immediately before the launch's first `recompute()`: a plan from before the
+  fix (a blank or past start) is moved to start TODAY and saved, and `interun_anchor_v1` marks it done. **Never
+  from its old start** — that would have handed every existing runner the load of the week their stored start
+  implies, after weeks at week 1's. A future start (a pause, or a plan not yet begun) is left alone. A first run
+  only sets the mark, so its own wizard start is never moved on a later launch. Verified in the browser: a stored
+  start three weeks back became today, marked, week 1.
+- **Every path that adopts a plan writes a date, never a blank** (a blank would mean "today" on every later
+  launch, and the block would slide again): un-pausing and "Use this plan again" write `todayIso()`; the wizard
+  writes the day picked (today by default). A guard sweeps the app for `profile.startDateIso = ""`.
+- **`formStartIso`**: a profile EDIT keeps the plan's own start unless the runner changes the field (or the field
+  is not on screen); the old rule pulled any past start up to today on every save, which would now have
+  restarted the block at week 1 on a name change. The WIZARD is a new plan: the day picked, today by default,
+  never the old plan's start.
+- **A pause keeps its meaning**: it sets a future start, so the block restarts on the resume date (with the
+  "after time off" run-in for over a month, as before). Once that day passes it is simply the block's start and
+  the weeks advance from it. ⚠️ **Open:** with progression real, a pause now resets it to the remaining block's
+  first week; "pick up where you left off" (shift the block, empty the window) is worth doing with B6, whose
+  "extend" option needs exactly that.
+- **What became reachable, as designed:** past weeks exist again, so `seedDone` ticks them, and the weekly
+  review's two evidence-based offers (an easier week after misses; an extra day when keeping up) can finally
+  find their four weeks of evidence. Seen in the browser: "The last few sessions have not happened." with an
+  ease-week suggestion — returned `quiet` because no run was logged that week (`runs.length === 0` in
+  `buildWeeklyReview`), an engine rule worth a look on its own.
+- **Also found and fixed:** `PLAN_PROF_FIELDS` was declared thirteen thousand lines below the first
+  `recompute()`, so `journalSync`'s `planProfSnapshot` threw in its dead zone at launch and the plan history only
+  ever recorded on a later rebuild. Moved up beside the store keys; driven: the row is now written at launch.
+  And the history's signature (goal | first Monday | weeks) changed every Monday while the block slid, so the
+  rail would have grown a "new plan" a week; anchored, it is stable (tested).
+- The calendar file now includes the past weeks of the block (it exports every week); harmless, not filtered.
+- **Tests:** `test/plan-anchor.test.ts` (5) — the regression drives the app's real `applyProfile` over the real
+  engine on six successive Mondays and requires weeks 1–6 with the block's own long runs. `manage-plan`'s two pause
+  guards restated for the new rule. **11 of 11 re-breaks caught**, the old clamp put back among them.

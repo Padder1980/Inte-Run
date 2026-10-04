@@ -137,6 +137,8 @@ node --test            # the suite (about 1,800 tests)
   Mondays and resyncs iOS reminders and the watch). `applyProfile` is pure; `adoptPlan` and `recompute` commit.
 - **`PLAN.weeks` is a display summary with no steps, exercises or pace bands; the prescription is
   `RAW.weeks`** (`rawSessionsForIso()`). Reading the wrong one fails silently.
+- **The block starts at `profile.startDateIso`, as it is** (`planStartIso` — never clamped to today, or the runner
+  is in week 1 for ever). Never write a blank start for a real plan; a profile edit keeps it (`formStartIso`).
 - **A session id names its calendar week** (`2026-10-12-d1-threshold`, `RC.sessionIdFor`). The plan is rebuilt from
   today, so a block loses a week every Monday: anything keyed on a week NUMBER slips a week. A store keyed on a session
   id reads old `w3-d1-…` ids through `legacySid` (notes/manage-plan.md, B4).
@@ -223,9 +225,9 @@ Strava switch waits on his Worker deploy. **B2 and B3 are built too:** skip one 
 session's time of day (`interun_time_v1`, into the calendar file and the reminders). **B4 is built (2026-10-04):** move a
 run a week earlier or later (`{ to, from, wk }` in `interun_dayov_v1`, applied by `applyCrossWeekMoves` before the
 breaks); it made session ids name their calendar week (below). **B5 is built (2026-10-04):** after a break that took
-running out, Today asks how quickly to build back up (`interun_reentry_v1`). ⚠️ **OPEN, AWAITING HIS RULING: the plan
-never gets harder** — `applyProfile` rebuilds the block from today, so the runner always lives in week 1 (measured, and
-the safe fix, in `notes/plan-profile.md`). Next: that fix if he rules for it, then B6. `PLAN.md` holds the full list and the Road Map is the live
+running out, Today asks how quickly to build back up (`interun_reentry_v1`). **The plan now gets harder** (fixed the same day,
+his ruling): the block was rebuilt from today on every launch, so the runner always lived in week 1; it now stays where
+it began (`notes/plan-profile.md`). Next is B6. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it

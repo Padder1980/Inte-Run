@@ -6510,6 +6510,23 @@ const TIME_KEY = "interun_time_v1";
  */
 const REENTRY_KEY = "interun_reentry_v1";
 /**
+ * The day a plan made before 2026-10-04 was moved to count from today (see anchorMigrate). Its presence is
+ * the mark that this install's plan start is now the block's real start, never to be moved again.
+ */
+const ANCHOR_KEY = "interun_anchor_v1";
+/**
+ * The plan-determining fields, and nothing else. See journalSync for why not the plan itself.
+ * ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), BECAUSE journalSync READS IT FROM INSIDE adoptPlan. It sat
+ * thirteen thousand lines further down, so at launch planProfSnapshot read it in its temporal dead zone, threw,
+ * and the try around journalSync swallowed it: the plan history never recorded a block at launch, only on a
+ * later rebuild (found 2026-10-04 in the browser while anchoring the block — journalSync by hand wrote the row
+ * that launch had not). JOURNAL_KEY's story above, one dependency further in.
+ */
+const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
+  "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
+  "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
+  "strengthKit", "returning", "age", "sex", "autoPace"];
+/**
  * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
  * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
  * or null when id is not an old one.
@@ -6929,7 +6946,7 @@ function applyProfile(pf) {
   // must not be called MAS, and 2 km at 5:00/km is exactly ten minutes — so carrying the 1 km's
   // MAS fractions across would have put a confident physiological label on a number that does not
   // support one.
-  const startDateIso = (pf.startDateIso && pf.startDateIso >= todayIso()) ? pf.startDateIso : todayIso();
+  const startDateIso = planStartIso(pf);
   const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso };
   const plan = RC.buildPlanSummary(ath, goal); // may throw
   const raw = RC.generatePlan(ath, goal); // raw sessions with steps, for the live runtime
@@ -8065,10 +8082,12 @@ function reentryWeeks() {
  *   Balanced — the next week a notch easier: one row.
  *   Quickly  — carry on as planned: nothing changes.
  * ⚠️ NOT THE "AFTER TIME OFF" PROFILE ANSWER, ALTHOUGH PLAN.md's SKETCH NAMED THE PAUSE'S REBUILD FOR A LONG
- * BREAK. Measured 2026-10-04: the plan is rebuilt from today on every launch, so returningFromBreak re-shapes
- * whichever week the runner is in, every week, for as long as it is set — this week's long run 61 minutes
- * instead of 80, and four weeks on 48 instead of 60. It is a brake that never comes off. An easier week is a
- * dated row that ends, is listed under Planned breaks with a Cancel, and can be undone.
+ * BREAK. returningFromBreak re-shapes the BLOCK'S FIRST WEEKS. Measured 2026-10-04, while the block was still
+ * rebuilt from today on every launch, that made it a brake that never came off (this week's long run 61
+ * minutes instead of 80, every week); since the block is anchored where it began (planStartIso, the same day),
+ * those first weeks are long past for anybody coming back mid-plan, so it would do nothing at all. Either way it
+ * is the wrong tool. An easier week is a dated row that ends, is listed under Planned breaks with a Cancel, and
+ * can be undone.
  * ⚠️ AN ANSWER THAT WOULD DO THE SAME AS A QUICKER ONE IS NOT OFFERED (two weeks where only one can be eased,
  * say). A recommended answer that is not offered passes to the next QUICKER one, because the reason it is
  * missing is that its week is already easier (the runner eased it) or has nothing to ease (a light week, race
@@ -8354,6 +8373,42 @@ function normalizeWeekStarts() {
     if (dow) wk.startIso = isoAdd(wk.startIso, -dow).toISOString().slice(0, 10);
   });
 }
+/**
+ * THE DAY THE PLAN'S BLOCK BEGAN, OR BEGINS: profile.startDateIso, used as it is — past or future.
+ *
+ * ⚠️⚠️ NEVER CLAMPED TO TODAY ANY MORE (2026-10-04, the owner: "fix the plan so it gets harder, counting from
+ * this week"). It used to read pf.startDateIso >= todayIso() ? pf.startDateIso : todayIso(), so a start in the
+ * past was replaced by today on every launch and the block was rebuilt from today every time the app opened.
+ * The runner was therefore ALWAYS in week 1. Measured on a 5-day half at 40 km a week: the long run 80 minutes
+ * every week for twelve weeks and the block never leaving base, where the plan as designed climbs 80, 84, 88,
+ * an easier week, 93 ... 119 minutes and reaches build. The weeks ahead on the Plan screen climbed correctly —
+ * and were regenerated as week 1 when they arrived. Kept where it began, the block stays put and the weeks
+ * advance through it.
+ * ⚠️ A FUTURE START IS STILL A PAUSE OR A PLAN NOT YET BEGUN (pausedCard reads it the same way); once its day
+ * passes it simply becomes the block's start. "" — a first run's example plan, before the wizard writes one —
+ * means today; every path that adopts a real plan now writes a date, so "" is never stored for one.
+ */
+function planStartIso(pf) { return (pf && pf.startDateIso) || todayIso(); }
+/**
+ * ONE-TIME, AND ONLY FOR A PLAN FROM BEFORE THE FIX: it counts from the day this build first runs.
+ * ⚠️⚠️ NEVER FROM THE START DATE IT WAS BUILT WITH. Until now the block restarted from today on every launch,
+ * so a runner who began a month ago has been doing week 1 every week. Their stored start says week 5;
+ * honouring it would hand them week 5's load at once — the jump the whole engine exists to prevent. So an
+ * existing plan's start becomes TODAY, once, and the block climbs from here: the owner's choice.
+ * ⚠️ A FUTURE START IS LEFT ALONE (a pause, or a plan that has not begun — already the right anchor). A first
+ * run has no plan to move: it only sets the mark, so its own wizard start is never moved later.
+ * ⚠️ BEFORE THE FIRST recompute() BELOW, WHICH IS THE WHOLE POINT. Run after it, the first launch would already
+ * have built the jumped plan, adopted it and told the watch. Reads only what is declared above this line.
+ */
+function anchorMigrate() {
+  try {
+    if (localStorage.getItem(ANCHOR_KEY)) return;
+    const t = todayIso();
+    if (!FIRST_RUN && profile && (!profile.startDateIso || profile.startDateIso < t)) { profile.startDateIso = t; saveProfileStore(); }
+    localStorage.setItem(ANCHOR_KEY, t);
+  } catch (e) {}
+}
+anchorMigrate();
 try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }
 // Locate the real calendar date within the plan: the week (array index) and day-of-week index today
 // falls on. TODAY_IN_PLAN is false when today is before the plan starts or after it ends — then the
@@ -15537,7 +15592,8 @@ function reusePlan(sig) {
       const ticks = todayTicks();
       for (const k of PLAN_PROF_FIELDS) if (j.prof[k] !== undefined) profile[k] = j.prof[k];
       profile.raceDate = newDate;
-      profile.startDateIso = "";
+      // The plan built again starts today — a date, never a blank (see planStartIso).
+      profile.startDateIso = todayIso();
       try { recompute(); } catch (e) {
         for (const k of PLAN_PROF_FIELDS) profile[k] = before[k];
         try { recompute(); } catch (e2) {}
@@ -15579,11 +15635,12 @@ function pausedCard() {
     '</div>';
 }
 // ⚠️ COMING BACK EARLY IS THE SAME REBUILD AS EVERY OTHER ON THIS SCREEN, and it keeps whatever target
-// date the pause left. Clearing the start date is what un-pauses: applyProfile then clamps it to today.
+// date the pause left. Starting the block today is what un-pauses — written as today, never cleared: the
+// block's start is kept as it is now (planStartIso), so a blank would mean "today" on every later launch.
 function resumeFromPause() {
   const before = profile.startDateIso;
   const ticks = todayTicks();
-  profile.startDateIso = "";
+  profile.startDateIso = todayIso();
   try { recompute(); } catch (e) {
     profile.startDateIso = before;
     toast("That did not work \u2014 nothing changed."); return;
@@ -21587,11 +21644,7 @@ function clubPbFromWheels(k) {
  * 'create journal' affordance." Every figure comes from the plan and the run history.
  */
 
-/** The plan-determining fields, and nothing else. See journalSync for why not the plan itself. */
-const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
-  "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
-  "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
-  "strengthKit", "returning", "age", "sex", "autoPace"];
+// PLAN_PROF_FIELDS (the plan-determining fields) is declared with the store keys, near the top — see there.
 function planListSub() {
   const n = loadJournals().length;
   // ⚠️ IT SAYS WHAT IS THERE. A row reading "look back at your plans" over an empty list is the app
@@ -26277,6 +26330,20 @@ function derivedGoalS(recentTimeS, goalDist, volRaw) {
   );
 }
 
+/**
+ * The plan's start a saved form means.
+ * ⚠️ A NEW PLAN (the wizard) starts on the day picked, today by default — never on the plan it replaces' start.
+ * ⚠️ AN EDIT KEEPS THE PLAN'S OWN START unless the runner changed that field. A running plan's start is in the
+ * past now (planStartIso), and the old rule pulled any past start up to today on every save — so saving a new
+ * name, or a different long-run day, would have restarted the block at week 1. The field not being on screen
+ * (another topic was open) is "unchanged" too.
+ * A date picked is never before today (the picker's own minimum, and clamped here for a stale draft).
+ */
+function formStartIso(field, isWizard, stored, today) {
+  if (isWizard) return field && field >= today ? field : today;
+  if (!field || field === stored) return stored || today;
+  return field >= today ? field : today;
+}
 function draftFromForm() {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   // ⚠️ ON THE VERY FIRST RUN, THE UNANSWERED QUESTIONS ARE ANSWERED BY DEFAULTS, SILENTLY.
@@ -26378,8 +26445,7 @@ function draftFromForm() {
   const _ld = wizFieldVal("s_longday");
   const longRunDay = _ld !== "" ? Number(_ld) : (profile.longRunDay != null ? profile.longRunDay : 6);
   const strengthDays = Math.max(0, Math.min(RC.STRENGTH_MAX_PER_WEEK, Number(draft.strength) || 0));
-  let startDateIso = wizFieldVal("s_startdate") || (profile.startDateIso || "");
-  if (startDateIso && startDateIso < todayIso()) startDateIso = todayIso();
+  const startDateIso = formStartIso(wizFieldVal("s_startdate"), state.screen === "wizard", profile.startDateIso || "", todayIso());
   if (startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
   return {
     name: wizFieldVal("s_name").trim().slice(0, 40),

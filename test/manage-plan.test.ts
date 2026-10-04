@@ -404,11 +404,14 @@ test("BLOCKER: a pause actually empties the window it was given", () => {
   // And the undo must put the start date back, or a pause cannot be taken off.
   assert.match(ap, /profile\.startDateIso = before\.startDateIso/, "undo does not restore the start date");
   assert.match(ap, /startDateIso: profile\.startDateIso/, "the snapshot does not include the start date");
-  // ⚠️ IT ONLY WORKS BECAUSE applyProfile HONOURS A FUTURE START DATE — its clamp refuses one in the
-  // past and accepts one ahead. If that ever changes, the pause silently stops emptying anything.
-  assert.match(nocomment(appBlock()),
-    /pf\.startDateIso && pf\.startDateIso >= todayIso\(\)\) \? pf\.startDateIso : todayIso\(\)/,
-    "applyProfile's start-date clamp changed; the pause depends on a future date being honoured");
+  // ⚠️ IT ONLY WORKS BECAUSE applyProfile HONOURS A FUTURE START DATE. If that ever changes, the pause
+  // silently stops emptying anything. (Since 2026-10-04 it honours a PAST one too — the block stays where it
+  // began instead of restarting today on every launch; see test/plan-anchor.test.ts — so the rule is simply
+  // "the stored start, as it is".)
+  assert.match(nocomment(fn("applyProfile")), /const startDateIso = planStartIso\(pf\);/,
+    "applyProfile no longer takes the plan's start from planStartIso");
+  assert.match(nocomment(fn("planStartIso")), /return \(pf && pf\.startDateIso\) \|\| todayIso\(\);/,
+    "planStartIso no longer honours the stored start as it is; the pause depends on a future date being honoured");
 });
 
 test("BLOCKER: a paused plan says so, and can be un-paused", () => {
@@ -427,7 +430,9 @@ test("BLOCKER: a paused plan says so, and can be un-paused", () => {
   // It is rendered by Today, and un-pausing is the same rebuild as every other.
   assert.match(app, /banner \+ pausedCard\(\)/, "Today does not render the paused card");
   const r = nocomment(fn("resumeFromPause"));
-  assert.match(r, /profile\.startDateIso = ""/, "un-pausing no longer clears the start date");
+  // Un-pausing starts the block TODAY, written as a date: a blank would mean "today" again on every later
+  // launch, and the block would slide (test/plan-anchor.test.ts).
+  assert.match(r, /profile\.startDateIso = todayIso\(\);/, "un-pausing no longer starts the plan today");
   // ⚠️ COUNTED, NOT MATCHED — the same trap applyPause's restoreTicks guard already paid for. There are
   // two rebuild paths in here, the un-pause and its undo, so a bare /recompute\(\)/ passed with the
   // un-pause's removed: watched escaping.

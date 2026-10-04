@@ -434,7 +434,9 @@ Measured: because `applyProfile` rebuilds the plan from today on every launch, `
 than four weeks sets it (`applyPause`, the "reentry" tier) and nothing clears it on its own (only the runner, by hand,
 in the profile). B5's Slowly is two dated easier
 weeks instead: they end, they are listed, and they can be undone. A guard holds `answerReentry` away from `returning`.
-The deeper cause is the next item.
+The deeper cause is the next item — **FIXED the same day** (the block is anchored where it began), after which the
+flag re-shapes only the block's first weeks, which for somebody coming back mid-plan are long past: still the wrong
+tool, now because it would do nothing.
 
 ### ⚠️⚠️ FOUND UNDER IT: THE PLAN NEVER PROGRESSES — see `notes/plan-profile.md`, "THE PLAN NEVER GETS HARDER"
 

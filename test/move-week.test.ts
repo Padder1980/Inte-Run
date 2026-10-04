@@ -516,7 +516,8 @@ test("BLOCKER: the weeks a move touched are marked, Today says where today's ses
   assert.equal(mv && mv.iso, addDays(MON(2), 4));
   assert.match(decomment(fnBody("todayDecision")), /const mv = onToday \? xwMovedFrom\(todayIso\(\)\) : null;[\s\S]*headline: "Moved to " \+ dayLabelIso\(mv\.iso\)/);
   // ⚠️ THE TEMPORAL DEAD ZONE: both are read inside adoptPlan, which recompute() runs at module top level.
-  const first = SRC.indexOf("try { recompute(); } catch (e)");
+  // The launch's own line: "try { recompute(); } catch (e)" also opens several FUNCTIONS above it, which run later.
+  const first = SRC.indexOf("try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); recompute(); }");
   assert.ok(first > 0);
   for (const name of ["PRIMARY_TYPES", "XWEEK"]) {
     const at = SRC.search(new RegExp("^(?:const|let) " + name + " = ", "m"));

@@ -286,7 +286,7 @@ test("the buttons are wired, and the answers never touch the 'after time off' pr
   box.api.reentryCapture([ended(21)]);
   const html = box.api.reentryCard();
   for (const id of ["slow", "balanced", "quick"]) assert.match(html, new RegExp('data-reentry="' + id + '"'));
-  // ⚠️ returningFromBreak re-shapes whichever week the runner is in, every week, while it is set (the plan is
-  // rebuilt from today) — a brake that never comes off. Measured and recorded in the notes; never used here.
+  // ⚠️ returningFromBreak re-shapes the block's FIRST weeks: a brake that never came off while the block was
+  // rebuilt from today, and nothing at all for a plan begun months ago now it is anchored. Never the tool here.
   assert.ok(!/returning/.test(decomment(fnBody("answerReentry"))), "an answer sets the 'after time off' profile flag");
 });

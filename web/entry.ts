@@ -3,7 +3,9 @@
 // engine client-side. Keep this surface minimal — just what the pages call.
 
 export { buildPlanSummary, weekView } from "../src/view/plan-summary.ts";
-export { easeWeek } from "../src/adapt/missed-sessions.ts";
+// countTrailingMisses: B6's "you have missed your last N runs" asks the engine's own count — one definition,
+// the same function the weekly review's ease offer and applyMissedSessionAdjustment read.
+export { easeWeek, countTrailingMisses } from "../src/adapt/missed-sessions.ts";
 export type { PlanSummary } from "../src/view/plan-summary.ts";
 export { parseDuration } from "../src/domain/units.ts";
 // ⚠️ HARD_BEFORE_RACE and sessionIdFor: the race-eve set and the one definition of a session's id, so the

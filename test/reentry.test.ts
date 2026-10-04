@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
 import { weekView } from "../src/view/plan-summary.ts";
-import { easeWeek } from "../src/adapt/missed-sessions.ts";
+import { easeWeek, countTrailingMisses } from "../src/adapt/missed-sessions.ts";
 
 /**
  * STAGE B5 (2026-10-04) — choose how quickly the plan builds back up after time off.
@@ -80,12 +80,18 @@ function fixture() {
   return { RAW: { weeks: raw }, PLAN: { weeks: raw.map((w, i) => Object.assign(weekView(w as any), { startIso: MON(i) })) } };
 }
 
+// ⚠️ B6's QUESTION IS LIFTED TOO, NOT STUBBED: the weekly review also steps aside for "How do you want to pick it
+// back up?", so a sandbox without it measures an easier program. It is quiet here for a real reason: the plan
+// began today (profile.startDateIso is empty), so nothing before today can have been missed — asserted below.
 const FNS = ["isoAdd", "dmon", "runDateLabelIso", "esc", "loadAdjust", "saveAdjust", "adjustFor", "weekSkips", "adjDrops",
   "applyAdjustments", "eased", "easeWeekIn", "easeWeekOptions", "pauseTierFor", "pauseDaysLabel", "loadReentry", "saveReentry",
   "reentryCapture", "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "reentryCard",
-  "answerReentry", "weeklyReviewCard"];
-const CONSTS = ["MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "REENTRY_KEY", "REENTRY_MODES", "REENTRY_ASK_DAYS",
-  "PAUSE_TIERS", "ADJ_MODES", "ADJ_QUALITY", "ADJ_RUN"];
+  "answerReentry", "genDay", "effDay", "ovTo", "planStartIso", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
+  "realignGapDays", "realignLongGapDays", "loadRealign", "saveRealign", "realignEvidence", "realignWeekAt", "realignPreview",
+  "realignPickup", "realignOptions", "currentRealign", "weeklyReviewCard"];
+const CONSTS = ["MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "REENTRY_KEY", "REENTRY_MODES",
+  "REENTRY_ASK_DAYS", "REALIGN_KEY", "REALIGN_RANK", "REALIGN_MIN_MISSES", "PAUSE_TIERS", "ADJ_MODES", "ADJ_QUALITY", "ADJ_RUN",
+  "PRIMARY_TYPES", "XWEEK"];
 
 function sandbox(seedRows: unknown[] = []) {
   const store: Record<string, string> = {};
@@ -103,7 +109,7 @@ function sandbox(seedRows: unknown[] = []) {
   const env: Record<string, unknown> = {
     PLAN, RAW, localStorage, todayIso: () => clock.today, TODAY_IN_PLAN: true, profile: box.profile,
     state: { trainFlag: null, dayOverride: {} }, ICON: { alfie: "" },
-    RC: { weekVolumeMeters, sessionVolumeMeters, weekView, easeWeek },
+    RC: { weekVolumeMeters, sessionVolumeMeters, weekView, easeWeek, countTrailingMisses },
     // The weekly review's own engine is not the subject here: it answers with a non-quiet review, so the
     // only thing that can silence the card is the one-question rule under test.
     currentWeeklyReview: () => box.review,
@@ -226,13 +232,14 @@ test("BLOCKER: one question at a time — the weekly review says nothing while t
   // ⚠️ PLAN.md's OWN RE-BREAK: remove the suppression, and two questions render.
   const box = sandbox();
   assert.ok(box.api.weeklyReviewCard(), "the review renders nothing even with no other question — the case proves nothing");
+  assert.equal(box.api.currentRealign(), null, "B6's question is up, so the review's silence would prove nothing about B5");
   box.api.reentryCapture([ended(14)]);
   assert.ok(box.api.reentryCard(), "the coming-back card did not render");
   assert.equal(box.api.weeklyReviewCard(), "", "the weekly review asked its question beside the coming-back one");
   box.api.answerReentry("quick");
   assert.ok(box.api.weeklyReviewCard(), "the review stayed silent after the question was answered");
-  // And it is the attention item: first in Today's cards.
-  assert.match(decomment(fnBody("todayCards")), /return \[reentryCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
+  // And it is the attention item: first in Today's cards (B6's "getting back on track" next, which waits for it).
+  assert.match(decomment(fnBody("todayCards")), /return \[reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
 });
 
 test("BLOCKER: an answer is remembered, Undo asks again, and the question goes after the first week back", () => {

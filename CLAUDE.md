@@ -227,7 +227,8 @@ run a week earlier or later (`{ to, from, wk }` in `interun_dayov_v1`, applied b
 breaks); it made session ids name their calendar week (below). **B5 is built (2026-10-04):** after a break that took
 running out, Today asks how quickly to build back up (`interun_reentry_v1`). **The plan now gets harder** (fixed the same day,
 his ruling): the block was rebuilt from today on every launch, so the runner always lived in week 1; it now stays where
-it began (`notes/plan-profile.md`). Next is B6. `PLAN.md` holds the full list and the Road Map is the live
+it began (`notes/plan-profile.md`). **B6 is built (2026-10-04):** missed runs or a gap → Today offers to get back on
+track (`interun_realign_v1`). Next is B7. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -244,7 +245,7 @@ status; update both when a stage lands.
 | Progression audits (`tools/audit-progression.mjs`), deload depth, race-pace progression, the engine-handoff read-across, taper specificity (`taper.ts`) | `notes/plan-audits.md` |
 | The coaching-book (Hudson) work: hill sprints, honest RPE bands, block lengths (`MAX_STRUCTURED_WEEKS`), two hard days, beginner quality, the no-recovery-week tier | `notes/plan-coaching-book.md` |
 | Profile answers → plan: `applyProfile`, status and experience, stated volume, age and max HR, running-day choices, `profileImpact`, the plan that never gets harder (the rebuild from today) | `notes/plan-profile.md` |
-| The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment, coming back after time off (B5) | `notes/plan-adaptation.md` |
+| The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment, coming back after time off (B5), getting back on track after missed runs (B6) | `notes/plan-adaptation.md` |
 | Manage plan: pause, holiday / not 100%, skip one session (B2), a session's time of day (B3), move a session a week (B4) and session ids that name their calendar week, week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
 | The native iPhone app: WebHost, the over-the-air web layer, the keyboard pan, viewport and status bar, installing, TestFlight, the toolchain, Apple Health | `notes/ios-native.md` |
 | The Apple Watch app: payload, companion, mirroring, Live Activities, starting runs from the phone, the watch redesign | `notes/watch.md` |

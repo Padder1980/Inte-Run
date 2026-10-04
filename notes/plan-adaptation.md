@@ -443,3 +443,59 @@ tool, now because it would do nothing.
 **Tests:** `test/reentry.test.ts` (8) drives the real lifted functions over a four-week plan built with the engine's
 own `weekView` and `easeWeek`. `skip-session` and `move-week` lift the capture now (their `saveAdjust` calls it).
 **16 of 16 re-breaks caught**, PLAN.md's own (the review not suppressed) among them.
+
+## MISSED SESSIONS: THE APP OFFERS TO GET BACK ON TRACK (stage B6, 2026-10-04)
+
+PLAN.md B6: *"Missed a few sessions? The app offers to realign the plan, and you choose."* A card on Today, **Getting
+back on track**, asks **"How do you want to pick it back up?"** at three levels, quietest first (`REALIGN_RANK`):
+- **Three missed runs in a row** (`REALIGN_MIN_MISSES`): *Ease back in* — the week ahead easier, as the "make a
+  week easier" row with `reason: "missed"`, so the engine words it as a re-entry ("35′ easy (eased re-entry)") —
+  or *Carry on*.
+- **A week without a run** (`PAUSE_TIERS[0].maxDays`): *Pick up where you left off* — the block's start AND the
+  target date move later by the whole weeks missed, so this week is the week the runner stopped in — *Start again
+  from this week* (same target date, week 1 again), or *Carry on*.
+- **Four weeks** (`PAUSE_TIERS[2].maxDays`, returnToRunningPlan's long layoff): *Start a new plan* (the wizard),
+  *Start again from this week* with the "after time off" run-in, or *Carry on*.
+Each answer quotes what it does — the week, its distance, the new target date — from a preview built through the
+real `applyProfile` and never adopted, and a test holds each quote to the plan after the answer. One commit, one
+Undo that also brings the question back. Recommended by `pauseTierFor(gap)`: up to a fortnight, pick up where you
+left off; after that, start again from this week; from four weeks, a new plan. Carrying on is always offered and
+never recommended.
+
+⚠️⚠️ **THE EVIDENCE IS RUNS LOGGED AGAINST THE PLAN — NEVER `state.done`** (PLAN.md's re-break, guarded: a `state.done`
+that says everything is done still yields the misses). The misses are the engine's own `countTrailingMisses`, now
+exported; a run counts on its day or where the runner linked it (B1).
+⚠️ **TIME THE RUNNER WAS EXCUSED IS NOT TIME MISSED.** The count starts after the latest of: their last run, the day
+before the plan began, and the last day of a break that took running out (B5's record). Nothing is asked during such
+a break, during a pause, or while B5's own question is open (`currentRealign` returns null then — a holiday is B5's
+to talk about).
+⚠️ **WHY THIS EXISTS BESIDE THE REVIEW'S OWN EASE OFFER** (two misses, `EASE_MIN_MISSES`): `buildWeeklyReview` is
+quiet when no run was logged that week — exactly the week somebody stops running — so that offer never reached the
+runner who needed it most. This card speaks at three, and the review steps aside while it is up (PLAN.md: "replaces
+the review card while showing").
+⚠️ **ONCE PER LAPSE, AGAIN ONLY IF IT GETS WORSE.** `interun_realign_v1 { key, tier, answer }`, keyed by the date of
+the last run: logging a run starts a new lapse; within one, a higher rank asks again.
+
+### ⚠️ "REARRANGE" IS NOT HERE, ON PURPOSE
+
+PLAN.md sketched "carry on / rearrange (uses B4)" for missed runs. The engine's own rule for missed sessions
+(`src/adapt/missed-sessions.ts`) is **"do NOT cram the missed work on top"** — ease the week ahead instead, which is
+what *Ease back in* does. Moving a particular session to another week stays on its own sheet (B4) for anybody who
+wants to. Guarded: the options never mention rearranging.
+
+### Picking up where you left off, now the block is anchored
+
+With the block kept where it began (`planStartIso`), progression is real, so a week or two off leaves the plan ahead
+of the runner. *Pick up* moves `startDateIso` and `raceDate` later by the same whole weeks (the block is laid out
+Monday to Sunday), never putting the start after today (or the plan would read as paused). Driven in the browser:
+ten days without a run (last run in week 3, now week 4) → "Back to week 3 (36.8 km), and your target date moves from
+20 Dec to 27 Dec" → exactly that, saved; Undo restored both dates and the question. This is also the "pick up where
+you left off" a PAUSE still lacks (it restarts the remaining block) — the same two writes would give a pause that
+resumes; not done here.
+
+⚠️ **AFTER FOUR WEEKS THE "AFTER TIME OFF" ANSWER IS THE RIGHT TOOL**, now that it re-shapes the first weeks of a
+block that has its first weeks AHEAD of it (restarted from this week). It was a permanent brake only while the block
+slid; see `notes/plan-profile.md`.
+
+**Tests:** `test/realign.test.ts` (7), over a plan built the way `applyProfile` builds one and growing week by week,
+so every quoted distance can be held to the result. **16 of 16 re-breaks caught**, PLAN.md's own among them.

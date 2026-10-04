@@ -6515,6 +6515,12 @@ const REENTRY_KEY = "interun_reentry_v1";
  */
 const ANCHOR_KEY = "interun_anchor_v1";
 /**
+ * Stage B6. The runner's answer to "how do you want to pick it back up?" after missed runs or a gap: { key, tier,
+ * answer, answeredIso } — key is the lapse (the date of their last run, or "none"), so logging a run starts a new
+ * one, and the question is asked again in the same lapse only when it gets worse (REALIGN_RANK).
+ */
+const REALIGN_KEY = "interun_realign_v1";
+/**
  * The plan-determining fields, and nothing else. See journalSync for why not the plan itself.
  * ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), BECAUSE journalSync READS IT FROM INSIDE adoptPlan. It sat
  * thirteen thousand lines further down, so at launch planProfSnapshot read it in its temporal dead zone, threw,
@@ -7296,7 +7302,12 @@ function applyAdjustments() {
     // ⚠️ AFTER THE DAY FILTER, DELIBERATELY. If a holiday has already taken sessions out of this week,
     // easing it should ease what is LEFT rather than what was originally prescribed — otherwise the two
     // windows compound into a cut neither of them asked for. An ORDERING claim.
-    if (eased(wk, rows) && raw) easeWeekIn(wk, raw);
+    if (eased(wk, rows) && raw) {
+      // B6: an easier week booked to ease back in after missed runs carries the engine's own "missed" wording
+      // ("eased re-entry"); every other is the runner's choice. The arithmetic is identical (EaseReason).
+      const er = adjustFor(wk.startIso, rows);
+      easeWeekIn(wk, raw, er && er.reason === "missed" ? "missed" : "chosen");
+    }
   });
   return removed;
 }
@@ -7323,9 +7334,9 @@ function eased(wk, rows) {
  * of 9,945 weeks, every one a taper week), so easeWeek reports triggered:false and this leaves the
  * week exactly as it was rather than claiming a change it did not make.
  */
-function easeWeekIn(wk, raw) {
+function easeWeekIn(wk, raw, reason) {
   try {
-    const r = RC.easeWeek(raw, "chosen");
+    const r = RC.easeWeek(raw, reason === "missed" ? "missed" : "chosen");
     if (!r || !r.triggered) return false;
     raw.sessions = r.week.sessions;
     raw.plannedDistanceMeters = r.week.plannedDistanceMeters;
@@ -8218,6 +8229,251 @@ function answerReentry(choice) {
     restore();
     if (o.weeks.length) { try { recompute(); } catch (e) {} computeToday(); seedDone(); restoreTicks(t2); }
     render();
+  });
+  render();
+}
+
+// ---- Missed sessions: offer to get back on track (stage B6) ---------------------------------
+/** The three questions, quietest first. The rank is what "asked again only when it gets worse" compares. */
+const REALIGN_RANK = { misses: 1, gap7: 2, gap28: 3 };
+/**
+ * Missed runs in a row before the plan asks (PLAN.md B6). The weekly review's own ease offer speaks at two
+ * (EASE_MIN_MISSES) — but only in a week with a run logged in it: buildWeeklyReview is quiet when runs.length is
+ * 0, which is exactly the week somebody has stopped running. This is the question for when the review is silent.
+ */
+const REALIGN_MIN_MISSES = 3;
+/**
+ * A week and four weeks without a run: the repository's own lines for time away, read from PAUSE_TIERS rather
+ * than typed again — "a week or less" is where nothing needs rebuilding, and past four weeks is what
+ * returnToRunningPlan already calls a long layoff.
+ */
+function realignGapDays() { return PAUSE_TIERS[0].maxDays; }
+function realignLongGapDays() { return PAUSE_TIERS[2].maxDays; }
+function loadRealign() {
+  try { const v = JSON.parse(localStorage.getItem(REALIGN_KEY) || "null"); return (v && typeof v === "object" && v.tier) ? v : null; }
+  catch (e) { return null; }
+}
+function saveRealign(v) { try { v ? localStorage.setItem(REALIGN_KEY, JSON.stringify(v)) : localStorage.removeItem(REALIGN_KEY); } catch (e) {} }
+/**
+ * B6 — WHAT THE RUNNER HAS ACTUALLY DONE: the plan's runs against the runs logged. NEVER state.done.
+ * seedDone ticks every session dated before today whether it happened or not, so state.done reads 100% for
+ * somebody who has not run at all — easeWeekEvidence's own warning, and PLAN.md's re-break for this stage.
+ * ⚠️ TIME THE RUNNER WAS EXCUSED IS NOT TIME MISSED: the count starts after the later of their last run, the
+ * day before the plan began, and the last day of a break that took running out (B5's record). A holiday is not
+ * a lapse, and coming back from one is B5's question, not this one. While such a break is running, or the plan
+ * is paused, nothing is being missed at all.
+ * ⚠️ A RUN COUNTS ON ITS DAY, OR WHEREVER THE RUNNER LINKED IT (B1) — the same "prescribed against logged" the
+ * ease offer uses, so the two never disagree about whether a session happened.
+ */
+function realignEvidence() {
+  if (!PLAN || !PLAN.weeks || !RAW || !RAW.weeks || !TODAY_IN_PLAN) return null;
+  const today = todayIso();
+  if (profile.startDateIso && profile.startDateIso > today) return null;
+  const rows = loadAdjust();
+  if (rows.some((r) => r && (r.kind === "holiday" || r.kind === "ease") && REENTRY_MODES[r.mode] && r.from && r.to && r.from <= today && r.to >= today)) return null;
+  const runDays = {};
+  let last = "";
+  (state.hist || []).forEach((r) => { if (r && r.d && r.d <= today) { runDays[r.d] = 1; if (r.d > last) last = r.d; } });
+  let active = last;
+  const dayBefore = isoAdd(planStartIso(profile), -1).toISOString().slice(0, 10);
+  if (dayBefore > active) active = dayBefore;
+  const re = loadReentry();
+  if (re && re.to && re.to > active && re.to < today) active = re.to;
+  const gap = Math.round((isoAdd(today, 0).getTime() - isoAdd(active, 0).getTime()) / 86400000);
+  const outcomes = [];
+  PLAN.weeks.forEach((w, wi) => {
+    const rw = RAW.weeks[wi];
+    if (!rw || !w.startIso) return;
+    (rw.sessions || []).forEach((s) => {
+      if (!PRIMARY_TYPES[s.type] || s.type === "race") return;
+      const iso = isoAdd(w.startIso, effDay(s)).toISOString().slice(0, 10);
+      if (iso <= active || iso >= today) return;
+      outcomes.push({ iso: iso, completed: !!runDays[iso] || !!linkedRunFor(w.index, s.id) });
+    });
+  });
+  outcomes.sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
+  const misses = RC.countTrailingMisses(outcomes);
+  let tier = null;
+  if (gap >= realignLongGapDays()) tier = "gap28";
+  else if (gap >= realignGapDays()) tier = "gap7";
+  else if (misses >= REALIGN_MIN_MISSES) tier = "misses";
+  return { key: last || "none", last: last, active: active, gap: gap, misses: misses, tier: tier };
+}
+/** The plan week holding a date (index into PLAN.weeks), or -1. */
+function realignWeekAt(iso) {
+  return PLAN.weeks.findIndex((w) => w && w.startIso && iso >= w.startIso && iso <= isoAdd(w.startIso, 6).toISOString().slice(0, 10));
+}
+/** A rebuilt plan, previewed and never adopted: the week holding today, its number, distance, and the block's length. */
+function realignPreview(changes) {
+  try {
+    const out = applyProfile(Object.assign({}, profile, changes));
+    const today = todayIso();
+    const ws = out.plan.weeks || [];
+    const monday = (iso) => isoAdd(iso, -((isoAdd(iso, 0).getUTCDay() + 6) % 7)).toISOString().slice(0, 10);
+    const w = ws.find((x) => x && x.startIso && today >= monday(x.startIso) && today <= isoAdd(monday(x.startIso), 6).toISOString().slice(0, 10));
+    return w ? { index: w.index, km: w.distanceKm, weeks: ws.length } : null;
+  } catch (e) { return null; }
+}
+/**
+ * B6 — PICK UP WHERE YOU LEFT OFF: the block and the target date move back by the whole weeks missed, so this
+ * week is the week the runner stopped in. ⚠️ WHOLE WEEKS, because the block is laid out Monday to Sunday; and the
+ * new start is never after today, or the plan would read as paused.
+ */
+function realignPickup(ev) {
+  if (!profile.raceDate) return null;
+  const today = todayIso();
+  const nowI = realignWeekAt(today);
+  let stopI = realignWeekAt(isoAdd(ev.active, 1).toISOString().slice(0, 10));
+  if (stopI < 0) stopI = 0;
+  const w = nowI - stopI;
+  if (nowI < 0 || w < 1) return null;
+  let start = isoAdd(planStartIso(profile), 7 * w).toISOString().slice(0, 10);
+  if (start > today) start = today;
+  const race = isoAdd(profile.raceDate, 7 * w).toISOString().slice(0, 10);
+  const pre = realignPreview({ startDateIso: start, raceDate: race });
+  return pre ? { start: start, race: race, weeks: w, pre: pre } : null;
+}
+/**
+ * B6 — the answers by how far the runner has slipped, each mapped to something that already exists and quoting
+ * what it does (pausePlanHtml's rule: a date or a distance, never "your plan will change").
+ *   misses: ease back in (the "make a week easier" row, in the engine's "missed" words) · carry on
+ *   gap7:   pick up where you left off (block and date move back) · start again from this week (same date) · carry on
+ *   gap28:  start a new plan (the wizard) · start again from this week, with the "after time off" run-in · carry on
+ * ⚠️ PLAN.md SKETCHED "REARRANGE" FOR MISSED RUNS, AND IT IS NOT HERE ON PURPOSE: the engine's own rule for missed
+ * sessions is "do NOT cram the missed work on top" (src/adapt/missed-sessions.ts). Moving a session to another
+ * week stays on its own sheet (B4) for anybody who wants to.
+ * ⚠️ RECOMMENDED BY pauseTierFor(gap), the lines the pause already uses: up to a fortnight, pick up where you
+ * left off; up to four weeks, rebuild the run-in; beyond, a new plan. Carrying on is never recommended once a
+ * week has gone by — the plan moved on while the runner did not.
+ * ⚠️ "AFTER TIME OFF" IS THE RIGHT TOOL AT FOUR WEEKS, NOW THE BLOCK IS ANCHORED: it re-shapes a block's first
+ * weeks, and a block restarted from this week has its first weeks ahead of it.
+ */
+function realignOptions(ev) {
+  const cw = PLAN.weeks[CURRENT_WEEK];
+  const out = [];
+  if (!cw) return out;
+  const carry = { id: "carry", t: "Carry on as planned", s: "This is week " + cw.index + " of " + PLAN.weeks.length + ": " +
+    reentryKm(cw.distanceKm) + " km" + (cw.longRunMin ? ", with a " + cw.longRunMin + "-minute long run" : "") + "." };
+  if (ev.tier === "misses") {
+    const today = todayIso();
+    const i0 = PLAN.weeks.findIndex((w) => w && w.startIso && w.startIso >= today);
+    const o = easeWeekOptions().find((x) => x.i === i0 && !x.why);
+    if (o) out.push({ id: "ease", t: "Ease back in", s: reentryWeekLine(o) + ", its hardest session swapped for an easy run.", weeks: [o], rec: true });
+    out.push(carry);
+    return out.length > 1 ? out : [];
+  }
+  const tierId = pauseTierFor(ev.gap).id;
+  const long = ev.tier === "gap28";
+  const race = profile.raceDate ? runDateLabelIso(profile.raceDate) : "";
+  if (long) out.push({ id: "newplan", t: "Start a new plan", s: "Answer the setup questions again, so the plan is built on where you are now.", rec: true });
+  if (!long) {
+    const p = realignPickup(ev);
+    if (p) out.push({ id: "pickup", t: "Pick up where you left off", pick: p, rec: tierId === "nudge" || tierId === "resume",
+      s: "Back to week " + p.pre.index + " (" + reentryKm(p.pre.km) + " km)" + (race ? ", and your target date moves from " + race + " to " + runDateLabelIso(p.race) : "") + "." });
+  }
+  const changes = long ? { startDateIso: todayIso(), returning: "break" } : { startDateIso: todayIso() };
+  const r = realignPreview(changes);
+  if (r) out.push({ id: "restart", t: "Start again from this week", changes: changes, rec: !long && tierId === "rebuild",
+    s: "Week 1 from this week (" + reentryKm(r.km) + " km)" + (race ? ", still building to " + race + " over " + r.weeks + " weeks" : "") +
+      (long ? ", with the gentler start for time off" : "") + "." });
+  out.push(carry);
+  if (!out.some((o) => o.rec)) { const first = out.find((o) => o.id !== "carry"); if (first) first.rec = true; }
+  return out.length > 1 ? out : [];
+}
+/**
+ * B6 — the question to ask now, or null. Asked when the runner has slipped (REALIGN_RANK), once per lapse — a
+ * lapse is "no run since this date", so logging a run starts afresh — and asked again only if it gets worse.
+ * ⚠️ NOT WHILE B5's QUESTION IS OPEN: coming back from a booked break is that card's to ask.
+ */
+function currentRealign() {
+  if (currentReentry()) return null;
+  const ev = realignEvidence();
+  if (!ev || !ev.tier) return null;
+  const rec = loadRealign();
+  if (rec && rec.key === ev.key && (REALIGN_RANK[rec.tier] || 0) >= REALIGN_RANK[ev.tier]) return null;
+  const options = realignOptions(ev);
+  return options.length ? { ev: ev, options: options } : null;
+}
+/**
+ * B6 — the card on Today. ⚠️ IT REPLACES THE WEEKLY REVIEW WHILE IT IS UP (weeklyReviewCard steps aside), the
+ * same one-question rule B5 keeps — and the review's ease offer would be this question asked a second way.
+ */
+function realignCard() {
+  const q = currentRealign();
+  if (!q) return "";
+  const ev = q.ev;
+  const head = ev.tier === "misses"
+    ? "You have missed your last " + ev.misses + " runs."
+    : ev.last ? "Your last run was " + ev.gap + " days ago, on " + runDateLabelIso(ev.last) + "."
+      : "You have not logged a run since your plan began, " + ev.gap + " days ago.";
+  const why = ev.tier === "misses"
+    ? "Rather than carrying that work forward, the week ahead can be made easier, so you pick the plan back up gently."
+    : pauseTierFor(ev.gap).why;
+  const opt = (o) => '<button class="po-opt' + (o.rec ? " rec" : "") + '" data-realign="' + o.id + '">' +
+    (o.rec ? '<span class="po-rec">Recommended</span>' : "") +
+    '<span class="po-t">' + esc(o.t) + '</span><span class="po-b">' + esc(o.s) + '</span></button>';
+  return '<div class="card wk-review re-card"><div class="db-head"><span class="db-ic">' + ICON.alfie + '</span><span>Getting back on track</span></div>' +
+    '<div class="db-body"><p>' + esc(head) + '</p><p>' + esc(why) + '</p><p><b>How do you want to pick it back up?</b></p></div>' +
+    '<div class="re-opts">' + q.options.map(opt).join("") + '</div>' +
+    '<p class="mp-note">Nothing changes until you choose, and you can undo straight after.</p></div>';
+}
+/**
+ * B6 — act on the answer in ONE commit with ONE Undo (the standing pattern), recording the answer for this lapse
+ * at this tier. Undo puts the plan back AND the question.
+ * ⚠️ A REBUILD SAVES THE OVERRIDES' SNAPSHOT AND WRITES IT BACK BEFORE REBUILDING ON UNDO: applyCrossWeekMoves
+ * reads the store (B4's lesson in applyPause's Undo).
+ */
+function answerRealign(choice) {
+  const q = currentRealign();
+  if (!q) return;
+  const o = q.options.find((x) => x.id === choice);
+  if (!o) return;
+  const beforeRec = loadRealign();
+  saveRealign({ key: q.ev.key, tier: q.ev.tier, answer: choice, answeredIso: todayIso() });
+  if (choice === "carry") {
+    toastUndo("Carrying on as planned.", () => { saveRealign(beforeRec); render(); });
+    render(); return;
+  }
+  if (choice === "newplan") { startWizard(); return; }
+  const beforeRows = JSON.stringify(loadAdjust());
+  const beforeProf = { raceDate: profile.raceDate, startDateIso: profile.startDateIso, returning: profile.returning };
+  const beforeOv = JSON.stringify(state.dayOverride || {});
+  const restore = () => {
+    try { localStorage.setItem(ADJUST_KEY, beforeRows); } catch (e) {}
+    profile.raceDate = beforeProf.raceDate; profile.startDateIso = beforeProf.startDateIso; profile.returning = beforeProf.returning;
+    try { state.dayOverride = JSON.parse(beforeOv); } catch (e) {}
+    saveDayOverride();
+    saveRealign(beforeRec);
+  };
+  if (choice === "ease") {
+    const rows = loadAdjust();
+    const w = o.weeks[0];
+    rows.unshift({ id: "adj-" + Date.now(), kind: "recovery", from: w.wk.startIso, to: isoAdd(w.wk.startIso, 6).toISOString().slice(0, 10),
+      mode: "recovery", reason: "missed", dropNonRun: false });
+    saveAdjust(rows);
+  } else if (choice === "pickup") {
+    profile.raceDate = o.pick.race; profile.startDateIso = o.pick.start;
+  } else if (choice === "restart") {
+    Object.assign(profile, o.changes);
+  }
+  const ticks = todayTicks();
+  try { recompute(); } catch (e) {
+    restore();
+    try { recompute(); } catch (e2) {}
+    computeToday(); seedDone(); restoreTicks(ticks); saveProfileStore();
+    toast("That did not work — your plan is unchanged."); render(); return;
+  }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  const msg = choice === "ease" ? "Week " + (o.weeks[0].i + 1) + " is easier."
+    : choice === "pickup" ? "Back to week " + o.pick.pre.index + "." + (o.pick.race ? " Target date: " + runDateLabelIso(o.pick.race) + "." : "")
+    : "Starting again from this week.";
+  toastUndo(msg, () => {
+    const t2 = todayTicks();
+    restore();
+    try { recompute(); } catch (e) {}
+    computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+    seedDone(); restoreTicks(t2); saveProfileStore(); render();
   });
   render();
 }
@@ -9115,7 +9371,8 @@ function todayNextUp() {
  */
 // ⚠️ B5: THE COMING-BACK QUESTION LEADS. It is about the days ahead of a runner who has just returned; a pace
 // flag or a review built from before the break can wait a week, and weeklyReviewCard steps aside for it.
-function todayCards() { return [reentryCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()]; }
+// B6: the getting-back-on-track question follows it: currentRealign is null while B5's is open, so only one shows.
+function todayCards() { return [reentryCard(), realignCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()]; }
 function todayAttention() {
   return todayCards().find((x) => x && x.trim()) || "";
 }
@@ -41148,6 +41405,8 @@ function weeklyReviewCard() {
   // ⚠️ B5: AND NOT WHILE "HOW QUICKLY DO YOU WANT TO BUILD BACK UP?" IS OPEN. One question at a time — the
   // review's own rule — and its ease-a-week offer would be the same question asked a second way.
   if (currentReentry()) return "";
+  // ⚠️ B6: AND NOT WHILE "HOW DO YOU WANT TO PICK IT BACK UP?" IS OPEN — PLAN.md: it replaces the review card.
+  if (currentRealign()) return "";
   const r = currentWeeklyReview();
   if (!r || r.quiet) return "";
   const lines = r.observations.map((o) => "<p>" + esc(o) + "</p>").join("");
@@ -42696,6 +42955,8 @@ function wire() {
   const wrEase = $("wrEase"); if (wrEase) wrEase.onclick = applyEaseOffer;
   // B5 — each answer to "how quickly do you want to build back up?" acts, with an Undo that re-asks.
   document.querySelectorAll("[data-reentry]").forEach((b) => { b.onclick = () => answerReentry(b.dataset.reentry); });
+  // B6 — each answer to "how do you want to pick it back up?" acts, with an Undo that re-asks.
+  document.querySelectorAll("[data-realign]").forEach((b) => { b.onclick = () => answerRealign(b.dataset.realign); });
   const wrNoEase = $("wrNoEase"); if (wrNoEase) wrNoEase.onclick = declineEaseOffer;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;
   const fitDismiss = $("fitDismiss"); if (fitDismiss) fitDismiss.onclick = dismissFitSuggest;

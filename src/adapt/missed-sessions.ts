@@ -76,7 +76,7 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
 
   // Demote the single hardest quality session to an easy run (no cramming, gentle re-entry).
   const hardestId = hardestSessionId(week);
-  const sessions: Session[] = week.sessions.map((s) => {
+  const trimmed: Session[] = week.sessions.map((s) => {
     if (s.id === hardestId) {
       changes.push(
         reason === "missed"
@@ -140,6 +140,14 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
     return s;
   });
 
+  // ⚠️⚠️ THE LONG RUN STAYS THE LONGEST RUN OF THE WEEK — the owner's ruling of 2026-10-05 ("Easier weeks: keep the
+  // long run the longest run"), chosen over the book's 30% band where the two disagree. keepLongRunLongest records
+  // where they do; test/ease-week.test.ts holds the band everywhere else.
+  const sessions = keepLongRunLongest(trimmed);
+  if (sessions.some((s, i) => s !== trimmed[i])) {
+    changes.push("Kept your long run the longest run of the week, so an easy run is a little shorter too.");
+  }
+
   changes.push(
     reason === "missed"
       ? "Trimmed the long run ~20% and easy volume ~15% this week; missed sessions are not added back."
@@ -180,15 +188,15 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
  * Hold every easy run of a week just under its long run, on both rulers this repo measures a run by (the
  * outing's distance and the training distance) — the owner's rule, "the long run is meant to be the longest run
  * of the week" (pc-longshort).
- * ⚠️ WHY IT EXISTS, AND WHY easeWeek DOES NOT CALL IT (YET). An eased week trims the long run by a fifth, easy
- * running by a seventh, and turns the demoted session into an easy run of 70% of ITS length, so it can come out
- * with an easy run longer than its long run: measured over the B-race axis of the progression audit, 148 such
- * weeks became 217 once the week before a B-race was eased. Holding the run under the long run costs time, and in
- * a handful of weeks (slow 5K base weeks, where the threshold session is longer than the long run) that pushes an
- * eased week past the book's 30% band that test/ease-week.test.ts holds "Make a week easier" to: 13 of 3,360
- * weeks over 28%, the deepest 32.2%. Two of the owner's rules disagree there, so "Make a week easier" and the
- * comeback offers are left as they were for him to decide. The week before a B-race (stage B7) is a race's
- * run-in, where a deeper cut is the point, and uses it.
+ * ⚠️ WHY IT EXISTS. An eased week trims the long run by a fifth, easy running by a seventh, and turns the demoted
+ * session into an easy run of 70% of ITS length, so it could come out with an easy run longer than its long run:
+ * measured over the B-race axis of the progression audit, 148 such weeks became 217 once the week before a B-race
+ * was eased (stage B7), worst 1.33x — a slow 5K runner's "50′ easy" of 9.6 km beside an 8.2 km long run.
+ * ⚠️⚠️ AND WHAT IT COSTS, WHICH THE OWNER WEIGHED. Holding the run under the long run takes time, and in a handful of
+ * weeks (slow 5K base weeks, where the threshold session outlasts the long run) that takes an eased week past the
+ * book's 20-30% band: 13 of 3,360 weeks over 28%, the deepest 32.2%. Asked which rule wins, the owner ruled on
+ * 2026-10-05: "Easier weeks: keep the long run the longest run". So easeWeek calls this for every caller — Make a
+ * week easier, both comeback offers (B5, B6) and the week before a B-race (B7).
  */
 export function keepLongRunLongest(sessions: Session[]): Session[] {
   const long = sessions.find((s) => s.type === "long");

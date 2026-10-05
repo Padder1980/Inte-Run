@@ -32,7 +32,7 @@ import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
 import { scaleSessionDistance, sessionVolumeMeters } from "../domain/steps.ts";
 import { RACE_DISTANCES_M } from "../domain/units.ts";
-import { easeWeek, keepLongRunLongest } from "../adapt/missed-sessions.ts";
+import { easeWeek } from "../adapt/missed-sessions.ts";
 import { runningDaysFor, runningDayChoices } from "../domain/running-days.ts";
 import { youthLimitsFor } from "../domain/youth.ts";
 import { strengthSessionsFor } from "../domain/strength-days.ts";
@@ -1853,8 +1853,8 @@ function applySecondaryRace(weeks: PlannedWeek[], goal: Goal, paces: TrainingPac
   if (!before.isDeload) {
     const eased = easeWeek(before, "race");
     if (eased.triggered) {
-      // ⚠️ AND ITS LONG RUN STAYS ITS LONGEST RUN (keepLongRunLongest says why easeWeek alone does not promise it).
-      before.sessions = keepLongRunLongest(eased.week.sessions);
+      // Its long run stays its longest run: easeWeek holds every eased week to that (the owner's ruling, 2026-10-05).
+      before.sessions = eased.week.sessions;
       before.focus = `Easier week — so you arrive at your ${label} fresh`;
       touched.add(before);
     }

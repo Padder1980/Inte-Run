@@ -121,27 +121,64 @@ test("BLOCKER: the cut is inside the book's own 20-to-30-percent band, measured 
   // run of 70% of its duration can leave the week with MORE kilometres — measured, 44 of 9,405 eased
   // weeks (0.5%), worst +0.94 km, while the training time still falls 21-24%.
   const cuts: number[] = [];
-  let gained = 0, n = 0;
-  for (const { w } of weeks()) {
+  let gained = 0, n = 0, past = 0;
+  for (const { who, w } of weeks()) {
     const r = easeWeek(w, "chosen");
     if (!r.triggered) continue;
     n++;
     const m0 = mins(w);
-    if (m0 > 0) cuts.push(1 - mins(r.week) / m0);
+    const cut = m0 > 0 ? 1 - mins(r.week) / m0 : 0;
+    if (m0 > 0) cuts.push(cut);
     if (km(r.week) > km(w) + 0.05) gained++;
+    // ⚠️⚠️ THE BAND HOLDS EXCEPT WHERE THE OWNER'S LONG-RUN RULE NEEDS MORE, AND ONLY THERE. Asked which wins when
+    // the two disagree, he ruled on 2026-10-05: "Easier weeks: keep the long run the longest run". Holding an easy
+    // run under the long run takes time, and in slow 5K base weeks — where the threshold session outlasts the long
+    // run — that takes the week past 30%. So a week past the band must be one the long-run hold shortened.
+    if (cut > 0.30) {
+      past++;
+      assert.ok(r.changes.some((c) => /Kept your long run the longest run/.test(c)),
+        `${who}: ${(cut * 100).toFixed(1)}% off the week, past the book's band, and not for the long-run rule`);
+    }
   }
   const mean = cuts.reduce((a, b) => a + b, 0) / cuts.length;
   assert.ok(cuts.length > 3000, `only ${cuts.length} weeks measured`);
-  // Measured min 13.4%, max 24.2%, mean 18.9%. A recovery week is 24-28%, so this is a shade shallower
-  // and is stated as such rather than tuned to match.
+  // Measured min 13.4%, max 24.2%, mean 18.9% before the ruling. A recovery week is 24-28%, so this is a shade
+  // shallower and is stated as such rather than tuned to match. Since it: the deepest 32.2%, in weeks the long-run
+  // hold shortened, and those weeks stay rare.
   assert.ok(Math.min(...cuts) >= 0.10,
     `the shallowest ease takes only ${(Math.min(...cuts) * 100).toFixed(1)}% off the week`);
-  assert.ok(Math.max(...cuts) <= 0.30,
-    `the deepest ease takes ${(Math.max(...cuts) * 100).toFixed(1)}% off the week, past the book's band`);
+  assert.ok(Math.max(...cuts) <= 0.35,
+    `the deepest ease takes ${(Math.max(...cuts) * 100).toFixed(1)}% off the week, past even what the long-run rule needs`);
+  assert.ok(past / n <= 0.01, `${past} of ${n} eased weeks are past the book's band (${(past / n * 100).toFixed(2)}%)`);
   assert.ok(mean >= 0.15 && mean <= 0.24, `the mean cut is ${(mean * 100).toFixed(1)}%`);
   // The km rise is real, rare and must stay rare — the copy is worded around it.
   assert.ok(gained / n <= 0.02,
     `${gained} of ${n} eased weeks come out with MORE counted km (${(gained / n * 100).toFixed(1)}%)`);
+});
+
+test("BLOCKER: an easier week keeps its long run the longest run — the owner's ruling, every week of the grid", () => {
+  // "Easier weeks: keep the long run the longest run" (2026-10-05). Before it, easeWeek's two trims (a fifth off the
+  // long run, a seventh off easy running) and the demoted session's 70% could leave an easy run longer than the long
+  // run: a slow 5K runner's "50′ easy" at 9.6 km beside an 8.2 km long run. Asked on both rulers this repo measures a
+  // run by, for every reason.
+  let checked = 0;
+  for (const { who, w } of weeks()) {
+    for (const reason of ["chosen", "missed", "race"] as const) {
+      const r = easeWeek(w, reason);
+      if (!r.triggered) continue;
+      const long = r.week.sessions.find((s) => s.type === "long");
+      if (!long) continue;
+      checked++;
+      for (const s of r.week.sessions) {
+        if (s === long || !["easy", "recovery", "strides"].includes(s.type)) continue;
+        assert.ok((s.estimatedDistanceMeters ?? 0) <= (long.estimatedDistanceMeters ?? 0),
+          `${who} (${reason}): "${s.title}" covers ${s.estimatedDistanceMeters} m, past the long run's ${long.estimatedDistanceMeters} m`);
+        assert.ok((s.trainingDistanceMeters ?? 0) <= (long.trainingDistanceMeters ?? 0),
+          `${who} (${reason}): "${s.title}" trains ${s.trainingDistanceMeters} m, past the long run's ${long.trainingDistanceMeters} m`);
+      }
+    }
+  }
+  assert.ok(checked > 6000, `only ${checked} eased weeks with a long run were checked`);
 });
 
 test("BLOCKER: nothing to ease is reported as nothing, and the week is left alone", () => {

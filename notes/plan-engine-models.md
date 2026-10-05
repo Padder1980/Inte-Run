@@ -602,3 +602,6 @@ and fuelling, which read the goal for every race before. A week-move refuses any
 distances) and `test/b-race-app.test.ts` (5, the real sheet, save, Undo, Cancel and Planned breaks). **25 of 25
 re-breaks caught**, PLAN.md's own (a B-race in the taper) among them. The progression audit has a B-race axis
 (`tools/audit-progression.mjs`, its last section).
+⚠️ **RULED THE NEXT DAY (2026-10-05): "Easier weeks: keep the long run the longest run."** `easeWeek` now holds every
+eased week to it, so the week before a B-race no longer calls `keepLongRunLongest` itself. The last chapter of
+`notes/plan-adaptation.md`.

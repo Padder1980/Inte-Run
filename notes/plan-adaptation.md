@@ -500,3 +500,22 @@ slid; see `notes/plan-profile.md`.
 
 **Tests:** `test/realign.test.ts` (7), over a plan built the way `applyProfile` builds one and growing week by week,
 so every quoted distance can be held to the result. **16 of 16 re-breaks caught**, PLAN.md's own among them.
+
+## EASIER WEEKS KEEP THE LONG RUN THE LONGEST RUN (the owner's ruling, 2026-10-05)
+
+Found by the progression audit's B-race axis (stage B7, `notes/plan-engine-models.md`): `easeWeek` trims the long
+run by a fifth and easy running by a seventh, and turns the demoted session into an easy run of 70% of ITS length,
+so an eased week could come out with an easy run longer than its long run — a slow 5K runner's "50′ easy" at 9.6 km
+beside an 8.2 km long run (worst 1.33×), against his rule "the long run is meant to be the longest run of the week".
+Holding the run under the long run (`keepLongRunLongest`, 95% on both rulers) takes time, and in a handful of slow
+5K base weeks — where the threshold session outlasts the long run — that takes the week past the book's 20–30% band:
+13 of 3,360 weeks over 28%, the deepest 32.2%. Put to him as a choice; he ruled: **"Easier weeks: keep the long run
+the longest run."**
+
+So `easeWeek` now calls `keepLongRunLongest` for every caller — Make a week easier, B5's "how quickly", B6's "ease
+back in" and the week before a B-race (B7, which called it itself and now relies on `easeWeek`) — and says so in its
+changes when it shortens a run ("Kept your long run the longest run of the week…").
+⚠️ **THE BAND GUARD WAS RESTATED, NOT LOOSENED.** `test/ease-week.test.ts` still holds every eased week to the 20–30%
+band EXCEPT a week the long-run hold shortened, and only that week; such weeks must stay under 1%, and nothing may
+pass 35% (re-broken with the hold at 60%: the deepest went to 48.8% and the guard failed). A new test asks the ruling
+itself on every week of the grid, for all three reasons, on both rulers. 2 of 2 re-breaks caught.

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, RaceDistanceKey, Session, TrainingPaces } from "../src/domain/types.ts";
-import { generatePlan } from "../src/plan/generate-plan.ts";
+import { generatePlan, longRunRangeFor } from "../src/plan/generate-plan.ts";
 import { MAX_STRUCTURED_WEEKS } from "../src/plan/periodization.ts";
 import { assessTrainingFlags } from "../src/adapt/training-flags.ts";
 import { deriveTrainingPaces } from "../src/science/paces.ts";
@@ -350,6 +350,45 @@ test("EVERY week honours the intensity model, across the whole product", () => {
     }
   }
   assert.ok(checked > 1500, `only ${checked} weeks checked`);
+});
+
+test("EVERY week honours the intensity model with each training dial too (stage B8)", () => {
+  // PLAN.md B8 D: "the intensity sweep gains them". Each non-default value of each dial, one at a time, over the
+  // sweep above at fewer runways — a second hard day, a flatter climb and a capped long run all take easy minutes
+  // out of some week, and every one of those weeks still has to hold the model. The engine holds "challenging" and
+  // less growth to the plan they replace (generatePlan); the long-run cap is held here.
+  const TARGET: Record<string, number> = { "5k": 1200, "10k": 2500, half: 5400, marathon: 11400 };
+  let checked = 0;
+  for (const dist of ["5k", "10k", "half", "marathon"] as RaceDistanceKey[]) {
+    for (const days of [3, 4, 5, 6]) {
+      for (const experience of ["recreational", "competitive"] as const) {
+        for (const weeks of [12, 20]) {
+          for (const vol of [undefined, 30, 70]) {
+            const ath: Athlete = { ...competitive, daysPerWeek: days, experience, ...(vol ? { weeklyVolumeKmCurrent: vol } : {}) };
+            const g = { ...goalFor(dist, weeks), targetTimeSeconds: TARGET[dist]! };
+            const range = longRunRangeFor(ath, g);
+            const dials: Partial<Athlete>[] = [
+              { volumeGrowth: "gradual" }, { volumeGrowth: "steady" }, { hardDays: "comfortable" }, { hardDays: "challenging" },
+              ...(range && range.choices.length ? [{ longRunMaxMinutes: range.minMinutes }] : []),
+            ];
+            for (const dial of dials) {
+              const plan = generatePlan({ ...ath, ...dial }, g);
+              for (const w of plan.weeks) {
+                if (w.sessions.some((s) => s.type === "race")) continue;
+                const d = computeDistribution(w.sessions);
+                if (d.totalSeconds === 0) continue;
+                checked++;
+                assert.ok(honoursModel(d, plan.intensityModel),
+                  `${dist} ${days}d ${experience} ${weeks}wk vol=${vol ?? "unset"} ${JSON.stringify(dial)} week ${w.index} (${w.phase}): ` +
+                  `${(d.easy * 100).toFixed(1)}% easy breaks ${plan.intensityModel}`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.ok(checked > 5000, `only ${checked} weeks checked`);
 });
 
 test("a quality session's warm-up and recoveries count as easy running", () => {

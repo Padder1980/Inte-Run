@@ -584,3 +584,83 @@ plan and a pause. Session ids already name the calendar week (B4), so nothing st
 - **Tests:** `test/plan-anchor.test.ts` (5) — the regression drives the app's real `applyProfile` over the real
   engine on six successive Mondays and requires weeks 1–6 with the block's own long runs. `manage-plan`'s two pause
   guards restated for the new rule. **11 of 11 re-breaks caught**, the old clamp put back among them.
+
+## ✅ B8 — TRAINING PREFERENCE DIALS (built 2026-10-05)
+
+Three questions on **Training rhythm** (two of them in the wizard too), each moving one thing in the engine, each
+hidden exactly where the engine would ignore it, and each shown in the preview before saving (`profileImpact` rows
+"Hard sessions across the plan", "Longest long run", "Your first full week"):
+
+- **"How much should your weekly mileage grow?"** About a fifth / About a tenth / About the same → `profile.volGrowth`
+  → `Athlete.volumeGrowth` → `VOLUME_GROWTH` (1.25 / 1.15 / 1.05), read through `peakMultiplierFor` (the peak's
+  height above the STATED mileage); `easyStartFracFor` follows (1 / multiplier). Only with a stated mileage: hidden
+  with a "why" without one (the engine ignores it there), and hidden outright on a beginner track (syncStatus hides
+  the mileage question and the save drops its number). Wizard: the volume step, shown as soon as a number is typed.
+- **"How many hard days?"** Comfortable / Balanced / Challenging → `profile.hardDays` → `qualitySessionsThisWeek(…,
+  hardDays)`. Hidden, with the reason (`hardDialWhy`), on a beginner track, on four days or fewer, and **under 18**
+  (one key day a week is their ceiling — measured, 0 of 72 young plans on five and six days changed). Wizard: the
+  details step (age is asked before it).
+- **"How long may your long run get?"** → `profile.longMax` (0 = no limit) → `Athlete.longRunMaxMinutes` → clamps
+  `peakLong` in `buildAll` to `min(natural, max(floor, cap))`. Not in the wizard (it needs a built plan to know its
+  choices). Its options are `RC.longRunRangeFor().choices` (memoised in `LONG_RANGE_MEMO`), rebuilt by
+  `syncLongMaxQ` when days, status, mileage, the race, the 5 km time, age or start date change (on change, never per
+  keystroke — each rebuild builds a plan; the wrapper `#longMaxWrap` is always rendered).
+
+**Defaults are byte-identical** (tested over the grid) and `applyProfile` sends nothing for a default answer.
+The engine wraps in one order: `generatePlan` (growth, with its step-back) → `withLongCap` → `withHardDays` →
+`generatePlanCore`. Every dial the engine could not honour says so in the plan's notes, all beginning "You asked
+for…", which the preview (pi-warn) and the Plan screen show.
+
+**What building it measured and fixed (each a guard now):**
+- ⚠️ **What the growth dial moves is the PEAK's height above what they run, not growth from week one.** A 10K at
+  30 km on 5 days went 27.2 → 38.3 km (progressive) and 22.7 → 32.4 km (steady): the fit takes both ends down
+  together. Where a plan cannot reach the stated mileage at all, the peak stays and week one rises toward it. The
+  question is worded for what it does.
+- **Less growth shallowed the taper**: over 310 plans whose default taper clears 30%, Gradual took 8 under and Steady
+  19 (worst 30.2% → 27.9%). The plan now steps back (Steady → Gradual → the usual) until the taper and week one hold,
+  and says which (`GROWTH_FELL_BACK`).
+- **Challenging built one session in the base** (0 of 576 plans gained a hard day): the base branch of
+  `qualityContentsFor` now builds two. Then it shrank plans without adding a day (the fit settles under the 0.9
+  scale where the second is allowed), so "must add a hard day" joined the post-condition; otherwise the balanced
+  plan with `CHALLENGING_FELL_BACK` (44 of 96 audit plans fall back).
+- **A cap could LENGTHEN the long run** where the race's floor sits over the absolute ceiling (146 against 145
+  minutes, a slow half): hence `min(natural, …)`.
+- **The shortest cap broke the intensity floor** (a 5K on three days, 50 minutes: a build week at 67.1% easy), and
+  with a stated mileage the volume fit makes the midweek runs LONGER to keep the week's distance, so week one went
+  past 1.10x (6 of 13 plans) and easy runs passed the capped long run (8 weeks). `withLongCap` holds a cap to the
+  plan without it on all three (`fault`: easy → weekOne → longest).
+- ⚠️⚠️ **Holding is NOT monotonic in the cap.** A 5K at 50 km on 6 days: caps 65–69 held, 70–81 did not (the fit
+  lands on a bigger first week there), 82 and up held again. An upward-only search turned a 75-minute limit into an
+  85-minute long run while 69 would have kept it. So: the picker offers only choices **asked of `generatePlan`
+  itself** (quarter hours from the shortest the plan allows, each falling back to +5 / +10 minutes), and a saved
+  cap that no longer holds is searched **down first** (the limit is the runner's), then up.
+- **The note gives the reason measured at the cap asked for** (`longCapNote(asked, given, reason)`, reasons in
+  `LONG_CAP_REASONS`: race / easy / weekOne / longest). A cap under the race's floor delivers the floor — and now
+  says so (it was silent).
+- **A cap is not read where the dial is not offered** (beginner ladder, run-walk, under 18: `longCapOffered`), so a
+  cap saved before the runner moved onto one of those tracks changes nothing and no note names a hidden setting.
+- **Empty choices are not null**: the question hides when the plan's long run is already as short as it can keep —
+  unless a limit is saved, when it shows "No limit" plus that limit, so the runner can reach the setting the Plan
+  screen's note names. A saved limit off the list is marked "can’t be kept exactly" only if the engine says so
+  (`longMaxKept`): a saved 84 minutes can be off the quarter-hour list and kept exactly.
+
+**Audit** (`tools/audit-progression.mjs`, "TRAINING-DIAL AXES"): every dial 0 → 0 weeks under the intensity floor,
+0 → 0 first weeks over 1.10x, 0 → 0 easy runs past the long run, and no taper shallower than the default's 29.1%.
+"Any run > long" rises (16 → 24 for the shortest cap): a hard session with its warm-up and cool-down passing a
+shortened long run — default plans have 22 such weeks; it is the cost of a shorter long run, not an easy run. Week-
+on-week rises over 10% in MINUTES go up slightly with Gradual/Steady (8.1% → 9.7% / 10.0% of steps) and Comfortable
+(7.4% → 8.9%): unguarded, recorded.
+
+**Two guards that never fire** (their re-breaks escape, honestly): the Challenging intensity post-condition (0 of
+6,912 plans, 5–7 days, 5 km in 16 to 50 minutes, four runways, with and without strength) and the cap's
+easy-run-longer test (0 of 1,152 plans: every plan where a capped long run lets an easy run pass it also breaks the
+week-one guard first). Both kept as safety nets; the rules they protect are asserted on every plan's OUTCOME
+(breaches, easy runs past the long run, week one), and breaking the week-one and easy-run guards together is caught.
+
+**Speed:** `longRunRangeFor` builds a plan per choice — under 250 ms on this Mac for the slowest case tried; the app
+memoises it per answers.
+
+**Tests:** `test/preference-dials.test.ts` (engine, 5), `test/preference-dials-app.test.ts` (the real form readers,
+builders, `applyProfile` and `profileImpact` lifted from the built page, 8), and the dial sweep in
+`test/session-library.test.ts`. **29 of 31 re-breaks caught** (PLAN.md's own "Steady at 0.9" among them); the two
+that escape are the never-firing guards above.

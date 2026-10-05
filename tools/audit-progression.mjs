@@ -297,3 +297,72 @@ for (const d of ["5k","10k","half","marathon"]) {
   console.log("  weeks under the intensity floor, without → with : " + B.floorBase + " → " + B.floorB + "   (race weeks excluded)");
   console.log("  long run not the longest run, without → with    : " + B.invBase + " → " + B.invB + "   (race weeks excluded)");
 }
+
+// ── THE TRAINING-DIAL AXES (stage B8) ──────────────────────────────────────────────────────────────────────────────
+// PLAN.md B8 D: "audit extended with the three axes before/after". Each non-default value of each dial, one at a
+// time, on a slice of the grid above (two runways, every distance, 4-6 days, both experience levels, mileage unset
+// and stated), measured against the same plan at its defaults. A dial that the engine had to step back from says
+// so in the plan's notes ("You asked for…"), and is counted rather than measured as if it had been honoured.
+{
+  const DIALS = [["volumeGrowth", "gradual"], ["volumeGrowth", "steady"], ["hardDays", "comfortable"], ["hardDays", "challenging"], ["longRunMaxMinutes", "min"]];
+  const { longRunRangeFor } = await import(root + "/src/plan/generate-plan.ts");
+  const R = {};
+  for (const [k, v] of DIALS) R[k + "=" + v] = { plans: 0, changed: 0, steppedBack: 0, notOffered: 0, overMin: 0, overMinBase: 0, trans: 0, floor: 0, floorBase: 0, taperMin: 1, taperMinBase: 1, wk1Over: 0, wk1OverBase: 0, inv: 0, invBase: 0, invEasy: 0, invEasyBase: 0 };
+  const minsOf = (w) => w.sessions.reduce((t, x) => t + (x.estimatedDurationSeconds || 0), 0) / 60;
+  const cutOf = (ws) => { const full = ws.filter((w, i) => i > 0 && !w.sessions.some((s) => s.type === "race")); const peak = Math.max(0, ...full.map((w) => w.plannedDistanceMeters)); const tw = ws.filter((w) => w.phase === "taper"); const lf = tw.length > 1 ? tw[tw.length - 2] : tw[0]; return peak && lf ? 1 - lf.plannedDistanceMeters / peak : 1; };
+  const measure = (p, stated, acc, base) => {
+    const full = p.weeks.filter((w, i) => i > 0 && !w.sessions.some((s) => s.type === "race"));
+    for (let i = 1; i < full.length; i++) {
+      if (full[i].isDeload || full[i - 1].isDeload || full[i].phase === "taper") continue;
+      if (!base) acc.trans++;
+      const r = minsOf(full[i - 1]) > 0 ? minsOf(full[i]) / minsOf(full[i - 1]) : 1;
+      if (r > 1.10) base ? acc.overMinBase++ : acc.overMin++;
+    }
+    for (const w of p.weeks) {
+      if (w.sessions.some((s) => s.type === "race")) continue;
+      const d = computeDistribution(w.sessions);
+      if (d && Number.isFinite(d.easy) && !honoursModel(d, p.intensityModel)) base ? acc.floorBase++ : acc.floor++;
+      const long = w.sessions.find((s) => s.type === "long");
+      // Two counts, because they are two different things: an EASY run past the long run breaks the owner's rule
+      // (the engine guards it — withLongCap's invertedWeeks), while a hard session with its warm-up and cool-down
+      // past a shortened long run is the cost of a shorter long run, and default plans have it too (22 weeks here).
+      if (long) { const lk = long.trainingDistanceMeters ?? long.estimatedDistanceMeters ?? 0; const km = (s) => s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0;
+        const others = w.sessions.filter((s) => s !== long && isRun(s));
+        if (others.length && Math.max(...others.map(km)) > lk) base ? acc.invBase++ : acc.inv++;
+        if (others.some((s) => (s.type === "easy" || s.type === "recovery") && km(s) > lk)) base ? acc.invEasyBase++ : acc.invEasy++; }
+    }
+    const c = cutOf(p.weeks); if (base) acc.taperMinBase = Math.min(acc.taperMinBase, c); else acc.taperMin = Math.min(acc.taperMin, c);
+    const first = (p.weeks.find((w) => !w.isDeload && !w.sessions.some((s) => s.type === "race"))?.plannedDistanceMeters ?? 0) / 1000;
+    if (stated && first > stated * 1.10) base ? acc.wk1OverBase++ : acc.wk1Over++;
+  };
+  for (const [, raceDate] of RUNWAYS.slice(1, 3))
+  for (const distance of ["5k", "10k", "half", "marathon"])
+  for (const days of [4, 5, 6])
+  for (const experience of ["recreational", "competitive"])
+  for (const vol of [null, 40]) {
+    const athlete = { daysPerWeek: days, recent: { distanceMeters: 10000, timeSeconds: 3000 }, experience, includeStrength: false,
+      returningFromInjury: false, ...(vol ? { weeklyVolumeKmCurrent: vol } : {}) };
+    const g = { distance, targetTimeSeconds: TT[distance], raceDateIso: raceDate, startDateIso: START };
+    let base; try { base = generatePlan(athlete, g); } catch { continue; }
+    for (const [k, v] of DIALS) {
+      const acc = R[k + "=" + v];
+      let value = v;
+      if (k === "longRunMaxMinutes") { const r = longRunRangeFor(athlete, g); if (!r || !r.choices.length) { acc.notOffered++; continue; } value = r.minMinutes; }
+      if (k === "volumeGrowth" && !vol) { acc.notOffered++; continue; }
+      const p = generatePlan({ ...athlete, [k]: value }, g);
+      acc.plans++;
+      if (p.notes.some((n) => /^You asked for/.test(n))) acc.steppedBack++;
+      if (JSON.stringify(p.weeks) !== JSON.stringify(base.weeks)) acc.changed++;
+      measure(p, vol, acc, false); measure(base, vol, acc, true);
+    }
+  }
+  console.log("\n── TRAINING-DIAL AXES (stage B8) — each non-default value against the same plan's defaults ─");
+  console.log("  dial                    plans  changed  stepped back  not offered   rises>1.10 (time)   under floor   taper min        wk1>1.10   easy run > long   any run > long");
+  for (const key of Object.keys(R)) {
+    const a = R[key];
+    console.log("  " + key.padEnd(24) + String(a.plans).padEnd(7) + String(a.changed).padEnd(9) + String(a.steppedBack).padEnd(14) + String(a.notOffered).padEnd(12) +
+      (pc(a.overMinBase, a.trans) + " → " + pc(a.overMin, a.trans)).padEnd(20) + (a.floorBase + " → " + a.floor).padEnd(14) +
+      (p2(a.taperMinBase) + " → " + p2(a.taperMin)).padEnd(17) + (a.wk1OverBase + " → " + a.wk1Over).padEnd(11) +
+      (a.invEasyBase + " → " + a.invEasy).padEnd(18) + a.invBase + " → " + a.inv);
+  }
+}

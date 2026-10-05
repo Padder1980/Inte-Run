@@ -63,7 +63,7 @@ export {
 
 // Planning
 export { assessFeasibility } from "./plan/feasibility.ts";
-export { generatePlan, secondaryRaceWindow, type GenerateOptions, type SecondaryRace } from "./plan/generate-plan.ts";
+export { generatePlan, secondaryRaceWindow, longRunRangeFor, VOLUME_GROWTH, type GenerateOptions, type SecondaryRace } from "./plan/generate-plan.ts";
 export {
   MAX_STRUCTURED_WEEKS,
   phaseSchedule,

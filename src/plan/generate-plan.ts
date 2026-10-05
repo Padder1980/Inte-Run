@@ -319,11 +319,24 @@ function noWorse(
 // adaptation, and 25% across a whole block is already brisk beside the usual "add 10% a week, then
 // back off" guidance.
 const PEAK_VOLUME_MULTIPLIER = 1.25;
+/**
+ * B8 — HOW FAST MILEAGE GROWS, the runner's dial (PLAN.md B8): the block's peak as a multiple of the mileage they
+ * stated. "progressive" is the 1.25 this engine has always used, so the default is byte-identical; the other two
+ * build toward a smaller peak, and week one follows by derivation (`easyStartFracFor`), so it stays anchored to what
+ * they already run whichever they choose.
+ */
+export const VOLUME_GROWTH = { progressive: PEAK_VOLUME_MULTIPLIER, gradual: 1.15, steady: 1.05 } as const;
+/** The peak multiplier for this runner: their dial, or the default when they have stated no mileage to grow from. */
+function peakMultiplierFor(athlete: Athlete): number {
+  const stated = athlete.weeklyVolumeKmCurrent;
+  if (!stated || !Number.isFinite(stated) || stated <= 0) return PEAK_VOLUME_MULTIPLIER;
+  return VOLUME_GROWTH[athlete.volumeGrowth ?? "progressive"] ?? PEAK_VOLUME_MULTIPLIER;
+}
 
 function targetPeakWeeklyKm(athlete: Athlete): number | null {
   const stated = athlete.weeklyVolumeKmCurrent;
   if (!stated || !Number.isFinite(stated) || stated <= 0) return null;
-  return stated * PEAK_VOLUME_MULTIPLIER;
+  return stated * peakMultiplierFor(athlete);
 }
 
 /**
@@ -485,6 +498,10 @@ export function schedulesRecoveryWeeks(athlete: Athlete, goal: Goal): boolean {
  * out of an early week raises that week's hard fraction. `test/session-library.test.ts` is the guard.
  */
 const EASY_START_FRAC = 1 / PEAK_VOLUME_MULTIPLIER;
+/** B8: and per plan, from the runner's own growth dial — the same derivation, so week one moves with the peak. */
+function easyStartFracFor(athlete: Athlete): number {
+  return 1 / peakMultiplierFor(athlete);
+}
 
 /**
  * This week's easy-run length as a fraction of peak, ramped up across base and build so the whole week
@@ -618,9 +635,9 @@ function quantisedLadder(
   return out;
 }
 
-function easyRampFor(wp: WeekPlan, fraction: number): number {
+function easyRampFor(wp: WeekPlan, fraction: number, startFrac = EASY_START_FRAC): number {
   if (wp.phase === "taper") return 1;
-  return EASY_START_FRAC + Math.min(1, Math.max(0, fraction)) * (1 - EASY_START_FRAC);
+  return startFrac + Math.min(1, Math.max(0, fraction)) * (1 - startFrac);
 }
 
 // Day-of-week scheduling (0 = Mon … 6 = Sun) is expressed RELATIVE to the long run, then rotated to
@@ -655,7 +672,194 @@ const BEG_STRENGTH_REL = [1, 5];
 const dayRel = (longDay: number, rel: number) => (longDay + rel) % 7;
 const longRunDayOf = (a: Athlete) => ((a.longRunDay ?? 6) % 7 + 7) % 7;
 
-export function generatePlan(
+/**
+ * B8 — "CHALLENGING" IS HELD TO THE PLAN IT WOULD REPLACE (PLAN.md: "protected by the existing intensityProfile /
+ * noWorse post-condition, and a note when it falls back"). A second hard day in the base takes easy minutes out of
+ * those weeks; if that leaves more weeks under the intensity model's floor, or any deeper than the balanced plan's
+ * own worst, the runner gets the balanced plan and is told why. Every other plan is built once, as before.
+ */
+export function generatePlan(athlete: Athlete, goal: Goal, options: GenerateOptions = {}): ReturnType<typeof generatePlanCore> {
+  const v = athlete.volumeGrowth;
+  const stated = athlete.weeklyVolumeKmCurrent;
+  if (!v || v === "progressive" || !stated || !Number.isFinite(stated) || stated <= 0) return withLongCap(athlete, goal, options);
+  // ⚠️⚠️ B8 — LESS GROWTH IS HELD TO THE TAPER AND TO WEEK ONE (PLAN.md B8 D: "taper ≥ 0.30 and week-one ≤ 1.10
+  // hold"), and that needed holding: a smaller plan keeps its taper's quality sessions at full length, so the
+  // taper is a smaller share of it — measured over 310 plans whose default taper clears 30%, Gradual took 8 under
+  // and Steady 19 (worst 30.2% -> 27.9%, a fast runner's 5K at 30 km on 6 days). So the plan steps back — Steady
+  // to Gradual, Gradual to the usual growth — until both hold, and says so.
+  const def = withLongCap({ ...athlete, volumeGrowth: "progressive" }, goal, options);
+  const floor = Math.min(TAPER_CUT_FLOOR, taperCutOf(def.weeks));
+  const weekOneCap = Math.max(stated * 1.10, weekOneKmOf(def.weeks));
+  for (const t of v === "steady" ? ["steady", "gradual"] as const : ["gradual"] as const) {
+    const p = withLongCap({ ...athlete, volumeGrowth: t }, goal, options);
+    if (taperCutOf(p.weeks) >= floor - 1e-9 && weekOneKmOf(p.weeks) <= weekOneCap + 1e-9)
+      return t === v ? p : { ...p, athlete, notes: [...p.notes, GROWTH_FELL_BACK.gradual] };
+  }
+  return { ...def, athlete, notes: [...def.notes, GROWTH_FELL_BACK.progressive] };
+}
+/** The taper's depth this engine holds a plan to: test/generate-plan.test.ts's own 30% (src/science/taper.ts). */
+const TAPER_CUT_FLOOR = 0.30;
+/** The last full taper week's cut against the plan's own peak — the measure test/generate-plan.test.ts uses. */
+function taperCutOf(weeks: PlannedWeek[]): number {
+  const full = weeks.filter((w, i) => i > 0 && !w.sessions.some((s) => s.type === "race"));
+  const peak = Math.max(0, ...full.map((w) => w.plannedDistanceMeters));
+  const tw = weeks.filter((w) => w.phase === "taper");
+  const lastFull = tw.length > 1 ? tw[tw.length - 2] : tw[0];
+  return peak > 0 && lastFull ? 1 - lastFull.plannedDistanceMeters / peak : 1;
+}
+/** The first full training week's distance, km — the week the 1.10x guardrail is read on (buildNotes). */
+function weekOneKmOf(weeks: PlannedWeek[]): number {
+  return (weeks.find((w) => !w.isDeload && !w.sessions.some((s) => s.type === "race"))?.plannedDistanceMeters ?? 0) / 1000;
+}
+/** What a runner reads when less growth could not be honoured (the app shows it on the Plan screen). */
+export const GROWTH_FELL_BACK = {
+  gradual: "You asked for steady mileage. Your plan grows gradually instead: any flatter, and its taper could not " +
+    "cut enough before your race.",
+  progressive: "You asked for less mileage growth. Your plan grows as usual: with less, its taper could not cut " +
+    "enough before your race.",
+} as const;
+
+/**
+ * B8 — A LONG-RUN CAP IS HELD TO THE PLAN WITHOUT IT, as the other dials are. A shorter long run takes easy minutes
+ * out of its week, and measured, the shortest cap a 5K on three days allows (50 minutes) left a build week at 67.1%
+ * easy, under the pyramidal floor. longRunRangeFor offers only caps that hold exactly as asked (it asks this
+ * function), so the search below is for a cap saved earlier that no longer holds — after a profile edit, say.
+ * ⚠️ IT LOOKS DOWN FIRST. The cap is the runner's limit, so a shorter long run that holds keeps their word; only when
+ * nothing down to the race's floor holds is the cap lifted. And the order matters because holding is NOT monotonic
+ * in the cap: measured on a 5K at 50 km on 6 days, caps 65-69 held, 70-81 did not (the volume fit lands on a bigger
+ * first week there) and 82+ held again — an upward-only search turned a 75-minute limit into an 85-minute long run
+ * while 69 would have kept it. Either way the runner is told, with the reason measured at the cap they asked for.
+ */
+function withLongCap(athlete: Athlete, goal: Goal, options: GenerateOptions): ReturnType<typeof generatePlanCore> {
+  const cap = athlete.longRunMaxMinutes;
+  if (!cap || !Number.isFinite(cap) || cap <= 0) return withHardDays(athlete, goal, options);
+  // ⚠️ NOT OFFERED, NOT READ: a beginner's own ladder, run-walk and a young runner's ceilings never see the dial, so a
+  // cap saved before the runner moved onto one of them must change nothing — not even a note about a hidden setting.
+  if (!longCapOffered(athlete)) return { ...withHardDays({ ...athlete, longRunMaxMinutes: undefined }, goal, options), athlete };
+  const free = withHardDays({ ...athlete, longRunMaxMinutes: undefined }, goal, options);
+  const natural = longestLongOf(free.weeks);
+  if (cap >= natural) return free;
+  const base = intensityProfile(free.weeks, free.intensityModel);
+  const floor = easyFloorFor(free.intensityModel, base);
+  // ⚠️ AND THE OTHER TWO THINGS A SHORTER LONG RUN CAN BREAK, both found by the audit's dial axis: with a stated
+  // mileage the volume fit makes the midweek runs LONGER to keep the week's distance, so week one rose past 1.10x
+  // what they run (6 of 13 plans) and easy runs passed the capped long run (8 weeks) — the owner's rule that the
+  // long run is the week's longest. A cap holds only if neither gets worse than the plan without it.
+  const stated = athlete.weeklyVolumeKmCurrent && athlete.weeklyVolumeKmCurrent > 0 ? athlete.weeklyVolumeKmCurrent : 0;
+  const weekOneCap = stated ? Math.max(stated * 1.10, weekOneKmOf(free.weeks)) : Infinity;
+  const invertedFree = invertedWeeks(free.weeks);
+  const fault = (p: ReturnType<typeof generatePlanCore>): keyof typeof LONG_CAP_REASONS | null =>
+    !noWorse(intensityProfile(p.weeks, p.intensityModel), base, floor) ? "easy" :
+    weekOneKmOf(p.weeks) > weekOneCap + 1e-9 ? "weekOne" :
+    invertedWeeks(p.weeks) > invertedFree ? "longest" : null;
+  const asked = withHardDays(athlete, goal, options);
+  const why = fault(asked);
+  const told = (p: ReturnType<typeof generatePlanCore>, reason: keyof typeof LONG_CAP_REASONS) =>
+    ({ ...p, athlete, notes: [...p.notes, longCapNote(Math.round(cap), longestLongOf(p.weeks), reason)] });
+  // A cap under the race's floor delivers the floor — kept, and said: the runner's limit was not.
+  if (!why) return longestLongOf(asked.weeks) > cap + 1 ? told(asked, "race") : asked;
+  // Down from the cap, while the long run still gets shorter (it stops at the race's floor).
+  let last = longestLongOf(asked.weeks);
+  if (last <= cap) for (let c = Math.round(cap) - 5; c > 0; c -= 5) {
+    const p = withHardDays({ ...athlete, longRunMaxMinutes: c }, goal, options);
+    const got = longestLongOf(p.weeks);
+    if (got >= last) break;
+    if (!fault(p)) return told(p, why);
+    last = got;
+  }
+  // Then up, from what the asked-for cap actually delivered (never under the race's floor).
+  for (let c = Math.max(Math.round(cap), longestLongOf(asked.weeks)) + 5; c < natural; c += 5) {
+    const p = withHardDays({ ...athlete, longRunMaxMinutes: c }, goal, options);
+    if (!fault(p)) return told(p, why);
+  }
+  return told(free, why);
+}
+/** Weeks whose long run is NOT their longest run, on either ruler this repo measures a run by. */
+function invertedWeeks(weeks: PlannedWeek[]): number {
+  return weeks.filter((w) => {
+    const long = w.sessions.find((s) => s.type === "long");
+    if (!long) return false;
+    return w.sessions.some((s) => s !== long && AEROBIC_RUN_TYPES.has(s.type) &&
+      ((s.estimatedDistanceMeters ?? 0) > (long.estimatedDistanceMeters ?? 0) ||
+       (s.trainingDistanceMeters ?? 0) > (long.trainingDistanceMeters ?? 0)));
+  }).length;
+}
+/** The longest long run in a plan, in whole minutes. */
+function longestLongOf(weeks: PlannedWeek[]): number {
+  return Math.max(0, ...weeks.flatMap((w) => w.sessions).filter((s) => s.type === "long")
+    .map((s) => Math.round(s.estimatedDurationSeconds / 60)));
+}
+/** Why a long-run cap could not be kept as asked — measured at the cap the runner asked for, in their words. */
+export const LONG_CAP_REASONS = {
+  race: "your long runs would be too short for your race",
+  easy: "your easy running would fall under what this plan is built on",
+  weekOne: "your first week would be too big a step up from what you run now",
+  longest: "an easy run would be longer than your long run",
+} as const;
+/** Where the longest-run dial is read at all: not a beginner's own ladder, run-walk, or a young runner's ceilings. */
+function longCapOffered(a: Athlete): boolean {
+  return !(a.experience === "beginner" || a.runWalk || youthLimitsFor(a.age));
+}
+/** What a runner reads when their long-run cap could not be kept (the app shows it on the Plan screen). */
+export function longCapNote(asked: number, given: number, reason: keyof typeof LONG_CAP_REASONS): string {
+  return `You asked for long runs of up to ${asked} minutes. Your longest is ${given} minutes, because at ${asked} ` +
+    `${LONG_CAP_REASONS[reason]}.`;
+}
+
+/** "Challenging" hard days, held to the balanced plan (see CHALLENGING_FELL_BACK). */
+function withHardDays(athlete: Athlete, goal: Goal, options: GenerateOptions): ReturnType<typeof generatePlanCore> {
+  if (athlete.hardDays !== "challenging") return generatePlanCore(athlete, goal, options);
+  const balanced = generatePlanCore({ ...athlete, hardDays: "balanced" }, goal, options);
+  const harder = generatePlanCore(athlete, goal, options);
+  const base = intensityProfile(balanced.weeks, balanced.intensityModel);
+  // ⚠️ AND IT MUST ACTUALLY ADD A HARD DAY. The volume fit can settle a "challenging" plan below the 0.9 scale where
+  // the second session is allowed, so it comes out with the same hard days on SMALLER easy runs (measured: a half
+  // at 40 km a week, week one 32.4 -> 29.7 km, not one session more). A dial that only shrinks the plan is not the
+  // dial the runner chose: that is a fall-back too.
+  const hard = (ws: PlannedWeek[]) => ws.reduce((n, w) => n + w.qualitySessionCount, 0);
+  if (hard(harder.weeks) > hard(balanced.weeks) &&
+      noWorse(intensityProfile(harder.weeks, harder.intensityModel), base, easyFloorFor(balanced.intensityModel, base))) return harder;
+  return { ...balanced, athlete, notes: [...balanced.notes, CHALLENGING_FELL_BACK] };
+}
+/** The note a runner reads when "Challenging" could not be honoured (the app shows it on the Plan screen). */
+export const CHALLENGING_FELL_BACK = "You asked for more hard days. Your base weeks cannot take a second one without " +
+  "dropping under the easy running this plan is built on, so they keep one.";
+
+/**
+ * B8 — THE LONGEST-RUN DIAL'S CHOICES, so the app offers only what the engine delivers exactly as asked (PLAN.md B8 A:
+ * "offered only where the plan can honour them"). From the shortest the plan allows (the race's floor, or above it
+ * where the floor does not hold — asked of the engine with a cap no plan can reach) up to this plan's own longest
+ * long run, on quarter hours; where a quarter hour does not hold, the next five or ten minutes are tried instead —
+ * holding is not monotonic in the cap (see withLongCap). Each choice is asked of generatePlan itself.
+ * Null for a beginner (their own ladder), run-walk or a young runner (their own ceilings), where the cap is not read.
+ * ⚠️ EMPTY CHOICES ARE NOT NULL: where no cap shorter than the plan's own long run holds, the app hides the question —
+ * unless a cap is already saved, because the Plan screen then explains a setting the runner must be able to reach.
+ */
+export function longRunRangeFor(
+  athlete: Athlete,
+  goal: Goal,
+  options: GenerateOptions = {},
+): { minMinutes: number; maxMinutes: number; choices: number[] } | null {
+  if (!longCapOffered(athlete)) return null;
+  const maxMinutes = longestLongOf(generatePlan({ ...athlete, longRunMaxMinutes: undefined }, goal, options).weeks);
+  const shortest = longestLongOf(generatePlan({ ...athlete, longRunMaxMinutes: 1 }, goal, options).weeks);
+  if (!(maxMinutes > 0 && shortest > 0)) return null;
+  const top = maxMinutes - 5;
+  const keeps = (c: number) => {
+    const p = generatePlan({ ...athlete, longRunMaxMinutes: c }, goal, options);
+    return !p.notes.some((n) => n.startsWith("You asked for long runs")) && longestLongOf(p.weeks) <= c;
+  };
+  const choices: number[] = [];
+  const targets = [shortest];
+  for (let q = Math.ceil((shortest + 5) / 15) * 15; q <= top; q += 15) targets.push(q);
+  targets.forEach((t, i) => {
+    const next = targets[i + 1] ?? top + 1;
+    for (let c = t; c < next && c <= top && c <= t + 10; c += 5) if (keeps(c)) { choices.push(c); break; }
+  });
+  return { minMinutes: choices[0] ?? maxMinutes, maxMinutes, choices };
+}
+
+function generatePlanCore(
   athlete: Athlete,
   goal: Goal,
   options: GenerateOptions = {},
@@ -812,10 +1016,18 @@ export function generatePlan(
     // The distance cap is applied last but must never fight the floor — if a runner is slow enough
     // that the floor alone exceeds the cap in minutes, the floor wins and the absolute time ceiling
     // is what holds them. (Cap > floor by construction: every band's upper edge exceeds its lower.)
-    const peakLong = Math.min(
+    const naturalPeakLong = Math.min(
       LONG_ABS_CEILING_MIN[goal.distance],
       Math.max(longFloorMin, Math.min(longCapMin, Math.max(longFloorMin, volumeDriven))),
     );
+    // ⚠️ B8 — THE LONGEST-RUN DIAL caps where the long run is going, never below the distance the race needs (the
+    // floor every long run is lifted to): a runner can choose a shorter peak, not an inadequate one. Not for a young
+    // runner, whose long run already answers their own ceiling (and whose floor is zero).
+    // ⚠️ AND NEVER ABOVE THE PLAN'S OWN PEAK: where the race's floor sits over the absolute ceiling, the natural peak
+    // is the ceiling, and lifting a cap to the floor first would make the long run LONGER (146 against 145, measured).
+    const peakLong = athlete.longRunMaxMinutes && athlete.longRunMaxMinutes > 0 && !youth
+      ? Math.min(naturalPeakLong, Math.max(longFloorMin, Math.round(athlete.longRunMaxMinutes)))
+      : naturalPeakLong;
     const startLong = Math.round(peakLong * (returning ? 0.42 : 0.55));
     // ⚠️ THE MAIN TRACK'S LONG-RUN LADDER — quantised and GEOMETRIC, for the two reasons recorded on
     // `longRunMinutes`. It lives here rather than beside `begFrac` because `startLong` and `peakLong`
@@ -858,7 +1070,7 @@ export function generatePlan(
       return { weekIndex, startDateIso, wp, ceilMin: peakLong,
         ctx: {
           athlete, goal, paces, returning, longMin, vScale, taperMult,
-          easyRamp: easyRampFor(wp, easyFrac[weekIndex] ?? 1),
+          easyRamp: easyRampFor(wp, easyFrac[weekIndex] ?? 1, easyStartFracFor(athlete)),
           qRefMin,
         } as WeekContext };
     });
@@ -1408,7 +1620,8 @@ function buildWeek(
   const longCarriesWork = long.steps.some(
     (st) => (st.targetRpe?.min ?? 0) >= 4 && (st.durationSeconds ?? 0) >= 10 * 60,
   );
-  const baseQuality = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1, youthLimitsFor(ctx.athlete.age) != null);
+  const baseQuality = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1, youthLimitsFor(ctx.athlete.age) != null,
+    ctx.athlete.hardDays);
   const qualityCount = runningDays <= 4 && longCarriesWork ? Math.min(baseQuality, 1) : baseQuality;
   const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
 
@@ -2344,6 +2557,7 @@ function qualitySessionsThisWeek(
   returning: boolean,
   vScale = 1,
   youth = false,
+  hardDays: Athlete["hardDays"] = "balanced",
 ): number {
   /**
    * WARNING: ONE KEY DAY A WEEK FOR A 12-17 RUNNER, AND THIS IS A LOAD DECISION RATHER THAN AN
@@ -2386,6 +2600,15 @@ function qualitySessionsThisWeek(
   // under any pyramidal or polarized target. Such weeks get their second quality session only in
   // the peak block, where a short, sharp overload is the intent and the taper follows.
   if (runningDays === 4 && wp.phase !== "peak") return Math.min(byPhase, 1);
+  // ⚠️ B8 — THE HARD-DAYS DIAL, AND ONLY WHERE THE WEEK CAN HONOUR IT (PLAN.md B8). By here the runner has five
+  // days or more, is not in a recovery week, and the plan is not shrunk below 0.9: the young runner, the four-day
+  // week and the small week have already been given their one hard day above, whatever the dial says.
+  //   comfortable: one hard day a week outside the peak, which keeps its short, sharp two before the taper;
+  //   challenging: the base gets a second after its foundation weeks — not for a runner coming back, whose
+  //                second waits for the second half of the build. generatePlan holds the result to the
+  //                balanced plan's intensity and falls back, with a note, when it would be worse.
+  if (hardDays === "comfortable" && wp.phase !== "peak") return Math.min(byPhase, 1);
+  if (hardDays === "challenging" && wp.phase === "base" && byPhase === 1 && runningDays >= 5 && vScale >= 0.9 && !returning) return 2;
   return byPhase;
 }
 
@@ -2609,6 +2832,16 @@ function qualityContentsFor(
   }
   // base: threshold-led (tempo/cruise/fartlek rotate); introduce VO2 flavour only in the latter part.
   const lateBase = wp.ordinalInPhase > Math.ceil(wp.phaseTotal / 2);
+  // ⚠️ B8: A BASE WEEK ONLY EVER BUILT ONE, so "challenging" asked for two and got one — measured, 0 of 576 plans
+  // gained a hard day. When it asks (qualitySessionsThisWeek), the base pairs them as the build does: threshold,
+  // then VO2 offset in the rotation, and never two big sessions in one week. No other plan asks the base for two.
+  if (count >= 2) {
+    const vRot = rot + 5;
+    const bothBig = thresholdIsBig(rot, fctx) && vo2IsBig(vRot, fctx);
+    out.push(thresholdSession(p, rot, fctx));
+    out.push(vo2Session(p, vRot, bothBig ? { ...fctx, avoidBig: true } : fctx));
+    return out.slice(0, count);
+  }
   out.push(lateBase && weekIndex % 2 === 0 ? vo2Session(p, rot, fctx) : thresholdSession(p, rot, fctx));
   return out.slice(0, count);
 }
@@ -3182,7 +3415,7 @@ function buildNotes(
   if (targetPeakKm) {
     const firstFull = (weeks.find((w) => !w.isDeload && !w.sessions.some((s) => s.type === "race"))
       ?.plannedDistanceMeters ?? 0) / 1000;
-    const stated = Math.round(targetPeakKm / PEAK_VOLUME_MULTIPLIER);
+    const stated = Math.round(targetPeakKm / peakMultiplierFor(athlete));
     if (firstFull > stated * 1.10) {
       notes.push(
         `You told us you run about ${stated} km a week, and this block opens at ${Math.round(firstFull)} km. ` +

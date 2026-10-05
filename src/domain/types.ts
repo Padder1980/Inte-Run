@@ -102,6 +102,18 @@ export type Athlete = {
    *  (3 run days, short durations, general strength, no strides or hard intervals). */
   runWalk?: boolean;
   weeklyVolumeKmCurrent?: number;
+  /**
+   * Stage B8 — the runner's training preference dials. Absent, each is its default and the plan is exactly what it
+   * was before them.
+   * HOW FAST MILEAGE GROWS: the block's peak as a multiple of the stated weekly mileage (VOLUME_GROWTH). Read only
+   * when `weeklyVolumeKmCurrent` is stated — without a mileage there is nothing for it to grow from.
+   */
+  volumeGrowth?: "progressive" | "gradual" | "steady";
+  /** HOW MANY HARD DAYS: "comfortable" keeps one a week outside the peak; "challenging" adds a second to the base
+   *  after its foundation weeks, where the week can take it (qualitySessionsThisWeek). */
+  hardDays?: "comfortable" | "balanced" | "challenging";
+  /** HOW LONG THE LONG RUN MAY GET, in minutes. Never below what the race needs (longRunRangeFor). */
+  longRunMaxMinutes?: number;
   maxHr?: number;
   restingHr?: number;
   /**

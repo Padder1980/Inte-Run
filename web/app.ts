@@ -6534,7 +6534,7 @@ const REALIGN_KEY = "interun_realign_v1";
 const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
   "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
   "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
-  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks", "bRace"];
+  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks", "bRace", "volGrowth", "hardDays", "longMax"];
 /**
  * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
  * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
@@ -6943,6 +6943,12 @@ function applyProfile(pf) {
   // A brand-new key cannot be pre-filled by history, so absent means unanswered and the model stays
   // genuinely opt-in. Do not "tidy" this back onto weeklyVolumeKm.
   if (pf.volKm > 0) ath.weeklyVolumeKmCurrent = pf.volKm;
+  // ⚠️ B8 — THE TRAINING PREFERENCE DIALS, SET ONLY WHEN THEY ARE NOT THE DEFAULT, so a runner who never touched
+  // them hands the engine the very athlete it had before (and their plan is byte-identical). Each is held by the
+  // engine to the plan it replaces, and says so when it steps back (generatePlan).
+  if (pf.volGrowth === "gradual" || pf.volGrowth === "steady") ath.volumeGrowth = pf.volGrowth;
+  if (pf.hardDays === "comfortable" || pf.hardDays === "challenging") ath.hardDays = pf.hardDays;
+  if (Number(pf.longMax) > 0) ath.longRunMaxMinutes = Number(pf.longMax);
   if (pf.twoKmS > 0) ath.twoKmTrialSeconds = pf.twoKmS;
   // ⚠️ THE TRIAL IS NO LONGER FED IN AS A SEPARATE VO2 BAND, and that is deliberate rather than an
   // omission. The 1 km version anchored the interval band via MAS while the 5 km anchored everything
@@ -7050,6 +7056,15 @@ function profileImpact(pf) {
   // days question (2026-09-09), reached through a different answer and still live for everybody.
   const otherDays = (plan) => { const w = midWeek(plan); return w ? w.sessions.filter((x) => !PRIMARY_TYPES[x.type] && x.type !== "rest").length : null; };
   cmp("Runs in a typical week", PLAN ? runDays(PLAN) : null, runDays(out.plan), (v) => String(Math.round(v)));
+  // ⚠️ B8: THE DIALS' OWN FIGURES. A count of runs and the biggest week cannot see a second hard day, a flatter
+  // climb or a capped long run, so the preview — "each shows its effect before you save" (PLAN.md B8) — reads the
+  // three things they move: hard sessions across the plan, the longest long run, and the first full week.
+  const hardAll = (plan) => plan.weeks.reduce((n, w) => n + (w.quality || 0), 0);
+  const longest = (plan) => Math.max(0, ...plan.weeks.map((w) => w.longRunMin || 0));
+  const firstFull = (plan) => { const w = plan.weeks.find((x, i) => i > 0 && !x.isDeload && x.distanceKm); return w ? w.distanceKm : null; };
+  cmp("Hard sessions across the plan", PLAN ? hardAll(PLAN) : null, hardAll(out.plan), (v) => String(Math.round(v)));
+  cmp("Longest long run", PLAN ? longest(PLAN) : null, longest(out.plan), (v) => Math.round(v) + " min");
+  cmp("Your first full week", PLAN ? firstFull(PLAN) : null, firstFull(out.plan), km);
   cmp("Strength & mobility sessions", PLAN ? otherDays(PLAN) : null, otherDays(out.plan), (v) => String(Math.round(v)));
   // ⚠️⚠️ A COUNT CANNOT SEE A SESSION CHANGING SHAPE, AND THIS SCREEN HAS SHIPPED THAT FALSEHOOD
   // TWICE ALREADY (the days question, then the strength toggle). Answering the new length, level or
@@ -7078,7 +7093,9 @@ function profileImpact(pf) {
   const liveIds = {};
   out.plan.weeks.forEach((wk) => wk.sessions.forEach((x) => { liveIds[x.id] = 1; }));
   const lost = Object.keys(state.dayOverride || {}).filter((k) => !liveIds[k]).length;
-  return { out: out, rows: rows, lost: lost, none: !rows.length && !lost };
+  // A dial the engine had to step back from says so here, before saving, in the words the Plan screen will use.
+  const steppedBack = (out.plan.notes || []).filter((n) => /^You asked for/.test(n));
+  return { out: out, rows: rows, lost: lost, steppedBack: steppedBack, none: !rows.length && !lost && !steppedBack.length };
 }
 function profileImpactHtml(imp) {
   if (!imp) return "";
@@ -7096,7 +7113,8 @@ function profileImpactHtml(imp) {
     ? '<div class="pi-warn"><b>' + imp.lost + (imp.lost === 1 ? " session you moved" : " sessions you moved") +
       '</b> to a different day will go back to where the plan put them.</div>'
     : "";
-  return '<div class="pi-rows">' + rows + '</div>' + lost;
+  const back = (imp.steppedBack || []).map((n) => '<div class="pi-warn">' + esc(n) + '</div>').join("");
+  return '<div class="pi-rows">' + rows + '</div>' + back + lost;
 }
 let PROFILE_CONFIRMED = false;
 /**
@@ -16366,7 +16384,7 @@ function viewPlan() {
   // note added upstream without being named here is the computed-and-discarded trap, which is
   // exactly how PLAN.notes came to be written and read by nothing for months.
   const volNotes = (PLAN.notes || []).filter((n) =>
-    /second run in the day|Adding a day|this block opens at|No scheduled easier weeks|strength programme is running/.test(n));
+    /second run in the day|Adding a day|this block opens at|No scheduled easier weeks|strength programme is running|You asked for/.test(n));
   const mileageNote = volNotes.length
     ? volNotes.map((n) => '<div class="plan-note" style="border-left-color:var(--peak)">' + n + '</div>').join("")
     : "";
@@ -26822,8 +26840,11 @@ function viewSetup() {
     // (owner, 2026-09-09). And syncStatus has to REBUILD this control when the status card changes,
     // hence the id, following the #volQ precedent one line down.
     '<div class="q" id="dayQ" style="margin-top:0"><label>How many days a week will you run? <span class="q-hint">we\\u2019ll shape the plan around this</span></label>' + seg("days", dayChoiceOpts(p), daySegVal(p)) + dayCapNote(p) + '</div>' +
+    hardQHtml(p) +
     '<div class="q" id="volQ"><label>Roughly how far do you run in a normal week? <span class="q-hint">km \— so we can build on what you already do</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:140px" value="' + (p.volKm || "") + '" placeholder="e.g. 40"><div class="q-hint" style="margin-top:5px">Leave it blank if you are not sure \— we\\u2019ll use a sensible default for your goal.</div></div>' +
+    growthQHtml(p) +
     '<div class="q"><label>Which day suits your long run? <span class="q-hint">we\\u2019ll build the week around it</span></label><select class="sel" id="s_longday" style="max-width:200px">' + dayOpts(p.longRunDay) + '</select></div>' +
+    '<div id="longMaxWrap">' + longMaxQHtml(p) + '</div>' +
     '<div class="q"><label>When do you want to start? <span class="q-hint">a mid-week start gives a shorter first week</span></label><input class="sel" id="s_startdate" type="date" value="' + (p.startDateIso || todayIso()) + '" min="' + todayIso() + '"></div>' +
     // ⚠️ A COUNT, NOT A Yes/No, AND THE SAME DRAFT KEY. Runna asks for a number up to four and the
     // engine has always built two, so the old flag could not express either end. Keeping the key
@@ -26896,7 +26917,7 @@ const SETUP_TOPICS = {
   you: ["s_name", "s_avatar_file"],
   why: ["su_why_inspire", "su_why_reason", "su_why_goal", "su_why_anchor"],
   goal: ["s_dist", "s_target", "s_date"],
-  rhythm: ["days", "s_longday", "s_volume", "s_startdate", "strength", "strmin", "strlevel", "strgoal", "s_strkit"],
+  rhythm: ["days", "hard", "s_longday", "s_longmax", "s_volume", "growth", "s_startdate", "strength", "strmin", "strlevel", "strgoal", "s_strkit"],
   context: ["returning", "s_age", "s_sex"],
   voice: ["coachSel"],
 };
@@ -26990,6 +27011,131 @@ function derivedGoalS(recentTimeS, goalDist, volRaw) {
  * (another topic was open) is "unchanged" too.
  * A date picked is never before today (the picker's own minimum, and clamped here for a stale draft).
  */
+// ---- Training preference dials (stage B8) --------------------------------------------------------------------
+/**
+ * B8 — THREE DIALS, EACH MOVING ONE ENGINE CONSTANT AND OFFERED ONLY WHERE THE PLAN CAN HONOUR IT (PLAN.md B8):
+ * how much the weekly mileage grows (VOLUME_GROWTH), how many hard days (qualitySessionsThisWeek), and how long the
+ * long run may get (longRunMaxMinutes). Each one's effect is shown before saving, by the profile preview
+ * (profileImpact's rows), and a dial the engine had to step back from says so on the Plan screen.
+ */
+const GROWTH_OPTS = [["progressive", "About a fifth"], ["gradual", "About a tenth"], ["steady", "About the same"]];
+const HARD_OPTS = [["comfortable", "Comfortable"], ["balanced", "Balanced"], ["challenging", "Challenging"]];
+/** Why the hard-days question is hidden, or "" where it applies. It changes nothing for a beginner track (its own
+ *  week), on four days or fewer (one hard day outside the peak already, whatever is asked: qualitySessionsThisWeek),
+ *  or for a runner under 18 — one key day a week is their ceiling, and measured, 0 of 72 young plans on five and six
+ *  days changed. ⚠️ THE ENGINE'S OWN TEST OF AGE (youthLimitsFor), so the page and the plan cannot disagree. */
+function hardDialWhy(status, days, age) {
+  if (status === "new" || status === "building") return "Your plan sets its own hard days while you build up, so there is nothing to choose yet.";
+  if (RC.youthLimitsFor(RC.ageAnswer(age))) return "Under 18, your plan keeps one hard session a week, so there is nothing to choose.";
+  if (Number(days) < 5) return "On four days or fewer your plan keeps one hard session a week until your peak, so there is nothing to choose.";
+  return "";
+}
+/** The age the form holds now: the field when it is on the page, else the stored answer. */
+function formAgeNow() {
+  const v = wizFieldVal("s_age");
+  return v !== "" ? v : profile.age;
+}
+/** ⚠️ WITHOUT A STATED MILEAGE THERE IS NOTHING TO GROW FROM (the engine ignores the dial), so the question hides and
+ *  says why — and comes back the moment a number is typed above it (syncGrowthQ), without a re-render. */
+function growthQHtml(p) {
+  const beginner = isBeginnerStatus(draft.status || p.status);
+  const on = !beginner && Number(p.volKm) > 0;
+  return '<div class="q" id="growthQ"' + (on ? "" : ' style="display:none"') + '><label>How much should your weekly mileage grow? ' +
+    '<span class="q-hint">how far above what you run now your biggest week goes</span></label>' +
+    seg("growth", GROWTH_OPTS, draft.growth || p.volGrowth || "progressive") +
+    '<div class="q-hint" style="margin-top:5px">About a fifth is the usual. Less keeps your biggest weeks nearer what you already do.</div></div>' +
+    '<div class="q-hint" id="growthWhy"' + (on || beginner ? ' style="display:none"' : "") + '>Tell us roughly how far you run in a week, and you can choose how much it grows.</div>';
+}
+function syncGrowthQ() {
+  const v = $("s_volume"), q = $("growthQ"), why = $("growthWhy");
+  if (!v || !q || !why) return;
+  // ⚠️ AND NOT ON A BEGINNER TRACK: syncStatus hides the mileage question there and the save drops its number, so a
+  // growth question left showing would be answered and then never read.
+  const beginner = isBeginnerStatus(draft.status || profile.status);
+  const on = !beginner && Number(v.value) > 0;
+  q.style.display = on ? "" : "none";
+  why.style.display = on || beginner ? "none" : "";
+}
+function hardQHtml(p) {
+  const why = hardDialWhy(draft.status || p.status, draft.days || p.daysPerWeek, formAgeNow());
+  const on = !why;
+  return '<div class="q" id="hardQ"' + (on ? "" : ' style="display:none"') + '><label>How many hard days? ' +
+    '<span class="q-hint">sessions faster than easy</span></label>' +
+    seg("hard", HARD_OPTS, draft.hard || p.hardDays || "balanced") +
+    '<div class="q-hint" style="margin-top:5px">Comfortable keeps one a week until your peak. Challenging adds a second in ' +
+    'your base weeks, where your plan can take it.</div></div>' +
+    '<div class="q-hint" id="hardWhy"' + (on ? ' style="display:none"' : "") + '>' + esc(why) + '</div>';
+}
+function syncHardQ() {
+  const q = $("hardQ"), why = $("hardWhy");
+  if (!q || !why) return;
+  const text = hardDialWhy(draft.status || profile.status, draft.days || profile.daysPerWeek, formAgeNow());
+  q.style.display = text ? "none" : "";
+  why.style.display = text ? "" : "none";
+  if (text) why.textContent = text;
+}
+/** The long-run caps this plan can honour: the engine's own range (RC.longRunRangeFor), memoised by the answers that
+ *  shape it, since the form renders more often than the plan changes. */
+let LONG_RANGE_MEMO = { key: "", val: null };
+function longMaxRange(p) {
+  try {
+    const out = applyProfile(Object.assign({}, p, { longMax: 0 }));
+    const key = JSON.stringify([out.ath, out.goal, p.bRace || null]);
+    if (LONG_RANGE_MEMO.key === key) return LONG_RANGE_MEMO.val;
+    const opts = p.bRace && p.bRace.distance && p.bRace.dateIso ? { secondaryRace: { distance: p.bRace.distance, dateIso: p.bRace.dateIso } } : {};
+    const val = RC.longRunRangeFor(out.ath, out.goal, opts);
+    LONG_RANGE_MEMO = { key: key, val: val };
+    return val;
+  } catch (e) { return null; }
+}
+/** ⚠️ HIDDEN WHERE IT WOULD CHANGE NOTHING: a beginner's own ladder, run-walk and a young runner's own ceilings (the
+ *  engine says so with a null range and never reads the limit there), and a plan whose long run is already as short as
+ *  it can keep. ⚠️ THE CHOICES ARE THE ENGINE'S (longRunRangeFor's choices): each one is a length this plan keeps
+ *  exactly — holding is not monotonic in the cap, so a ladder made here offered limits the plan then had to move.
+ *  ⚠️ AND A SAVED LIMIT STAYS ON SCREEN, selected, even where it is no longer a choice: the Plan screen then says what
+ *  happened to it, and the runner must be able to reach the setting that note names. It is marked only if the engine
+ *  says so (longMaxKept) — the choices are quarter hours, so a saved 84 minutes can be off the list and kept exactly. */
+function longMaxQHtml(p) {
+  const r = longMaxRange(p);
+  const cur = Number(p.longMax) || 0;
+  if (!r || (!r.choices.length && !cur)) return "";
+  const vals = r.choices.slice();
+  const extra = cur > 0 && vals.indexOf(cur) < 0;
+  if (extra) { vals.push(cur); vals.sort((a, b) => a - b); }
+  const curKept = !extra || longMaxKept(p, cur);
+  const hm = (m) => (m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) + " min" : "") : m + " min");
+  const opt = (v, t) => '<option value="' + v + '"' + (String(v) === String(cur) ? " selected" : "") + '>' + t + '</option>';
+  const label = (v) => hm(v) + (v === cur && !curKept ? " \\u2014 can\\u2019t be kept exactly" : "");
+  return '<div class="q" id="longMaxQ"><label>How long may your long run get? <span class="q-hint">the longest single run in your plan</span></label>' +
+    '<select class="sel" id="s_longmax" style="max-width:100%">' + opt(0, "No limit \\u2014 up to " + hm(r.maxMinutes)) +
+    vals.map((v) => opt(v, label(v))).join("") + '</select>' +
+    '<div class="q-hint" style="margin-top:5px">' + (r.choices.length
+      ? "These are the lengths your plan can keep. The shortest is " + hm(r.minMinutes) + "."
+      : "Your plan can\\u2019t keep a shorter long run at the moment. Choose No limit to clear this.") + '</div></div>';
+}
+/** Does the plan these answers build keep this long-run limit as it is? Asked of the engine: it notes every limit it
+ *  had to move ("You asked for long runs…"). */
+function longMaxKept(p, mins) {
+  try {
+    const out = applyProfile(Object.assign({}, p, { longMax: mins }));
+    return !(out.plan.notes || []).some((n) => /^You asked for long runs/.test(n));
+  } catch (e) { return true; }
+}
+/** ⚠️ B8 — REBUILT WHEN AN ANSWER THAT SHAPES THE PLAN CHANGES ON THE SAME SCREEN (days, status, mileage, the race, the
+ *  5 km time): its choices are the lengths the plan those answers build can keep, so a list made before the change
+ *  offers limits the new plan may not keep. On change, never per keystroke: each rebuild builds a plan. The runner's
+ *  unsaved pick rides along (draftFromForm reads the select), and the wrapper is always rendered, so a question that
+ *  was hidden can appear. Replacing form markup means re-linking the labels and re-applying the topic focus. */
+function syncLongMaxQ() {
+  const wrap = $("longMaxWrap");
+  if (!wrap) return;
+  let p;
+  try { p = draftFromForm(); } catch (e) { return; }
+  wrap.innerHTML = longMaxQHtml(p);
+  linkFormLabels();
+  applySetupFocus();
+}
+
 function formStartIso(field, isWizard, stored, today) {
   if (isWizard) return field && field >= today ? field : today;
   if (!field || field === stored) return stored || today;
@@ -27107,6 +27253,14 @@ function draftFromForm() {
     // ⚠️ B7: AND AN EDIT KEEPS THE RUNNER'S B-RACE — the same whole-object replacement would drop it. A new plan does
     // not: its weeks are different, and the race is the runner's to add to it again.
     bRace: state.screen !== "wizard" && profile.bRace ? profile.bRace : null,
+    // ⚠️ B8 — THE DIALS, each falling back to the stored answer when its control was not on screen (another topic
+    // open), and then to its default. The long-run cap is not in the wizard — it needs a built plan to know what it
+    // can honour (longRunRangeFor) — so a new plan starts without one; its select uses "0" for "no limit", so a
+    // blank still means "not on screen".
+    volGrowth: draft.growth || profile.volGrowth || "progressive",
+    hardDays: draft.hard || profile.hardDays || "balanced",
+    longMax: state.screen === "wizard" ? 0
+      : wizFieldVal("s_longmax") !== "" ? (Number(wizFieldVal("s_longmax")) || 0) : (Number(profile.longMax) || 0),
     ...(keepsBlock ? { blockFromIso: profile.blockFromIso, pauseWeeks: Number(profile.pauseWeeks) || 0 } : {}),
     name: wizFieldVal("s_name").trim().slice(0, 40),
     avatar: draft.avatar != null ? draft.avatar : (profile.avatar || ""),
@@ -27942,12 +28096,19 @@ function wizBody(id, p, st) {
   }
   if (id === "volume") {
     return '<p class="wz-lead">So we can build on what you already do. Leave it blank if you\\u2019re not sure \— we\\u2019ll use a sensible default for your goal.</p>' +
-      '<div class="q"><label>Roughly how far in a normal week? <span class="q-hint">km</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:160px" value="' + esc(wizFieldVal("s_volume")) + '" placeholder="e.g. 40"></div>';
+      '<div class="q"><label>Roughly how far in a normal week? <span class="q-hint">km</span></label><input class="sel" id="s_volume" type="number" inputmode="numeric" min="0" max="250" step="5" style="max-width:160px" value="' + esc(wizFieldVal("s_volume")) + '" placeholder="e.g. 40"></div>' +
+      // B8: how much that mileage grows, beside the answer it grows from (shown once a number is typed: syncGrowthQ).
+      growthQHtml(Object.assign({}, p, { volKm: Number(wizFieldVal("s_volume")) || 0 }));
   }
   if (id === "details") {
     const sx = wizFieldVal("s_sex");
     return '<p class="wz-lead">These fine-tune the plan. Skip anything you\\u2019d rather not answer.</p>' +
       '<div class="q"><label>Coming back to running? <span class="q-hint">time off and injury shape the early weeks differently</span></label>' + seg("returning", [["0", "No"], ["break", "After time off"], ["injury", "After an injury"]], draft.returning || "0") + '</div>' +
+      // B8: how many hard days — the days are picked after this step, so it shows for any runner who is not on a
+      // beginner track or under 18 (age is asked before this), and the plan honours it from five days a week.
+      (draft.status === "new" || draft.status === "building" || RC.youthLimitsFor(RC.ageAnswer(wizFieldVal("s_age"))) ? "" :
+        '<div class="q"><label>How many hard days? <span class="q-hint">counts from five running days a week</span></label>' +
+        seg("hard", HARD_OPTS, draft.hard || p.hardDays || "balanced") + '</div>') +
       '<div class="q"><label>Sex <span class="q-hint">helps tailor advice</span></label><select class="sel" id="s_sex" style="max-width:200px"><option value=""' + (!sx ? " selected" : "") + '>Prefer not to say</option><option value="female"' + (sx === "female" ? " selected" : "") + '>Female</option><option value="male"' + (sx === "male" ? " selected" : "") + '>Male</option></select></div>';
   }
   if (id === "plan") {
@@ -43192,6 +43353,16 @@ function wire() {
   // looks-live-does-nothing class this project has shipped three times. One definition, two callers;
   // a hand copy is the fix-one-builder-not-the-other trap.
   document.querySelectorAll("[data-set]").forEach(bindSegButtons);
+  // B8: the growth dial appears once there is a mileage to grow from, without re-rendering the field being typed in.
+  { const ve = $("s_volume"); if (ve && $("growthQ")) ve.addEventListener("input", syncGrowthQ); }
+  // B8: and the long-run limits follow the answers that shape the plan — on change, not per keystroke. The goal card
+  // is delegated because refreshGoalBlock replaces its fields after this runs.
+  if ($("longMaxWrap")) {
+    ["s_volume", "s_rectime", "s_2km", "s_age", "s_easypace", "s_startdate"].forEach((id) => { const f = $(id); if (f) f.addEventListener("change", syncLongMaxQ); });
+    const gc = $("goalCard"); if (gc) gc.addEventListener("change", syncLongMaxQ);
+  }
+  // B8: and the hard-days question hides for a runner under 18, whose plan keeps one key day a week.
+  { const ag = $("s_age"); if (ag && $("hardQ")) ag.addEventListener("change", syncHardQ); }
   // The equipment tick-boxes write straight into the hidden field, which is the only thing
   // draftFromForm and captureSetupFields ever read — so the tick state cannot get out of step with
   // what is saved, and it survives a trip to another tab like every other s_ field.
@@ -43602,6 +43773,8 @@ function bindSegButtons(s) {
   s.querySelectorAll("button").forEach((b) => b.onclick = () => {
     draft[s.dataset.set] = b.dataset.v; s.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
     if (s.dataset.set === "status") syncStatus();
+    // B8: the hard-days dial means nothing below five days or on a beginner track, and hides itself then.
+    if (s.dataset.set === "days" || s.dataset.set === "status") { syncHardQ(); syncGrowthQ(); syncLongMaxQ(); }
     // The sessions-a-week answer reveals or hides the four questions that only mean something once
     // there is a session to describe; the other two keep their own hint matched to what is lit up.
     if (s.dataset.set === "strength" || s.dataset.set === "strlevel" || s.dataset.set === "strgoal") syncStrength();

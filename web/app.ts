@@ -364,6 +364,12 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .rd-react svg { width: 16px; height: 16px; flex: none; }
 .rd-react-n { margin: var(--s2) 0 0; font-size: var(--t-label); color: var(--ink-faint); }
 .rd-insight p { margin: var(--s3) 0 0; font-size: var(--t-card); line-height: 1.5; color: var(--ink-soft); }
+/* B11: Alfie's version says so, and its button carries Alfie's mark. */
+.sd-brief p.alf-ver, .rd-insight p.alf-ver { margin: var(--s2) 0 0; font-size: var(--t-label); font-weight: 700; letter-spacing: .02em; color: var(--accent); }
+.alf-expand { display: inline-flex; align-items: center; gap: var(--s1); }
+.alf-expand svg { width: 16px; height: 16px; flex: none; }
+/* The small print under it, in both cards — specific enough to win over the cards' own paragraph sizes. */
+.sd-brief p.alf-note, .rd-insight p.alf-note { margin: var(--s1) 0 0; font-size: var(--t-label); line-height: 1.4; color: var(--ink-faint); }
 .fuel-l { margin: 9px 0 0; padding-left: 18px; }
 .fuel-l li { font-size: 12.8px; line-height: 1.55; color: var(--ink-soft); margin-bottom: 6px; }
 .fuel-l li:last-child { margin-bottom: 0; }
@@ -14228,9 +14234,115 @@ function briefText(key, facts, write) {
   const e = m[key];
   if (e && e.sig === sig && Array.isArray(e.paras) && e.paras.length) return e.paras;
   const paras = write(facts);
-  m[key] = { sig: sig, paras: paras, src: "rule", at: todayIso() };
+  // B11: whether Alfie has been asked for this one is kept when the pack moves — once per briefing or run (PLAN.md).
+  m[key] = { sig: sig, paras: paras, src: "rule", at: todayIso(), tried: !!(e && e.tried) };
   saveBriefs(m);
   return paras;
+}
+// ============ B11 — EXPAND WITH ALFIE: the same facts, written up by the AI through Inte-Run's server, gated ======
+/** The fact packs on screen, by cache key — what "Expand with Alfie" sends. Memory only. */
+const EXPAND_PACKS = {};
+/** Keys being written up right now, so a second tap does nothing. */
+const EXPAND_BUSY = {};
+/**
+ * What a briefing or an insight may send: its fact pack WITHOUT what the runner told us about their health — this
+ * morning's check-in (ready) and whether anything hurt (pain). The privacy policy promises health check-in answers are
+ * never sent, and the DPIA that they are kept nowhere; this is where that stays true.
+ */
+function expandFactsFor(facts) {
+  const out = Object.assign({}, facts);
+  delete out.ready; delete out.pain;
+  return out;
+}
+/**
+ * Does Inte-Run's server write briefings and insights up? ⚠️ ASKED OF THE SERVER, NEVER ASSUMED (B1's Strava handshake,
+ * again): GET / lists the modes it knows, so a deploy from before B11 is simply never asked — deploy skew fails closed.
+ * Asked once a launch, from wire() — never while a screen is being drawn — and only for a runner who has said yes to
+ * Ask Alfie online. null until known; the button only reads it.
+ */
+let ALFIE_EXPAND = null;
+let ALFIE_EXPAND_ASKED = false;
+function alfieExpandProbe() {
+  if (ALFIE_EXPAND !== null || ALFIE_EXPAND_ASKED || !alfieOnline() || !alfieBase()) return;
+  ALFIE_EXPAND_ASKED = true;
+  try {
+    fetch(alfieBase(), { method: "GET" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      ALFIE_EXPAND = d && Array.isArray(d.expand) ? d.expand.map(String) : false;
+      if (ALFIE_EXPAND) expandRerender();
+    }).catch(() => { ALFIE_EXPAND = false; });
+  } catch (e) { ALFIE_EXPAND = false; }
+}
+/**
+ * Send a fact pack to be written up. ⚠️ THE SENDER ASKS FOR ITSELF, as alfieRemote does: a future caller that forgot
+ * the switch would otherwise send a runner's facts with online answers off, or under 13 (alfieOnline holds both).
+ */
+function alfieExpand(mode, facts) {
+  const base = alfieBase();
+  if (!base || !alfieOnline()) return Promise.reject(new Error("offline"));
+  return fetch(base, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ mode: mode, context: facts, device: alfieDevice() }),
+  }).then((r) => (r.ok ? r.json() : Promise.reject(Object.assign(new Error("http " + r.status), { status: r.status }))))
+    .then((d) => { if (!d || !d.text) throw new Error("bad reply"); return String(d.text); });
+}
+/** Words that never reach a runner from the AI: a diagnosis or a medical claim. Matched case-insensitively. */
+const EXPAND_MEDICAL = /diagnos|injur|overtrain|dehydrat|illness|\\bsick|disease|syndrome|symptom|medical|treatment|\\bcure\\b|you are ill/i;
+/** The most words an expansion may run to — the server asks for 80; this is the line past which it is not one. */
+const EXPAND_MAX_WORDS = 110;
+/**
+ * ⚠️ THE AI'S WORDS ARE CHECKED BEFORE THEY ARE SHOWN (PLAN.md: "a no-new-numbers filter — every number must occur in
+ * the serialised facts — and a medical-term sweep, else the rule text stays"). The AI was told the same; this is the
+ * second line, and the one that holds when a model ignores its instructions.
+ */
+function expandReplyOk(text, facts) {
+  const t = String(text || "").trim();
+  if (!t || t.split(/\\s+/).length > EXPAND_MAX_WORDS) return false;
+  const have = {};
+  (JSON.stringify(facts).match(/\\d+(?:[.:]\\d+)*/g) || []).forEach((n) => { have[n] = 1; });
+  if ((t.match(/\\d+(?:[.:]\\d+)*/g) || []).some((n) => !have[n])) return false;
+  return !EXPAND_MEDICAL.test(t);
+}
+/** "Expand with Alfie", where it can be offered: online answers on, a server that knows the mode, not asked before. */
+function expandBtnHtml(key, mode) {
+  const e = loadBriefs()[key];
+  const modes = ALFIE_EXPAND;
+  if (!e || e.tried || e.src === "ai" || !EXPAND_PACKS[key] || !alfieOnline() || !alfieBase() || !modes || modes.indexOf(mode) < 0) return "";
+  if (EXPAND_BUSY[key]) return '<p class="alf-note">Alfie is writing it up\\u2026</p>';
+  return '<button class="sd-addlink alf-expand" data-expand="' + esc(key) + '" data-mode="' + mode + '">' + ICON.alfie + ' Expand with Alfie</button>' +
+    '<p class="alf-note">Sends these facts to Ask Alfie online \\u2014 never your name, where you are, or your health answers.</p>';
+}
+/** Says when the text is Alfie's, so a runner always knows which they are reading. */
+function expandVerHtml(key) {
+  const e = loadBriefs()[key];
+  return e && e.src === "ai" ? '<p class="alf-ver">Written up by Alfie from your numbers</p>' : "";
+}
+/** Redraw whichever screen holds the card: the session sheet in place, or the run's page. */
+function expandRerender() {
+  try { if (SHEET_CTX && SHEET_CTX.sess && $("sheetOv") && $("sheetOv").classList.contains("on")) { reopenSessionSheet(); return; } } catch (e) {}
+  if (state.screen === "runview") render();
+}
+/**
+ * The tap. One request per briefing or run: a reply that passes the checks replaces the text (src "ai"); one that does
+ * not leaves the rule-based text, and either way it is not offered again. A full day's allowance or no signal is not an
+ * answer, so the offer stays. Nothing about the plan is touched.
+ */
+function expandBrief(key, mode) {
+  const pack = EXPAND_PACKS[key];
+  const e = loadBriefs()[key];
+  if (!pack || !e || e.tried || e.src === "ai" || EXPAND_BUSY[key]) return;
+  EXPAND_BUSY[key] = true; expandRerender();
+  alfieExpand(mode, pack).then((text) => {
+    const m = loadBriefs();
+    if (m[key]) {
+      const ok = expandReplyOk(text, pack);
+      m[key] = Object.assign({}, m[key], ok ? { paras: [String(text).trim()], src: "ai", tried: true } : { tried: true });
+      saveBriefs(m);
+      if (!ok) toast("Alfie\\u2019s version didn\\u2019t pass our checks, so yours stays as it was.");
+    }
+  }).catch((err) => {
+    toast(err && err.status === 429 ? "Alfie\\u2019s write-ups for today are used up. Try again tomorrow."
+      : "Alfie couldn\\u2019t be reached, so yours stays as it was.");
+  }).then(() => { delete EXPAND_BUSY[key]; expandRerender(); });
 }
 /**
  * B10 — A SESSION'S BRIEFING FACTS (PLAN.md: "briefingFacts(sess, iso) from existing sources only"). Every value is
@@ -14290,7 +14402,7 @@ function briefingText(f) {
   // today" would contradict the advice the Ready? sheet has just given them.
   if (f.ready && f.ready.band === "rest") {
     p.push(f.when + ": " + f.title + ".");
-    p.push("This morning you rated yourself " + f.ready.score + ". " + f.ready.advice);
+    p.push(briefingReadyLine(f.ready));
     return p;
   }
   // The effort is said once: with the work when there is a target to say it with, else on the first line.
@@ -14319,21 +14431,35 @@ function briefingText(f) {
   if (f.fuel) before.push(f.fuel.charAt(0).toLowerCase() + f.fuel.slice(1).replace(/\\.$/, ""));
   if (before.length) p.push("Before you go: " + before.join("; and ") + ".");
   if (f.heat) p.push("It could reach " + f.heat.upTo + " before you run, about " + f.heat.harder + " harder at these paces: the heat note below can adjust them.");
-  if (f.ready) p.push("This morning you rated yourself " + f.ready.score + ". " + f.ready.advice);
+  if (f.ready) p.push(briefingReadyLine(f.ready));
   return p;
 }
+/** This morning's check-in in one line, for the briefing — written on screen, never stored or sent (briefingCardHtml). */
+function briefingReadyLine(r) { return "This morning you rated yourself " + r.score + ". " + r.advice; }
 /** B10 — the card on a run's sheet, today or tomorrow. A runnable session the plan holds; never strength or rest. */
 function briefingCardHtml(sess, iso, week, shown) {
   const today = todayIso();
   if (!PRIMARY_TYPES[sess.type] || !iso || iso < today || iso > isoAdd(today, 1).toISOString().slice(0, 10)) return "";
   let facts, paras;
-  try { facts = briefingFacts(sess, iso, week, shown); paras = briefText("b|" + sess.id + "|" + iso, facts, briefingText); }
+  const key = "b|" + sess.id + "|" + iso;
+  try {
+    facts = briefingFacts(sess, iso, week, shown);
+    // ⚠️ B11 (found under it): THE MORNING CHECK-IN IS NEVER STORED. The DPIA (Step 6) and APPSTORE.md promise the
+    // check-in answers are kept nowhere and sent nowhere, and the cache held "you rated yourself 2 out of 5" with the
+    // engine's advice. So the text is cached — and sent to Alfie — from the pack WITHOUT it, and its line is added here,
+    // on screen only. A runner who should rest still reads just that (briefingText's own rule, never cached).
+    const kept = expandFactsFor(facts);
+    EXPAND_PACKS[key] = kept;
+    paras = facts.ready && facts.ready.band === "rest" ? briefingText(facts)
+      : briefText(key, kept, briefingText).concat(facts.ready ? [briefingReadyLine(facts.ready)] : []);
+  }
   catch (e) { try { console.warn("briefing skipped", e); } catch (e2) {} return ""; }
   // ⚠️ A BRIEFING THAT QUOTES THE FORECAST CARRIES OPEN-METEO'S CREDIT, as every forecast on screen does (their licence;
   // test/app-store.test.ts). briefingFacts only formats the temperature; this card is where it is shown.
   return '<div class="sd-brief"><div class="sd-brief-h">' + ICON.alfie + '<span>Your briefing</span></div>' +
-    paras.map((x) => '<p>' + esc(x) + '</p>').join("") +
-    (facts.heat ? '<p class="wx-credit-row">' + wxCreditHtml() + '</p>' : "") + '</div>';
+    expandVerHtml(key) + paras.map((x) => '<p>' + esc(x) + '</p>').join("") +
+    (facts.heat ? '<p class="wx-credit-row">' + wxCreditHtml() + '</p>' : "") +
+    (facts.ready && facts.ready.band === "rest" ? "" : expandBtnHtml(key, "briefing")) + '</div>';
 }
 function sessionSheetHtml(sess, week) {
   // ⚠️ THE ONE CHOKE POINT — every current and future consumer of this sheet reads sess.exercises
@@ -14488,6 +14614,8 @@ function wireSheet() {
   // wireSheet(), not wire(), and the heat handlers used to sit only inside wire() — so the block
   // rendered with both of its buttons doing nothing whatsoever.
   wireHeatControls();
+  // B11: and the briefing's Expand with Alfie, for the same reason.
+  document.querySelectorAll("#sheetBody [data-expand]").forEach((b) => b.onclick = () => expandBrief(b.dataset.expand, b.dataset.mode));
   document.querySelectorAll("[data-moveto]").forEach((b) => b.onclick = () => {
     if (!SHEET_CTX) return;
     // ⚠⚠ A PROGRAMME SESSION IS DATED, NOT WEEK-AND-DAY, SO moveSession CANNOT MOVE IT -- AND
@@ -25852,7 +25980,7 @@ const PRIVACY_FLOWS = [
   { id: "place", hosts: ["nominatim.openstreetmap.org"], short: "town names for runs", sw: "pvPlace",
     t: "Town names for runs", d: "The middle of a run, to about 1 km, goes to OpenStreetMap to find which town it was in. Once for each run." },
   { id: "alfie", hosts: ["alfie-proxy.alfie-proxy.workers.dev"], short: "Ask Alfie’s online answers", sw: "pvAlfie",
-    t: "Ask Alfie online answers", d: "Your question and a short summary of your plan go to Inte-Run’s server, which asks an AI service run by Cloudflare to write the reply. Nothing is sent until you say yes, and serious warning signs, like chest pain or fainting, never leave the phone." },
+    t: "Ask Alfie online answers", d: "Your question and a short summary of your plan go to Inte-Run’s server, which asks an AI service run by Cloudflare to write the reply. If you tap Expand with Alfie on a briefing or a run, the facts it was written from go too, never your health answers. Nothing is sent until you say yes, and serious warning signs, like chest pain or fainting, never leave the phone." },
   { id: "strava", hosts: ["alfie-proxy.alfie-proxy.workers.dev"], short: "Strava if you connect it",
     t: "Strava", d: "Only if you connect it. Then the runs and strength sessions you send go to your Strava account, through Inte-Run’s server, which keeps the connection (never your runs) until you disconnect." },
   { id: "update", hosts: ["padder1980.github.io"], short: "app updates", native: true,
@@ -25881,7 +26009,7 @@ const ICO_COMPLAINTS_URL = "https://ico.org.uk/make-a-complaint/";
  * the pages tell the same story as PRIVACY_FLOWS, the server and the age rules.
  */
 const LEGAL_SITE = "https://padder1980.github.io/Inte-Run/";
-const LEGAL_UPDATED = "28 September 2026";
+const LEGAL_UPDATED = "5 October 2026";
 const LEGAL_PAGES = [
   { id: "simple", path: "simple/", t: "The simple version", d: "Your information and the rules, in plain words." },
   { id: "privacy", path: "privacy/", t: "Privacy policy", d: "Everything that happens to your information." },
@@ -33394,11 +33522,15 @@ function rdReactHtml(run, a, v) {
     '<div class="seg">' + btn("up", ICON.thumbUp, "Good") + btn("down", ICON.thumbDown, "Tough") + '</div></div>';
   if (!r) return '<h2 class="rd-sec">Your insight</h2>' + ask +
     '<p class="rd-react-n">Tell us, and your coach will put this run in context.</p>';
-  let paras;
-  try { paras = briefText("i|" + run.id, insightFacts(run, a, v), insightText); }
+  let paras, f = null;
+  const key = "i|" + run.id;
+  try { f = insightFacts(run, a, v); paras = briefText(key, f, insightText); EXPAND_PACKS[key] = expandFactsFor(f); }
   catch (e) { try { console.warn("insight skipped", e); } catch (e2) {} paras = []; }
+  // B11: Alfie's version is offered on an insight too — never for a run where something hurt (that is a health answer,
+  // and the debrief above already puts it first).
   return '<h2 class="rd-sec">Your insight</h2>' + ask +
-    '<div class="rd-insight">' + paras.map((x) => '<p>' + esc(x) + '</p>').join("") + '</div>';
+    '<div class="rd-insight">' + expandVerHtml(key) + paras.map((x) => '<p>' + esc(x) + '</p>').join("") +
+    (f && !f.pain ? expandBtnHtml(key, "insight") : "") + '</div>';
 }
 /** The thumbs, from the run's page. Saved on the run and shown; nothing else changes. */
 function setRunReact(val) {
@@ -44515,6 +44647,9 @@ function wire() {
   // put it.
   // B10: the thumbs on a run's page, and nothing but the run's own reaction is written.
   document.querySelectorAll("[data-react]").forEach((b) => b.onclick = () => setRunReact(b.dataset.react));
+  // B11: Expand with Alfie, on a run's insight — and, once a launch, ask the server whether it can (never mid-draw).
+  document.querySelectorAll("[data-expand]").forEach((b) => b.onclick = () => expandBrief(b.dataset.expand, b.dataset.mode));
+  alfieExpandProbe();
   document.querySelectorAll("[data-pain]").forEach((c) => c.onclick = () => {
     const val = c.dataset.pain === "1";
     if (state.screen === "runview") {

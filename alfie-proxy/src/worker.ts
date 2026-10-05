@@ -41,6 +41,8 @@ type Ask = {
   history?: Array<{ role: string; text?: string; html?: string }>;
   /** An opaque per-install id, used only to bound how much one device can spend. Not a credential. */
   device?: string;
+  /** Stage B11: "briefing" or "insight" — write the app's own facts up in words. No question comes with it. */
+  mode?: string;
 };
 
 /**
@@ -63,6 +65,12 @@ const CF_MAX_TOKENS = 700;
 
 /** Used only when BRAIN is "claude". */
 const MODEL = "claude-opus-5";
+/**
+ * Stage B11 — the model that writes a briefing or an insight up when BRAIN is "claude" (PLAN.md: "when BRAIN moves to
+ * Claude, briefings use Haiku"). An 80-word rewrite of facts the app hands over needs no reasoning, so the small, fast
+ * model is the right one, and it keeps an optional extra at a fraction of a penny.
+ */
+const EXPAND_MODEL = "claude-haiku-4-5-20251001";
 
 /**
  * ⚠️ THIS CEILING COVERS THINKING *AND* THE ANSWER, and that is why it is not 1024.
@@ -134,6 +142,31 @@ const CF_EXTRA = [
   "You are not a doctor. Never guess at what an injury is.",
 ].join("\n");
 
+/**
+ * Stage B11 — WRITING THE APP'S OWN FACTS UP IN WORDS (PLAN.md: "MODE_EXTRA[mode]: only the numbers given, ≤80 words,
+ * no diagnosis, no plan changes"). The app has already written a rule-based version from the same facts and keeps it
+ * unless this reply passes its own checks — every number in it must be in the facts, and no medical word — so these
+ * lines are the first defence and the app's filter the second.
+ */
+const EXPAND_MODES = ["briefing", "insight"] as const;
+type ExpandMode = (typeof EXPAND_MODES)[number];
+const EXPAND_SYSTEM = [
+  "You are Alfie, the coach inside Inte-Run, a running app. You are given facts as JSON and write them up for the runner.",
+  "Write ONE short paragraph of at most 80 words. Plain, warm, direct. No preamble, no sign-off, no lists, no emoji.",
+  "Use ONLY the numbers that appear in the facts, written exactly as they appear there. Never add a number, pace, time,",
+  "distance, percentage or date that is not in the facts, and never work one out.",
+  "Do not diagnose, and do not mention injury, illness or any medical condition.",
+  "Do not tell the runner to change their plan, skip a session, swap it, or move it. You describe; you never change anything.",
+].join("\n");
+const MODE_EXTRA: Record<ExpandMode, string> = {
+  briefing: "This is a briefing for a run the runner has not done yet: what it is for, the work, where it sits in their plan, " +
+    "what their last run of this kind says about this one, and what to do before it. Speak to them as you would before they go.",
+  insight: "This is an insight about a run the runner has just finished, and how it felt to them (react: up is good, down is " +
+    "tough). Say what it means in plain words, warmly and honestly, and finish with what is next if the facts say.",
+};
+/** The largest fact pack accepted, as JSON. The app's are a few hundred characters; anything far bigger is not one. */
+const EXPAND_MAX_CONTEXT = 4000;
+
 function cors(env: Env, origin: string | null): Record<string, string> {
   const configured = (env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
   // With no ALLOWED_ORIGINS set, any origin is allowed — the same open default this Worker shipped
@@ -172,6 +205,13 @@ function cors(env: Env, origin: string | null): Record<string, string> {
 const PER_DEVICE_HOURLY = 15;
 const PER_DEVICE_DAILY = 40;
 const GLOBAL_DAILY = 200;
+/**
+ * Stage B11 — THE EXPANSIONS' OWN BUDGET, in buckets of their own (rl:brief:) so a briefing never uses up a runner's
+ * questions, nor the other way round. PLAN.md's numbers: a few a day for one phone (it is an extra, offered once per
+ * briefing or run), and a small global ceiling, because the global cap is the one that bounds a stranger.
+ */
+const PER_DEVICE_BRIEF_DAILY = 3;
+const GLOBAL_BRIEF_DAILY = 40;
 
 /** Counters live in the KV namespace the Strava tokens already use, with a TTL so they self-clear. */
 let burstFault: string | null = null;
@@ -215,6 +255,84 @@ async function overLimit(env: Env, device: string): Promise<string | null> {
   return null;
 }
 
+/** The expansions' budget — the burst guard, then one device's day, then everybody's day. Checked before the model. */
+async function overBriefLimit(env: Env, device: string): Promise<string | null> {
+  if (env.BURST) {
+    try {
+      const { success } = await env.BURST.limit({ key: "brief:" + device });
+      if (!success) return "burst";
+    } catch (e) { burstFault = e instanceof Error ? e.message : String(e); }
+  }
+  if (!env.STRAVA) return null;
+  const day = Math.floor(Date.now() / 86400000);
+  const id = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("alfie:" + device)))]
+    .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  const buckets: Array<[string, number, number, string]> = [
+    ["rl:brief:d:" + id + ":" + day, PER_DEVICE_BRIEF_DAILY, 90000, "daily"],
+    ["rl:brief:all:" + day, GLOBAL_BRIEF_DAILY, 90000, "global"],
+  ];
+  for (const [key, cap, ttl, label] of buckets) {
+    const used = Number((await env.STRAVA.get(key)) || "0");
+    if (used >= cap) return label;
+    await env.STRAVA.put(key, String(used + 1), { expirationTtl: ttl });
+  }
+  return null;
+}
+
+/**
+ * Stage B11 — a briefing or an insight written up from the app's facts. ⚠️ BRANCHED BEFORE THE "no question" 400, and
+ * no question is involved: what is sent is the fact pack the app's own rule-based text was written from, never anything
+ * the runner typed. The reply is { text }; any failure is a non-200, and the app keeps its own version.
+ */
+async function expand(env: Env, body: Ask, mode: ExpandMode, headers: Record<string, string>): Promise<Response> {
+  const ctx = body.context;
+  if (!ctx || typeof ctx !== "object" || Array.isArray(ctx)) return Response.json({ error: "no facts" }, { status: 400, headers });
+  const facts = JSON.stringify(ctx);
+  if (facts.length > EXPAND_MAX_CONTEXT) return Response.json({ error: "facts too long" }, { status: 413, headers });
+  // ⚠️ CHECKED BEFORE THE MODEL IS CALLED — after it, the money is spent.
+  const limited = await overBriefLimit(env, String(body.device || "anonymous"));
+  if (limited) return Response.json({ error: "rate limited", scope: limited }, { status: 429, headers });
+  const ask = mode === "briefing" ? "Write the briefing." : "Write the insight.";
+  if (BRAIN === "cloudflare") {
+    if (!env.AI) return Response.json({ error: "no ai binding" }, { status: 503, headers });
+    try {
+      const out = await env.AI.run(CF_MODEL, {
+        max_tokens: 300,
+        messages: [
+          { role: "system", content: EXPAND_SYSTEM + "\n" + MODE_EXTRA[mode] },
+          { role: "system", content: "The facts (JSON):\n" + facts },
+          { role: "user", content: ask },
+        ],
+      }) as { response?: string };
+      const text = String(out?.response ?? "").trim();
+      if (!text) return Response.json({ error: "empty" }, { status: 502, headers });
+      return Response.json({ text }, { headers });
+    } catch (err) {
+      return Response.json({ error: "upstream", detail: String(err).slice(0, 120) }, { status: 502, headers });
+    }
+  }
+  if (!env.ANTHROPIC_API_KEY) return Response.json({ error: "no key" }, { status: 503, headers });
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  try {
+    const response = await client.messages.create({
+      model: EXPAND_MODEL,
+      max_tokens: 400,
+      system: [
+        { type: "text", text: EXPAND_SYSTEM + "\n" + MODE_EXTRA[mode] },
+        { type: "text", text: "The facts (JSON):\n" + facts },
+      ],
+      messages: [{ role: "user", content: ask }],
+    });
+    if (response.stop_reason === "refusal") return Response.json({ error: "refused" }, { status: 502, headers });
+    const text = response.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
+    if (!text) return Response.json({ error: "empty" }, { status: 502, headers });
+    return Response.json({ text }, { headers });
+  } catch (err) {
+    const status = err instanceof Anthropic.APIError ? err.status ?? 502 : 502;
+    return Response.json({ error: "upstream" }, { status, headers });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const headers = cors(env, request.headers.get("origin"));
@@ -237,6 +355,11 @@ export default {
           : (env.ANTHROPIC_API_KEY ? "ready (claude)" : "no key"),
         burstGuard: env.BURST ? (burstFault ? "failing: " + burstFault : "bound") : "absent",
         budgetStore: env.STRAVA ? "bound" : "absent",
+        // Stage B11: the app offers "Expand with Alfie" only once this lists the mode — a deploy that does not know it
+        // is simply never asked (deploy skew fails closed) — and these are the expansions' own daily limits.
+        expand: EXPAND_MODES,
+        expandDaily: { device: PER_DEVICE_BRIEF_DAILY, global: GLOBAL_BRIEF_DAILY,
+          usedToday: env.STRAVA ? Number((await env.STRAVA.get("rl:brief:all:" + Math.floor(Date.now() / 86400000))) || "0") : null },
       }, { headers });
     }
     if (request.method !== "POST") return new Response("POST only", { status: 405, headers });
@@ -246,6 +369,13 @@ export default {
       body = (await request.json()) as Ask;
     } catch {
       return Response.json({ error: "bad json" }, { status: 400, headers });
+    }
+
+    // Stage B11 — a briefing or an insight: its own branch, BEFORE the question check (PLAN.md).
+    if (body.mode !== undefined) {
+      const mode = EXPAND_MODES.find((m) => m === body.mode);
+      if (!mode) return Response.json({ error: "bad mode" }, { status: 400, headers });
+      return expand(env, body, mode, headers);
     }
 
     const question = String(body.question || "").slice(0, 2000).trim();

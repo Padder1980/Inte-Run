@@ -190,6 +190,9 @@ test("the time limits and caps the policy states are the ones the code and the s
   const srvHist = Number((WORKER.match(/body\.history \|\| \[\]\)\.slice\(-(\d+)\)/) || [])[1]);
   assert.ok(appHist > 0 && appHist === cap("alfie-history") && srvHist === cap("alfie-history"),
     "the policy says " + cap("alfie-history") + " earlier messages; the app sends " + appHist + " and the server keeps " + srvHist);
+  // B11: how many briefings one phone may have Alfie expand a day — the server's own number.
+  const expandCap = Number((WORKER.match(/const PER_DEVICE_BRIEF_DAILY = (\d+);/) || [])[1]);
+  assert.ok(expandCap > 0 && cap("alfie-expand") === expandCap, "the policy says " + cap("alfie-expand") + " expansions a day; the server allows " + expandCap);
   // How long an unused Strava connection lasts, and a half-finished one.
   const conn = new Function("return " + ((STRAVA.match(/export const CONNECTION_TTL_SECONDS = ([\d* ]+);/) || [])[1] || "NaN"))() as number;
   assert.equal(conn, 365 * 24 * 60 * 60, "CONNECTION_TTL_SECONDS is not a year any more -- the policy says a year");
@@ -201,7 +204,8 @@ test("the time limits and caps the policy states are the ones the code and the s
   assert.ok(nonce > 0 && ttl("strava-link")[0] === nonce / 60 + " minutes", "the policy says " + ttl("strava-link")[0] + "; a half-finished connection lasts " + nonce + " s");
   // Ask Alfie's counters: the hourly one within about an hour, the daily ones within about a day.
   const buckets = [...WORKER.matchAll(/\["rl:[^\]]*?, (\d+), "(hourly|daily|global)"\]/g)].map((m) => ({ ttl: Number(m[1]), label: m[2]! }));
-  assert.equal(buckets.length, 3, "the Worker's rate-limit counters were not read");
+  // Three for questions (an hour, a day, everybody's day) and, since B11, two for expansions (a day, everybody's day).
+  assert.equal(buckets.length, 5, "the Worker's rate-limit counters were not read");
   for (const b of buckets) assert.ok(b.label === "hourly" ? b.ttl <= 2 * 3600 : b.ttl <= 26 * 3600, b.label + " counter lives " + b.ttl + " s, longer than the policy says");
   assert.ok(DOC.privacy.includes("within about an hour") && DOC.privacy.includes("about a day"), "the policy no longer says how long the counters live");
   // About 1 km: two decimal places, in both requests that carry a location.

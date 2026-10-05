@@ -208,8 +208,10 @@ test("BLOCKER: every number an insight prints is in its fact pack — thumbs up 
 
 test("BLOCKER: no second derivation — the text is a template over its facts, and the facts are read from the sheet's own sources", () => {
   // The text functions join facts: they call nothing that could look something up or work a number out.
-  const ALLOWED = new Set(["push", "join", "split", "slice", "charAt", "toLowerCase", "replace", "indexOf", "String", "tgt"]);
-  for (const fn of ["briefingText", "insightText"]) {
+  // briefingReadyLine (B11) is the readiness line's own template, split out so the line is written on screen and never
+  // stored; it is held to the same rule below.
+  const ALLOWED = new Set(["push", "join", "split", "slice", "charAt", "toLowerCase", "replace", "indexOf", "String", "tgt", "briefingReadyLine"]);
+  for (const fn of ["briefingText", "insightText", "briefingReadyLine"]) {
     // String literals out first: "first (it is in the steps)" is words, not a call.
     const body = decomment(fnBody(fn)!).replace(/^function \w+\(/, "(").replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
     const calls = [...body.matchAll(/([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]!).filter((n) => !["if", "for", "while", "return", "function"].includes(n));

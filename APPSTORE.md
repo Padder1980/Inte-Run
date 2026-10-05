@@ -129,10 +129,10 @@ For every row: **used to track you: No**, and the only purpose is **App Function
 | **Precise Location** (Location) | **Yes** | The GPS route of a run the runner sends to their own Strava account. Only if they connect Strava. | `strava` |
 | **Coarse Location** (Location) | No | A rough location for the weather (Open-Meteo, rounded to about 1 km), the map around a run (CARTO or Mapbox), and a run's town (OpenStreetMap, about 1 km). No identifier from us goes with it. | `weather`, `maps`, `place` |
 | **Health** (Health & Fitness) | **Yes** | Heart rate in runs sent to Strava — only from 16, which is Strava's own rule. | `strava` |
-| **Fitness** (Health & Fitness) | **Yes** | Runs and strength sessions sent to Strava; and the short plan summary that goes with an Ask Alfie question. | `strava`, `alfie` |
+| **Fitness** (Health & Fitness) | **Yes** | Runs and strength sessions sent to Strava; the short plan summary that goes with an Ask Alfie question; and, when the runner taps Expand with Alfie (B11), the facts a briefing or a run's insight was written from — never the check-in answers or whether anything hurt. | `strava`, `alfie` |
 | **Name** (Contact Info) | **Yes** | The Strava account's first name, kept on Inte-Run's server to show "Connected as ...". | `strava` |
 | **User ID** (Identifiers) | **Yes** | The Strava connection itself: the account's tokens, kept on Inte-Run's server. | `strava` |
-| **Device ID** (Identifiers) | **Yes** | Random keys made by the app for this install, stored on the server only as a scrambled (hashed) value: one keys the Strava connection, the other counts Ask Alfie questions per hour and per day to keep the free AI allowance fair (those counts delete themselves within about a day). | `strava`, `alfie` |
+| **Device ID** (Identifiers) | **Yes** | Random keys made by the app for this install, stored on the server only as a scrambled (hashed) value: one keys the Strava connection, the other counts Ask Alfie questions per hour and per day, and expansions per day, to keep the free AI allowance fair (those counts delete themselves within about a day). | `strava`, `alfie` |
 | **Other User Content** (User Content) | No | Ask Alfie questions (and the last few that already reached the server) — only after the runner says yes. The server keeps none of it; Cloudflare's side is governed by Cloudflare's terms. | `alfie` |
 
 **Data used to track you: none.** There are no third-party SDKs, no analytics and no adverts.

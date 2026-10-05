@@ -70,3 +70,61 @@ runnable only; readiness fresh and today's only; rest means rest; the credit; "l
 cache and the prune. The new insight functions sit inside the Logbook debrief region, so `test/run-debrief.test.ts`'s
 "no verdict diagnoses anything" sweep covers them too. **26 of 26 re-breaks caught**, PLAN.md's own ("the briefing
 invents a number") among them. Driven in the browser at 375×812, light and dark.
+
+## ✅ B11 — EXPAND WITH ALFIE: THE SAME FACTS, WRITTEN UP BY THE AI THROUGH THE SERVER, GATED (built 2026-10-05)
+
+PLAN.md B11: "reuse `POST /` with `mode:"briefing"|"insight"` + `context` = facts (branch before the "no question"
+400); `MODE_EXTRA[mode]`: only the numbers given, ≤80 words, no diagnosis, no plan changes. New KV buckets `rl:brief:`
+with `GLOBAL_BRIEF_DAILY` (~40) and `PER_DEVICE_BRIEF_DAILY` (~3) checked before the model; `GET /` reports them. App:
+"Expand with Alfie" tap, once per session id; reply passes a no-new-numbers filter … and a medical-term sweep, else the
+rule text stays; cached `src:"ai"`. When `BRAIN` moves to Claude, briefings use Haiku. Re-break: remove the number
+filter."
+
+**The server (`alfie-proxy/src/worker.ts`):** `expand()` — its own branch BEFORE the question check; the facts in a
+system turn; `EXPAND_SYSTEM` + `MODE_EXTRA[mode]` (80 words, only the facts' numbers written as they appear, no
+diagnosis, never a plan change); 413 for a pack over `EXPAND_MAX_CONTEXT`; its own budget `overBriefLimit` —
+`rl:brief:d:<hash>:<day>` 3 a day a phone and `rl:brief:all:<day>` 40 a day for everyone — checked before the model,
+so expansions never spend a runner's questions (tested); `EXPAND_MODEL` = Claude Haiku when `BRAIN` is "claude"; `GET /`
+lists `expand` and `expandDaily` (limits and today's count). ⚠️ **The server is now RUN in the tests** (its fetch
+handler, with Cloudflare's AI and the KV store stood in) — it loads fine under node from the repo root.
+
+**The app:**
+- **Asked, never assumed:** `alfieExpandProbe()` does one `GET /` a launch, from `wire()` — never while a screen is
+  being drawn (it began in the button's own render path, and the heat harness, which lifts everything the session
+  sheet reaches, followed it through `render` into the whole app) — and only for a runner with Ask Alfie online on.
+  A deploy whose `GET /` lists no `expand` is never offered: deploy skew fails closed, B1's Strava handshake again.
+- **The button** (`expandBtnHtml`, on the briefing card and the insight): only with online answers on (`alfieOnline`:
+  a yes, and 13 or over — checked at render AND inside the sender, `alfieExpand`), a server that lists the mode, and
+  not asked before for this card; never on a run where something hurt, never on a rest-day briefing. Its small print:
+  "Sends these facts to Ask Alfie online — never your name, where you are, or your health answers."
+- **What is sent:** `{ mode, context, device }` and nothing else — the pack on screen through `expandFactsFor`, which
+  drops `ready` (the morning check-in) and `pain`. No question, no history.
+- **The checks, before a word is shown (`expandReplyOk`):** every number token in the reply must be one in the sent
+  pack's JSON; no word from `EXPAND_MEDICAL`; at most `EXPAND_MAX_WORDS` (110 — the server asks for 80). A reply that
+  passes replaces the text (`src: "ai"`, labelled "Written up by Alfie from your numbers"); one that fails leaves the
+  rule text, with a toast. Either way the card is not offered again (`tried`, kept even when the pack later moves —
+  once per briefing or run). A full day's allowance (429) or no signal is not an answer: the offer stays.
+
+**⚠️ Found under it and fixed — B10's cache stored the morning check-in.** The DPIA (Step 6) and APPSTORE.md (2.3)
+promise check-in answers are kept nowhere and sent nowhere; B10 cached the briefing text with "This morning you rated
+yourself 2 out of 5" and the engine's advice in `interun_brief_v1`. Now the cache — and anything Alfie is sent — is
+written from the pack WITHOUT `ready`, and the readiness line (`briefingReadyLine`) is added on screen at render. A
+runner who should rest still reads only that (never cached).
+
+**The pages (`test/privacy-copy.test.ts` holds them to the code):** `PRIVACY_FLOWS`' alfie line; the privacy policy's
+Ask Alfie section (what an expansion sends, "Never sent with it: your morning check-in and whether anything hurt", the
+reply checked number by number, `<span data-cap="alfie-expand">3</span>` a day — tested against
+`PER_DEVICE_BRIEF_DAILY`) and its "what we keep" (expansion counts too); the simple version; `LEGAL_UPDATED` and all
+three pages' dates to 5 October 2026; `APPSTORE.md`'s Fitness and Device ID rows; `DPIA.md`'s alfie row. The
+counter-lifetime test now expects five counters. **The owner should read the policy change** — it is a new thing that
+leaves the phone, though only on a tap, only with online answers on, and only once the server is deployed.
+
+**Owner action:** deploy the Worker (`npx wrangler login` in his terminal, then deploy from `alfie-proxy/`). Until then
+the button never appears.
+
+**Tests:** `test/briefing-ai.test.ts` (7: the server's branch and prompt, its budget and report — run, not read; the
+number filter; what is and is not sent and stored; when the button is offered; the tap, a refused reply, a full day,
+the sender's own gate; the pages and the wiring). `test/alfie-proxy.test.ts` restated per spending path;
+`test/briefings.test.ts` allows `briefingReadyLine`. **29 of 29 re-breaks caught**, PLAN.md's own ("remove the number
+filter") among them. Driven in the browser with the network stood in (light and dark, 375×812): the sent body was
+`{ mode, context, device }` with no readiness or pain in the context, and the reply replaced the text with its label.

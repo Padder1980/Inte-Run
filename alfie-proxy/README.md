@@ -37,6 +37,26 @@ phone  →  this Worker  →  Cloudflare Workers AI (env.AI)
 A `GET /` reports the brain and whether the burst guard and the counter store are bound, without
 spending a question.
 
+### Expand with Alfie (`POST /` with `mode`, stage B11)
+
+A briefing or a run's insight, written up from facts the app hands over: `{ mode: "briefing" | "insight",
+context: <the fact pack>, device }`, answered `{ text }`. It is its own branch, before the question check, and
+no question is involved. The app has already written a rule-based version from the same facts and shows the
+AI's only if every number in it is one it sent and no medical word is in it; otherwise its own stays.
+
+- **What arrives:** the fact pack (the session, the plan week, the last run of that kind and its rated effort,
+  warm-up, fuelling, today's heat; for a run, how it went and felt and the week's totals) and the random
+  per-install id. **Never** the morning check-in or whether anything hurt — the app removes both first.
+- **Model:** the same `CF_MODEL` while `BRAIN` is `"cloudflare"`; `EXPAND_MODEL` (Claude Haiku) if it becomes
+  `"claude"`. 300 tokens; told 80 words, only the facts' numbers, no diagnosis, no plan changes.
+- **Limits, of its own** (`rl:brief:` counters, so expansions never spend a runner's questions): 3 a day per
+  install, 40 a day for the whole app, checked before the model. `GET /` lists `expand` (the modes this
+  deploy knows — **the app offers the button only once it sees them**, so an older deploy is never asked)
+  and `expandDaily` (the two limits and today's count).
+
+⚠️ **The feature is dormant until this Worker is deployed** — the app asks `GET /` first and finds no
+`expand` on the old deploy.
+
 ## Deploy
 
 ```bash

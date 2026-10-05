@@ -31,11 +31,22 @@ function fn(name: string): string {
 
 test("⚠️ the spend ceiling is checked before the model is called", () => {
   const src = worker();
-  const check = src.indexOf("await overLimit(");
-  const call = src.indexOf("client.messages.create(");
+  // ⚠️ B11: TWO PATHS SPEND MONEY NOW — a question (the fetch handler) and an expansion (expand) — and each checks its
+  // own budget before ITS model calls. Measured per path, because the first call in the file is no longer the question's.
+  const handler = src.slice(src.indexOf("export default {"));
+  const check = handler.indexOf("await overLimit(");
+  const call = handler.indexOf("client.messages.create(");
   assert.ok(check > 0, "there is no rate limit at all — a public URL spending real money");
   assert.ok(call > 0, "the model call has moved; this guard cannot see it");
-  assert.ok(check < call, "the limit is checked after the model runs, by which point the money is spent");
+  assert.ok(check < call && check < handler.indexOf("env.AI.run("), "the limit is checked after the model runs, by which point the money is spent");
+  const exp = src.slice(src.indexOf("async function expand("), src.indexOf("export default {"));
+  const echeck = exp.indexOf("await overBriefLimit(");
+  assert.ok(echeck > 0, "an expansion has no budget of its own");
+  for (const c of ["env.AI.run(", "client.messages.create("]) {
+    assert.ok(exp.indexOf(c) > echeck, "an expansion calls the model (" + c + ") before its budget is checked");
+  }
+  assert.match(src, /GLOBAL_BRIEF_DAILY/, "expansions have no global daily cap");
+  assert.match(src, /rl:brief:all:/, "the expansions' global cap is declared but never counted against");
   // ⚠️ A GLOBAL CAP IS THE ONE THAT ACTUALLY BOUNDS A STRANGER. Per-device limits bound an honest
   // runner; anyone with a script can mint a fresh device id per request, so a per-device-only design
   // has no ceiling at all.

@@ -17,11 +17,11 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>InteRun reads your heart rate during a run so you can see how hard you are working.</string>
+	<string>Inte-Run reads your heart rate during a run so you can see how hard you are working.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>InteRun saves your runs to Health, so they count towards your Activity rings.</string>
+	<string>Inte-Run saves your runs to Health, so they count towards your Activity rings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>InteRun uses the watch's GPS to measure your pace, distance and route while you run.</string>
+	<string>Inte-Run uses the watch's GPS to measure your pace, distance and route while you run.</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKBackgroundModes</key>

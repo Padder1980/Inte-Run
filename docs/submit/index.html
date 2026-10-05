@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit Checklist</title>
+<!-- Stage D4 of PLAN.md: the one page for the day Inte-Run goes to Apple. Hand-maintained like the TestFlight
+     guide, and held to APPSTORE.md by test/submit-checklist.test.ts: every box you copy from here must be the
+     words in APPSTORE.md sections 5 and 9, so the two can never drift. Left out of the app bundle
+     (ios/make-project.py). Nothing here is secret: the token step copies from your clipboard to a file. -->
+<style>
+  :root {
+    --bg: #F4F8F7; --surface: #FFFFFF; --surface-2: #EDF4F2; --text: #1A2D2A; --muted: #50706B;
+    --border: #CCE0DC; --teal: #0A7A6E; --teal-light: #E3F5F3; --purple: #5B4FCF; --purple-light: #EEEAFF;
+    --amber: #8F5807; --amber-light: #FFF4E0; --done-bg: #E3F5F3; --on-accent: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0D1F1C; --surface: #142620; --surface-2: #1C3530; --text: #E2EFED; --muted: #9DBDB8;
+      --border: #2A4440; --teal: #3FC1B0; --teal-light: #0D2E2A; --purple: #A99CFF; --purple-light: #1E1A40;
+      --amber: #F2B45C; --amber-light: #2A1E08; --done-bg: #0D2E2A; --on-accent: #0D1F1C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1F1C; --surface: #142620; --surface-2: #1C3530; --text: #E2EFED; --muted: #9DBDB8;
+    --border: #2A4440; --teal: #3FC1B0; --teal-light: #0D2E2A; --purple: #A99CFF; --purple-light: #1E1A40;
+    --amber: #F2B45C; --amber-light: #2A1E08; --done-bg: #0D2E2A; --on-accent: #0D1F1C;
+  }
+  :root[data-theme="light"] {
+    --bg: #F4F8F7; --surface: #FFFFFF; --surface-2: #EDF4F2; --text: #1A2D2A; --muted: #50706B;
+    --border: #CCE0DC; --teal: #0A7A6E; --teal-light: #E3F5F3; --purple: #5B4FCF; --purple-light: #EEEAFF;
+    --amber: #8F5807; --amber-light: #FFF4E0; --done-bg: #E3F5F3; --on-accent: #FFFFFF;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 24px 16px 80px; }
+  .page { max-width: 680px; margin: 0 auto; }
+  a { color: var(--teal); }
+  code { font: 15px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+  .header { text-align: center; padding: 28px 0 24px; }
+  .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--teal); margin-bottom: 10px; }
+  h1 { font-size: clamp(30px, 6vw, 40px); line-height: 1.15; margin: 0 0 12px; text-wrap: balance; }
+  .header p { color: var(--muted); margin: 0 auto; max-width: 500px; text-wrap: balance; }
+  .progress { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px; margin: 0 0 24px; display: flex; align-items: center; gap: 14px; }
+  .progress-label { font-size: 15px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--teal); border-radius: 4px; transition: width 0.3s ease; }
+  .count { font-size: 15px; font-weight: 700; color: var(--teal); white-space: nowrap; min-width: 52px; text-align: right; }
+  .step { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 22px 20px; margin-bottom: 16px; }
+  .step.done { background: var(--done-bg); border-color: var(--teal); }
+  .step-header { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+  .step-num { font-size: 34px; font-weight: 900; line-height: 1; color: var(--teal); opacity: 0.45; min-width: 36px; font-variant-numeric: tabular-nums; }
+  .step-meta { flex: 1; min-width: 0; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 10px; border-radius: 20px; margin-bottom: 6px; }
+  .badge-you { background: var(--teal-light); color: var(--teal); }
+  .badge-claude { background: var(--purple-light); color: var(--purple); }
+  .step-title { font-size: 21px; line-height: 1.25; margin: 0; text-wrap: balance; }
+  .step-time { font-size: 15px; color: var(--muted); margin-top: 2px; }
+  .lead { margin: 0 0 14px; }
+  q { quotes: "\201C" "\201D"; }
+  .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .checklist li { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; min-height: 44px; padding: 8px 0; user-select: none; }
+  .check-box { width: 24px; height: 24px; flex-shrink: 0; margin-top: 2px; border: 2px solid var(--border); border-radius: 7px; background: var(--surface); display: flex; align-items: center; justify-content: center; }
+  .checklist li.checked .check-box { background: var(--teal); border-color: var(--teal); }
+  .checklist li.checked .check-box::after { content: ""; width: 6px; height: 11px; border: 2.5px solid var(--on-accent); border-top: 0; border-left: 0; transform: rotate(45deg) translate(-1px, -1px); }
+  .check-text { flex: 1; min-width: 0; }
+  .checklist li.checked .check-text { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+  .copy-box { margin-top: 14px; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
+  .copy-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 6px 6px 14px; border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 700; color: var(--muted); }
+  .copy-btn { min-height: 44px; min-width: 88px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--teal); color: var(--on-accent); font: 700 16px -apple-system, system-ui, sans-serif; cursor: pointer; }
+  .copy-text { margin: 0; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); max-height: 320px; overflow-y: auto; overflow-x: clip; }
+  .info-box { margin-top: 14px; background: var(--amber-light); border-left: 4px solid var(--amber); border-radius: 0 10px 10px 0; padding: 12px 14px; }
+  .info-box strong { display: block; color: var(--amber); }
+  .done-card .step-title { margin-bottom: 10px; }
+  .done-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .done-list li { display: flex; gap: 10px; }
+  .tick { color: var(--teal); font-weight: 900; }
+  .foot { text-align: center; color: var(--muted); font-size: 15px; margin-top: 28px; }
+  @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+</head>
+<body>
+<main class="page">
+<header class="header"><div class="eyebrow">Stage D4 · Submit checklist</div>
+<h1>Send Inte-Run to Apple</h1>
+<p>Most of it is done. What is left is below, in order. Tap a line to tick it; the ticks stay on this device.</p></header>
+<div class="progress"><span class="progress-label">Progress</span><div class="track"><div class="fill" id="fill"></div></div><span class="count" id="count">0 / 0</span></div>
+<section class="step" id="step-0"><div class="step-header"><div class="step-num">0</div><div class="step-meta"><div class="badge badge-claude">Claude</div><h2 class="step-title">Fix one thing in the app first</h2><div class="step-time">About 30 minutes, Claude does it</div></div></div><p class="lead">The Ready? check shows <q>From your watch: Slept 7.5 h, Resting HR normal</q> to everyone, watch or not. Those numbers are made up. A reviewer who opens it would see invented health data, so fix it before the build.</p><ul class="checklist"><li data-id="fix-watch"><span class="check-box" aria-hidden="true"></span><span class="check-text">Paste this into Claude, or start the task Claude already left for it</span></li></ul><div class="copy-box"><div class="copy-head"><span>For Claude</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="prompt-fix">Stop showing made-up watch numbers in the Ready? check (the hard-coded watch constant in web/app.ts), with tests, then npm run verify, commit and push.</pre></div></section>
+<section class="step" id="step-1"><div class="step-header"><div class="step-num">1</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">Put your map token where the build can find it</h2><div class="step-time">2 minutes</div></div></div><p class="lead">The free map tiles now all say <q>API KEY REQUIRED</q>, so the App Store build needs your Mapbox token. Without it the build stops and tells you why, so nothing broken can go to Apple.</p><ul class="checklist"><li data-id="tok-copy"><span class="check-box" aria-hidden="true"></span><span class="check-text">Open <a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener">your Mapbox tokens page</a> and copy your <b>Default public token</b>. It begins <code>pk.</code></span></li><li data-id="tok-save"><span class="check-box" aria-hidden="true"></span><span class="check-text">In Terminal, run the line below. It saves what you copied straight into the file; the token never goes through a chat.</span></li></ul><div class="copy-box"><div class="copy-head"><span>Terminal</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="cmd-token">pbpaste &gt; ~/Developer/InteRun/ios/mapbox-token.txt</pre></div></section>
+<section class="step" id="step-2"><div class="step-header"><div class="step-num">2</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">Switch on the new server features</h2><div class="step-time">5 minutes</div></div></div><p class="lead">This turns on Expand with Alfie and the Strava switch for runs you add by hand. The app only offers them once the server says it can.</p><ul class="checklist"><li data-id="srv-login"><span class="check-box" aria-hidden="true"></span><span class="check-text">In Terminal: log in. A browser opens; click <b>Allow</b> within about two minutes</span></li><li data-id="srv-deploy"><span class="check-box" aria-hidden="true"></span><span class="check-text">Then deploy, and wait for the line that says it was published</span></li></ul><div class="copy-box"><div class="copy-head"><span>Terminal, step 1</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="cmd-login">cd ~/Developer/InteRun/alfie-proxy &amp;&amp; npx wrangler login</pre></div><div class="copy-box"><div class="copy-head"><span>Terminal, step 2</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="cmd-deploy">CI=1 WRANGLER_SEND_METRICS=false npx --no-install wrangler deploy</pre></div></section>
+<section class="step" id="step-3"><div class="step-header"><div class="step-num">3</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">Read what the privacy policy now says</h2><div class="step-time">10 minutes</div></div></div><ul class="checklist"><li data-id="read-policy"><span class="check-box" aria-hidden="true"></span><span class="check-text">Read the Ask Alfie part of the <a href="https://padder1980.github.io/Inte-Run/privacy/" target="_blank" rel="noopener">privacy policy</a>: it now says what <q>Expand with Alfie</q> sends</span></li><li data-id="read-dp"><span class="check-box" aria-hidden="true"></span><span class="check-text">Before people outside your family test it: have someone who knows data protection read the policy and the terms</span></li></ul></section>
+<section class="step" id="step-4"><div class="step-header"><div class="step-num">4</div><div class="step-meta"><div class="badge badge-claude">Claude</div><h2 class="step-title">Make the new build and send it to Apple</h2><div class="step-time">About 20 minutes, then 30–60 minutes while Apple checks it</div></div></div><ul class="checklist"><li data-id="build-ask"><span class="check-box" aria-hidden="true"></span><span class="check-text">Paste this into Claude (it follows the same steps as the TestFlight upload)</span></li><li data-id="build-mail"><span class="check-box" aria-hidden="true"></span><span class="check-text">Wait for Apple’s email saying the build has finished processing</span></li></ul><div class="copy-box"><div class="copy-head"><span>For Claude</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="prompt-build">Please build Inte-Run and upload it to App Store Connect for App Store review, following TESTFLIGHT.md step 2 exactly. My Mapbox token is in ios/mapbox-token.txt. Tell me the build number that went up.</pre></div></section>
+<section class="step" id="step-5"><div class="step-header"><div class="step-num">5</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">Fill in App Information</h2><div class="step-time">About 10 minutes</div></div></div><ul class="checklist"><li data-id="ai-open"><span class="check-box" aria-hidden="true"></span><span class="check-text">Open <a href="https://appstoreconnect.apple.com/apps" target="_blank" rel="noopener">App Store Connect</a> → Inte-Run → <b>App Information</b></span></li><li data-id="ai-name"><span class="check-box" aria-hidden="true"></span><span class="check-text">Name and Subtitle: paste the two boxes below</span></li><li data-id="ai-cat"><span class="check-box" aria-hidden="true"></span><span class="check-text">Category: <b>Health &amp; Fitness</b>. Content Rights: <b>Yes</b>, it shows third-party content, and you have the rights (maps, weather and town names are credited)</span></li><li data-id="ai-age"><span class="check-box" aria-hidden="true"></span><span class="check-text">Age Rating: answer each question as in <a href="https://github.com/Padder1980/Inte-Run/blob/main/APPSTORE.md#1-age-rating" target="_blank" rel="noopener">APPSTORE.md section 1</a></span></li><li data-id="ai-privacy-url"><span class="check-box" aria-hidden="true"></span><span class="check-text">Privacy Policy URL: paste the box below</span></li><li data-id="ai-label"><span class="check-box" aria-hidden="true"></span><span class="check-text">App Privacy: declare the eight data types in <a href="https://github.com/Padder1980/Inte-Run/blob/main/APPSTORE.md#2-app-privacy-the-nutrition-label" target="_blank" rel="noopener">section 2</a>. Nothing is used to track anyone</span></li></ul><div class="copy-box"><div class="copy-head"><span>Name</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-name">Inte-Run: Running Coach</pre></div><div class="copy-box"><div class="copy-head"><span>Subtitle</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-subtitle">Intelligent Training Companion</pre></div><div class="copy-box"><div class="copy-head"><span>Privacy Policy URL</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="url-privacy">https://padder1980.github.io/Inte-Run/privacy/</pre></div></section>
+<section class="step" id="step-6"><div class="step-header"><div class="step-num">6</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">Fill in the version page</h2><div class="step-time">About 15 minutes</div></div></div><ul class="checklist"><li data-id="v-open"><span class="check-box" aria-hidden="true"></span><span class="check-text">Open the <b>1.0</b> version page (under iOS App)</span></li><li data-id="v-shots"><span class="check-box" aria-hidden="true"></span><span class="check-text">Screenshots: in Finder open <b>InteRun › store-shots</b>. Drag the six in <b>iphone-6.9</b> into <b>iPhone 6.9&quot; Display</b>, and the five in <b>watch-ultra</b> into <b>Apple Watch</b>. The 6.5&quot; ones are optional; Apple shrinks the 6.9&quot; set if you leave them out</span></li><li data-id="v-text"><span class="check-box" aria-hidden="true"></span><span class="check-text">Promotional Text, Description and Keywords: paste the three boxes below</span></li><li data-id="v-urls"><span class="check-box" aria-hidden="true"></span><span class="check-text">Support URL, Version and Copyright: paste the boxes below. Leave Marketing URL empty</span></li><li data-id="v-build"><span class="check-box" aria-hidden="true"></span><span class="check-text">Build: choose the new one from step 4</span></li><li data-id="v-review"><span class="check-box" aria-hidden="true"></span><span class="check-text">App Review Information: sign-in <b>not required</b>; your name, email and phone (in the form +44 …); paste the Notes box</span></li><li data-id="v-price"><span class="check-box" aria-hidden="true"></span><span class="check-text">Pricing and Availability: <b>Free</b>. Countries: <b>your decision</b>. I recommend the United Kingdom only for now, because the crisis lines and the youth limits in the app are UK ones</span></li></ul><div class="copy-box"><div class="copy-head"><span>Promotional Text</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-promo">A plan built from your goal and your fitness, a briefing before every run, a voice coach during it and a debrief after. No account needed.</pre></div><div class="copy-box"><div class="copy-head"><span>Description</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-description">Inte-Run turns your race goal and your current fitness into a training plan, then coaches you through every run of it.
+
+YOUR PLAN
+• Tell it your race, the date and a recent time. Inte-Run builds a plan in phases (base, build, peak and taper) with easier weeks built in.
+• Every session comes with its purpose, its paces and its effort, worked out from your own fitness.
+• Life gets in the way: move a run, skip one, add a smaller race, or take a holiday or a few days off ill, and the plan adjusts. It suggests; you decide.
+
+BEFORE AND DURING EVERY RUN
+• Your briefing: what the session is for, what last time tells you, the heat and what to eat.
+• A voice coach through every step, from the warm-up to the last rep.
+• Live pace and distance on your iPhone, and heart rate with your Apple Watch, which can also record the run itself.
+
+AFTER THE RUN
+• A coach's debrief: whether you hit the brief, how even your pace was, and how hard it felt against what the plan asked.
+• Your logbook, your weekly totals and your best times.
+
+MORE
+• Strength training for runners: sessions built to your time and equipment, pictures of the exercises, a guided player and a rest timer.
+• Ask Alfie, your coach in the app, answers questions about your plan and your running. It works on your phone; online answers are optional and only with your permission.
+• A programme for runners aged 12 to 17 that keeps training within UK Athletics' limits for their age.
+• Send your runs to Strava and save them to Apple Health.
+• Inte-Club: your own running page, with posts, stories and journals of past training blocks. It stays on your phone.
+
+PRIVATE BY DESIGN
+No account and no sign-in. Your training history is kept on your phone, not on our servers. Nothing is sold and nothing is used to track you.
+
+Inte-Run gives general training guidance, not medical advice. If something hurts or you feel unwell, stop and talk to a doctor or physiotherapist.</pre></div><div class="copy-box"><div class="copy-head"><span>Keywords</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-keywords">marathon,half,10k,5km,race,plan,pace,interval,tempo,strength,gps,jogging,runner,workout,fitness</pre></div><div class="copy-box"><div class="copy-head"><span>Support URL</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="url-support">https://padder1980.github.io/Inte-Run/support/</pre></div><div class="copy-box"><div class="copy-head"><span>Version</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-version">1.0</pre></div><div class="copy-box"><div class="copy-head"><span>Copyright</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-copyright">2026 Adam Palmer</pre></div><div class="copy-box"><div class="copy-head"><span>Notes for the reviewer</span><button type="button" class="copy-btn" data-copy>Copy</button></div><pre class="copy-text" data-field="store-notes">Inte-Run is a running coach. No account or sign-in is needed, and every feature works without one.
+
+Location: used while a run is recording, including with the screen locked, to measure distance, pace
+and route. A rough location (about 1 km) is also sent to Open-Meteo for the weather, map tiles are
+requested from CARTO or Mapbox, and a run's town can be looked up from OpenStreetMap.
+
+HealthKit: reads heart rate during a run and saves finished phone-recorded runs to Health as workouts.
+Runs recorded on the Apple Watch are saved to Health by watchOS and never written twice.
+
+Apple Watch and Live Activities: an optional companion app; a run can be recorded on the watch or the
+phone, and the lock screen shows the run's time and distance.
+
+Ask Alfie is an optional AI assistant. Nothing is sent until the user agrees in the app. Then the
+question and a short summary of their plan go to our server, which asks an AI service run by
+Cloudflare for the reply and stores nothing. Questions that mention a serious warning sign (chest pain,
+fainting, thoughts of self-harm and similar) are recognised on the device and answered with safety
+guidance; they are never sent. Users aged 12 to 17, or who have not given an age, are never offered
+online answers unprompted, and users under 13 cannot switch them on.
+
+Strava is optional. Connecting uses Strava's own page in Safari. The access tokens are kept on our
+server, never on the device, because Strava's token exchange needs our client secret. The user can
+disconnect at any time from Profile &gt; Apps &amp; devices, which also revokes access at Strava. No Strava
+account is needed to review anything else.
+
+Health guidance: the injury and fuelling pages give first-aid and general guidance, list the warning
+signs that need a doctor or emergency care, and advise seeing a GP or physiotherapist. The app does not
+diagnose.
+
+Ages 12 to 17: the app asks the runner's age and keeps the plan within UK Athletics' limits for that
+age. For under-18s, and anyone who has not given an age, Ask Alfie's online answers, town names for
+runs and saving to Apple Health all start switched off.
+
+The interface is a web page bundled in the app (WKWebView). The app can download newer versions of that
+same page from our website; updates never change the app's purpose, as the Apple Developer Program
+License Agreement section 3.3.1(B) requires.</pre></div></section>
+<section class="step" id="step-7"><div class="step-header"><div class="step-num">7</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">The dry run</h2><div class="step-time">5 minutes</div></div></div><ul class="checklist"><li data-id="dry-add"><span class="check-box" aria-hidden="true"></span><span class="check-text">On the version page, press <b>Add for Review</b></span></li><li data-id="dry-red"><span class="check-box" aria-hidden="true"></span><span class="check-text">If anything is missing, App Store Connect lists it in red at the top. Fix each one and press it again until nothing is red</span></li><li data-id="dry-stop"><span class="check-box" aria-hidden="true"></span><span class="check-text"><b>Stop there.</b> The next button, <b>Submit to App Review</b>, sends it to Apple for real. Press it only when you are ready</span></li></ul><div class="info-box"><strong>Expect one rejection.</strong>Apple often asks one question about a first app. Paste their message into Claude; the likely questions are answered in <a href="https://github.com/Padder1980/Inte-Run/blob/main/APPSTORE.md#6-what-app-review-might-question" target="_blank" rel="noopener">APPSTORE.md section 6</a>.</div></section>
+<section class="step" id="step-8"><div class="step-header"><div class="step-num">8</div><div class="step-meta"><div class="badge badge-you">You</div><h2 class="step-title">Sign the DPIA</h2><div class="step-time">10 minutes</div></div></div><p class="lead">Not something Apple asks for. UK data protection law expects it.</p><ul class="checklist"><li data-id="dpia"><span class="check-box" aria-hidden="true"></span><span class="check-text">Read <a href="https://github.com/Padder1980/Inte-Run/blob/main/DPIA.md" target="_blank" rel="noopener">DPIA.md</a>, then tell Claude <q>I have signed the DPIA</q> so it records your name and the date</span></li></ul></section>
+<section class="step done-card"><h2 class="step-title">Already done</h2><ul class="done-list"><li><span class="tick" aria-hidden="true">✓</span><span><b>Encryption answer</b>: ITSAppUsesNonExemptEncryption is false (standard HTTPS only), so App Store Connect does not ask</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Permission messages</b>: location, Health, motion, camera and photos, now naming Inte-Run, on the phone and the watch</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Privacy files</b>: PrivacyInfo.xcprivacy for the phone and for the watch, matching the App Privacy answers</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Background modes</b>: location and audio on the phone (a run keeps recording with the screen locked), workout processing on the watch</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Export settings</b>: ExportOptions.plist: App Store Connect, automatic signing, your team, symbols uploaded</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Age rating, App Privacy and review notes</b>: APPSTORE.md sections 1, 2 and 5</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Privacy policy, terms and support page</b>: on GitHub Pages since D1, with real contact details</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>Screenshots</b>: iPhone 6.9&quot; and 6.5&quot; and Apple Watch, made by tools/store-shots.mjs and the watch simulator</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>The store listing</b>: name, subtitle, description and keywords, within Apple’s limits (APPSTORE.md section 9)</span></li><li><span class="tick" aria-hidden="true">✓</span><span><b>No broken maps</b>: an App Store build now stops if the map token is missing</span></li></ul></section>
+<p class="foot">The full answers and their reasons are in <a href="https://github.com/Padder1980/Inte-Run/blob/main/APPSTORE.md" target="_blank" rel="noopener">APPSTORE.md</a>.</p>
+</main>
+<script>
+  const KEY = "interun-submit-checks";
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
+  function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+  const items = Array.from(document.querySelectorAll(".checklist li[data-id]"));
+  function paint() {
+    const s = load();
+    items.forEach((li) => li.classList.toggle("checked", !!s[li.dataset.id]));
+    const n = items.filter((li) => li.classList.contains("checked")).length;
+    document.getElementById("fill").style.width = (items.length ? Math.round(n / items.length * 100) : 0) + "%";
+    document.getElementById("count").textContent = n + " / " + items.length;
+    document.querySelectorAll(".step").forEach((st) => {
+      const own = Array.from(st.querySelectorAll(".checklist li[data-id]"));
+      st.classList.toggle("done", own.length > 0 && own.every((li) => li.classList.contains("checked")));
+    });
+  }
+  items.forEach((li) => li.addEventListener("click", (ev) => {
+    if (ev.target.closest("a")) return;
+    const s = load(); s[li.dataset.id] = !s[li.dataset.id]; save(s); paint();
+  }));
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => {
+    const text = b.closest(".copy-box").querySelector(".copy-text").textContent;
+    const done = () => { b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy"; }, 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => {});
+  }));
+  paint();
+</script>
+</body>
+</html>

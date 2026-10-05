@@ -321,7 +321,7 @@ enum WatchPreview {
                                        control: Bool = true,
                                        metrics: [WatchSettings.Metric]? = nil) -> some View {
         let store = SessionStore()
-        store.runnerName = "Adam"
+        store.runnerName = "Sam"
         store.maxHr = 182
         if live {
             store.phoneLive = [
@@ -406,7 +406,7 @@ enum WatchPreview {
     private static func homeScene(_ page: Int, anchor: UnitPoint? = nil) -> some View {
         let store = SessionStore()
         let today = SessionStore.localTodayIso()
-        store.runnerName = "Adam"
+        store.runnerName = "Sam"
         store.contextIso = today
         store.hasSynced = true
         store.session = intervalSession

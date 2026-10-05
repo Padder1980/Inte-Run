@@ -23,21 +23,21 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>InteRun reads your heart rate during a run so it can show it live and save it with the session. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices unless you choose to send or share it, for example by sending a run to Strava.</string>
+	<string>Inte-Run reads your heart rate during a run so it can show it live and save it with the session. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices unless you choose to send or share it, for example by sending a run to Strava.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>InteRun saves your finished runs to Apple Health as workouts, with their distance, duration, route and heart rate, so they appear in Health and Fitness like a run recorded by any other app. Runs recorded on your Apple Watch are already saved by the watch and are never written twice. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices unless you choose to send or share it, for example by sending a run to Strava.</string>
+	<string>Inte-Run saves your finished runs to Apple Health as workouts, with their distance, duration, route and heart rate, so they appear in Health and Fitness like a run recorded by any other app. Runs recorded on your Apple Watch are already saved by the watch and are never written twice. It also uses HealthKit to start a run on your Apple Watch from your phone. Your health data stays on your devices unless you choose to send or share it, for example by sending a run to Strava.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>InteRun uses your phone's step counter to keep measuring your distance when GPS drops out — under trees, between tall buildings or in a tunnel — and to show your cadence. It stays on your phone and is never sent anywhere.</string>
+	<string>Inte-Run uses your phone's step counter to keep measuring your distance when GPS drops out — under trees, between tall buildings or in a tunnel — and to show your cadence. It stays on your phone and is never sent anywhere.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>InteRun keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
+	<string>Inte-Run keeps tracking your run when your phone is locked or in a pocket, so your pace and route stay accurate for the whole session.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>InteRun uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket. To show the weather, draw maps of your runs and name the town you ran in, it sends a rough location to a weather service, a map service and OpenStreetMap.</string>
+	<string>Inte-Run uses your location to measure pace, distance and your route while a session is running, including when your phone is locked or in your pocket. To show the weather, draw maps of your runs and name the town you ran in, it sends a rough location to a weather service, a map service and OpenStreetMap.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>InteRun uses your camera only when you choose Take Photo, for a share card, an Inte-Club post or your profile picture. Photos stay on your phone and are never sent anywhere by InteRun unless you share them yourself.</string>
+	<string>Inte-Run uses your camera only when you choose Take Photo, for a share card, an Inte-Club post or your profile picture. Photos stay on your phone and are never sent anywhere by Inte-Run unless you share them yourself.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>InteRun saves a share card to your photo library when you tap Save to device. It only ever adds the card you made.</string>
+	<string>Inte-Run saves a share card to your photo library when you tap Save to device. It only ever adds the card you made.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>InteRun lets you pick your own photos and videos for a share card, or for a post or story in Inte-Club. They are used on this device and are never uploaded by InteRun.</string>
+	<string>Inte-Run lets you pick your own photos and videos for a share card, or for a post or story in Inte-Club. They are used on this device and are never uploaded by Inte-Run.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>instagram-stories</string>

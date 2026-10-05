@@ -16,8 +16,11 @@ test/app-store.test.ts keeps this file, the privacy manifests and the app's own 
    `https://padder1980.github.io/Inte-Run/privacy/` into App Store Connect as the Privacy Policy URL and
    `https://padder1980.github.io/Inte-Run/support/` as the Support URL (section 0).
 4. **Review notes** — paste section 5 into the notes field.
+5. **The store listing and the screenshots** — section 9 (stage D4): the name, subtitle, description and
+   keywords to paste, and which screenshot folder goes in which slot.
 
-Everything else Apple asks is answered in section 4.
+Everything else Apple asks is answered in section 4. The step-by-step list for the day you submit is the
+checklist page, `https://padder1980.github.io/Inte-Run/submit/`.
 
 ## 0. What still blocks a submission
 
@@ -27,7 +30,10 @@ Everything else Apple asks is answered in section 4.
 | ✅ A version of that policy a **12-year-old can read** | The ICO's Children's Code (see `DPIA.md`) | **Done (D1):** `https://padder1980.github.io/Inte-Run/simple/`, measured at Flesch-Kincaid grade 2.6 |
 | ✅ **Terms** with a parent or guardian clause | Under-18s cannot sign a binding contract (`YOUTH.md` section 6). ⚠️ How the terms word a minimum age changes the age rating — section 1.3. | **Done (D1):** `https://padder1980.github.io/Inte-Run/terms/`. "Designed for runners aged 12 and up", with no minimum age (your ruling, section 1.3) |
 | ✅ A **support URL** that leads to real contact details | Apple: "This URL must lead to actual contact information (legal address, email address, telephone number), as may be required by local law ... This property is required." | **Done (D1):** `https://padder1980.github.io/Inte-Run/support/`, giving adam.palmer86@gmail.com, which is also `PRIVACY_CONTACT` in the app |
-| A **new app build** | The privacy files, the location message and the watch app's privacy file only reach Apple in a build (section 7) | Press Play in Xcode, then upload |
+| A **new app build** | The privacy files, the location message and the watch app's privacy file only reach Apple in a build (section 7). Since D4 the permission messages also say "Inte-Run" rather than "InteRun". | Archive and upload. ⚠️ **Put your Mapbox token in `ios/mapbox-token.txt` first** (D4): the free CARTO map tiles now all read "API KEY REQUIRED", so an archive without the token stops with an error rather than ship broken route maps |
+| ✅ **Screenshots** for iPhone 6.9" and 6.5" and Apple Watch | Required for every app; a watch app needs watch ones | **Done (D4):** `store-shots/`, section 9 |
+| ✅ **The store listing**: name, subtitle, description, keywords | Required fields on the version page | **Done (D4):** section 9, held to Apple's limits by a test |
+| **Where it is sold** | The crisis lines and youth limits are UK ones | **Your decision** — section 9 recommends the UK only |
 | Signing `DPIA.md` | Not an Apple rule — UK data protection law | You |
 
 ## 1. Age rating
@@ -302,3 +308,110 @@ Read on 28 September 2026 for the privacy policy (stage D1):
 - CARTO privacy notice — https://carto.com/privacy
 - OpenStreetMap Foundation privacy policy — https://osmfoundation.org/wiki/Privacy_Policy
 - Apple's Licensed Application End User License Agreement — https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+## 9. The store listing (stage D4, written 5 October 2026)
+
+What App Store Connect asks for on the version page and in App Information, ready to paste. Apple's limits
+(read 5 October 2026, sources at the end of this section): name and subtitle 30 characters, promotional text
+170 characters, description 4000 characters, keywords 100 bytes, each keyword longer than two characters,
+none repeating the app's name or the company name, and no names of other apps or companies.
+`test/submit-checklist.test.ts` holds every block below to those limits, and holds the description to what
+the app does — change a feature and the description has to change with it.
+
+**Name** (App Information). ⚠️ It must be unique on the App Store; App Store Connect says at once if it is
+taken. "Running Coach" is in the name because people search for it.
+
+```store-name
+Inte-Run: Running Coach
+```
+
+**Subtitle** (App Information): the tagline, which fits exactly.
+
+```store-subtitle
+Intelligent Training Companion
+```
+
+**Promotional text** (version page; can be changed later without a new review):
+
+```store-promo
+A plan built from your goal and your fitness, a briefing before every run, a voice coach during it and a debrief after. No account needed.
+```
+
+**Description** (version page):
+
+```store-description
+Inte-Run turns your race goal and your current fitness into a training plan, then coaches you through every run of it.
+
+YOUR PLAN
+• Tell it your race, the date and a recent time. Inte-Run builds a plan in phases (base, build, peak and taper) with easier weeks built in.
+• Every session comes with its purpose, its paces and its effort, worked out from your own fitness.
+• Life gets in the way: move a run, skip one, add a smaller race, or take a holiday or a few days off ill, and the plan adjusts. It suggests; you decide.
+
+BEFORE AND DURING EVERY RUN
+• Your briefing: what the session is for, what last time tells you, the heat and what to eat.
+• A voice coach through every step, from the warm-up to the last rep.
+• Live pace and distance on your iPhone, and heart rate with your Apple Watch, which can also record the run itself.
+
+AFTER THE RUN
+• A coach's debrief: whether you hit the brief, how even your pace was, and how hard it felt against what the plan asked.
+• Your logbook, your weekly totals and your best times.
+
+MORE
+• Strength training for runners: sessions built to your time and equipment, pictures of the exercises, a guided player and a rest timer.
+• Ask Alfie, your coach in the app, answers questions about your plan and your running. It works on your phone; online answers are optional and only with your permission.
+• A programme for runners aged 12 to 17 that keeps training within UK Athletics' limits for their age.
+• Send your runs to Strava and save them to Apple Health.
+• Inte-Club: your own running page, with posts, stories and journals of past training blocks. It stays on your phone.
+
+PRIVATE BY DESIGN
+No account and no sign-in. Your training history is kept on your phone, not on our servers. Nothing is sold and nothing is used to track you.
+
+Inte-Run gives general training guidance, not medical advice. If something hurts or you feel unwell, stop and talk to a doctor or physiotherapist.
+```
+
+**Keywords** (version page). "half" rather than "half marathon": Apple matches single words, and
+"marathon" is already there.
+
+```store-keywords
+marathon,half,10k,5km,race,plan,pace,interval,tempo,strength,gps,jogging,runner,workout,fitness
+```
+
+**The rest of the version page and App Information:**
+
+| Field | Answer |
+|---|---|
+| Support URL | `https://padder1980.github.io/Inte-Run/support/` |
+| Marketing URL | Leave empty (optional). |
+| Privacy Policy URL | `https://padder1980.github.io/Inte-Run/privacy/` |
+| Version | `1.0` |
+| Copyright | `2026 Adam Palmer` |
+| Primary category | Health & Fitness (section 4) |
+| Secondary category | Leave empty (optional). |
+| Price | Free |
+| Sign-in required | No — there are no accounts (section 4) |
+| App Review contact | Your name, `adam.palmer86@gmail.com` and your phone number in international form (+44 …) |
+| Notes | Section 5, word for word |
+| Build | The new one — see "A new app build" in section 0 |
+
+**⚠️ Availability — your decision.** I recommend **the United Kingdom only** for the first release. The
+crisis lines the app shows (Samaritans, Shout, Childline, NHS 111, 999) and the youth limits (UK Athletics)
+are UK ones; a runner in another country who needs help would be shown numbers that do not work there.
+Adding countries later is a tick-box, after the safety pages say what to do elsewhere.
+
+**Screenshots** (version page, "Previews and Screenshots"). Made by `tools/store-shots.mjs` (iPhone) and the
+watch simulator's preview scenes (Apple Watch) into `store-shots/`, which git ignores — run the tool again
+whenever the app's look changes. The runner in them is made up ("Sam"), so no real person's runs or places
+are published; there are no maps in them, because the free map tiles now read "API KEY REQUIRED" and the
+Mapbox token is not handed to a tool.
+
+| App Store Connect slot | Folder | Size |
+|---|---|---|
+| iPhone 6.9" Display (required) | `store-shots/iphone-6.9/` (6 shots) | 1320 × 2868 |
+| iPhone 6.5" Display (optional — Apple scales the 6.9" ones if it is left empty) | `store-shots/iphone-6.5/` (6 shots) | 1284 × 2778 |
+| Apple Watch (required, because the app has a watch app) | `store-shots/watch-ultra/` (5 shots) | 410 × 502 |
+
+Sources, read on 5 October 2026:
+
+- Screenshot specifications — https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications/
+- Platform version information (promotional text, description, keywords, URLs, copyright, review notes) — https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information
+- App information (name, subtitle, categories, content rights) — https://developer.apple.com/help/app-store-connect/reference/app-information/app-information

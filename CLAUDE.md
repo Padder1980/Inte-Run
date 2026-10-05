@@ -242,8 +242,11 @@ after race day Today asks what next (`interun_handover_v1`). **B10 is built (202
 today or tomorrow and an insight on a run's page after thumbs up/down, both rule-based from fact packs
 (`briefingFacts`, `insightFacts`; `interun_brief_v1`). **B11 is built (2026-10-05):** Expand with Alfie — the same packs,
 written up by the AI through the Worker (`mode`, `rl:brief:` budget), shown only if every number is one it sent;
-dormant until he deploys the Worker. **All eleven features are built; next is D4** (submit to Apple). `PLAN.md` holds the full list and the Road Map is the live
-status; update both when a stage lands.
+dormant until he deploys the Worker. **All eleven features are built. D4's kit is ready (2026-10-06):** the checklist
+page `docs/submit/`, the store listing (`APPSTORE.md` §9), screenshots from `tools/store-shots.mjs` into the ignored
+`store-shots/`; the submission itself is his. ⚠️ CARTO's free tiles now all read "API KEY REQUIRED": an archive stops
+without `ios/mapbox-token.txt`. `PLAN.md` holds the full list and the Road Map is the live status; update both when a
+stage lands.
 
 ## Notes index — read the file for the area before changing it
 
@@ -280,4 +283,4 @@ status; update both when a stage lands.
 | The 12–17 programme: the safety step, goal and plan ceilings, youth strength, Strava's age rules (and `YOUTH.md`) | `notes/youth-programme.md` |
 | Adding a run by hand (`saveManualRun`, the third commit point), linking a run to its session (`interun_link_v1`, the seedDone replay), best times (`src/progress/records.ts`), Done for today | `notes/manual-runs-and-records.md` |
 | Briefings and insights (B10): the fact packs (`briefingFacts`, `insightFacts`), the rule-based text, the thumbs (`run.react`), the cache (`interun_brief_v1`); Expand with Alfie (B11): the Worker's `mode` branch and budget, the number filter, what is never sent | `notes/briefings-and-insights.md` |
-| Privacy defaults (Children's Code), Delete everything, what leaves the phone (`PRIVACY_FLOWS`), the App Store answers (and `DPIA.md`, `APPSTORE.md`), the published privacy policy, terms and simple version, the under-13 consent lock | `notes/privacy-and-app-store.md` |
+| Privacy defaults (Children's Code), Delete everything, what leaves the phone (`PRIVACY_FLOWS`), the App Store answers (and `DPIA.md`, `APPSTORE.md`), the published privacy policy, terms and simple version, the under-13 consent lock, the D4 submit kit (checklist page, store listing, screenshots, the map-token archive stop) | `notes/privacy-and-app-store.md` |

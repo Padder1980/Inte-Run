@@ -33,3 +33,7 @@ ios/mapbox-token.txt
 # Strava API credentials — the client secret must never be committed.
 strava-secret.txt
 alfie-proxy/.dev.vars
+
+# App Store screenshots: made by tools/store-shots.mjs (and the watch simulator) whenever they are
+# needed, uploaded by hand, never committed — megabytes of pixels that a script rebuilds in a minute.
+store-shots/

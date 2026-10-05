@@ -427,3 +427,66 @@ re-breaks, all 30 caught**, each on a copy restored byte-identical (the harness 
 - **Paste the URLs into App Store Connect**: Privacy Policy `…/Inte-Run/privacy/`, Support `…/support/`.
 - **An Xcode build** for the camera wording, the `mailto` scheme and everything Y6 left waiting.
 - For another day: the watch keeping the first name; "Prefer not to say" still passing both age gates.
+
+## ✅ D4 — THE SUBMIT KIT: ONE CHECKLIST PAGE, THE STORE LISTING, THE SCREENSHOTS (2026-10-06)
+
+PLAN.md D4: "one page: done (…); not done (privacy URL from D1; screenshots iPhone 6.9"/6.5" + Watch via the
+`tools/story-shots.mjs` pattern; a support URL that leads to real contact details) … Verify: a dry-run 'Submit for
+Review' reaches the confirmation with no red fields." The privacy and support URLs were D1's. The dry run happens in
+App Store Connect under the owner's Apple account, so it is HIS — the kit stops at it (step 7 of the page).
+
+**What was built:**
+- **`docs/submit/index.html`** — the page for the day: step 0 (a fix in the app first), the Mapbox token, the server
+  deploy, the policy read, the build (a prompt for Claude), App Information, the version page, the dry run (stop
+  before "Submit to App Review" until he means it; expect one rejection), the DPIA; then "Already done". Ticks in
+  `interun-submit-checks` (this device). Fifteen Copy boxes. Left out of the app bundle (`--exclude 'submit'`).
+- **`APPSTORE.md` section 9** — the store listing, as ```` ```store-name ```` etc. blocks (name "Inte-Run: Running Coach",
+  subtitle "Intelligent Training Companion" — the tagline fits exactly, 30 — promotional text, description,
+  keywords), the version-page table, and the screenshot slots. Apple's limits read on Apple's pages 2026-10-05: name
+  and subtitle 30, promotional text 170, description 4000, keywords 100 BYTES with every keyword longer than two
+  characters (so "5km", never "5k"), no repeat of the name or company, no other apps or companies. Section 0 has the
+  D4 rows. **His decision, recommended UK only:** availability — the crisis lines and the youth limits are UK ones.
+- **`tools/store-shots.mjs`** — headless Chrome (the story-shots pattern) at 440×956 and 428×926 points ×3 = 1320×2868
+  (6.9") and 1284×2778 (6.5"). A made-up runner ("Sam": half marathon, 13 weeks, week 5 — the App Store is public and a
+  real history publishes where someone runs); earlier runs RUN THROUGH EACH SESSION'S OWN STEPS at the middle of their
+  own bands, shaped like `liveRunRecord`, linked with `linkRunTo`/`tickSession`, on a loop in Hyde Park. The clock is
+  patched to the coming SUNDAY 07:10 (`Page.addScriptToEvaluateOnNewDocument`), never more than a week ahead, so the
+  live weather is a real forecast. Six scenes: Today, the briefing, the plan, the debrief (scrolled past the map), Ask
+  Alfie (offline answer), strength. Every capture re-encoded RGBA → RGB (`pngToRgb`, Apple: "Images can't include alpha
+  channels"). Output in the git-ignored `store-shots/`.
+- **The watch shots** — the DEBUG-only `-InteRunWatchPreview <scene>` harness on the Ultra 2 simulator (IR-W49, 410×502),
+  built with the release Xcode: mid-run, pace-good, detail, home-today, hr-hero into `store-shots/watch-ultra/`, alpha
+  removed. ⚠️ The watch status bar cannot be overridden ("Status bar overrides not supported on this platform"), so the
+  clock shows the time of capture. The preview's runner was "Adam" — now "Sam", to match and keep his name off the store.
+
+**⚠️ Found under it and fixed:**
+- **CARTO's free basemap tiles ALL read "API KEY REQUIRED"** (measured 2026-10-05: every style the app uses, with or
+  without a referrer, 2–2.5 KB placeholder PNGs). A build without `ios/mapbox-token.txt` draws that on every route map —
+  and the file was not on this Mac. The embed phase now STOPS an archive (`ACTION=install`) without a `pk.` token, with
+  a plain error; a build to his phone only warns (it may hold a pasted token); `INTERUN_NO_MAP_TOKEN_OK=1` overrides.
+  The screenshots carry no maps for the same reason: the token is a live credential and no tool is handed it.
+- **The permission messages said "InteRun"** (ten on the phone, three on the watch, and the widget's visible name). Display
+  text — now "Inte-Run"; needs the next build.
+
+**Found, not changed (Road Map steps, unticked):** the Ready? check's hard-coded `watch` constant (B10's finding) is now
+step 0 of the page — a reviewer would see invented health data — and a test fails the moment it is fixed until the step
+comes off the page; interval sessions' debrief says "A run by feel — this one had no prescribed pace" (`runVerdict`'s
+`!band` branch; `paceStampFor` answers `pmix: "reps"`, pband null) and B10's briefing quotes it — why the store clock is
+Sunday's long run, not Tuesday's tempo; "4 × 10′ tempo / 2′ walk" gives an easy JOG between blocks; the web version's maps.
+
+**The guard (`test/submit-checklist.test.ts`, 11):** the encryption answer; every permission message DERIVED from the
+code (HKHealthStore, CLLocationManager, CMPedometer, PHPhotoLibrary `.readWrite`, the share sheet's Save Image, an image
+file picker's Take Photo; the watch's own) and all in the name Inte-Run; the background modes exactly what the code
+needs (`allowsBackgroundLocationUpdates`, `.playback`; `HKWorkoutSession` on the watch); both privacy files; the export
+settings; the map-token stop in make-project.py AND the regenerated project (its script is one escaped string —
+unescape `\n` and `\"` before matching); the page out of the bundle; the listing inside Apple's limits and keyword
+rules; the description's promises tied to code; every Copy box equal to APPSTORE.md word for word (notes derived as
+`test/app-store.test.ts` derives them); step 0 present exactly while the made-up numbers are; the tool's sizes Apple's,
+and `pngToRgb` turning an RGBA PNG with an Up-filtered row into RGB with the right colours. **28 of 28 re-breaks
+caught.** The page driven at 375 px in light and dark: nothing wider than the screen, every button ≥ 44 px, no text
+under 15 px.
+
+**What finishes D4 (all his, in the page's order):** the watch-numbers fix (Claude, a task is waiting); the token file;
+the Worker deploy; the policy read; the build and upload (Claude, TESTFLIGHT.md step 2 — the archive now checks the
+token); App Information and the version page in App Store Connect; the dry run; the DPIA signature. Re-run
+`node tools/store-shots.mjs` (with `docs/` served) whenever the look changes; the watch shots come from the simulator.

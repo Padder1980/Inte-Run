@@ -45,7 +45,8 @@ mkdir -p "${DST}"
 # Dev-only pages and the owner's private roadmap never ship.
 # ⚠️ Nor do the privacy policy, terms, simple version and support pages (stage D1). The app opens them
 # on GitHub Pages, so a runner always reads the version that is current, not the one this build froze.
-# Nor the TestFlight guide and tester brief (stage D2), nor the development plan: pages for people.
+# Nor the TestFlight guide and tester brief (stage D2), nor the development plan, nor the submit
+# checklist (stage D4): pages for people.
 # ⚠️ AND A PERSONAL VOICE PACK STAYS IN THE OWNER'S OWN BUILDS (his ruling, 2026-09-29, stage D2). docs/
 # voices-personal/ holds clips of the coach saying one real person's name, so it must never reach another
 # person's phone. An ARCHIVE -- every TestFlight or App Store build -- runs this phase with ACTION=install,
@@ -64,6 +65,7 @@ rsync -a --delete ${PERSONAL_EXCLUDE} \
   --exclude 'legal.css' \
   --exclude 'testflight' \
   --exclude 'plan' \
+  --exclude 'submit' \
   "${SRC}/" "${DST}/"
 echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}${PERSONAL_EXCLUDE:+, personal voice packs left out}"
 
@@ -72,8 +74,13 @@ echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}${PERSONA
 # and a Mapbox token is billable. It lives in ios/mapbox-token.txt, which is gitignored, and is copied
 # into the bundle here at build time. Same two-tier shape as the personal voice packs: the public
 # build has no key in it, the owner's build does.
-# ⚠️ Absent is the NORMAL case, not an error — a checkout without the file simply builds on the free
-# CARTO maps, which is what anyone else cloning this repo should get.
+# ⚠️ ABSENT USED TO BE THE NORMAL CASE, AND IS NOT ANY MORE (2026-10-05, stage D4). A checkout without
+# the file built on the free CARTO maps — but CARTO now answers every free tile, in every style the app
+# uses, with a grey "API KEY REQUIRED" picture (measured). So an ARCHIVE — every TestFlight and App Store
+# build, ACTION=install — STOPS without a token rather than send Apple's reviewer and every runner an app
+# whose route maps are all that picture. A build straight to the owner's phone (ACTION=build) only
+# warns: his phone may hold a token pasted in Your data › Maps. INTERUN_NO_MAP_TOKEN_OK=1 (a build
+# setting on the xcodebuild line) archives without one anyway, for a build where maps do not matter.
 # ⚠️ VALIDATE IT, DO NOT JUST COPY IT. The first version copied whatever the file held and announced
 # "embedded a Mapbox token" — and the owner, following an instruction of mine literally, had a file
 # containing the words PASTE_YOUR_TOKEN_HERE. Swift's pk. guard refused it correctly and the app fell
@@ -81,17 +88,26 @@ echo "note: embedded web app ($(du -sh "${DST}" | cut -f1)) from ${SRC}${PERSONA
 # is how someone spends an evening wondering why their maps have not changed.
 TOK="${SRCROOT}/mapbox-token.txt"
 rm -f "${DST}/mapbox-token.txt"
+MAPS_OK=0
 if [ -f "${TOK}" ]; then
   VAL=$(tr -d " \t\r\n" < "${TOK}")
   case "${VAL}" in
     pk.*) printf '%s' "${VAL}" > "${DST}/mapbox-token.txt"
+          MAPS_OK=1
           echo "note: embedded a Mapbox token — maps will use Mapbox" ;;
-    sk.*) echo "warning: ios/mapbox-token.txt holds a SECRET token (sk.). Refusing to ship it — a secret token must never go in an app. Maps will use the free CARTO styles." ;;
-    "")   echo "note: ios/mapbox-token.txt is empty — maps will use the free CARTO styles" ;;
-    *)    echo "warning: ios/mapbox-token.txt does not contain a Mapbox token (they begin with pk.). Maps will use the free CARTO styles." ;;
+    sk.*) echo "warning: ios/mapbox-token.txt holds a SECRET token (sk.). Refusing to ship it — a secret token must never go in an app." ;;
+    "")   echo "warning: ios/mapbox-token.txt is empty." ;;
+    *)    echo "warning: ios/mapbox-token.txt does not contain a Mapbox token (they begin with pk.)." ;;
   esac
 else
-  echo "note: no ios/mapbox-token.txt — maps will use the free CARTO styles"
+  echo "warning: no ios/mapbox-token.txt."
+fi
+if [ "${MAPS_OK}" != "1" ]; then
+  if [ "${ACTION:-build}" = "install" ] && [ "${INTERUN_NO_MAP_TOKEN_OK:-}" != "1" ]; then
+    echo "error: no Mapbox token, so every route map in this TestFlight / App Store build would show CARTO's API KEY REQUIRED picture. Put your Mapbox token (it begins pk.) in ios/mapbox-token.txt and archive again." >&2
+    exit 1
+  fi
+  echo "warning: maps will fall back to CARTO, whose free tiles now all read API KEY REQUIRED."
 fi
 '''
 

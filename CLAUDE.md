@@ -238,7 +238,9 @@ track (`interun_realign_v1`). The same day a pause began picking up where you le
 (2026-10-05):** the training dials (`volGrowth`, `hardDays`, `longMax`; the long-run picker offers only
 `RC.longRunRangeFor().choices`, each asked of the engine). **B9 is built (2026-10-05):** plans saved for later and Up
 next (`interun_queue_v1`), one start path for every stored plan (`adoptProf` → `recompute({ newPlan: true })`), and
-after race day Today asks what next (`interun_handover_v1`). Next is B10. `PLAN.md` holds the full list and the Road Map is the live
+after race day Today asks what next (`interun_handover_v1`). **B10 is built (2026-10-05):** a briefing on a run's sheet
+today or tomorrow and an insight on a run's page after thumbs up/down, both rule-based from fact packs
+(`briefingFacts`, `insightFacts`; `interun_brief_v1`). Next is B11 (the same packs, expanded by AI through the Worker). `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -275,4 +277,5 @@ status; update both when a stage lands.
 | Strength A5–A8: the guided player and rest timer, e1RM and records, programmes, Strava weight training | `notes/strength-a5-a8.md` |
 | The 12–17 programme: the safety step, goal and plan ceilings, youth strength, Strava's age rules (and `YOUTH.md`) | `notes/youth-programme.md` |
 | Adding a run by hand (`saveManualRun`, the third commit point), linking a run to its session (`interun_link_v1`, the seedDone replay), best times (`src/progress/records.ts`), Done for today | `notes/manual-runs-and-records.md` |
+| Briefings and insights (B10): the fact packs (`briefingFacts`, `insightFacts`), the rule-based text, the thumbs (`run.react`), the cache (`interun_brief_v1`) — the ground B11's AI builds on | `notes/briefings-and-insights.md` |
 | Privacy defaults (Children's Code), Delete everything, what leaves the phone (`PRIVACY_FLOWS`), the App Store answers (and `DPIA.md`, `APPSTORE.md`), the published privacy policy, terms and simple version, the under-13 consent lock | `notes/privacy-and-app-store.md` |

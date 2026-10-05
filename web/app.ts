@@ -351,6 +351,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .fuel-card.reh { background: color-mix(in srgb, var(--peak) 10%, var(--surface-2)); border-color: color-mix(in srgb, var(--peak) 32%, var(--line)); }
 .fuel-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
 .fuel-h svg { width: 17px; height: 17px; flex: none; color: var(--peak); }
+/* B10: the briefing on a run's sheet, under its chips. The coach's voice, so it wears the Alfie mark. */
+.sd-brief { margin: var(--s3) 0 var(--s1); padding: var(--s3); border-radius: var(--r-card); background: var(--surface-2); border: 1px solid var(--line); }
+.sd-brief-h { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-body); font-weight: 700; color: var(--ink); }
+.sd-brief-h svg { width: 17px; height: 17px; flex: none; color: var(--accent); }
+.sd-brief p { margin: var(--s2) 0 0; font-size: var(--t-body); line-height: 1.5; color: var(--ink-soft); }
+/* B10: how a run felt (thumbs), and the insight that follows the answer. */
+.rd-react { flex-direction: column; align-items: stretch; }
+.rd-react .seg { display: flex; flex-wrap: nowrap; width: 100%; }
+.rd-react > span { align-self: flex-start; }
+.rd-react .seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--s1); min-height: 44px; }
+.rd-react svg { width: 16px; height: 16px; flex: none; }
+.rd-react-n { margin: var(--s2) 0 0; font-size: var(--t-label); color: var(--ink-faint); }
+.rd-insight p { margin: var(--s3) 0 0; font-size: var(--t-card); line-height: 1.5; color: var(--ink-soft); }
 .fuel-l { margin: 9px 0 0; padding-left: 18px; }
 .fuel-l li { font-size: 12.8px; line-height: 1.55; color: var(--ink-soft); margin-bottom: 6px; }
 .fuel-l li:last-child { margin-bottom: 0; }
@@ -6319,6 +6332,9 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
   cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/><circle cx="8" cy="14" r=".6" fill="currentColor"/><circle cx="12" cy="14" r=".6" fill="currentColor"/><circle cx="16" cy="14" r=".6" fill="currentColor"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  /* B10: how a run felt. Drawn here on the 24-unit grid, a cuff and a hand; the down thumb is the same turned over. */
+  thumbUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5h3v10h-3z"/><path d="M6.5 11l3.6-6.6a1.8 1.8 0 0 1 3.3 1.3l-.8 4.3h5.1a2 2 0 0 1 2 2.4l-1.3 6.3a2 2 0 0 1-2 1.6H6.5"/></svg>',
+  thumbDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="rotate(180 12 12)"><path d="M3.5 10.5h3v10h-3z"/><path d="M6.5 11l3.6-6.6a1.8 1.8 0 0 1 3.3 1.3l-.8 4.3h5.1a2 2 0 0 1 2 2.4l-1.3 6.3a2 2 0 0 1-2 1.6H6.5"/></g></svg>',
   wxSun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>',
   wxCloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 0 1 .5-8 5.5 5.5 0 0 1 10.5 1.5A3.5 3.5 0 0 1 17.5 18z"/></svg>',
   wxWind: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h11a2.5 2.5 0 1 0-2.5-2.5M3 14h15a2.5 2.5 0 1 1-2.5 2.5M3 12h6"/></svg>',
@@ -6517,6 +6533,13 @@ const LINK_KEY = "interun_link_v1";
  * when its session can no longer be anywhere ahead.
  */
 const TIME_KEY = "interun_time_v1";
+/**
+ * Stage B10. The briefing and insight text, keyed "b|<session id>|<date>" and "i|<run id>": { sig, paras, src, at }.
+ * sig is the fact pack it was written from, so the same pack never reads differently from one opening to the next and
+ * a changed pack (a forecast, a readiness answer) writes afresh; src is "rule" here, and B11's AI text lands beside it.
+ * Pruned in seedDone by date and by run — never by the plan.
+ */
+const BRIEF_KEY = "interun_brief_v1";
 /**
  * Stage B5. The break the runner has just come back from, and their answer to "how quickly do you want to
  * build back up?": { id, kind, mode, from, to, days, answer, answeredIso }. Written by reentryCapture the
@@ -9204,6 +9227,20 @@ function seedDone() {
     Object.keys(times).forEach((sid) => { const e = times[sid]; if (!e || !e.iso || e.iso < cut) { delete times[sid]; gone = true; } });
     if (gone) saveTimes(times);
   } catch (e) { try { console.warn("session time prune skipped", e); } catch (e2) {} }
+  // ⚠️ B10: THE BRIEFING CACHE IS PRUNED BY DATE AND BY RUN — a briefing once its day has gone, an insight once its run
+  // has left the store (the 50-run cap). Never by the plan: nothing in it is the plan's.
+  try {
+    const m = loadBriefs();
+    const today = todayIso();
+    const runIds = {};
+    (state.logged || []).forEach((r) => { if (r && r.id) runIds[r.id] = 1; });
+    let gone = false;
+    Object.keys(m).forEach((k) => {
+      const p = k.split("|");
+      if ((p[0] === "b" && !(p[2] >= today)) || (p[0] === "i" && !runIds[p[1]]) || (p[0] !== "b" && p[0] !== "i")) { delete m[k]; gone = true; }
+    });
+    if (gone) saveBriefs(m);
+  } catch (e) { try { console.warn("briefing cache prune skipped", e); } catch (e2) {} }
 }
 
 // ---- helpers --------------------------------------------------------------
@@ -14042,18 +14079,21 @@ function warmupHtml(sess) {
       (w.embedded ? "" : ' <span class="wu-min num">' + w.totalMinutes + ' min</span>') + '</div>' +
     '<div class="wu-why">' + esc(w.why) + '</div>' + rowsH + (w.embedded ? "" : delay + check) + notes + '</div>';
 }
-function fuelHtml(sess) {
-  if (!sess || !sess.steps) return "";
+/** A session's fuelling plan, asked of the engine ONCE — the card below and the briefing (B10) read the same answer. */
+function sessionFuelling(sess) {
+  if (!sess || !sess.steps) return null;
   const mins = Math.round(sess.estimatedDurationSeconds / 60);
   // A block of 10+ minutes at RPE 4+ is race-pace work — the same content test buildWeek uses to
   // decide whether a long run counts as a key day. Never keyed off the title.
   const racePace = (sess.steps || []).some((st) =>
     st.targetRpe && st.targetRpe.min >= 4 && (st.durationSeconds || 0) >= 600);
-  let f;
   try {
-    f = RC.fuellingFor({ durationMinutes: mins, raceDistance: sess.type === "race" ? raceKeyOf(sess) : profile.goalDist, sessionType: sess.type, hasRacePaceWork: racePace });
-  } catch (e) { return ""; }
-  if (!f.needed) return "";
+    return RC.fuellingFor({ durationMinutes: mins, raceDistance: sess.type === "race" ? raceKeyOf(sess) : profile.goalDist, sessionType: sess.type, hasRacePaceWork: racePace });
+  } catch (e) { return null; }
+}
+function fuelHtml(sess) {
+  const f = sessionFuelling(sess);
+  if (!f || !f.needed) return "";
   return '<div class="fuel-card' + (f.rehearsal ? " reh" : "") + '">' +
     '<div class="fuel-h">' + ICON.fuel + '<span>' + esc(f.headline) + '</span></div>' +
     '<ul class="fuel-l">' + f.points.map((pt) => "<li>" + pt + "</li>").join("") + '</ul>' +
@@ -14073,7 +14113,7 @@ function fuelHtml(sess) {
 function sessionStages(sess, sc) {
   const all = warmupCardFor(sess) ? sess.steps.filter((st) => st.kind !== "warmup") : sess.steps;
   const cool = all.filter((st) => st.kind === "cooldown");
-  const main = all.filter((st) => st.kind !== "cooldown");
+  const main = mainSetSteps(sess);
   const mins = (list) => Math.round(list.reduce((a, st) => a + stepSecs(st), 0) / 60);
   const rowsFor = (list) => structureRows(list).map((r) =>
     '<div class="sd-step"><div class="sd-dot" style="background:' + (r.muted ? "var(--ink-faint)" : sc) + '"></div>' +
@@ -14119,10 +14159,12 @@ function sessionStages(sess, sc) {
     stage(3, "Cool down", "Easy until your breathing settles", cool, false, "var(--eff-easy)");
 }
 /** One line describing the work, so a collapsed stage still says what it is. */
+/** The step that IS the work in a main set without repetitions: the longest. One definition (mainSubtitle, B10). */
+function longestStep(list) { return list.slice().sort((a, b) => stepSecs(b) - stepSecs(a))[0]; }
 function mainSubtitle(list) {
   const reps = list.filter((st) => st.kind === "rep").length;
   if (reps > 1) return reps + " repetitions with recoveries";
-  const longest = list.slice().sort((a, b) => stepSecs(b) - stepSecs(a))[0];
+  const longest = longestStep(list);
   return longest && longest.label ? String(longest.label).split(" — ")[0].slice(0, 60) : "The work";
 }
 /**
@@ -14147,6 +14189,151 @@ function whyThisSession(sess) {
     '<span class="sd-whya">' + esc(WHY_SHORT[sess.type] || "What it is for") + '</span>' +
     '<span class="sd-chev" aria-hidden="true">\u203A</span></summary>' +
     '<div class="sd-whyb">' + esc(sess.description) + '</div></details>';
+}
+/**
+ * B10 — THE STEPS THE SHEET CALLS THE MAIN SET: everything but the cool-down, and but the session's own warm-up when a
+ * generated one stands in for it. One definition, read by the stages and by the briefing.
+ */
+function mainSetSteps(sess) {
+  const all = warmupCardFor(sess) ? sess.steps.filter((st) => st.kind !== "warmup") : sess.steps;
+  return all.filter((st) => st.kind !== "cooldown");
+}
+/**
+ * B10 — the runner's most recent run of this session type before a date, by its own date: state.logged is held
+ * newest-first by INSERTION, not by date (a run added by hand is slotted in). A simulated run is not the runner's.
+ */
+function lastRunOfType(type, beforeIso) {
+  let best = null;
+  for (const r of state.logged || []) {
+    if (!r || r.sim || r.type !== type || !r.dateIso || r.dateIso >= beforeIso) continue;
+    if (!best || r.dateIso > best.dateIso) best = r;
+  }
+  return best;
+}
+/** Bumped when the wording of the rule-based text changes, so a cached paragraph is written again in the new words. */
+const BRIEF_TEXT_V = 1;
+function loadBriefs() {
+  try { const v = JSON.parse(localStorage.getItem(BRIEF_KEY) || "{}"); return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; }
+  catch (e) { return {}; }
+}
+function saveBriefs(m) { try { Object.keys(m).length ? localStorage.setItem(BRIEF_KEY, JSON.stringify(m)) : localStorage.removeItem(BRIEF_KEY); } catch (e) {} }
+/**
+ * The paragraphs for a fact pack: from the cache while the pack has not moved, else written by the rule and kept.
+ * ⚠️ KEYED ON THE PACK ITSELF, so a briefing never reads differently between two openings of one sheet, and a new
+ * forecast or a readiness answer is a new pack and new words.
+ */
+function briefText(key, facts, write) {
+  const sig = BRIEF_TEXT_V + "|" + JSON.stringify(facts);
+  const m = loadBriefs();
+  const e = m[key];
+  if (e && e.sig === sig && Array.isArray(e.paras) && e.paras.length) return e.paras;
+  const paras = write(facts);
+  m[key] = { sig: sig, paras: paras, src: "rule", at: todayIso() };
+  saveBriefs(m);
+  return paras;
+}
+/**
+ * B10 — A SESSION'S BRIEFING FACTS (PLAN.md: "briefingFacts(sess, iso) from existing sources only"). Every value is
+ * read, never worked out again: the chips' own numbers (handed in by sessionSheetHtml), the main set's plain row
+ * (structureRows, the text stored with every logged run), the session's purpose (WHY_SHORT), the plan week, the
+ * fuelling plan (sessionFuelling), today's heat (heatOffer, today only — the forecast is today's), this morning's
+ * readiness through the engine the Ready? sheet reads, and the last run of the same type through its own debrief
+ * (runVerdict). ⚠️ DISPLAY-READY: the text only joins these, so every number it prints is in here — and B11's AI is
+ * held to exactly these numbers.
+ */
+function briefingFacts(sess, iso, week, shown) {
+  const today = todayIso();
+  const title = String(sess.title || "");
+  // The distance only where the title does not already say it ("7 km moderate run, 44 minutes, 7 km" said it twice).
+  const f = { kind: "briefing", when: iso === today ? "Today" : "Tomorrow", type: sess.type, title: title,
+    focus: WHY_SHORT[sess.type] || "",
+    length: shown.durMin + " minutes" + (shown.dist && title.indexOf(shown.dist) < 0 ? ", " + shown.dist : "") };
+  if (shown.rpe && shown.rpe.min != null) f.effort = "RPE " + shown.rpe.min + "–" + shown.rpe.max;
+  // The work as the sheet's own rows say it: repetitions by their row (structureRows, the text stored with every logged
+  // run) and their target (stepTargetText, the steps' own); a steady run by its longest step's target.
+  const main = mainSetSteps(sess);
+  const work = structureRows(main, true).find((r) => r.tag === "Work");
+  const repStep = main.find((st) => st.kind === "rep");
+  if (work && repStep) f.main = { reps: String(work.lab || ""), target: stepTargetText(repStep), between: String(work.rec || "") };
+  else if (main.length) { const st = longestStep(main); if (st && stepTargetText(st)) f.main = { steady: stepTargetText(st) }; }
+  const wk = weekByNo(week);
+  if (wk && wk.index) f.week = { n: wk.index, of: PLAN.weeks.length, phase: PHASE_NAME[wk.phase] || "", easier: !!wk.isDeload };
+  if (shown.wuMin > 0) f.warmup = shown.wuMin + " minutes";
+  const fuel = sessionFuelling(sess);
+  if (fuel && fuel.needed && fuel.headline) f.fuel = String(fuel.headline);
+  if (iso === today) {
+    const h = heatOffer(sess);
+    if (h) f.heat = { upTo: fmtTemp(h.row.tempC, true), harder: h.pct + "%" };
+    // ⚠️ ONLY A FRESH ANSWER IS AN ANSWER: state.subj ships with defaults, and an answer from yesterday is not today's.
+    if (state.subjAnswered && state.subjAt && Date.now() - state.subjAt < 12 * 3600e3) {
+      const r = RC.assessReadiness(readinessInput());
+      f.ready = { score: readinessScore() + " out of 5", band: r.band, advice: String(r.recommendation || "") };
+    }
+  }
+  const last = lastRunOfType(sess.type, iso);
+  if (last) {
+    const v = runVerdict(last, runAnalysis(last));
+    f.last = { day: runDateLabelIso(last.dateIso), verdict: v.headline, state: v.state,
+      felt: last.rpe ? last.rpe + " out of 10" : "", planned: last.rband ? last.rband.min + "–" + last.rband.max : "" };
+  }
+  return f;
+}
+/**
+ * B10 — THE BRIEFING IN WORDS, from its facts alone: no lookups, no arithmetic, nothing the pack does not say — a
+ * template, like debriefParagraphs. Short on purpose: what it is for, the work, where it sits in the plan, what last
+ * time says about this time, what to do before it, and today's conditions.
+ */
+function briefingText(f) {
+  const p = [];
+  const aim = f.type === "race" ? "Race day." : f.focus ? "The aim: " + f.focus.charAt(0).toLowerCase() + f.focus.slice(1) + "." : "";
+  // ⚠️ A RUNNER WHO SAYS THEY SHOULD REST HEARS THAT AND NOTHING ELSE — a warm-up and a fuelling line under "rest
+  // today" would contradict the advice the Ready? sheet has just given them.
+  if (f.ready && f.ready.band === "rest") {
+    p.push(f.when + ": " + f.title + ".");
+    p.push("This morning you rated yourself " + f.ready.score + ". " + f.ready.advice);
+    return p;
+  }
+  // The effort is said once: with the work when there is a target to say it with, else on the first line.
+  p.push(f.when + ": " + f.title + ", " + f.length + (f.effort && !f.main ? " (" + f.effort + ")" : "") + ". " + aim);
+  const tgt = (t) => String(t).split(" · ").join(", ");
+  if (f.main && f.main.reps) {
+    p.push("The main set: " + f.main.reps + (f.main.target ? " at " + tgt(f.main.target) : "") +
+      (f.main.between ? ", " + f.main.between : "") + ".");
+  } else if (f.main && f.main.steady) {
+    p.push("Keep it at " + tgt(f.main.steady) + ".");
+  }
+  if (f.week) {
+    p.push("It is week " + f.week.n + " of " + f.week.of + (f.week.easier ? ", an easier week" : f.week.phase ? ", in the " + f.week.phase.toLowerCase() + " phase" : "") + ".");
+  }
+  if (f.last) {
+    let then = "Last time, on " + f.last.day + ", your debrief said: " + f.last.verdict + ".";
+    if (f.last.felt && f.last.planned) then += " You rated it " + f.last.felt + ", against a planned " + f.last.planned + ".";
+    if (f.last.verdict === "Quicker than the brief") then += " This time, hold back to the target from the start.";
+    else if (f.last.verdict === "On pace, but it cost you") then += " Start at the easier end and see if it feels more controlled.";
+    else if (f.last.state === "achieved") then += " Aim to run it the same way.";
+    else if (f.last.state === "partial") then += " Settle into the target early.";
+    p.push(then);
+  }
+  const before = [];
+  if (f.warmup) before.push("warm up for " + f.warmup + " first (it is in the steps)");
+  if (f.fuel) before.push(f.fuel.charAt(0).toLowerCase() + f.fuel.slice(1).replace(/\\.$/, ""));
+  if (before.length) p.push("Before you go: " + before.join("; and ") + ".");
+  if (f.heat) p.push("It could reach " + f.heat.upTo + " before you run, about " + f.heat.harder + " harder at these paces: the heat note below can adjust them.");
+  if (f.ready) p.push("This morning you rated yourself " + f.ready.score + ". " + f.ready.advice);
+  return p;
+}
+/** B10 — the card on a run's sheet, today or tomorrow. A runnable session the plan holds; never strength or rest. */
+function briefingCardHtml(sess, iso, week, shown) {
+  const today = todayIso();
+  if (!PRIMARY_TYPES[sess.type] || !iso || iso < today || iso > isoAdd(today, 1).toISOString().slice(0, 10)) return "";
+  let facts, paras;
+  try { facts = briefingFacts(sess, iso, week, shown); paras = briefText("b|" + sess.id + "|" + iso, facts, briefingText); }
+  catch (e) { try { console.warn("briefing skipped", e); } catch (e2) {} return ""; }
+  // ⚠️ A BRIEFING THAT QUOTES THE FORECAST CARRIES OPEN-METEO'S CREDIT, as every forecast on screen does (their licence;
+  // test/app-store.test.ts). briefingFacts only formats the temperature; this card is where it is shown.
+  return '<div class="sd-brief"><div class="sd-brief-h">' + ICON.alfie + '<span>Your briefing</span></div>' +
+    paras.map((x) => '<p>' + esc(x) + '</p>').join("") +
+    (facts.heat ? '<p class="wx-credit-row">' + wxCreditHtml() + '</p>' : "") + '</div>';
 }
 function sessionSheetHtml(sess, week) {
   // ⚠️ THE ONE CHOKE POINT — every current and future consumer of this sheet reads sess.exercises
@@ -14180,9 +14367,11 @@ function sessionSheetHtml(sess, week) {
   const dist = sess.estimatedDistanceMeters ? (Math.round(sess.estimatedDistanceMeters / 100) / 10) + " km" : null;
   const chips = ['<span class="chip">' + dur + "′" + (dist ? " · " + dist : "") + "</span>"];
   // Same rule: quote the warm-up the runner is given, not the engine's rounded estimate of it.
-  if (extra > 0) chips.push('<span class="chip">incl. ' + Math.round(((live.steps || [])
+  // B10: worked out once here, and the briefing quotes this same number.
+  const wuMin = extra > 0 ? Math.round(((live.steps || [])
     .filter((st) => st.kind === "warmup")
-    .reduce((a, st) => a + (st.durationSeconds || 0), 0)) / 60) + "′ warm-up</span>");
+    .reduce((a, st) => a + (st.durationSeconds || 0), 0)) / 60) : 0;
+  if (wuMin > 0) chips.push('<span class="chip">incl. ' + wuMin + "′ warm-up</span>");
   if (sess.targetRpe) chips.push('<span class="chip rpe">RPE ' + sess.targetRpe.min + "–" + sess.targetRpe.max + "</span>");
   let body;
   if (sess.exercises && sess.exercises.length) {
@@ -14241,6 +14430,8 @@ function sessionSheetHtml(sess, week) {
   return '<div class="sd-type" style="--sc:' + sc + '">' + (SESSION_LABEL[sess.type] || sess.type) + '</div>' +
     '<div class="sd-title">' + esc(sess.title) + '</div>' +
     '<div class="sd-chips">' + chips.join("") + '</div>' +
+    // B10: the briefing, for a run today or tomorrow, under the numbers it talks about and above the steps.
+    briefingCardHtml(sess, sIso, week, { durMin: dur, dist: dist, wuMin: wuMin, rpe: sess.targetRpe }) +
     // ⚠️ ABOVE THE STEPS, BECAUSE IT EXPLAINS THEM. openSessionSheet has already run heatApplied, so
     // every band below this line is the adapted one — the block is the only thing on the card that
     // says why. Put it under the steps and the runner reads a set of numbers they cannot account for
@@ -18258,6 +18449,8 @@ function viewRunDetail() {
       rdVerdictHtml(run, a, v) +
       rdEvidenceHtml(run, a, v) +
       rdPlanHtml(run, a) +
+      // B10: how it felt, and — once answered — the insight.
+      rdReactHtml(run, a, v) +
       rdNextHtml(run) +
       rdKeyStatsHtml(run) +
       rdAnalysisHtml(run, a) +
@@ -33140,6 +33333,80 @@ function rdPlanHtml(run, a) {
       unlink +
     '</div>';
 }
+/**
+ * B10 — A RUN'S INSIGHT FACTS (PLAN.md: "insightFacts(run) from runAnalysis, runVerdict, debriefParagraphs,
+ * runEvidenceConfidence, RPE, alfieNextSession, logTotals"). ⚠️ THE SAME a AND v THE PAGE ABOVE IS DRAWN FROM, handed
+ * in rather than worked out again, so the insight cannot disagree with the debrief it sits under; the confidence is
+ * runAnalysis's own (runEvidenceConfidence, never recomputed). Display-ready, for the text and for B11.
+ */
+function insightFacts(run, a, v) {
+  const today = todayIso();
+  const f = { kind: "insight", react: run.react, day: runDateLabelIso(run.dateIso), verdict: v.headline, state: v.state,
+    confidence: a.confidence || "", pain: run.pain === true, manual: !!run.manual };
+  const read = debriefParagraphs(run, a);
+  if (read && read[0]) f.read = String(read[0]);
+  else if (a.band && a.n) f.inBand = { km: a.inBand, of: a.n };
+  if (run.rpe && a.rband) f.effort = { felt: run.rpe + " out of 10", planned: a.rband.min + "–" + a.rband.max, over: run.rpe > a.rband.max };
+  const mon = isoAdd(run.dateIso, -((isoAdd(run.dateIso, 0).getUTCDay() + 6) % 7)).toISOString().slice(0, 10);
+  const t = logTotals(mon, run.dateIso);
+  if (t && t.runs) f.week = { runs: t.runs, km: (Math.round(t.km * 10) / 10).toFixed(1), current: mon === isoAdd(today, -((isoAdd(today, 0).getUTCDay() + 6) % 7)).toISOString().slice(0, 10) };
+  // What is next is today's next session, so it is said only after a run from today or yesterday.
+  if (run.dateIso >= isoAdd(today, -1).toISOString().slice(0, 10)) {
+    const nx = alfieNextSession();
+    if (nx && nx.list && nx.list[0]) f.next = { title: String(nx.list[0].title || ""), day: runDateLabelIso(nx.iso) };
+  }
+  return f;
+}
+/** B10 — the insight in words, from its facts alone (a template, like debriefParagraphs). Hedged; it never diagnoses. */
+function insightText(f) {
+  const p = [];
+  // ⚠️ SOMETHING HURT: the debrief above already puts it first, and nothing here talks past it.
+  if (f.pain) {
+    p.push("You said something hurt, so that comes first in your debrief above. Thanks for telling us.");
+    return p;
+  }
+  const good = f.react === "up";
+  if (f.state === "achieved") p.push(good ? "Good, and the numbers agree: " + f.verdict + "." : "It felt hard, but the work was done: " + f.verdict + ".");
+  else if (f.state === "insufficientData") p.push(good ? "Glad it felt good." : "A tough one.");
+  else p.push((good ? "Glad it felt good. " : "A tough one. ") + "Your debrief says: " + f.verdict + ".");
+  if (f.read) p.push(f.read);
+  else if (f.inBand) p.push(f.inBand.km + " of " + f.inBand.of + " kilometres were in the target.");
+  // The effort, unless the debrief's own paragraph quoted above already says it.
+  if (f.effort && !(f.read && f.read.indexOf("You rated it") >= 0)) p.push("You rated it " + f.effort.felt + ", against a planned " + f.effort.planned + ".");
+  if (f.confidence === "low" && !f.manual) p.push("Only part of this run was measured, so read the numbers lightly.");
+  if (f.week) p.push((f.week.current ? "That makes " : "That made ") + f.week.runs + (f.week.runs === 1 ? " run" : " runs") + " and " + f.week.km + " km " + (f.week.current ? "this week." : "that week."));
+  if (f.next) {
+    let nx = "Next: " + f.next.title + ", " + f.next.day + ".";
+    if (!good || (f.effort && f.effort.over)) nx += " If your legs still feel heavy by then, keep to the easier end of each target.";
+    p.push(nx);
+  }
+  return p;
+}
+/**
+ * B10 — HOW DID THAT RUN FEEL? Thumbs up or down, saved on the run (run.react), and the insight renders AFTER the
+ * answer (PLAN.md) — an offer, never text the runner did not ask for. Runs only: this page is never a strength one.
+ */
+function rdReactHtml(run, a, v) {
+  const r = run.react === "up" || run.react === "down" ? run.react : "";
+  const btn = (val, icon, label) => '<button data-react="' + val + '"' + (r === val ? ' class="on"' : "") +
+    ' aria-pressed="' + (r === val ? "true" : "false") + '">' + icon + '<span>' + label + '</span></button>';
+  const ask = '<div class="zr-auto rd-react"><span>How did that run feel?</span>' +
+    '<div class="seg">' + btn("up", ICON.thumbUp, "Good") + btn("down", ICON.thumbDown, "Tough") + '</div></div>';
+  if (!r) return '<h2 class="rd-sec">Your insight</h2>' + ask +
+    '<p class="rd-react-n">Tell us, and your coach will put this run in context.</p>';
+  let paras;
+  try { paras = briefText("i|" + run.id, insightFacts(run, a, v), insightText); }
+  catch (e) { try { console.warn("insight skipped", e); } catch (e2) {} paras = []; }
+  return '<h2 class="rd-sec">Your insight</h2>' + ask +
+    '<div class="rd-insight">' + paras.map((x) => '<p>' + esc(x) + '</p>').join("") + '</div>';
+}
+/** The thumbs, from the run's page. Saved on the run and shown; nothing else changes. */
+function setRunReact(val) {
+  if (state.screen !== "runview" || (val !== "up" && val !== "down")) return;
+  const run = viewedRun();
+  if (!run) return;
+  run.react = val; saveRuns(); render();
+}
 function rdNextHtml(run) {
   // ⚠️ ONE primary coaching action, and it must be a thing the app can genuinely do. "View next run"
   // opens the next session in the plan; the app cannot compose a new one from here, so it does not
@@ -44246,6 +44513,8 @@ function wire() {
   // adaptive check on unchanged evidence and could raise a banner the runner's tap had nothing to do
   // with. Discomfort reaches the coaching through runVerdict's own precedence, which is where the pack
   // put it.
+  // B10: the thumbs on a run's page, and nothing but the run's own reaction is written.
+  document.querySelectorAll("[data-react]").forEach((b) => b.onclick = () => setRunReact(b.dataset.react));
   document.querySelectorAll("[data-pain]").forEach((c) => c.onclick = () => {
     const val = c.dataset.pain === "1";
     if (state.screen === "runview") {

@@ -305,6 +305,8 @@ test("BLOCKER: the weather credit is Open-Meteo's own wording, and every forecas
     conditionsSquare: "a button -- the credit sits under the tiles in viewToday instead",
     heatChipHtml: "a button -- viewToday's credit line also covers it",
     unitsView: "example temperatures, not Open-Meteo's data",
+    // B10: a fact pack, not markup — briefingCardHtml shows the credit under any briefing that quotes the forecast.
+    briefingFacts: "facts, not markup -- briefingCardHtml prints the credit whenever the briefing quotes a forecast",
   };
   const printers = [...PAGE.matchAll(/\nfunction (\w+)\(/g)].map((m) => m[1]!).filter((n) => n !== "fmtTemp" && fnOf(n).includes("fmtTemp("));
   assert.ok(printers.length >= 5, "the temperature sweep found almost nothing, so it proves nothing: " + printers.join(", "));
@@ -315,6 +317,8 @@ test("BLOCKER: the weather credit is Open-Meteo's own wording, and every forecas
   const today = fnOf("viewToday");
   assert.match(today, /\(activeWeather\(\)\.live \|\| heatChoice\(conditionsSession\(\)\) \? '<p class="wx-credit-row">' \+ wxCreditHtml\(\)/,
     "Today's credit line no longer follows the live forecast and the heat chip it covers");
+  assert.match(fnOf("briefingCardHtml"), /\(facts\.heat \? '<p class="wx-credit-row">' \+ wxCreditHtml\(\) \+ '<\/p>' : ""\)/,
+    "the briefing quotes the forecast without the credit");
   const heat = fnOf("heatBlockHtml");
   assert.ok((heat.match(/, true\);/g) || []).length >= 2 && heat.includes(", w.live);"), "the heat advice's forecast states do not all carry the credit");
   assert.ok(DOC.includes("Weather data by Open-Meteo.com"), "APPSTORE.md's content-rights answer does not record the credit");

@@ -84,7 +84,7 @@ function fixture() {
 const FNS = ["isoAdd", "todayIso", "dmon", "runDateLabelIso", "esc", "genDay", "effDay", "ovTo", "ovFrom", "doneKey",
   "rawSessionDone", "loadLinks", "saveLinks", "planSessionRef", "linkedRunFor", "loadAdjust", "saveAdjust", "adjPhrase",
   "adjustFor", "weekSkips", "adjDrops", "applyAdjustments", "eased", "weekAdjust", "weekAdjustNote", "plannedBreaksHtml", "bRaceAhead",
-  "skipOfferable", "skipSession", "cancelAdjust", "todayDecision", "sessionEffort", "effortVar",
+  "skipOfferable", "skipSession", "cancelAdjust", "todayDecision", "racePassed", "sessionEffort", "effortVar",
   "loadTimes", "hmValid", "sessionTimeAt", "legacySid", "sidKeys", "weekMoves", "xwDir",
   // B5: saveAdjust records a break that has just ended before its prune can drop it.
   "reentryCapture", "loadReentry", "saveReentry"];

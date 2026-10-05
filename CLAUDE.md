@@ -135,6 +135,8 @@ node --test            # the suite (about 1,800 tests)
 
 - **Never assign `PLAN` from an `applyProfile()` result by hand — call `adoptPlan(out)`** (it snaps weeks to
   Mondays and resyncs iOS reminders and the watch). `applyProfile` is pure; `adoptPlan` and `recompute` commit.
+  A plan started from stored answers goes through `adoptProf`; a NEW plan passes `{ newPlan: true }`, or the plan
+  history treats it as the same plan (B9: pauses and date edits are the same plan; only a new goal is new by itself).
 - **`PLAN.weeks` is a display summary with no steps, exercises or pace bands; the prescription is
   `RAW.weeks`** (`rawSessionsForIso()`). Reading the wrong one fails silently.
 - **The block starts at `profile.startDateIso`, as it is** (`planStartIso` — never clamped to today, or the runner
@@ -234,7 +236,9 @@ it began (`notes/plan-profile.md`). **B6 is built (2026-10-04):** missed runs or
 track (`interun_realign_v1`). The same day a pause began picking up where you left off (`blockFromIso`). **B7 is built
 (2026-10-04):** a B-race (`profile.bRace` → `GenerateOptions.secondaryRace`, shaped after the volume fit). **B8 is built
 (2026-10-05):** the training dials (`volGrowth`, `hardDays`, `longMax`; the long-run picker offers only
-`RC.longRunRangeFor().choices`, each asked of the engine). Next is B9. `PLAN.md` holds the full list and the Road Map is the live
+`RC.longRunRangeFor().choices`, each asked of the engine). **B9 is built (2026-10-05):** plans saved for later and Up
+next (`interun_queue_v1`), one start path for every stored plan (`adoptProf` → `recompute({ newPlan: true })`), and
+after race day Today asks what next (`interun_handover_v1`). Next is B10. `PLAN.md` holds the full list and the Road Map is the live
 status; update both when a stage lands.
 
 ## Notes index — read the file for the area before changing it
@@ -252,7 +256,7 @@ status; update both when a stage lands.
 | The coaching-book (Hudson) work: hill sprints, honest RPE bands, block lengths (`MAX_STRUCTURED_WEEKS`), two hard days, beginner quality, the no-recovery-week tier | `notes/plan-coaching-book.md` |
 | Profile answers → plan: `applyProfile`, status and experience, stated volume, age and max HR, running-day choices, `profileImpact`, the plan that never gets harder (the rebuild from today), the training dials (B8: growth, hard days, the long-run limit) | `notes/plan-profile.md` |
 | The weekly review, "Make a week easier", the ease offer, the plan-rebuild moment, coming back after time off (B5), getting back on track after missed runs (B6) | `notes/plan-adaptation.md` |
-| Manage plan: pause, holiday / not 100%, skip one session (B2), a session's time of day (B3), move a session a week (B4) and session ids that name their calendar week, a pause that picks up where you left off (`blockFromIso`), week marking, plan history, move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
+| Manage plan: pause, holiday / not 100%, skip one session (B2), a session's time of day (B3), move a session a week (B4) and session ids that name their calendar week, a pause that picks up where you left off (`blockFromIso`), week marking, plan history, Your plans and the plan queue, starting a stored plan (`adoptProf`), after race day (B9), move a workout (calendar drag), the menu's colours | `notes/manage-plan.md` |
 | The native iPhone app: WebHost, the over-the-air web layer, the keyboard pan, viewport and status bar, installing, TestFlight, the toolchain, Apple Health | `notes/ios-native.md` |
 | The Apple Watch app: payload, companion, mirroring, Live Activities, starting runs from the phone, the watch redesign | `notes/watch.md` |
 | The 2026-08-21 watch batch: the companion screen, pace derivation, cadence, count-in beats, wrist controls | `notes/watch-batch.md` |

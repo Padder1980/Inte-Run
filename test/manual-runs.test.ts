@@ -68,7 +68,7 @@ const FNS = [
   "tickSession", "plannedSessionIso", "linkedRunFor", "untickSession", "addRunTypeLabel", "dayGap", "linkCandidatesFor",
   "linkCandidateLabel", "buildManualRun", "saveManualRun", "saveRuns", "loadHist", "saveHist", "runOriginOf", "syncHist",
   "histForget", "runBestRows", "runBestToast", "flagObservations", "runWorkPace", "impliedRecentFromRun", "plannedRpeBandOf",
-  "deleteRun", "linkExistingRun", "unlinkExistingRun", "seedDone", "todayDecision", "runVerdict", "perfBestsHtml",
+  "deleteRun", "linkExistingRun", "unlinkExistingRun", "seedDone", "todayDecision", "racePassed", "runVerdict", "perfBestsHtml",
   "commBests", "clubPbText",
   // B3: todayDecision reads a session's time through these.
   "loadTimes", "hmValid", "sessionTimeAt",

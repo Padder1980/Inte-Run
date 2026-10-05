@@ -84,7 +84,7 @@ function buildPlan(pf: any) {
   return { plan: { weeks: raw.map((w, i) => Object.assign(weekView(w as any), { startIso: addDays(MONDAY(start), 7 * i) })) }, raw: { weeks: raw } };
 }
 
-const FNS = ["isoAdd", "dmon", "runDateLabelIso", "esc", "genDay", "effDay", "ovTo", "ovFrom", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
+const FNS = ["currentHandover", "racePassed", "isoAdd", "dmon", "runDateLabelIso", "esc", "genDay", "effDay", "ovTo", "ovFrom", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
   "loadAdjust", "saveAdjust", "adjustFor", "weekSkips", "adjDrops", "applyAdjustments", "eased", "easeWeekIn", "easeWeekOptions",
   "pauseTierFor", "pauseDaysLabel", "planStartIso", "blockStartIso", "firstShownWeek", "computeToday", "saveDayOverride", "loadReentry", "saveReentry", "reentryCapture",
   "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "realignGapDays", "realignLongGapDays",
@@ -261,7 +261,8 @@ test("BLOCKER: one question at a time — it replaces the weekly review, and wai
   assert.equal(box.api.weeklyReviewCard(), "", "the weekly review asked its question beside this one");
   box.api.answerRealign("carry");
   assert.ok(box.api.weeklyReviewCard(), "the review stayed silent after the question was answered");
-  assert.match(decomment(fnBody("todayCards")), /return \[reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
+  // B9: after race day "what next?" comes first — the plan is over — then this order, unchanged.
+  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
   assert.match(decomment(fnBody("currentRealign")), /if \(currentReentry\(\)\) return null;/, "both coming-back questions can show at once");
   assert.match(decomment(SRC), /document\.querySelectorAll\("\[data-realign\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => answerRealign\(b\.dataset\.realign\); \}\);/,
     "the answers render and do nothing");

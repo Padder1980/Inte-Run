@@ -187,7 +187,7 @@ test("BLOCKER: a race session is read at its own distance — the warm-up and th
 test("BLOCKER: the race survives a profile edit, never follows an old plan, and is wired where it is shown", () => {
   // draftFromForm replaces the profile whole, so a field it leaves out is gone.
   assert.match(decomment(fnBody("draftFromForm")), /bRace: state\.screen !== "wizard" && profile\.bRace \? profile\.bRace : null,/);
-  assert.match(decomment(fnBody("reusePlan")), /profile\.bRace = null;/, "a plan used again keeps the old plan's race");
+  assert.match(decomment(fnBody("adoptProf")), /profile\.bRace = null;/, "a plan used again keeps the old plan's race");
   assert.match(constStmt("PLAN_PROF_FIELDS"), /"bRace"/, "the race does not travel with the plan's answers");
   // Both options objects carry it, so the summary and the prescription agree.
   const ap = decomment(fnBody("applyProfile"));

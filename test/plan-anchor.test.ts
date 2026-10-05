@@ -163,7 +163,10 @@ test("BLOCKER: a profile edit keeps the plan's start; a new plan starts when ask
   // No path writes a blank start for a real plan: a blank would mean "today" on every later launch.
   assert.ok(!/profile\.startDateIso = ""/.test(decomment(SRC)), "a path still clears the plan's start");
   assert.match(decomment(fnBody("resumeFromPause")), /profile\.startDateIso = todayIso\(\);/);
-  assert.match(decomment(fnBody("reusePlan")), /profile\.startDateIso = todayIso\(\);/);
+  // B9: a stored plan starts through adoptProf, on the date its caller passes — today, or a recovery week's Monday.
+  assert.match(decomment(fnBody("adoptProf")), /profile\.startDateIso = o\.startIso;/);
+  assert.match(decomment(fnBody("planStartSheet")), /startStored\(src, today, ""\)/);
+  assert.match(decomment(fnBody("answerHandover")), /todayIso\(\), "next"\)[\s\S]*q\.recoveryIso, "recovery"\)/);
 });
 
 test("BLOCKER: what the launch reads is declared above the first rebuild — so the plan history records at launch", () => {

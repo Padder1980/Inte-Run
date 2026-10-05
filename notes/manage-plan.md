@@ -1108,3 +1108,82 @@ it is declared above the first `recompute()`, and `test/plan-anchor.test.ts` now
 **Tests:** `test/pause-pickup.test.ts` (8), over the real engine and the real sheet, `applyPause` and
 `resumeFromPause`. **24 of 24 re-breaks caught**, the defect itself among them (lay the block out from the restart
 day and five tests fail). `manage-plan`'s two pause guards were restated for `pauseChanges`.
+
+## ✅ B9 — THE PLAN QUEUE, PLANS SAVED FOR LATER, AND AFTER RACE DAY (built 2026-10-05)
+
+PLAN.md B9: "`interun_queue_v1` … wizard Save for later; adoption factors `reusePlan` into `adoptProf(prof, newDate)`;
+handover card on Today when `raceDate < today` … re-anchor `recentTimeS` from the logged race as an offer; Your plans:
+current / upcoming / drafts / completed / incomplete."
+
+**What the runner gets:**
+- **Save it for later** on the wizard's last step (only beside a plan already running): the answers go into Your plans
+  and nothing else moves — no profile write, no plan adopted, no plan-history row (`wizardSaveLater`).
+- **Your plans** in five lists: Your active plan, **Up next**, **Saved for later**, **Finished**, **Stopped early**
+  (`viewPlans`, `queueCard`, `planFinished`: ended on or after its own race day, or — for a row from before answers were
+  kept — in its last week). Screen title is now "Your plans", as the menu always said.
+- **One sheet to start any stored plan** (`planStartSheet`): its weeks, race day (or the new one when its own has passed),
+  the fitness it will be built with, then **Start it today**, **Start it after your race on …** (it waits in Up next),
+  or **Take it out of Up next**. A saved plan is deleted with an Undo (it never ran); renamed in its own store.
+- **After race day, Today asks what next** (`handoverCard`, first in `todayCards`): start the plan that is up next (or one
+  of the saved plans, or build a new one), **take a recovery week first** (easy running or rest until the Sunday; the
+  next plan starts the first Monday at least a week after the race), or **Not now**. Each with its dates; one tap with
+  Undo; once per race (`interun_handover_v1`, keyed on the race date); the weekly review steps aside while it is open.
+- **A recovery week** stands where the paused card would, called a recovery week, never "Paused" (`recoveryCard` at the
+  top of `pausedCard`): "Spring marathon starts on 12 Oct" with Start it now — or, with no plan chosen, "On 12 Oct we
+  will ask what is next", and the question comes back that day.
+- **The race becomes a fitness offer, once** (`raceResult`, `raceFitCheck`): a run on race day within a tenth of the
+  distance (one linked to race day's session first, then the nearest), its 5 km equivalent by the engine's own Riegel
+  (`RC.riegelPredict`), offered through the existing fitness banner with race wording when it is 2% or more from the
+  paces in use (`RACE_FIT_MIN`). ⚠️ A run added by hand counts here, unlike the automatic checks: a chip time typed in is
+  the best record of a race there is, and nothing changes unless the runner takes the offer.
+- **A finished plan says so**: the day after race day the hero reads "Plan finished — Race day was 4 Oct" with See your
+  plans, and nothing is offered as next (`todayDecision`, `todayNextUp`).
+
+**The stores:** `interun_queue_v1` `[{ id, name, status: "draft"|"upcoming", prof, weeks, createdIso, createdAt }]`, at
+most `QUEUE_MAX` (12; a full queue says so). ⚠️ Intent, kept apart from the journal (the record of blocks that ran) — the
+one-plan-store guard in `test/manage-plan.test.ts` still passes because neither new key says plan/block/history.
+`interun_handover_v1` `{ race, answer: "keep"|"recovery"|"next", answeredIso, untilIso, fitAsked }`.
+
+**One start path — `adoptProf(prof, { raceDate, startIso, at, name })`.** `reusePlan`, `startQueued` and
+`answerHandover` all reach it (through `planStartSheet` / `startStored`). It writes the stored answers, the dates, no
+pause (`blockFromIso` "", `pauseWeeks` 0) and no smaller race, then `recompute({ newPlan: true })` → `adoptPlan` →
+`journalSync(newPlan)`. Undo is a whole snapshot (`adoptSnapshot` / `adoptRestore`): the plan's fields, the runner's
+stamp, the journal, the queue, the handover answer and the day overrides, put back before the rebuild. PLAN.md's own
+re-break ("adopt by assigning PLAN") is guarded twice: nothing but `adoptPlan` assigns `PLAN` (counted over the app), and a
+start must leave the plan-history row only `adoptPlan` writes.
+
+**⚠️⚠️ The runner's own state is whichever is newer (`RUNNER_STATE_FIELDS`: fitness, mileage, status, age, sex,
+returning).** Without it, a plan saved in January and started after a February race put the paces back to January's,
+silently — and "Use this plan again" on a plan from a fitter year handed back paces the runner cannot hold. So
+`saveProfileStore` stamps `profile.stateAt` when (and only when) one of those fields changes (`stateSig`), `draftFromForm`
+carries the stamp across its whole-object replacement, and `adoptProf` keeps the profile's values when its stamp is newer
+than the stored answers (`at`: a queue item's `createdAt`, a journal row's `createdIso`). The start sheet says which:
+"Built with your current fitness: a 23:00 5K" or "…the fitness you gave for it". **This changes "Use this plan again" on
+purpose:** it used to restore every old answer, fitness included.
+
+**⚠️⚠️ Found under it and fixed: a pause split one plan in two in the history.** `journalSync` identified a block by
+goal | first Monday | length, so (measured, today a Wednesday mid-plan): a pickup pause, a restart pause, a long pause
+and a race-date edit each wrote a NEW row and ended the old one — Your plans would have listed the paused plan as stopped
+early beside a copy of itself. Now the live row is the same plan unless the goal changes or the caller made a new plan
+(`adoptPlan(out, { newPlan: true })` — the wizard and `adoptProf`); it keeps its identity (sig, start, name) and takes
+the plan's latest length (counted from its own start) and answers. The 7-day pause and a new goal were already right.
+
+**Found in the browser and fixed:** a saved March half was offered "Start it after your race on 25 Apr" — a plan cannot
+wait for a race it comes before (`queueAfterOk`: its race at least four weeks after yours, or already gone and set afresh);
+the day after a race, Today offered last Monday's easy run with View session and Tuesday's intervals as Next up; the two
+lower buttons on the start sheet and Save it for later rendered content-width (`.ps-alt`, `.wz-later`).
+
+**Deliberately not built:** a recovery BLOCK of sessions (PLAN.md keeps non-race modes and a recovery block for their own
+planning round — here a recovery week is a later start with plain guidance); a "Recommended" badge on the race-day
+options (no evidence rule for it exists in the repo, and none was invented); starting an Up next plan by itself on a date
+(always with the runner — race day asks).
+
+**Known, not changed:** `anchorMigrate` moves the start of any profile without its marker to today; on a profile whose
+race has already passed that puts the start after the race. Seen only with test data seeded without `interun_anchor_v1`
+— every phone that has run the app since 4 Oct has the marker.
+
+**Tests:** `test/plan-queue.test.ts` (9: save for later, the one start path and its Undo, the newer-state rule, the
+history across pauses and goals, the five lists, Up next, the race-day question and its answers, the recovery week, the
+race offer and the finished plan). Restated for the new home of the start path: `test/manage-plan.test.ts`,
+`plan-anchor`, `pause-pickup`, `b-race-app`; `realign` and `reentry` lift the new question beside theirs. **28 of 28
+re-breaks caught.** Driven in the browser at 375×812, light and dark.

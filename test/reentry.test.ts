@@ -83,7 +83,7 @@ function fixture() {
 // ⚠️ B6's QUESTION IS LIFTED TOO, NOT STUBBED: the weekly review also steps aside for "How do you want to pick it
 // back up?", so a sandbox without it measures an easier program. It is quiet here for a real reason: the plan
 // began today (profile.startDateIso is empty), so nothing before today can have been missed — asserted below.
-const FNS = ["isoAdd", "dmon", "runDateLabelIso", "esc", "loadAdjust", "saveAdjust", "adjustFor", "weekSkips", "adjDrops",
+const FNS = ["currentHandover", "racePassed", "isoAdd", "dmon", "runDateLabelIso", "esc", "loadAdjust", "saveAdjust", "adjustFor", "weekSkips", "adjDrops",
   "applyAdjustments", "eased", "easeWeekIn", "easeWeekOptions", "pauseTierFor", "pauseDaysLabel", "loadReentry", "saveReentry",
   "reentryCapture", "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "reentryCard",
   "answerReentry", "genDay", "effDay", "ovTo", "planStartIso", "blockStartIso", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
@@ -239,7 +239,8 @@ test("BLOCKER: one question at a time — the weekly review says nothing while t
   box.api.answerReentry("quick");
   assert.ok(box.api.weeklyReviewCard(), "the review stayed silent after the question was answered");
   // And it is the attention item: first in Today's cards (B6's "getting back on track" next, which waits for it).
-  assert.match(decomment(fnBody("todayCards")), /return \[reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
+  // B9: after race day "what next?" comes first — the plan is over — then this order, unchanged.
+  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
 });
 
 test("BLOCKER: an answer is remembered, Undo asks again, and the question goes after the first week back", () => {

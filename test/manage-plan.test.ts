@@ -277,7 +277,8 @@ test("BLOCKER: plan history is ONE store, and adoptPlan is the only thing that a
   assert.equal([...app.matchAll(/unshift\(\{\s*sig:/g)].length, 1, "something else adds a journal row");
   // ⚠️ INSIDE adoptPlan. That function's own note records what happens when the assignment is
   // open-coded somewhere else: normalizeWeekStarts and the two syncs get skipped.
-  assert.match(nocomment(fn("adoptPlan")), /journalSync\(\)/, "adoptPlan no longer writes the journal");
+  // B9: and it says whether the plan is a new one (the wizard, adoptProf) — every other rebuild is the same plan.
+  assert.match(nocomment(fn("adoptPlan")), /journalSync\(!!\(opts && opts\.newPlan\)\)/, "adoptPlan no longer writes the journal");
 });
 
 test("BLOCKER: the row carries what the list needs and nothing personal", () => {
@@ -334,22 +335,26 @@ test("BLOCKER: a row written before any of this still lists, and offers only wha
 });
 
 test("BLOCKER: reusing a plan rebuilds from the answers and cannot land in the past", () => {
-  const r = nocomment(fn("reusePlan"));
+  // ⚠️ B9: ONE START PATH. Reusing a past plan, starting a plan saved for later and starting the next plan after race
+  // day all go reusePlan / startQueued / answerHandover -> planStartSheet or startStored -> adoptProf.
+  assert.match(nocomment(fn("reusePlan")), /planStartSheet\(\{ kind: "journal"/, "reusing a plan no longer asks through the start sheet");
+  const r = nocomment(fn("adoptProf"));
   // ⚠️ REBUILT, NEVER RESTORED. The snapshot is the fields that DETERMINE a plan, so the block comes
   // back built by today's engine rather than by whatever version was current when it was abandoned.
-  assert.match(r, /recompute\(\)/, "the rebuild no longer goes through recompute");
+  assert.match(r, /recompute\(\{ newPlan: true \}\)/, "the rebuild no longer goes through recompute");
   assert.ok(!/\bPLAN\s*=/.test(r), "PLAN is being assigned by hand");
-  // ⚠️ A TARGET DATE IN THE PAST PRODUCES A PLAN WITH NO WEEKS IN IT, because applyProfile clamps the
-  // start to today. So a stale date is pulled forward — and the runner is told which happened.
-  assert.match(r, /j\.prof\.raceDate <= todayIso\(\)/, "a target date in the past is no longer detected");
-  assert.match(r, /the old one has passed/, "the runner is not told the date moved");
-  assert.match(r, /keeping its target date/, "the runner is not told the date was kept");
-  // It asks, and the ticks and the snapshot follow the same ordering every rebuild path here uses.
-  assert.match(r, /confirmSheet\(/, "reusing a plan no longer asks");
-  const snap = r.indexOf("const before ="), reb = r.indexOf("recompute()"), seed = r.indexOf("seedDone()");
+  // ⚠️ A TARGET DATE IN THE PAST PRODUCES A PLAN WITH NO WEEKS IN IT. So a stale date is pulled forward —
+  // and the runner is told which happened.
+  assert.match(nocomment(fn("storedDates")), /const stale = !r \|\| r <= startIso;/, "a target date in the past is no longer detected");
+  const sheet = nocomment(fn("planStartSheet"));
+  assert.match(sheet, /Its race day has passed/, "the runner is not told the date moved");
+  assert.match(sheet, /Race day: <b>/, "the runner is not told the date was kept");
+  // It asks, and the snapshot, the rebuild and the ticks follow the ordering every rebuild path here uses.
+  assert.match(sheet, /id="psNow"/, "starting a stored plan no longer asks");
+  const snap = r.indexOf("const snap = adoptSnapshot()"), reb = r.indexOf("recompute("), seed = r.indexOf("seedDone()");
   assert.ok(snap >= 0 && snap < reb && reb < seed, "the snapshot/rebuild/seed ordering is wrong");
-  assert.match(r, /seedDone\(\); restoreTicks\(/, "today's ticks are not restored around seedDone");
 });
+
 
 test("BLOCKER: deleting a plan asks first, and says what it does not touch", () => {
   const d = nocomment(fn("confirmDeletePlan"));

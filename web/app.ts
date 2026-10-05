@@ -5986,6 +5986,10 @@ html.kbup .club-txc { bottom: var(--kbh, 0px); }
 .pz-card { border-left: 3px solid var(--accent); }
 .pz-t { font-size: var(--t-section); font-weight: 700; color: var(--ink); margin-top: 2px; }
 .pz-s { font-size: var(--t-label); color: var(--ink-soft); margin-top: 5px; line-height: 1.55; }
+/* B9: the start sheet's other choices, under its one primary button, full width like it. */
+.ps-alt { display: block; width: 100%; margin-top: var(--s2); }
+/* B9: the wizard's last step — Save it for later, under the summary, the full width of its tiles. */
+.wz-later { display: block; width: 100%; margin-top: var(--s4); }
 
 /* ---- Holiday / easing -------------------------------------------------------------------- */
 /* ⚠️ IT WRAPS RATHER THAN OVERFLOWING, because the thing that decides whether two date fields fit is
@@ -6360,7 +6364,15 @@ function fmtTimeFull(s) { s = Math.round(s); const h = Math.floor(s/3600), m = M
 const DEFAULT_PROFILE = { name: "", avatar: "", status: "regular", goalDist: "half", targetS: 6300, targetSet: true, raceDate: futureIso(245), startDateIso: "", longRunDay: 6, fitSrc: "recent", recentDistM: 5000, recentTimeS: 1500, noRecent: false, easyPaceS: 0, twoKmS: 0, daysPerWeek: 5, volKm: 0, sex: "", strength: true, returning: false, personalized: false, bRace: null };
 
 function loadProfile() { try { const s = localStorage.getItem("rc_profile_v1"); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
-function saveProfileStore() { try { localStorage.setItem("rc_profile_v1", JSON.stringify(profile)); } catch (e) {} }
+function saveProfileStore() {
+  try {
+    // ⚠️ B9: WHEN THE RUNNER'S OWN STATE LAST CHANGED (RUNNER_STATE_FIELDS) — what adoptProf weighs a stored plan's
+    // answers against. Stamped HERE, where the profile is written, so no path that changes a pace can forget it.
+    const sig = JSON.stringify(RUNNER_STATE_FIELDS.map((k) => (profile[k] === undefined ? null : profile[k])));
+    if (profile.stateSig !== sig) { profile.stateSig = sig; profile.stateAt = Date.now(); }
+    localStorage.setItem("rc_profile_v1", JSON.stringify(profile));
+  } catch (e) {}
+}
 // Completed runs recorded in-app (from a live GPS or simulated session) — persisted so they
 // survive a reload and show up in your logbook alongside the sample history.
 // ---- SHOE RACK ---------------------------------------------------------------------------------
@@ -6524,6 +6536,19 @@ const ANCHOR_KEY = "interun_anchor_v1";
  */
 const REALIGN_KEY = "interun_realign_v1";
 /**
+ * Stage B9. Plans the runner means to run and has not started: [{ id, name, status: "draft" | "upcoming", prof,
+ * weeks, createdIso, createdAt }]. ⚠️ INTENT, KEPT APART FROM THE JOURNAL (JOURNAL_KEY), which is the record of blocks
+ * that ran: a draft that never starts must never be listed as a plan somebody did. prof is the same plan-determining
+ * snapshot a journal row carries (PLAN_PROF_FIELDS), never a built plan, so a plan started in a year is built by the
+ * engine of that day.
+ */
+const QUEUE_KEY = "interun_queue_v1";
+/**
+ * Stage B9. The answer to "what next?" once race day has passed: { race, answer, answeredIso, untilIso, fitAsked } —
+ * keyed on the race date, so the next race asks again, and "not now" is remembered rather than asked again tomorrow.
+ */
+const HANDOVER_KEY = "interun_handover_v1";
+/**
  * The plan-determining fields, and nothing else. See journalSync for why not the plan itself.
  * ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), BECAUSE journalSync READS IT FROM INSIDE adoptPlan. It sat
  * thirteen thousand lines further down, so at launch planProfSnapshot read it in its temporal dead zone, threw,
@@ -6535,6 +6560,16 @@ const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDat
   "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
   "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
   "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks", "bRace", "volGrowth", "hardDays", "longMax"];
+/**
+ * B9 — THE FIELDS THAT DESCRIBE THE RUNNER RATHER THAN THE PLAN THEY CHOSE: fitness, weekly mileage, status, age. A
+ * plan started from stored answers (a plan saved for later, the next plan after race day, a past plan used again)
+ * takes these from whichever is newer, the stored answers or the profile (profile.stateAt, stamped by
+ * saveProfileStore). Without it, starting a plan saved in January after a February race put the paces back to
+ * January's, silently; and a past plan used again from a fitter year handed back paces the runner cannot hold now.
+ * ⚠️ DECLARED ABOVE THE FIRST recompute(): saveProfileStore reads it, and anchorMigrate saves at launch.
+ */
+const RUNNER_STATE_FIELDS = ["status", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS", "volKm",
+  "returning", "age", "sex", "autoPace"];
 /**
  * A planned session's id in the form written before 2026-10-02 ("w3-d1-threshold": the week's NUMBER in
  * the block) carried to the form the engine writes now ("2026-10-26-d1-threshold": the week's MONDAY),
@@ -8521,7 +8556,7 @@ function answerRealign(choice) {
   render();
 }
 
-function adoptPlan(out) {
+function adoptPlan(out, opts) {
   PLAN = out.plan; RAW = out.raw; FITNESS = out.fitness; CLASS = out.classification; MASTERS = out.masters;
   normalizeWeekStarts();
   // ⚠️ B4: THE WEEK-MOVES FIRST, THEN THE BREAKS — a move says where a session is, and a break applies to
@@ -8541,12 +8576,13 @@ function adoptPlan(out) {
   // the assignment: a journal written at only some of the call sites is a block that existed and left no
   // record because it was adopted by the other path. And inside a try, like the two syncs above — losing
   // a journal row must never cost somebody their plan.
-  try { journalSync(); } catch (e) {}
+  // B9: a new plan (the wizard, adoptProf) says so; every other rebuild is the same plan, whatever moved.
+  try { journalSync(!!(opts && opts.newPlan)); } catch (e) {}
   // ⚠️ AFTER RAW IS SET, because it resolves v1 rows through the live plan. Guarded by meta.migratedAt,
   // so the rebuild that happens on every launch runs it exactly once.
   try { migrateSlog(); } catch (e) {}
 }
-function recompute() { adoptPlan(applyProfile(profile)); }
+function recompute(opts) { adoptPlan(applyProfile(profile), opts); }
 
 /* ------------------------------------------------------------------------------------------------
  * THE MOMENT A PLAN IS REBUILT.
@@ -9384,6 +9420,13 @@ function examplePlanBanner() {
  * coach's own prescription." That is why this returns the action rather than Today choosing one.
  */
 function todayDecision() {
+  // ⚠️ B9: AFTER RACE DAY THE PLAN IS OVER, and a session from its last week is not today's. Found in the browser: the
+  // day after a race, Today offered last Monday's easy run with "View session", and Tuesday's intervals as next up.
+  if (racePassed()) {
+    return { kind: "completed", eyebrow: "Your plan", headline: "Plan finished",
+      implication: "Race day was " + runDateLabelIso(profile.raceDate) + ". Your next plan starts whenever you are ready.",
+      action: "See your plans", actionId: "todayPlans", actionIcon: false };
+  }
   const sess = selectedSession();
   const onToday = TODAY_IN_PLAN && isCurrentWeek() && state.selDay === TODAY_DOW;
   // ⚠️ rawSessionDone, NOT doneKey(…, sess). sess is a RAW session with no .day, so the old key could
@@ -9448,6 +9491,8 @@ function todayDecision() {
 
 /** The next prescribed session after today — the thing the brief wants directly under the decision. */
 function todayNextUp() {
+  // B9: nothing is next in a plan whose race has passed (todayDecision says so).
+  if (racePassed()) return null;
   try {
     const wk = curWeek();
     const from = (TODAY_IN_PLAN && isCurrentWeek()) ? TODAY_DOW + 1 : state.selDay + 1;
@@ -9479,7 +9524,12 @@ function todayNextUp() {
 // ⚠️ B5: THE COMING-BACK QUESTION LEADS. It is about the days ahead of a runner who has just returned; a pace
 // flag or a review built from before the break can wait a week, and weeklyReviewCard steps aside for it.
 // B6: the getting-back-on-track question follows it: currentRealign is null while B5's is open, so only one shows.
-function todayCards() { return [reentryCard(), realignCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()]; }
+// B9: after race day, "what next?" leads — the plan is over, so nothing else here is about the days ahead. And the
+// race's own evidence is turned into the fitness offer once, before the cards are read (raceFitCheck).
+function todayCards() {
+  try { raceFitCheck(); } catch (e) {}
+  return [handoverCard(), reentryCard(), realignCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
+}
 function todayAttention() {
   return todayCards().find((x) => x && x.trim()) || "";
 }
@@ -15919,6 +15969,14 @@ function viewPlans() {
   const rows = loadJournals();
   const live = rows.length && !rows[0].endedIso ? rows[0] : null;
   const past = rows.filter((r) => r !== live);
+  const queue = loadQueue();
+  const next = queue.filter((q) => q.status === "upcoming");
+  const saved = queue.filter((q) => q.status !== "upcoming");
+  // B9: the live row's race day is the profile's (it follows a moved date); a past row's is its own answers'.
+  const raceLine = (j, isLive) => {
+    const r = isLive ? profile.raceDate : (j.prof && j.prof.raceDate);
+    return r ? (r < todayIso() ? "Race day was " : "Race day ") + runDateLabelIso(r) : "";
+  };
   const card = (j, isLive) =>
     '<div class="rp-card' + (isLive ? " live" : "") + '">' +
       // ⚠️ ACTIVE VERSUS PAST, NOT A COLOUR PER DISTANCE. The reference gives each plan type its own
@@ -15931,6 +15989,7 @@ function viewPlans() {
       '<span class="rp-mid"><span class="rp-t">' + esc(planName(j)) + '</span>' +
       '<span class="rp-s">' + j.weeks + (j.weeks === 1 ? " week" : " weeks") +
         (planDistLabel(j) ? " · " + planDistLabel(j) : "") + '</span>' +
+      (raceLine(j, isLive) ? '<span class="rp-s">' + esc(raceLine(j, isLive)) + '</span>' : "") +
       (planCreatedIso(j) ? '<span class="rp-s">Created ' + esc(runDateLabelIso(planCreatedIso(j))) + '</span>' : "") +
       '</span>' +
       (isLive
@@ -15941,15 +16000,61 @@ function viewPlans() {
           '</span>') +
       '<button class="rp-name" data-rpname="' + esc(j.sig) + '" aria-label="Rename ' + esc(planName(j)) + '">' + ICON.cEdit + '</button>' +
       '</div>';
+  // ⚠️ B9: FINISHED AND STOPPED EARLY ARE TWO LISTS, read from what the row records (planFinished) — the
+  // owner's reference lists Completed and Incomplete apart, and one "other plans" heap hid which was which.
+  const done = past.filter(planFinished), stopped = past.filter((j) => !planFinished(j));
   // ⚠️ THE EMPTY STATE IS THE NORMAL STATE FOR MONTHS. The journal starts the day a plan is first
   // adopted, so a runner on their first block has exactly one row and no past ones -- and a heading
   // reading "Your other plans" over nothing is the app looking like it has lost them.
   return '<h2 class="sec">Your active plan</h2>' +
     (live ? card(live, true) : '<div class="card"><p class="mp-note">No plan yet. Build one from Manage plan.</p></div>') +
-    (past.length
-      ? '<h2 class="sec">Your other plans</h2>' + past.map((j) => card(j, false)).join("")
-      : '<p class="mp-note" style="margin-top:var(--s4)">When you start a new plan, the one you are on ' +
-        'now moves down here so you can look back at it — or pick it up again.</p>');
+    (next.length ? '<h2 class="sec">Up next</h2>' + next.map((q, i) => queueCard(q, i)).join("") : "") +
+    (saved.length ? '<h2 class="sec">Saved for later</h2>' + saved.map((q) => queueCard(q, -1)).join("") : "") +
+    // ⚠️ AND IT SAYS HOW TO MAKE ONE. A list that only fills from the last step of another screen is a feature
+    // nobody finds.
+    (!queue.length ? '<p class="mp-note">Planning your next race? Start a new plan from Manage plan and choose <b>Save it for later</b> on the last step.</p>' : "") +
+    (done.length ? '<h2 class="sec">Finished</h2>' + done.map((j) => card(j, false)).join("") : "") +
+    (stopped.length ? '<h2 class="sec">Stopped early</h2>' + stopped.map((j) => card(j, false)).join("") : "") +
+    (!past.length
+      ? '<p class="mp-note" style="margin-top:var(--s4)">When you start a new plan, the one you are on ' +
+        'now moves down here so you can look back at it — or pick it up again.</p>'
+      : "");
+}
+/**
+ * B9 — DID THIS PLAN REACH ITS RACE? Ended on or after race day (from its own answers), or, for a row from before
+ * answers were kept, in its last week. A plan replaced before then stopped early.
+ */
+function planFinished(j) {
+  if (!j || !j.endedIso) return false;
+  const race = j.prof && j.prof.raceDate;
+  if (race) return j.endedIso >= race;
+  return j.endedIso >= isoAdd(j.startIso, Math.max(1, Number(j.weeks) || 1) * 7 - 7).toISOString().slice(0, 10);
+}
+/** B9 — a plan saved for later, or next in line: its goal's shield, its dates, and the way to start it. */
+function queueCard(q, upIdx) {
+  const pf = q.prof || {};
+  const name = queueName(q);
+  const j = { goal: pf.goalDist, sig: q.id };
+  const today = todayIso();
+  const liveRace = profile.raceDate && profile.raceDate >= today ? profile.raceDate : "";
+  const when = q.status === "upcoming"
+    ? (upIdx === 0 ? (liveRace ? "Starts after your race on " + runDateLabelIso(liveRace) : "Ready to start") : "Next after that")
+    : "Saved " + runDateLabelIso(q.createdIso || today);
+  const race = pf.raceDate
+    ? (pf.raceDate <= today ? "Its race day has passed: starting it sets a new one" : "Race day " + runDateLabelIso(pf.raceDate)) : "";
+  return '<div class="rp-card">' +
+    '<span class="rp-badge" style="--pc:' + planHue(j, false) + '">' + esc(planBadge(j)) + '</span>' +
+    '<span class="rp-mid"><span class="rp-t">' + esc(name) + '</span>' +
+      '<span class="rp-s">' + (q.weeks ? q.weeks + (q.weeks === 1 ? " week" : " weeks") : "") +
+        (planDistLabel(j) ? (q.weeks ? " · " : "") + planDistLabel(j) : "") + '</span>' +
+      (race ? '<span class="rp-s">' + esc(race) + '</span>' : "") +
+      '<span class="rp-s">' + esc(when) + '</span></span>' +
+    '<span class="rp-acts">' +
+      '<button class="rp-ico" data-qstart="' + esc(q.id) + '" aria-label="Start ' + esc(name) + '">' + ICON.play + '</button>' +
+      '<button class="rp-ico" data-qdel="' + esc(q.id) + '" aria-label="Delete ' + esc(name) + '">' + ICON.trash + '</button>' +
+    '</span>' +
+    '<button class="rp-name" data-qname="' + esc(q.id) + '" aria-label="Rename ' + esc(name) + '">' + ICON.cEdit + '</button>' +
+    '</div>';
 }
 // A two-or-three character mark, derived from the goal. Deliberately not an image: this app ships with
 // no external network assets, and a badge picture per plan would be twenty-four of them.
@@ -15980,19 +16085,23 @@ function planBadge(j) {
   const B = { "5k": "5K", "10k": "10K", half: "21", marathon: "42", "1mile": "MI" };
   return B[j && j.goal] || "RUN";
 }
-function openRenameSheet(sig) {
-  const j = loadJournals().find((r) => r && r.sig === sig);
+function openRenameSheet(sig, kind) {
+  // B9: a plan saved for later is renamed here too, in its own store.
+  const isQ = kind === "queue";
+  const j = isQ ? loadQueue().find((q) => q.id === sig) : loadJournals().find((r) => r && r.sig === sig);
   if (!j) return;
+  const goal = isQ ? (j.prof && j.prof.goalDist) : j.goal;
   ensureSheet(); SHEET_CTX = null;
   $("sheetBody").innerHTML = '<div class="eyebrow">Rename</div>' +
     '<h3 class="sheet-h">What would you like to call this plan?</h3>' +
     '<input class="sel" id="rpNameIn" type="text" maxlength="40" autocomplete="off" ' +
-      'placeholder="' + esc(planName(j)) + '" value="' + esc(j.name || "") + '">' +
-    '<p class="mp-note">Leave it blank to go back to <b>' + esc((RACE_LABEL[j.goal] || "Training") + " plan") + '</b>.</p>' +
+      'placeholder="' + esc(isQ ? queueName(j) : planName(j)) + '" value="' + esc(j.name || "") + '">' +
+    '<p class="mp-note">Leave it blank to go back to <b>' + esc((RACE_LABEL[goal] || "Training") + " plan") + '</b>.</p>' +
     '<div class="act-pair"><button class="ap-no" id="rpNameCancel">Cancel</button>' +
     '<button class="ap-yes" id="rpNameSave">Save</button></div>';
   $("rpNameSave").onclick = () => {
-    journalUpdate(sig, { name: ($("rpNameIn").value || "").trim().slice(0, 40) });
+    const name = ($("rpNameIn").value || "").trim().slice(0, 40);
+    if (isQ) queueUpdate(sig, { name: name }); else journalUpdate(sig, { name: name });
     closeSheet(); render();
   };
   $("rpNameCancel").onclick = closeSheet;
@@ -16013,45 +16122,404 @@ function confirmDeletePlan(sig) {
 // ⚠️ REBUILT FROM THE STORED ANSWERS, NEVER RESTORED FROM A STORED PLAN. The snapshot is the ~20 fields
 // that DETERMINE a plan, so the block comes back built by today's engine rather than by whatever
 // version was current when it was abandoned.
-// ⚠️ AND THE TARGET DATE IS PULLED FORWARD IF IT HAS PASSED, because applyProfile clamps the start to
-// today and a target date in the past produces a plan with no weeks in it at all. The runner is told
-// which of the two happened before they agree to it.
-// ⚠️ THE UNDO IS A FULL SNAPSHOT TAKEN BEFORE THE REBUILD, for the reason applyPause records: seedDone
-// prunes state.dayOverride of every session id the new plan lacks and PERSISTS the prune.
+// ⚠️ AND THE TARGET DATE IS PULLED FORWARD IF IT HAS PASSED (storedDates), because a target date in the past
+// produces a plan with no weeks in it at all. The runner is told which of the two happened before they agree to it.
+// ⚠️ B9: THROUGH THE ONE START PATH (adoptProf, by way of planStartSheet), with the plans saved for later and the
+// next plan after race day — three copies of "build a plan from stored answers" is how two of them drift.
 function reusePlan(sig) {
   const j = loadJournals().find((r) => r && r.sig === sig);
   if (!j || !j.prof) return;
-  const weeks = Math.max(4, Number(j.weeks) || 12);
-  const stale = !j.prof.raceDate || j.prof.raceDate <= todayIso();
-  const newDate = stale ? futureIso(weeks * 7) : j.prof.raceDate;
-  confirmSheet("Use this plan again?",
-    "This builds " + planName(j) + " again from the answers you gave for it" +
-    (stale
-      ? ", with a new target date of " + runDateLabelIso(newDate) + " — the old one has passed."
-      : ", keeping its target date of " + runDateLabelIso(newDate) + ".") +
-    " The plan you are on now moves into your other plans.",
-    "Build it", () => {
-      const before = planProfSnapshot();
-      const ticks = todayTicks();
-      for (const k of PLAN_PROF_FIELDS) if (j.prof[k] !== undefined) profile[k] = j.prof[k];
-      profile.raceDate = newDate;
-      // The plan built again starts today — a date, never a blank (see planStartIso) — and is laid out from today:
-      // whatever pause the old plan picked up from is not this plan's (blockStartIso).
-      profile.startDateIso = todayIso();
-      profile.blockFromIso = ""; profile.pauseWeeks = 0;
-      // B7: and its old B-race, whose date belonged to the block it was in.
-      profile.bRace = null;
-      try { recompute(); } catch (e) {
-        for (const k of PLAN_PROF_FIELDS) profile[k] = before[k];
-        try { recompute(); } catch (e2) {}
-        toast("That plan could not be rebuilt — nothing changed."); return;
-      }
+  planStartSheet({ kind: "journal", id: j.sig, name: j.name || "", title: planName(j), prof: j.prof, weeks: j.weeks,
+    at: Date.parse((j.createdIso || j.startIso || "1970-01-01") + "T00:00:00Z") || 0 });
+}
+
+// ============ B9 — THE PLAN QUEUE: plans saved for later, the next plan, and starting either ===========
+function loadQueue() {
+  try {
+    const a = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+    return Array.isArray(a) ? a.filter((q) => q && q.id && q.prof && typeof q.prof === "object") : [];
+  } catch (e) { return []; }
+}
+function saveQueue(rows) {
+  try { rows.length ? localStorage.setItem(QUEUE_KEY, JSON.stringify(rows)) : localStorage.removeItem(QUEUE_KEY); } catch (e) {}
+}
+/** How many plans the queue holds: a year of races, and a bound on what one store may grow to. */
+const QUEUE_MAX = 12;
+/** Add a plan to the queue; null when it is full (the caller says so — never a silent drop). */
+function queueAdd(item) {
+  const rows = loadQueue();
+  if (rows.length >= QUEUE_MAX) return null;
+  const now = Date.now();
+  const q = Object.assign({ id: "q-" + now + "-" + rows.length, name: "", status: "draft", createdIso: todayIso(), createdAt: now }, item);
+  rows.push(q);
+  saveQueue(rows);
+  return q;
+}
+function queueUpdate(id, patch) {
+  const rows = loadQueue();
+  const i = rows.findIndex((q) => q.id === id);
+  if (i < 0) return false;
+  rows[i] = Object.assign({}, rows[i], patch);
+  saveQueue(rows);
+  return true;
+}
+function queueRemove(id) {
+  const rows = loadQueue();
+  const keep = rows.filter((q) => q.id !== id);
+  if (keep.length === rows.length) return false;
+  saveQueue(keep);
+  return true;
+}
+/** The plan next in line after this one's race: the first marked to start after it. */
+function queueNext() { return loadQueue().find((q) => q.status === "upcoming") || null; }
+function queueName(q) { return (q && q.name) ? String(q.name) : planName({ goal: q && q.prof && q.prof.goalDist }); }
+/**
+ * The dates a stored plan starts on and races to. ⚠️ A RACE DAY ON OR BEFORE THE START IS PULLED FORWARD by the
+ * plan's own length, as reusePlan always did: a target in the past builds a plan with no weeks in it.
+ */
+function storedDates(src, startIso) {
+  const weeks = Math.max(4, Number(src.weeks) || 12);
+  const r = src.prof && src.prof.raceDate;
+  const stale = !r || r <= startIso;
+  return { raceDate: stale ? isoAdd(startIso, weeks * 7).toISOString().slice(0, 10) : r, stale: stale };
+}
+/** The state a start writes over, kept whole so Undo can put every part of it back. */
+function adoptSnapshot() {
+  const get = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  return { prof: planProfSnapshot(), stateAt: profile.stateAt, stateSig: profile.stateSig,
+    journal: get(JOURNAL_KEY), queue: get(QUEUE_KEY), handover: get(HANDOVER_KEY),
+    overrides: JSON.stringify(state.dayOverride || {}) };
+}
+function adoptRestore(snap) {
+  for (const k of PLAN_PROF_FIELDS) { if (snap.prof[k] === undefined) delete profile[k]; else profile[k] = snap.prof[k]; }
+  profile.stateAt = snap.stateAt; profile.stateSig = snap.stateSig;
+  const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
+  put(JOURNAL_KEY, snap.journal); put(QUEUE_KEY, snap.queue); put(HANDOVER_KEY, snap.handover);
+  // ⚠️ THE OVERRIDES GO BACK BEFORE THE REBUILD: applyCrossWeekMoves reads the store (B4's lesson).
+  try { state.dayOverride = JSON.parse(snap.overrides); } catch (e) {}
+  saveDayOverride();
+  const ticks = todayTicks();
+  try { recompute(); } catch (e) {}
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+}
+/**
+ * B9 — START A PLAN FROM STORED ANSWERS: a past plan used again, a plan saved for later, or the next plan after race
+ * day. ONE PATH (PLAN.md: "adoption factors reusePlan into adoptProf(prof, newDate)"), through recompute and so
+ * through adoptPlan — never PLAN assigned by hand, which skips the week snapping, the reminders, the watch and the
+ * plan history. o: { raceDate, startIso, at (when the answers were stored, ms), name }.
+ * ⚠️ THE PLAN'S CHOICES ARE THE STORED ONES; THE RUNNER'S OWN STATE IS WHICHEVER IS NEWER (RUNNER_STATE_FIELDS).
+ * ⚠️ IT STARTS ON A DATE, NEVER A BLANK (planStartIso), laid out from that date (no pause it was not in), and
+ * without the old plan's smaller race, whose date belonged to the block it was in.
+ * Returns the Undo, or null when the plan could not be built — and then nothing has changed.
+ */
+function adoptProf(prof, o) {
+  const snap = adoptSnapshot();
+  const keepState = (Number(profile.stateAt) || 0) > (Number(o.at) || 0);
+  for (const k of PLAN_PROF_FIELDS) {
+    if (prof[k] === undefined) continue;
+    if (keepState && RUNNER_STATE_FIELDS.indexOf(k) >= 0) continue;
+    profile[k] = prof[k];
+  }
+  profile.raceDate = o.raceDate;
+  profile.startDateIso = o.startIso;
+  profile.blockFromIso = ""; profile.pauseWeeks = 0;
+  profile.bRace = null;
+  const ticks = todayTicks();
+  try { recompute({ newPlan: true }); } catch (e) { adoptRestore(snap); return null; }
+  if (o.name) { const rows = loadJournals(); if (rows[0] && !rows[0].endedIso) journalUpdate(rows[0].sig, { name: o.name }); }
+  computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+  seedDone(); restoreTicks(ticks); saveProfileStore();
+  return () => adoptRestore(snap);
+}
+/** The fitness a stored plan will be built with, said before it starts (adoptProf's rule, read the same way). */
+function storedFitnessLine(src) {
+  const mine = (Number(profile.stateAt) || 0) > (Number(src.at) || 0);
+  const t = mine ? profile.recentTimeS : (src.prof && src.prof.recentTimeS);
+  const none = mine ? profile.noRecent : (src.prof && src.prof.noRecent);
+  if (!t || none) return "";
+  return mine ? "Built with your current fitness: a " + fmtTimeFull(t) + " 5K."
+    : "Built with the fitness you gave for it: a " + fmtTimeFull(t) + " 5K.";
+}
+/**
+ * B9 — THE ONE SHEET EVERY STORED PLAN STARTS FROM: what it is, its dates, the fitness it is built with, and the
+ * choices — start now; start after the race you are training for (it waits in Up next); take it out of Up next.
+ * src: { kind: "journal" | "queue", id, name, title, prof, weeks, at, status }.
+ */
+function planStartSheet(src) {
+  const today = todayIso();
+  const d = storedDates(src, today);
+  const liveRace = profile.raceDate && profile.raceDate >= today ? profile.raceDate : "";
+  const isUp = src.kind === "queue" && src.status === "upcoming";
+  const after = !isUp && queueAfterOk(src.prof, liveRace);
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = '<div class="eyebrow">Your plans</div>' +
+    '<h3 class="sheet-h">' + esc(src.title) + '</h3>' +
+    '<p class="mp-note">' + (src.weeks ? esc(src.weeks + " weeks") + ". " : "") +
+      (d.stale ? "Its race day has passed, so starting it today sets a new one: <b>" + esc(runDateLabelIso(d.raceDate)) + "</b>."
+        : "Race day: <b>" + esc(runDateLabelIso(d.raceDate)) + "</b>.") + '</p>' +
+    (storedFitnessLine(src) ? '<p class="mp-note">' + esc(storedFitnessLine(src)) + '</p>' : "") +
+    '<button class="primary" id="psNow">Start it today</button>' +
+    (after ? '<button class="ctrl ps-alt" id="psAfter">Start it after your race on ' + esc(runDateLabelIso(liveRace)) + '</button>' : "") +
+    (isUp ? '<button class="ctrl ps-alt" id="psOut">Take it out of Up next</button>' : "") +
+    '<button class="ctrl ps-alt" id="psNo">Cancel</button>' +
+    '<p class="mp-note">Starting it today moves the plan you are on now into Your plans. Nothing changes until you choose.</p>';
+  $("sheetOv").classList.add("on");
+  $("psNo").onclick = closeSheet;
+  $("psNow").onclick = () => { closeSheet(); startStored(src, today, ""); };
+  if ($("psAfter")) $("psAfter").onclick = () => { closeSheet(); queueStored(src, "upcoming"); };
+  if ($("psOut")) $("psOut").onclick = () => { closeSheet(); queueStored(src, "draft"); };
+}
+/**
+ * Can a stored plan wait for the race the runner is training for? ⚠️ ONLY IF ITS OWN RACE COMES WELL AFTER IT — four
+ * weeks at least, or there is no plan to run between the two (found in the browser: a March half was offered a start
+ * after an April marathon). A race day already gone is set afresh when it starts (storedDates), so that one can wait.
+ */
+function queueAfterOk(prof, liveRace) {
+  if (!liveRace) return false;
+  const r = prof && prof.raceDate;
+  if (!r || r <= todayIso()) return true;
+  return r >= isoAdd(liveRace, 28).toISOString().slice(0, 10);
+}
+/**
+ * Start a stored plan on a date, with one Undo. handoverAnswer records the race-day choice this start answers
+ * ("next", or "recovery" for a start a week out), so the question is not asked again.
+ */
+function startStored(src, startIso, handoverAnswer) {
+  const raceBefore = profile.raceDate;
+  const prevHandover = loadHandover();
+  const d = storedDates(src, startIso);
+  const undo = adoptProf(src.prof, { raceDate: d.raceDate, startIso: startIso, at: src.at, name: src.name || "" });
+  if (!undo) { toast("That plan could not be built. Nothing changed."); render(); return; }
+  if (src.kind === "queue") queueRemove(src.id);
+  if (handoverAnswer) {
+    saveHandover(Object.assign({}, prevHandover && prevHandover.race === raceBefore ? prevHandover : {},
+      { race: raceBefore, answer: handoverAnswer, answeredIso: todayIso(), untilIso: handoverAnswer === "recovery" ? startIso : "" }));
+  }
+  state.screen = null; state.tab = handoverAnswer ? "today" : "plan";
+  render();
+  toastUndo(src.title + (startIso > todayIso() ? " starts on " + runDateLabelIso(startIso) + "." : " is your plan now."),
+    () => { undo(); render(); });
+}
+/** Put a stored plan in the queue, or move it between Up next and Saved for later, with one Undo. */
+function queueStored(src, status) {
+  const before = (() => { try { return localStorage.getItem(QUEUE_KEY); } catch (e) { return null; } })();
+  let ok;
+  if (src.kind === "queue") ok = queueUpdate(src.id, { status: status });
+  else ok = !!queueAdd({ status: status, prof: src.prof, weeks: src.weeks, name: src.name || "", createdAt: src.at });
+  if (!ok) { toast("Your plans can hold " + QUEUE_MAX + " saved plans. Delete one to add this."); return; }
+  render();
+  const msg = status === "upcoming" ? src.title + " is up next, after your race on " + runDateLabelIso(profile.raceDate) + "."
+    : src.title + " is saved for later.";
+  toastUndo(msg, () => { try { before == null ? localStorage.removeItem(QUEUE_KEY) : localStorage.setItem(QUEUE_KEY, before); } catch (e) {} render(); });
+}
+/** A plan saved for later goes with an Undo, not a question: it was never started, and nothing else reads it. */
+function deleteQueued(id) {
+  const q = loadQueue().find((x) => x.id === id);
+  if (!q) return;
+  const before = (() => { try { return localStorage.getItem(QUEUE_KEY); } catch (e) { return null; } })();
+  queueRemove(id);
+  render();
+  toastUndo(queueName(q) + " deleted.", () => { try { before == null ? localStorage.removeItem(QUEUE_KEY) : localStorage.setItem(QUEUE_KEY, before); } catch (e) {} render(); });
+}
+function startQueued(id) {
+  const q = loadQueue().find((x) => x.id === id);
+  if (!q) return;
+  planStartSheet({ kind: "queue", id: q.id, name: q.name || "", title: queueName(q), prof: q.prof, weeks: q.weeks,
+    at: Number(q.createdAt) || 0, status: q.status });
+}
+/**
+ * B9 — "SAVE IT FOR LATER" on the wizard's last step: the answers go into the queue as a plan saved for later, and
+ * the plan the runner is on carries on untouched — no profile written, no plan adopted.
+ */
+function wizardSaveLater() {
+  captureSetupFields();
+  let pf;
+  try { pf = draftFromForm(); } catch (e) { state.wizErr = e.message; render(); return; }
+  let out;
+  try { out = applyProfile(pf); } catch (e) { state.wizErr = "That goal can’t be planned yet — try a date further ahead."; render(); return; }
+  const prof = {};
+  for (const k of PLAN_PROF_FIELDS) if (pf[k] !== undefined) prof[k] = pf[k];
+  prof.blockFromIso = ""; prof.pauseWeeks = 0; prof.bRace = null;
+  const q = queueAdd({ status: "draft", prof: prof, weeks: out.plan.weeks.length });
+  if (!q) { state.wizErr = "Your plans can hold " + QUEUE_MAX + " saved plans. Delete one first."; render(); return; }
+  draft = {}; state.wizErr = null; state.wizStep = 0;
+  state.screen = "plans"; state.tab = "plan";
+  render();
+  toast(queueName(q) + " is saved in Your plans. The plan you are on carries on.");
+}
+
+// ============ B9 — AFTER RACE DAY: what next, a recovery week, and what the race says about fitness ======
+function loadHandover() {
+  try { const v = JSON.parse(localStorage.getItem(HANDOVER_KEY) || "null"); return (v && typeof v === "object" && v.race) ? v : null; }
+  catch (e) { return null; }
+}
+function saveHandover(v) { try { v ? localStorage.setItem(HANDOVER_KEY, JSON.stringify(v)) : localStorage.removeItem(HANDOVER_KEY); } catch (e) {} }
+/** The race this plan was built for has passed. Race day itself is still the plan's. */
+function racePassed() { return !!(profile.raceDate && profile.raceDate < todayIso() && PLAN && PLAN.weeks && PLAN.weeks.length); }
+/** The first Monday at least a week after race day: when the next plan starts after a recovery week. Null once past. */
+function recoveryStartIso() {
+  const race = profile.raceDate;
+  if (!race) return null;
+  const wk = isoAdd(race, 7);
+  const mon = isoAdd(race, 7 + ((7 - ((wk.getUTCDay() + 6) % 7)) % 7)).toISOString().slice(0, 10);
+  return mon > todayIso() ? mon : null;
+}
+/**
+ * The question after race day, or null. ⚠️ ONCE PER RACE: "not now" is remembered for this race, and a recovery
+ * week asks again only when it ends. Starting any plan answers it by itself: the new plan's race is ahead.
+ */
+function currentHandover() {
+  if (!racePassed()) return null;
+  const h = loadHandover();
+  if (h && h.race === profile.raceDate) {
+    if (h.answer === "keep") return null;
+    if (h.answer === "recovery" && h.untilIso && todayIso() < h.untilIso) return null;
+  }
+  const queue = loadQueue();
+  return { race: profile.raceDate, next: queueNext(), saved: queue.filter((q) => q.status !== "upcoming").length,
+    recoveryIso: recoveryStartIso(), result: raceResult() };
+}
+/**
+ * B9 — THE RACE, FROM THE RUNS: a run on race day within a tenth of the distance, one linked to race day's session
+ * first, then the nearest in distance. Its 5 km equivalent is the engine's own Riegel (RC.riegelPredict).
+ * ⚠️ A RUN ADDED BY HAND COUNTS HERE, unlike the automatic fitness checks: a chip time typed in is the best record of a
+ * race there is, and nothing is changed by it — it is shown as an offer the runner takes or leaves.
+ */
+function raceResult() {
+  const iso = profile.raceDate, km = RACE_KM[profile.goalDist];
+  if (!iso || !km || iso > todayIso()) return null;
+  const links = loadLinks();
+  const pool = (state.logged || []).filter((r) => r && r.dateIso === iso && Number(r.sec) > 0 &&
+    Math.abs(Number(r.distKm) - km) <= km * 0.1);
+  if (!pool.length) return null;
+  const linked = (r) => !!(links[r.id] && /-race$/.test(String(links[r.id].sid || "")));
+  pool.sort((a, b) => (linked(b) - linked(a)) || (Math.abs(a.distKm - km) - Math.abs(b.distKm - km)));
+  const r = pool[0];
+  return { id: r.id, distKm: Number(r.distKm), sec: Number(r.sec),
+    implied: Math.round(RC.riegelPredict(Number(r.distKm) * 1000, Number(r.sec), 5000)) };
+}
+/** How far a race's 5 km equivalent must sit from the paces before it is worth offering: a race is a clean signal. */
+const RACE_FIT_MIN = 0.02;
+/**
+ * B9 — "RE-ANCHOR recentTimeS FROM THE LOGGED RACE, AS AN OFFER" (PLAN.md): once per race, the race's 5 km equivalent
+ * becomes the fitness suggestion Today already knows how to ask about (fitSuggestBanner, applyFitSuggest) — never a
+ * change by itself. Applied, it stamps the runner's state, so a plan started afterwards keeps it (adoptProf).
+ */
+function raceFitCheck() {
+  const iso = profile.raceDate;
+  if (!iso || iso > todayIso()) return;
+  const h = loadHandover();
+  if (h && h.race === iso && h.fitAsked) return;
+  const res = raceResult();
+  if (!res) return;
+  saveHandover(Object.assign({}, h && h.race === iso ? h : { race: iso }, { fitAsked: true }));
+  const cur = profile.noRecent ? 0 : Number(profile.recentTimeS) || 0;
+  if (cur && Math.abs(cur - res.implied) / cur < RACE_FIT_MIN) return;
+  state.fitSuggest = { dir: !cur || res.implied < cur ? "better" : "lower", implied: res.implied, from: cur, at: todayIso(),
+    sessTitle: RACE_LABEL[profile.goalDist] || "race", race: { iso: iso, goal: profile.goalDist, sec: res.sec } };
+  saveFitSuggest();
+}
+/** B9 — the card on Today after race day: what next, each with its dates. Nothing changes until the runner chooses. */
+function handoverCard() {
+  const q = currentHandover();
+  if (!q) return "";
+  const lbl = RACE_LABEL[profile.goalDist] || "race";
+  const nameOf = (x) => queueName(x);
+  const dayBefore = (iso) => isoAdd(iso, -1).toISOString().slice(0, 10);
+  const opts = [];
+  if (q.next) {
+    const d = storedDates({ prof: q.next.prof, weeks: q.next.weeks }, todayIso());
+    opts.push({ id: "next", t: "Start " + nameOf(q.next), s: "It starts today, with race day on " + runDateLabelIso(d.raceDate) + "." });
+  } else if (q.saved) {
+    opts.push({ id: "saved", t: "Start one of your saved plans", s: q.saved === 1 ? "You have one in Your plans." : "You have " + q.saved + " in Your plans." });
+  } else {
+    opts.push({ id: "new", t: "Build my next plan", s: "A few questions, then your new plan." });
+  }
+  if (q.recoveryIso) {
+    opts.push({ id: "recovery", t: "Take a recovery week first", s: "Easy running or rest until " + runDateLabelIso(dayBefore(q.recoveryIso)) + ". " +
+      (q.next ? nameOf(q.next) + " starts on " + runDateLabelIso(q.recoveryIso) + "." : "We will ask again on " + runDateLabelIso(q.recoveryIso) + ".") });
+  }
+  opts.push({ id: "keep", t: "Not now", s: "Your plan stays as it is. Start a new one whenever you like from Manage plan." });
+  const opt = (o) => '<button class="po-opt" data-handover="' + o.id + '"><span class="po-t">' + esc(o.t) + '</span><span class="po-b">' + esc(o.s) + '</span></button>';
+  return '<div class="card wk-review re-card"><div class="db-head"><span class="db-ic">' + ICON.rRace + '</span><span>After race day</span></div>' +
+    '<div class="db-body"><p>Your ' + esc(lbl) + ' was on ' + esc(runDateLabelIso(q.race)) + '.' +
+      (q.result ? ' You ran it in ' + esc(fmtTimeFull(q.result.sec)) + '.' : '') + '</p><p><b>What next?</b></p></div>' +
+    '<div class="re-opts">' + opts.map(opt).join("") + '</div>' +
+    '<p class="mp-note">Nothing changes until you choose, and you can undo straight after.</p></div>';
+}
+function answerHandover(choice) {
+  const q = currentHandover();
+  if (!q) return;
+  const before = loadHandover();
+  const keep = before && before.race === q.race ? before : {};
+  if (choice === "new") { startWizard(); return; }
+  if (choice === "saved") { state.screen = "plans"; render(); return; }
+  if (choice === "next" && q.next) {
+    startStored({ kind: "queue", id: q.next.id, name: q.next.name || "", title: queueName(q.next), prof: q.next.prof,
+      weeks: q.next.weeks, at: Number(q.next.createdAt) || 0, status: q.next.status }, todayIso(), "next");
+    return;
+  }
+  if (choice === "recovery" && q.recoveryIso) {
+    if (q.next) {
+      startStored({ kind: "queue", id: q.next.id, name: q.next.name || "", title: queueName(q.next), prof: q.next.prof,
+        weeks: q.next.weeks, at: Number(q.next.createdAt) || 0, status: q.next.status }, q.recoveryIso, "recovery");
+      return;
+    }
+    saveHandover(Object.assign({}, keep, { race: q.race, answer: "recovery", answeredIso: todayIso(), untilIso: q.recoveryIso }));
+    render();
+    toastUndo("Recovery week. We will ask what is next on " + runDateLabelIso(q.recoveryIso) + ".", () => { saveHandover(before); render(); });
+    return;
+  }
+  if (choice === "keep") {
+    saveHandover(Object.assign({}, keep, { race: q.race, answer: "keep", answeredIso: todayIso() }));
+    render();
+    toastUndo("Your plan stays as it is.", () => { saveHandover(before); render(); });
+  }
+}
+/**
+ * B9 — THE RECOVERY WEEK ON TODAY, where the paused card would stand: easy running or rest until a date, and what
+ * happens then — the next plan starting (already chosen), or the question coming back. Either can be brought forward.
+ */
+function recoveryCard() {
+  const h = loadHandover();
+  const today = todayIso();
+  if (!h || h.answer !== "recovery" || !h.untilIso || today >= h.untilIso) return "";
+  const nextStarts = !!(profile.startDateIso && profile.startDateIso === h.untilIso && profile.raceDate !== h.race);
+  if (!nextStarts && profile.raceDate !== h.race) return "";
+  const rows = loadJournals();
+  const nm = nextStarts && rows[0] ? planName(rows[0]) : "";
+  return '<div class="card pz-card">' +
+    '<div class="eyebrow">Recovery week</div>' +
+    '<div class="pz-t">Easy running or rest until ' + esc(runDateLabelIso(isoAdd(h.untilIso, -1).toISOString().slice(0, 10))) + '</div>' +
+    '<div class="pz-s">' + (nextStarts ? esc(nm) + ' starts on ' + esc(runDateLabelIso(h.untilIso)) + '.'
+      : 'On ' + esc(runDateLabelIso(h.untilIso)) + ' we will ask what is next.') + ' Log anything you run and it still counts.</div>' +
+    (nextStarts ? '<button class="ctrl" id="rcNow">Start it now</button>' : '<button class="ctrl" id="rcChoose">Choose what is next now</button>') +
+    '</div>';
+}
+/** Bring a recovery week to an end: the plan already chosen starts today, or the question comes back. One Undo. */
+function endRecovery() {
+  const h = loadHandover();
+  if (!h) return;
+  if (profile.startDateIso && profile.startDateIso === h.untilIso && profile.raceDate !== h.race) {
+    const before = { startDateIso: profile.startDateIso };
+    const ticks = todayTicks();
+    profile.startDateIso = todayIso();
+    saveHandover(Object.assign({}, h, { answer: "next", untilIso: "" }));
+    try { recompute(); } catch (e) {}
+    computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
+    seedDone(); restoreTicks(ticks); saveProfileStore(); render();
+    toastUndo("Your plan starts today.", () => {
+      const t2 = todayTicks();
+      profile.startDateIso = before.startDateIso; saveHandover(h);
+      try { recompute(); } catch (e) {}
       computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
-      seedDone(); restoreTicks(ticks); saveProfileStore();
-      state.screen = null; state.tab = "plan";
-      render();
-      toast(planName(j) + " is your plan again.");
+      seedDone(); restoreTicks(t2); saveProfileStore(); render();
     });
+    return;
+  }
+  saveHandover(Object.assign({}, h, { answer: "", untilIso: "" }));
+  render();
 }
 
 
@@ -16069,6 +16537,9 @@ function reusePlan(sig) {
 // would be a second answer to "are they away", and the two would disagree the first time somebody
 // edited their start date on the profile screen instead.
 function pausedCard() {
+  // B9: a recovery week after race day stands where a pause would, and is not called one.
+  const rc = recoveryCard();
+  if (rc) return rc;
   const from = profile.startDateIso;
   if (!from || from <= todayIso()) return "";
   // A pause that picks up where the runner left off comes back to a week past week 1, and says so.
@@ -22386,12 +22857,27 @@ function journalSig(pl) {
  * ⚠️ AND IT NEVER THROWS INTO adoptPlan. Losing a journal row must never cost somebody their plan, so
  * the whole thing is inside a try, exactly as syncNativeReminders and syncWatch are.
  */
-function journalSync() {
+function journalSync(newPlan) {
   const w = (PLAN && PLAN.weeks) || [];
   if (!w.length) return;
-  const sig = journalSig(PLAN);
   const rows = loadJournals();
-  if (rows.length && rows[0].sig === sig) return;
+  const live = rows.length && !rows[0].endedIso ? rows[0] : null;
+  // ⚠️⚠️ B9: THE SAME PLAN IS THE SAME ROW. The signature (goal | first Monday | length) changed on a pause that picks
+  // up, a restart, a long pause and a race-date edit — measured, each wrote a new row and ended the old one, so Your
+  // plans would have listed a paused plan as stopped early beside a copy of itself. A row is new only when the goal
+  // changes or the caller made a new plan (the wizard, adoptProf); otherwise the live row keeps its identity (sig,
+  // start, name) and takes the plan's latest length (counted from its own start) and answers.
+  if (live && !newPlan && live.goal === (profile.goalDist || "")) {
+    const end = isoAdd(w[w.length - 1].startIso, 7).getTime();
+    const weeks = Math.max(1, Math.round((end - isoAdd(live.startIso, 0).getTime()) / 6048e5));
+    const prof = planProfSnapshot();
+    if (live.weeks !== weeks || JSON.stringify(live.prof || null) !== JSON.stringify(prof)) {
+      live.weeks = weeks; live.prof = prof; saveJournals(rows);
+    }
+    return;
+  }
+  const sig = journalSig(PLAN);
+  if (live && live.sig === sig) return;
   // ⚠️ THE PREVIOUS BLOCK ENDED WHEN IT WAS REPLACED, which is a real date rather than the date its
   // last week would have fallen on — a block abandoned in week 6 of 20 did not run for 20 weeks.
   if (rows.length && !rows[0].endedIso) rows[0].endedIso = todayIso();
@@ -27303,6 +27789,10 @@ function draftFromForm() {
     // been correct at one end and unread at the other, which is why the round trip is now tested
     // rather than the helper.
     returning: draft.returning === "injury" ? "injury" : draft.returning === "break" ? "break" : "",
+    // ⚠️ B9: AND THE STAMP OF THE RUNNER'S OWN STATE (saveProfileStore). This object replaces the profile whole, so
+    // without it every save would read as a change of fitness, and a plan saved for later with a new 5 km time would
+    // lose that time to an edit of the long-run day.
+    stateSig: profile.stateSig, stateAt: profile.stateAt,
     personalized: true,
   };
 }
@@ -28159,7 +28649,13 @@ function wizBody(id, p, st) {
         '<div class="wz-sum-tile"><div class="wz-sum-n">' + days + '</div><div class="wz-sum-l">runs / week</div></div>' +
         '<div class="wz-sum-tile"><div class="wz-sum-n">' + peak + '</div><div class="wz-sum-l">peak km</div></div>' +
       '</div>' +
-      '</div>';
+      '</div>' +
+      // ⚠️ B9: SAVE IT FOR LATER, only beside a plan already running — a first plan has nothing to carry on with, and
+      // "Start my plan" stays the one primary button. The answers go into Your plans and nothing else changes.
+      (profile.personalized && PLAN && PLAN.weeks && PLAN.weeks.length
+        ? '<button class="ctrl wz-later" id="wizSaveLater" type="button">Save it for later</button>' +
+          '<p class="mp-note">It goes into Your plans, and the plan you are on carries on. Start it whenever you are ready.</p>'
+        : "");
   }
   return "";
 }
@@ -28348,7 +28844,7 @@ function wizardFinish() {
   let out;
   try { out = applyProfile(pf); } catch (e) { state.wizErr = "That goal can\\u2019t be planned yet — try a date further ahead."; render(); return; }
   const keptTicks = todayTicks();
-  profile = pf; adoptPlan(out); computeToday();
+  profile = pf; adoptPlan(out, { newPlan: true }); computeToday();
   state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(keptTicks); saveProfileStore(); renderAvatar();
   // Apply the reminder choice from the schedule step.
@@ -28371,6 +28867,7 @@ function wizardFinish() {
 }
 function wireWizard() {
   const next = $("wizNext"); if (next) next.onclick = wizNext;
+  const later = $("wizSaveLater"); if (later) later.onclick = wizardSaveLater;
   const back = $("wizBack"); if (back) back.onclick = wizBack;
   // The safety step. Ticking a symptom clears "None of these" and the other way round, so the two can
   // never both be true; every change repaints the screener's answer under the questions.
@@ -41974,6 +42471,8 @@ function weeklyReviewCard() {
   if (currentReentry()) return "";
   // ⚠️ B6: AND NOT WHILE "HOW DO YOU WANT TO PICK IT BACK UP?" IS OPEN — PLAN.md: it replaces the review card.
   if (currentRealign()) return "";
+  // ⚠️ B9: AND NOT WHILE "WHAT NEXT?" IS OPEN after race day — one question at a time.
+  if (currentHandover()) return "";
   const r = currentWeeklyReview();
   if (!r || r.quiet) return "";
   const lines = r.observations.map((o) => "<p>" + esc(o) + "</p>").join("");
@@ -42094,8 +42593,15 @@ function fitSuggestBanner() {
   const fs = state.fitSuggest; if (!fs) return "";
   const faster = fs.dir === "better";
   const impliedPace = fmtPace(fs.implied / 5);
-  const head = faster ? "You\\u2019re running stronger than your plan assumes" : "That run was tougher than your plan expects";
-  const body = faster
+  const race = fs.race && fs.race.iso ? fs.race : null;
+  const head = race ? "Your race says your fitness has changed"
+    : faster ? "You\\u2019re running stronger than your plan assumes" : "That run was tougher than your plan expects";
+  // B9: a race is the runner's own result, not a training run read against its target, so it says so.
+  const body = race
+    ? "Your " + (RACE_LABEL[race.goal] || "race") + " on " + runDateLabelIso(race.iso) + " took " + fmtTimeFull(race.sec) +
+      ", about a " + fmtTimeFull(fs.implied) + " 5K" + (fs.from ? ". Your paces use " + fmtTimeFull(fs.from) + "." : ".") +
+      (fs.from ? " Update them to match?" : " Use it to set your paces?")
+    : faster
     ? "Your last run implies about a " + fmtTimeFull(fs.implied) + " 5K (was " + fmtTimeFull(fs.from) + "). Update your paces so every session matches your current fitness?"
     : "Your last run implies about a " + fmtTimeFull(fs.implied) + " 5K (was " + fmtTimeFull(fs.from) + "). Ease your paces to match how you\\u2019re running right now?";
   return '<div class="fit-banner ' + (faster ? "up" : "down") + '"><div class="fb-ic">' + (faster ? ICON.trendUp : ICON.trendDown) + '</div>' +
@@ -42447,7 +42953,7 @@ function render() {
     return;
   }
   if (state.screen === "plans") {
-    $("topTitle").textContent = "Recent plans";
+    $("topTitle").textContent = "Your plans";
     v.innerHTML = viewPlans();
     v.scrollTop = keepScroll;
     wire();
@@ -43401,7 +43907,15 @@ function wire() {
     vw.querySelectorAll("[data-rpname]").forEach((b) => { b.onclick = () => openRenameSheet(b.dataset.rpname); });
     vw.querySelectorAll("[data-rpdel]").forEach((b) => { b.onclick = () => confirmDeletePlan(b.dataset.rpdel); });
     vw.querySelectorAll("[data-rpuse]").forEach((b) => { b.onclick = () => reusePlan(b.dataset.rpuse); });
+    // B9: the plans saved for later and next in line.
+    vw.querySelectorAll("[data-qstart]").forEach((b) => { b.onclick = () => startQueued(b.dataset.qstart); });
+    vw.querySelectorAll("[data-qdel]").forEach((b) => { b.onclick = () => deleteQueued(b.dataset.qdel); });
+    vw.querySelectorAll("[data-qname]").forEach((b) => { b.onclick = () => openRenameSheet(b.dataset.qname, "queue"); });
+    // B9: after race day, and the recovery week.
+    vw.querySelectorAll("[data-handover]").forEach((b) => { b.onclick = () => answerHandover(b.dataset.handover); });
   }
+  if ($("rcNow")) $("rcNow").onclick = endRecovery;
+  if ($("rcChoose")) $("rcChoose").onclick = endRecovery;
   bindTimeInput($("s_target")); bindTimeInput($("s_rectime")); bindTimeInput($("s_easypace"));
   const km1 = $("s_2km");
   if (km1) { bindTimeInput(km1); km1.addEventListener("input", refreshMasHint); refreshMasHint(); }
@@ -43614,6 +44128,8 @@ function wire() {
   // an id nothing renders, which is what the invented-identifier guard exists to catch. It caught this.
   // ⚠️ The decision hero's action on a rest or completed day is PREVIEW, not start — the brief is
   // explicit that a rest day's premium action is reassurance or preview, never a record button.
+  // B9: a finished plan's hero leads to Your plans, where the next one is started.
+  const tpl = $("todayPlans"); if (tpl) tpl.onclick = () => { state.screen = "plans"; render(); };
   const prev = $("todayPreview"); if (prev) prev.onclick = () => {
     const n = todayNextUp();
     if (!n) return;

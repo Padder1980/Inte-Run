@@ -63,11 +63,11 @@ const WED = addDays(MONDAY, 2);
 const START = addDays(MONDAY, -35);
 const RACE = addDays(MONDAY, 7 * 10 + 6);
 
-const FNS = ["isoAdd", "dmon", "runDateLabelIso", "esc", "applyProfile", "planStartIso", "blockStartIso", "holdBeforeStart",
+const FNS = ["recoveryCard", "loadHandover", "isoAdd", "dmon", "runDateLabelIso", "esc", "applyProfile", "planStartIso", "blockStartIso", "holdBeforeStart",
   "firstShownWeek", "returnKind", "adoptPlan", "recompute", "normalizeWeekStarts", "computeToday", "planDefaultWeek",
   "pauseTierFor", "pauseDaysLabel", "pauseChanges", "pausePlanHtml", "applyPause", "resumeFromPause", "pausedCard",
   "pausedWeekRow", "loadAdjust", "adjustFor", "eased", "easeWeekOptions", "legacySid", "sidKeys", "addDayEvidence", "wkLabelInner"];
-const CONSTS = ["MONTHS", "MON_SHORT", "ADJ_QUALITY", "PAUSE_TIERS", "PAUSE_CHOICES", "ADJUST_KEY", "SKIP_KEEP_DAYS", "PRIMARY_TYPES"];
+const CONSTS = ["HANDOVER_KEY", "MONTHS", "MON_SHORT", "ADJ_QUALITY", "PAUSE_TIERS", "PAUSE_CHOICES", "ADJUST_KEY", "SKIP_KEEP_DAYS", "PRIMARY_TYPES"];
 
 const PROFILE = () => ({ status: "regular", goalDist: "half", targetS: 6300, raceDate: RACE, startDateIso: START, longRunDay: 6,
   recentTimeS: 1500, noRecent: false, twoKmS: 0, daysPerWeek: 5, volKm: 40, strength: false, returning: false, age: 40 } as any);
@@ -322,7 +322,8 @@ test("BLOCKER: a profile edit keeps a pause's layout, and everything that starts
   assert.match(draft, /const keepsBlock = state\.screen !== "wizard" && startDateIso === \(profile\.startDateIso \|\| ""\) && !!profile\.blockFromIso;/);
   assert.match(draft, /\.\.\.\(keepsBlock \? \{ blockFromIso: profile\.blockFromIso, pauseWeeks: Number\(profile\.pauseWeeks\) \|\| 0 \} : \{\}\)/);
   // A plan used again, and B6's "start again from this week", are laid out from today.
-  assert.match(decomment(fnBody("reusePlan")), /profile\.blockFromIso = ""; profile\.pauseWeeks = 0;/);
+  // B9: through the one start path every stored plan takes (reusePlan -> planStartSheet -> startStored -> adoptProf).
+  assert.match(decomment(fnBody("adoptProf")), /profile\.blockFromIso = ""; profile\.pauseWeeks = 0;/);
   assert.match(decomment(fnBody("realignOptions")), /startDateIso: todayIso\(\), blockFromIso: "", pauseWeeks: 0/);
   // B6's "pick up where you left off" moves the day the block is laid out from, not the day it started again.
   assert.match(decomment(fnBody("realignPickup")), /isoAdd\(blockStartIso\(profile\), 7 \* w\)/);

@@ -15,6 +15,56 @@ export const REBUILD_KEY_RUN_MIN = 40;
 /** "Felt easy": an effort the runner rated at or under this (the app's 1–10 scale; easy running is 2–4). */
 export const EASY_RPE_MAX = 4;
 
+// ---- The end-of-block test, chosen by level (STAGES.md §10, decision 5 of 2026-11-18) -------------------------------
+
+/** The four levels of §10's table, as the status card names them ("Just getting started" … "Competitive"). */
+export type RunnerLevel = "new" | "building" | "regular" | "competitive";
+/**
+ * The tests a block can end in:
+ *   "trial-2k"       the 2 km time trial — the fastest pace held for the whole 2 km (a maximal effort);
+ *   "controlled-2k"  a 2 km run strong but controlled — Galloway's "Magic Mile" style, never flat out;
+ *   "parkrun"        a parkrun or a 5 km (or a race);
+ *   "time-on-feet"   the block's own longest run, without stopping, that felt easy — no timed effort at all.
+ */
+export type BlockTest = "trial-2k" | "controlled-2k" | "parkrun" | "time-on-feet";
+/**
+ * A parkrun or a 5 km is offered only once the runner's longest run in the last 30 days reaches this (§10: "once the
+ * longest run is about 4.5 km"). Why: a run more than 10% longer than the longest of the last 30 days raised injury
+ * risk 52–128% (Frandsen 2025, BJSM 59:1203), and a 5 km for somebody whose longest run is 3 km is that jump.
+ */
+export const PARKRUN_MIN_LONGEST_KM = 4.5;
+/** The window that "longest run" is read over (Frandsen's own: the last 30 days). */
+export const LONGEST_RUN_WINDOW_DAYS = 30;
+
+/**
+ * May this runner be offered a maximal test? ⚠️ NEVER "Just getting started", NEVER anyone back from injury (§10's
+ * table): running tests are for the already active, and hard unaccustomed effort carries the highest short-term risk
+ * in the least active (Cooper Institute; AHA/ACSM 2007); a runner back from injury has no time trial until running is
+ * back to normal (Stanford FASTR). THE CLINICAL REVIEWER CHECKS THIS RULE AND ITS WORDING BEFORE RELEASE.
+ */
+export function maximalTestAllowed(o: { level: RunnerLevel; injured: boolean }): boolean {
+  return o.level !== "new" && !o.injured;
+}
+
+/**
+ * THE END-OF-BLOCK TEST BY LEVEL — §10's table, in the order the runner is offered them (the first is the one put
+ * first). One definition: the checkpoint asks it, the app offers what it returns and nothing else.
+ *   Just getting started  time on feet only — the block's target run, non-stop at chatting pace; no time trial.
+ *   Back from injury      a strong-but-controlled 2 km, or time on feet — no time trial until running is normal.
+ *   Building the habit    a strong-but-controlled 2 km, or a parkrun once the longest run is about 4.5 km.
+ *   Regular / Competitive a parkrun or 5 km (or a race) once the longest run is about 4.5 km, or the 2 km trial.
+ */
+export function blockTestsFor(o: { level: RunnerLevel; injured: boolean; longestKm30d?: number | null }): BlockTest[] {
+  if (o.level === "new") return ["time-on-feet"];
+  if (o.injured) return ["controlled-2k", "time-on-feet"];
+  const parkrun = Number(o.longestKm30d) >= PARKRUN_MIN_LONGEST_KM;
+  if (o.level === "building") return parkrun ? ["controlled-2k", "parkrun"] : ["controlled-2k"];
+  return parkrun ? ["parkrun", "trial-2k"] : ["trial-2k"];
+}
+
+/** A run of at least `needMin` minutes, without stopping, that felt easy (rated EASY_RPE_MAX or under). */
+export type EasyRunKey = { needMin: number; bestMin: number | null; bestIso?: string | null };
+
 export type CheckpointFacts = {
   /** The stage whose checkpoint this is. */
   stage: "rebuild" | "base";
@@ -27,11 +77,23 @@ export type CheckpointFacts = {
   /**
    * Rebuild: the key run asked for, in minutes — `REBUILD_KEY_RUN_MIN`, or the stage's own longest planned run where
    * that is shorter (a runner who follows the plan exactly must be able to pass), and the longest run logged in the
-   * stage that felt easy (null: none). Base: a test run logged in the stage (null: none).
+   * stage that felt easy (null: none). Base: a test run logged in the stage (null: none) — the tests this runner is
+   * offered (`offer`, from blockTestsFor), and where time on feet counts too (a runner back from injury) the block's
+   * own longest planned run against the longest easy-feeling run logged in it.
    */
-  keyRun: { kind: "easy-run"; needMin: number; bestMin: number | null; bestIso?: string | null }
-    | { kind: "test"; doneIso: string | null; label?: string | null };
+  keyRun: ({ kind: "easy-run" } & EasyRunKey)
+    | { kind: "test"; doneIso: string | null; label?: string | null; offer?: BlockTest[]; timeOnFeet?: EasyRunKey | null };
 };
+
+/** "a strong-but-controlled 2 km, or a parkrun or 5 km" — the offered tests in the runner's words. */
+function offerWords(offer: BlockTest[] | undefined, tof: EasyRunKey | null | undefined): string {
+  const words = (offer && offer.length ? offer : ["trial-2k" as BlockTest]).map((t) =>
+    t === "trial-2k" ? "the 2 km test run"
+      : t === "controlled-2k" ? "a strong-but-controlled 2 km"
+        : t === "parkrun" ? "a parkrun or 5 km"
+          : `a ${tof ? tof.needMin : REBUILD_KEY_RUN_MIN}-minute run without stopping that feels easy`);
+  return words.length < 2 ? words.join("") : words.slice(0, -1).join(", ") + " or " + words[words.length - 1];
+}
 
 export type CheckpointVerdict = {
   verdict: "ready" | "nearly" | "notyet";
@@ -60,7 +122,10 @@ export function evaluateCheckpoint(f: CheckpointFacts): CheckpointVerdict {
   const runs = planned > 0 && done >= need;
   const noPain = !(f.painRuns > 0);
   const k = f.keyRun;
-  const keyRun = k.kind === "easy-run" ? k.bestMin != null && k.bestMin >= k.needMin : !!k.doneIso;
+  const easyMet = (e: EasyRunKey | null | undefined) => !!e && e.bestMin != null && e.bestMin >= e.needMin;
+  // A test logged in the stage, or — where time on feet counts — the block's own longest run, easy and unbroken.
+  const tofMet = k.kind === "test" && easyMet(k.timeOnFeet);
+  const keyRun = k.kind === "easy-run" ? easyMet(k) : !!k.doneIso || tofMet;
   const reasons: string[] = [];
   reasons.push(planned === 0
     ? "No runs were planned in the last two weeks, so there is nothing to count yet."
@@ -78,9 +143,16 @@ export function evaluateCheckpoint(f: CheckpointFacts): CheckpointVerdict {
       : k.bestMin != null
         ? `Your longest easy-feeling run so far is ${k.bestMin} minutes; this stage's key run is ${k.needMin} minutes without stopping.`
         : `No run of ${k.needMin} minutes that felt easy yet — your long run is the chance.`);
+  } else if (k.doneIso) {
+    reasons.push(`You did your test run on ${k.doneIso}${k.label ? " (" + k.label + ")" : ""}.`);
+  } else if (tofMet) {
+    const t = k.timeOnFeet!;
+    reasons.push(`Your ${t.bestMin}-minute run${t.bestIso ? " on " + t.bestIso : ""} felt easy — that is this block’s key run.`);
   } else {
-    reasons.push(keyRun
-      ? `You did your test run${k.doneIso ? " on " + k.doneIso : ""}${k.label ? " (" + k.label + ")" : ""}.`
+    // ⚠️ THE WORDS NAME ONLY WHAT THIS RUNNER IS OFFERED (blockTestsFor): never the 2 km trial to somebody back from
+    // injury, never a parkrun before the longest run reaches about 4.5 km.
+    reasons.push(k.offer && k.offer.length
+      ? `No test run yet — ${offerWords(k.offer, k.timeOnFeet)} ends this block and sets up the next one.`
       : "No test run yet — a short test run sets your paces from real running.");
   }
   const missing = [runs, noPain, keyRun].filter((x) => !x).length;

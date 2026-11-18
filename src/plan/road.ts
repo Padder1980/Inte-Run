@@ -10,8 +10,33 @@ import { addDays, dayOfWeekMondayZero, weeksBetween } from "./dates.ts";
 import { type GenerateOptions, type RoadStage, roadFoundationNeed } from "./generate-plan.ts";
 import { RACE_BLOCK_WEEKS } from "./periodization.ts";
 
-/** How long Rebuild runs when the time allows (STAGES.md §3: 4–6 weeks). */
-export const REBUILD_WEEKS = 4;
+/**
+ * A BLOCK — the stretch between two checkpoints (STAGES.md §10, the owner's decision 1 of 2026-11-18: "yes to all five,
+ * build it"). Four weeks as standard, six at most, at every level: the research put 4–6 weeks as the review point
+ * from "Building the habit" up (Daniels re-sets paces every 3–6 weeks; Hudson's recovery week every 3rd–4th), and no
+ * study sets a maximum after which a block stops working — so six is a limit on how long a runner goes WITHOUT A
+ * CHECKPOINT, not a limit on adaptation. A stage longer than that is laid out as several blocks, each ending in its
+ * own checkpoint; the runner can always repeat one (one more week, at the checkpoint).
+ */
+export const BLOCK_WEEKS = 4;
+export const BLOCK_MAX_WEEKS = 6;
+
+/**
+ * A stage of `weeks` as its blocks, in order: as many four-week blocks as fit, the odd weeks spread over the LAST
+ * ones (so the early checkpoints keep falling on the road's every-fourth-week lighter week), and never a block over
+ * BLOCK_MAX_WEEKS. A stage of six weeks or fewer is one block. Seven is the one length that cannot be cut into
+ * blocks of four to six, and it is cut 4 + 3 rather than run seven weeks without a checkpoint.
+ */
+export function blockSplit(weeks: number): number[] {
+  const n = Math.max(0, Math.floor(Number(weeks) || 0));
+  if (n <= BLOCK_MAX_WEEKS) return n > 0 ? [n] : [];
+  const k = Math.floor(n / BLOCK_WEEKS), r = n - k * BLOCK_WEEKS;
+  if (BLOCK_WEEKS + Math.ceil(r / k) > BLOCK_MAX_WEEKS) return [BLOCK_WEEKS, ...blockSplit(n - BLOCK_WEEKS)];
+  return Array.from({ length: k }, (_, i) => BLOCK_WEEKS + Math.floor(r / k) + (i >= k - (r % k) ? 1 : 0));
+}
+
+/** How long Rebuild runs when the time allows (STAGES.md §3: 4–6 weeks) — one block. */
+export const REBUILD_WEEKS = BLOCK_WEEKS;
 /** The shortest Base worth calling one (§3: 4–8 weeks typical). */
 export const BASE_MIN_WEEKS = 4;
 /**
@@ -85,7 +110,11 @@ export function roadFor(athlete: Athlete, goal: Goal, startIso: string, options:
   const base = fWeeks - rebuild;
   const stages: RoadStage[] = [];
   if (rebuild > 0) stages.push({ kind: "rebuild", weeks: rebuild });
-  if (base > 0) stages.push({ kind: "base", weeks: base });
+  // ⚠️ DECISION 1 (§10): BASE IS LAID OUT AS BLOCKS, each ending in a checkpoint — never more than six weeks without
+  // one. Consecutive stages of one kind ARE consecutive blocks: the engine builds them as one stretch of Base (its
+  // dose counts Base weeks so far, its lighter week every fourth week of the road), and the app puts a checkpoint
+  // at the end of each.
+  for (const w of blockSplit(base)) stages.push({ kind: "base", weeks: w });
   stages.push({ kind: "race", weeks: raceWeeks });
   return {
     stages,

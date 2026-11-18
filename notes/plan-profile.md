@@ -865,3 +865,77 @@ the plan again from the wizard with the same answers and a 23 November start —
 Decision 1 (harder sessions return after Rebuild for an injured returner), the pain rule and its wording, the
 Rebuild key run (40 minutes or the stage's own longest), easing back meaning a lighter week of easy running, the
 2 km test run at the end of Base (a maximal effort for somebody back from injury), and the card's injury sentence.
+
+---
+
+## ✅ §10 — BLOCKS FOR EVERY LONG-TERM GOAL, PIECE 1: 4-WEEK BLOCKS AND THE TEST BY LEVEL (2026-11-18)
+
+The owner approved all five decisions of `STAGES.md` §10 the evening Stages was built: *"yes to all five, build it"*
+(recorded word for word against each). Built in his order, one piece at a time; this is piece 1 — decisions 1 and 5 on
+the road that already existed (the beginner track's continuous runner).
+
+### Decision 1 — a block is 4 weeks, 6 at most before a checkpoint (`src/plan/road.ts`)
+
+- `BLOCK_WEEKS` = 4, `BLOCK_MAX_WEEKS` = 6, `blockSplit(n)`: as many fours as fit, the odd weeks on the LAST blocks (so the
+  early checkpoints keep landing on the road's every-fourth-week lighter week), never a block over six; 7 is the one
+  length that cannot be four-to-six and is cut 4 + 3. `REBUILD_WEEKS` is now `BLOCK_WEEKS`.
+- `roadFor` lays Base out as blocks: **consecutive stages of one kind ARE consecutive blocks.** The engine flattens stages
+  to one kind per week, so a road cut into blocks builds exactly the plan the uncut one did (its Base dose counts Base
+  weeks so far; deloads are every fourth week of the road) — guarded byte for byte, and re-broken by restarting the dose
+  at each block. The app already put a checkpoint at the end of every stage entry (`roadLegsNow`), so each block got one.
+- ⚠️ **`effectiveRoad` no longer stretches a stage past six weeks.** A later race adds Base blocks before the race block
+  (a last Base block not yet begun is cut again together with the new weeks; one under way keeps its end, so the
+  checkpoint the runner is heading for never moves under them). A sooner race takes from the later Base blocks first —
+  a later block down to nothing, the first keeping a week — before the race block gives up a week. Zero-week legs are
+  spliced out before the hold reads them. The old road-app expectation "r4 b7 r16" became "r4 b4 b3 r16" on purpose.
+- Names: `roadLegName` — "Base 1", "Base 2" where a kind runs to more than one block (the sheet's header, the timeline,
+  the toast); `roadLine` says "16 weeks Base in 4 blocks". A checkpoint whose next block is the same stage reads "Ready
+  for your next block" / "Start Base 2" / "On to Base 2." / "You chose to go on" — never "move up" to the same stage.
+
+### Decision 5 — the end-of-block test by level (`src/plan/checkpoint.ts`)
+
+- `blockTestsFor({ level, injured, longestKm30d })` is §10's table and the one definition: new → time on feet only;
+  back from injury → a strong-but-controlled 2 km or time on feet; building → the controlled 2 km, plus a parkrun once
+  the longest run of the last 30 days is ≥ `PARKRUN_MIN_LONGEST_KM` (4.5, Frandsen's per-run rule over
+  `LONGEST_RUN_WINDOW_DAYS` = 30); regular/competitive → a parkrun (same gate) or the 2 km trial.
+  `maximalTestAllowed` = not new and not injured.
+- Base's key run (`roadFacts`): the offered tests (`offer`) plus, where time on feet counts, `timeOnFeet` = the block's
+  OWN longest planned long run against the longest easy-feeling (RPE ≤ 4) run logged in it — the Rebuild rule's shape, so
+  a runner who follows the plan exactly can pass. Where time on feet is the only test ("new"), the key run IS an
+  easy-run. The words name only what is offered — never the 2 km trial to somebody back from injury.
+- ⚠️⚠️ **The controlled 2 km.** `startTrialFlow(mode, from)`: mode "controlled" changes the trial's words on every screen
+  (`TRIAL_CONTROLLED_TITLE`, `TRIAL_CONTROLLED_HOW`; RPE 7–8 to the warm-up generator instead of 9–10) and is saved as
+  `effort: "controlled"` on the 2 km record. **It is a floor on fitness, not a measure of it:** it becomes `twoKmS` only
+  where there is none or it is quicker, so it can lift the paces and never pull down what an all-out test set (and
+  applyProfile already uses a 2 km only where it projects faster than the runner's own 5 km). Started from the
+  checkpoint (`from` "road"), saving lands back on Today with the checkpoint open and the test counted.
+- **A parkrun counts by the runner's own tap.** The sheet lists runs of about 5 km in the block (±10%, raceResult's
+  tolerance; ⚠️ not one the runner rated easy — found in the browser, an easy 5.4 km sat beside the parkrun as a "test")
+  with "Count your 5.0 km run on 16 Jan as your parkrun or 5 km test ›"; `countRoadTest` stores `run.test = "5k"` and
+  turns its 5 km equivalent into the existing pace offer (`state.fitSuggest` with `test: true` — "Your 5 km test says
+  your fitness has changed", Update my paces / Not now). Never a change by itself.
+- ⚠️ **The weekly review's 28-day 2 km retest (an all-out effort) is no longer offered to somebody just getting started
+  or back from injury** — `WeeklyReviewInput.noMaximalTest`, from the same `maximalTestAllowed`. Before this the review
+  would have asked an injured returner for a maximal 2 km in the same weeks the checkpoint was telling them not to.
+
+### Found in the browser (both fixed, both guarded)
+
+- ⚠️⚠️ **The checkpoint popped back up over the test the runner had just chosen from it.** "Do the 2 km" renders Today with
+  the test's card, and Today's render calls `maybeRoadPopup` — which opened the checkpoint again on top whenever it had
+  been opened from the Plan screen (so today's mark was not yet set). It now holds while `state.trialPending`, and any
+  opening of the checkpoint counts as today's showing. The old 2 km button had the same fault.
+- ⚠️ **A latent one, fixed before it bit:** the sheet's test buttons were `data-trialstart`, and `wire()` binds every
+  `[data-trialstart]` in the document to the all-out trial — a render while the sheet was open would have turned the
+  controlled 2 km into a maximal one, started behind the sheet. They are `data-roadtrial` now, wired only by the sheet.
+
+**Tests:** `test/road-blocks.test.ts` (8, engine) and `test/road-blocks-app.test.ts` (8, lifted from the built page);
+`road-app.test.ts`'s moved-race-date and test-run guards restated. **Re-breaks: 21 of 21 caught.** Driven in a browser at
+phone size, light and dark: an injured habit-builder's Base checkpoint (the controlled 2 km and time on feet, nothing
+else), the controlled 2 km through to saved and counted, a habit-builder's parkrun counted to "Ready" with the pace
+offer on Today, and a long road as Base 1–4 with "Start Base 2" and "You chose to go on".
+
+### For the clinical reviewer (added to the list above)
+
+The no-maximal-test rule and the retest gate; the controlled 2 km's words ("quicker than your usual runs, but never flat
+out…", "Not a race: keep something in reserve all the way to the finish"); time on feet as an injured returner's key run
+(the block's own longest planned run, felt easy, unbroken); the parkrun gate (longest run ≥ 4.5 km in 30 days).

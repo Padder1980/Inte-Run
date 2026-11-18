@@ -74,8 +74,24 @@ test("BLOCKER: a checkpoint not yet answered holds the runner in the stage they 
 test("BLOCKER: the road fits a moved race date from its own first week, never re-laying the weeks run", () => {
   const h = harness("2026-11-25", ROAD());
   h.profile.raceDate = "2027-05-30";
-  assert.equal(kinds(h.api.effectiveRoad(h.profile, ATH, { raceDateIso: "2027-05-30" })), "r4 b7 r16", "two more weeks go to Base");
+  // ⚠️ §10 DECISION 1: two more weeks go to Base — as BLOCKS, never one stage past six weeks without a checkpoint. Base
+  // has not begun, so it is cut again together with the new weeks (seven: 4 + 3).
+  assert.equal(kinds(h.api.effectiveRoad(h.profile, ATH, { raceDateIso: "2027-05-30" })), "r4 b4 b3 r16", "two more weeks go to Base");
   assert.equal(kinds(h.api.effectiveRoad(h.profile, ATH, { raceDateIso: "2027-05-02" })), "r4 b3 r16", "two fewer come out of Base");
+  // A race thirteen weeks later: Base (5 + 13 = 18 weeks) as blocks of four to six, and no stage longer than six.
+  const far = h.api.effectiveRoad(h.profile, ATH, { raceDateIso: "2027-08-15" });
+  assert.equal(kinds(far), "r4 b4 b4 b5 b5 r16");
+  assert.ok(far.stages.slice(0, -1).every((s: any) => s.weeks <= 6), kinds(far));
+  // ⚠️ A BASE BLOCK ALREADY UNDER WAY KEEPS ITS END — the checkpoint the runner is heading for never moves under them —
+  // and the new weeks become blocks of their own after it.
+  const inBase = harness("2027-01-06", ROAD([{ dueIso: "2026-12-21", kind: "rebuild", answer: "up" }]));
+  inBase.profile.raceDate = "2027-06-13";
+  assert.equal(kinds(inBase.api.effectiveRoad(inBase.profile, ATH, { raceDateIso: "2027-06-13" })), "r4 b5 b4 r16");
+  // A sooner race takes from the later Base blocks first — down to nothing — before the race block gives up a week.
+  // (Its road fills 29 weeks to a race on 13 June; the race comes six weeks sooner.)
+  const blocks = harness("2026-11-25", ROAD([], [{ kind: "rebuild", weeks: 4 }, { kind: "base", weeks: 4 }, { kind: "base", weeks: 5 }, { kind: "race", weeks: 16 }]));
+  assert.equal(kinds(blocks.api.effectiveRoad(blocks.profile, ATH, { raceDateIso: "2027-06-13" })), "r4 b4 b5 r16", "as laid");
+  assert.equal(kinds(blocks.api.effectiveRoad(blocks.profile, ATH, { raceDateIso: addDays("2027-06-13", -42) })), "r4 b3 r16");
   // A runner the road no longer places (now a regular runner) has no road at all: the plan it would have been.
   assert.equal(h.api.effectiveRoad(h.profile, { experience: "recreational" }, GOAL), null);
 });
@@ -164,9 +180,13 @@ test("BLOCKER: one question at a time — the checkpoint waits behind the others
 test("Base's test run can be started from the checkpoint itself — the plan schedules none", () => {
   const html = decomment(fnBody("roadCheckpointHtml"));
   assert.match(html, /cp\.kind === "base" && !v\.met\.keyRun/);
-  assert.match(html, /data-trialstart="1"/);
-  // Wired by the sheet itself (wire() runs on a render, not when a sheet opens) to the one trial flow.
-  assert.match(decomment(fnBody("openRoadCheckpoint")), /#sheetBody \[data-trialstart\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => \{ closeSheet\(\); startTrialFlow\(\); \}; \}\)/);
+  // §10 decision 5: the controlled 2 km and the all-out trial, each only when this runner is offered it.
+  assert.match(html, /offer\.indexOf\("controlled-2k"\) >= 0\) trial \+= '<button class="perf-a" data-roadtrial="controlled">/);
+  assert.match(html, /offer\.indexOf\("trial-2k"\) >= 0\) trial \+= '<button class="perf-a" data-roadtrial="max">/);
+  // Wired by the sheet itself (wire() runs on a render, not when a sheet opens) to the one trial flow, in its mode.
+  // ⚠️ NEVER data-trialstart: wire() binds every one in the document to the all-out trial.
+  assert.doesNotMatch(html, /data-trialstart/);
+  assert.match(decomment(fnBody("openRoadCheckpoint")), /#sheetBody \[data-roadtrial\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => \{ closeSheet\(\); startTrialFlow\(b\.dataset\.roadtrial === "controlled" \? "controlled" : null, "road"\); \}; \}\)/);
 });
 
 test("BLOCKER: the checkpoint is a pop-up, never a card wedged onto Today — once a day, never stacked", () => {

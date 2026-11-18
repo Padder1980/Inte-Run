@@ -52,6 +52,11 @@ export type WeeklyReviewInput = {
   /** The runner has reported illness, injury or pain. Blocks any suggestion to test. */
   unwell?: boolean;
   /**
+   * STAGES.md §10, decision 5 (owner, 2026-11-18): no maximal test for somebody just getting started or back from
+   * injury (`maximalTestAllowed` in src/plan/checkpoint.ts is the one rule). True blocks the 2 km retest offer.
+   */
+  noMaximalTest?: boolean;
+  /**
    * Everything needed to decide whether to offer another running day. Absent means do not consider it —
    * a caller that cannot supply the evidence must not get the offer by default. See `addDayOffer`.
    */
@@ -354,8 +359,11 @@ function daysBetween(aIso: string, bIso: string): number {
  * on top of a hard week is the test doing harm — and offering it anyway teaches the runner to
  * ignore the app's prompts, which is worse than never prompting.
  */
-export function retestDue(input: Pick<WeeklyReviewInput, "lastTrialIso" | "todayIso" | "inTaperOrRaceWeek" | "unwell" | "runs">): boolean {
+export function retestDue(input: Pick<WeeklyReviewInput, "lastTrialIso" | "todayIso" | "inTaperOrRaceWeek" | "unwell" | "runs" | "noMaximalTest">): boolean {
   if (input.unwell || input.inTaperOrRaceWeek) return false;
+  // ⚠️ §10: the 2 km retest is a maximal effort ("the fastest pace you can hold"), and decision 5 rules one out for a
+  // runner just getting started or back from injury — their checkpoints use a controlled 2 km or time on feet instead.
+  if (input.noMaximalTest) return false;
   // Somebody who has barely run does not need a maximal test; they need to run.
   if (input.runs.filter((r) => r.distKm > 0).length < 2) return false;
   if (!input.lastTrialIso) return true;

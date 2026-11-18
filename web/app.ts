@@ -9687,17 +9687,36 @@ function effectiveRoad(pf, ath, goal) {
   const race = stages[stages.length - 1];
   const diff = roadWeeksBetween(r.fromIso, weekMondayOf(goal.raceDateIso)) + 1 - stages.reduce((n, s) => n + s.weeks, 0);
   const lastF = stages.length > 1 ? stages[stages.length - 2] : race;
-  if (diff > 0) lastF.weeks += diff;
+  if (diff > 0 && stages.length > 1) {
+    // ⚠️ §10 DECISION 1 — NEVER MORE THAN SIX WEEKS WITHOUT A CHECKPOINT. A later race adds BASE BLOCKS before the race
+    // block (RC.blockSplit: four weeks as standard, six at most), each with its own checkpoint, rather than stretching
+    // one stage past six. A last Base block not yet begun is cut again together with the new weeks; one already under
+    // way keeps its end, so the checkpoint the runner is heading for never moves under them.
+    const lastFrom = roadMondayAfter(r.fromIso, stages.slice(0, -2).reduce((n, s) => n + s.weeks, 0));
+    const fresh = lastF.kind === "base" && lastFrom > weekMondayOf(todayIso());
+    const weeks = RC.blockSplit((fresh ? lastF.weeks : 0) + diff).map((w) => ({ kind: "base", weeks: w }));
+    stages.splice(stages.length - (fresh ? 2 : 1), fresh ? 1 : 0, ...weeks);
+  } else if (diff > 0) lastF.weeks += diff;
   else if (diff < 0) {
     // Fewer weeks: from the stage before the race block, then the race block, then (only then) the earlier stages.
+    // ⚠️ §10: "THE STAGE BEFORE THE RACE BLOCK" IS EVERY BASE BLOCK FROM THE FIRST ONE ON — the latest first, a later
+    // block down to nothing, the first keeping a week — before the race block gives up a single week.
     let need = -diff;
-    const order = [stages.length - 2, stages.length - 1];
-    for (let j = stages.length - 3; j >= 0; j--) order.push(j);
+    const firstBase = stages.findIndex((s) => s.kind === "base");
+    const lastF0 = stages.length - 2;
+    const order = [];
+    for (let j = lastF0; j >= 0 && firstBase >= 0 && j >= firstBase; j--) order.push(j);
+    if (!order.length && lastF0 >= 0) order.push(lastF0);
+    order.push(stages.length - 1);
+    for (let j = lastF0; j >= 0; j--) if (order.indexOf(j) < 0) order.push(j);
     for (const j of order) {
       if (j < 0 || need <= 0) continue;
-      const t = Math.min(need, Math.max(0, stages[j].weeks - (stages[j].kind === "race" ? ROAD_MIN_RACE_WEEKS : 1)));
+      const floor = stages[j].kind === "race" ? ROAD_MIN_RACE_WEEKS : (firstBase >= 0 && j > firstBase ? 0 : 1);
+      const t = Math.min(need, Math.max(0, stages[j].weeks - floor));
       stages[j].weeks -= t; need -= t;
     }
+    // A block cut to nothing is gone before the hold below reads the legs (a leg of no weeks has no checkpoint).
+    for (let j = stages.length - 1; j >= 0; j--) if (stages[j].weeks <= 0) stages.splice(j, 1);
   }
   const thisMonday = weekMondayOf(todayIso());
   let at = r.fromIso;
@@ -9797,32 +9816,107 @@ function roadFacts(cp) {
   });
   const runs = (state.logged || []).filter((r) => r && r.dateIso && r.dateIso >= lo && r.dateIso <= today);
   const painRuns = runs.filter((r) => r.pain === true).length;
+  // The longest run in the stage that felt easy (rated RC.EASY_RPE_MAX or under): Rebuild's key run, and time on feet.
+  let best = null, bestIso = null;
+  (state.logged || []).forEach((r) => {
+    if (!r || !r.dateIso || r.dateIso < cp.fromIso || r.dateIso > today) return;
+    if (!(Number(r.rpe) > 0 && Number(r.rpe) <= RC.EASY_RPE_MAX)) return;
+    const m = Math.round((Number(r.sec) || 0) / 60);
+    if (m > 0 && (best == null || m > best)) { best = m; bestIso = r.dateIso; }
+  });
+  const easy = { bestMin: best, bestIso: bestIso ? runDateLabelIso(bestIso) : null };
   let keyRun;
   if (cp.kind === "rebuild") {
-    const need = Math.min(RC.REBUILD_KEY_RUN_MIN, longestPlanned || RC.REBUILD_KEY_RUN_MIN);
-    let best = null, bestIso = null;
-    (state.logged || []).forEach((r) => {
-      if (!r || !r.dateIso || r.dateIso < cp.fromIso || r.dateIso > today) return;
-      if (!(Number(r.rpe) > 0 && Number(r.rpe) <= RC.EASY_RPE_MAX)) return;
-      const m = Math.round((Number(r.sec) || 0) / 60);
-      if (m > 0 && (best == null || m > best)) { best = m; bestIso = r.dateIso; }
-    });
-    keyRun = { kind: "easy-run", needMin: need, bestMin: best, bestIso: bestIso ? runDateLabelIso(bestIso) : null };
+    keyRun = Object.assign({ kind: "easy-run", needMin: Math.min(RC.REBUILD_KEY_RUN_MIN, longestPlanned || RC.REBUILD_KEY_RUN_MIN) }, easy);
   } else {
-    const t = (loadTwoKm() || []).find((x) => x && x.completedAt && String(x.completedAt).slice(0, 10) >= cp.fromIso &&
-      String(x.completedAt).slice(0, 10) <= today);
-    keyRun = { kind: "test", doneIso: t ? runDateLabelIso(String(t.completedAt).slice(0, 10)) : null,
-      label: t && t.elapsedSeconds ? "2 km in " + Math.floor(t.elapsedSeconds / 60) + ":" + String(Math.round(t.elapsedSeconds) % 60).padStart(2, "0") : null };
+    // ⚠️ §10 DECISION 5 — THE TEST BY LEVEL (RC.blockTestsFor, the one definition): never a maximal test for somebody just
+    // getting started or back from injury. Time on feet is the block's OWN longest planned run (a runner who follows the
+    // plan exactly must be able to pass), easy and unbroken; where it is the only test, it is the key run itself.
+    const offer = roadTestOffer(profile);
+    const tof = Object.assign({ needMin: longestPlanned || RC.REBUILD_KEY_RUN_MIN }, easy);
+    if (offer.length === 1 && offer[0] === "time-on-feet") keyRun = Object.assign({ kind: "easy-run" }, tof);
+    else {
+      const t = roadTestIn(cp, today);
+      keyRun = { kind: "test", doneIso: t ? runDateLabelIso(t.iso) : null, label: t ? t.label : null, offer: offer,
+        timeOnFeet: offer.indexOf("time-on-feet") >= 0 ? tof : null };
+    }
   }
   return { stage: cp.kind, planned: planned, done: done, painRuns: painRuns, keyRun: keyRun };
 }
+/** "9:40" for a whole number of seconds. */
+function roadClock(sec) { const s = Math.round(Number(sec) || 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+/**
+ * §10 — THE LONGEST RUN OF THE LAST RC.LONGEST_RUN_WINDOW_DAYS DAYS, in km, from the history rows and the runs store both
+ * (either one is a run — roadFacts' rule). It gates the parkrun: a 5 km is offered only once this is about 4.5 km.
+ */
+function roadLongestKm(today) {
+  const lo = isoAdd(today, -(RC.LONGEST_RUN_WINDOW_DAYS - 1)).toISOString().slice(0, 10);
+  let km = 0;
+  (state.hist || loadHist() || []).forEach((h) => { if (h && h.d >= lo && h.d <= today) km = Math.max(km, Number(h.k) || 0); });
+  (state.logged || []).forEach((r) => { if (r && r.dateIso >= lo && r.dateIso <= today) km = Math.max(km, Number(r.distKm) || 0); });
+  return km;
+}
+/** §10 decision 5 — the tests this runner's block can end in: level from the status card, injury from the comeback answer. */
+function roadTestOffer(pf) {
+  return RC.blockTestsFor({ level: resolvedStatus(pf), injured: returnKind(pf) === "injury", longestKm30d: roadLongestKm(todayIso()) });
+}
+/**
+ * A test done in this block, or null: a 2 km from the trial flow (all-out or strong but controlled — the record says
+ * which), or a run of about 5 km the runner COUNTED as their parkrun or 5 km test (run.test, set only by their tap).
+ */
+function roadTestIn(cp, today) {
+  const t = (loadTwoKm() || []).find((x) => x && x.completedAt && String(x.completedAt).slice(0, 10) >= cp.fromIso &&
+    String(x.completedAt).slice(0, 10) <= today);
+  if (t) return { iso: String(t.completedAt).slice(0, 10),
+    label: t.elapsedSeconds ? "2 km in " + roadClock(t.elapsedSeconds) + (t.effort === "controlled" ? ", strong but controlled" : "") : null };
+  const r = (state.logged || []).find((x) => x && x.test === "5k" && x.dateIso >= cp.fromIso && x.dateIso <= today);
+  return r ? { iso: r.dateIso, label: (Number(r.distKm) || 0).toFixed(1) + " km in " + fmtTimeFull(Number(r.sec) || 0) } : null;
+}
+/**
+ * Runs of about 5 km in this block (within a tenth — raceResult's own tolerance) not yet counted as the test. ⚠️ NOT ONE
+ * THE RUNNER RATED EASY (RC.EASY_RPE_MAX or under — the checkpoint's own "felt easy"): by their own account that was an
+ * easy run, not a test, and offering it as one was noise found in the browser. An unrated run is still theirs to count.
+ */
+function roadParkrunCandidates(cp, today) {
+  return (state.logged || []).filter((r) => r && r.id && r.dateIso >= cp.fromIso && r.dateIso <= today && r.test !== "5k" &&
+    Number(r.sec) > 0 && Math.abs(Number(r.distKm) - 5) <= 0.5 && !(Number(r.rpe) > 0 && Number(r.rpe) <= RC.EASY_RPE_MAX)).slice(0, 2);
+}
+/**
+ * The runner says this run was their parkrun or 5 km test: it counts for the checkpoint, and its 5 km equivalent becomes
+ * the pace offer Today already knows how to ask (fitSuggestBanner) — never a change by itself (always with the runner).
+ */
+function countRoadTest(id) {
+  const r = (state.logged || []).find((x) => x && x.id === id);
+  if (!r) return false;
+  r.test = "5k";
+  saveRuns();
+  const implied = Math.round(RC.riegelPredict(Number(r.distKm) * 1000, Number(r.sec), 5000));
+  const cur = profile.noRecent ? 0 : Number(profile.recentTimeS) || 0;
+  if (implied > 0 && (!cur || Math.abs(cur - implied) / cur >= RACE_FIT_MIN)) {
+    state.fitSuggest = { dir: !cur || implied < cur ? "better" : "lower", implied: implied, from: cur, at: todayIso(),
+      sessTitle: "5 km test", race: { iso: r.dateIso, goal: "5k", sec: Number(r.sec) }, test: true };
+    saveFitSuggest();
+  }
+  return true;
+}
 /** "4 weeks" / "1 week". */
 function roadWeeksLabel(n) { return n + (n === 1 ? " week" : " weeks"); }
+/**
+ * A leg's name: "Rebuild", "Base", "Race block" — and "Base 1", "Base 2" where a stage runs to more than one block (§10
+ * decision 1: never more than six weeks without a checkpoint, so a long Base is several blocks, each with its own).
+ */
+function roadLegName(legs, i) {
+  const l = legs[i];
+  if (!l) return "";
+  const all = legs.filter((x) => x.kind === l.kind);
+  return ROAD_STAGE_LABEL[l.kind] + (all.length > 1 ? " " + (all.indexOf(l) + 1) : "");
+}
 /** The road in one line, as the wizard and the Plan screen say it: "4 weeks Rebuild → 5 weeks Base → 16 weeks race block". */
 function roadLine(stages) {
   const legs = [];
-  stages.forEach((s) => { const l = legs[legs.length - 1]; if (l && l.kind === s.kind) l.weeks += s.weeks; else legs.push({ kind: s.kind, weeks: s.weeks }); });
-  return legs.map((l) => roadWeeksLabel(l.weeks) + " " + (l.kind === "race" ? "race block" : ROAD_STAGE_LABEL[l.kind])).join(" → ");
+  stages.forEach((s) => { const l = legs[legs.length - 1]; if (l && l.kind === s.kind) { l.weeks += s.weeks; l.n++; } else legs.push({ kind: s.kind, weeks: s.weeks, n: 1 }); });
+  return legs.map((l) => roadWeeksLabel(l.weeks) + " " + (l.kind === "race" ? "race block" : ROAD_STAGE_LABEL[l.kind]) +
+    (l.n > 1 ? " in " + l.n + " blocks" : "")).join(" → ");
 }
 /**
  * The stored road after an answer, without committing it: the EFFECTIVE stages (a hold made real), then the answer.
@@ -9859,14 +9953,16 @@ function roadCheckpointHtml() {
   let cp = null;
   try { cp = currentRoadCheckpoint(); } catch (e) { cp = null; }
   if (!cp) return "";
-  let v;
-  try { v = RC.evaluateCheckpoint(roadFacts(cp)); } catch (e) { return ""; }
+  let v, facts;
+  try { facts = roadFacts(cp); v = RC.evaluateCheckpoint(facts); } catch (e) { return ""; }
   const next = cp.next;
-  const head = { ready: "Ready to move up", nearly: "Nearly there", notyet: "Not yet" }[v.verdict];
-  const nextName = next ? (next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[next.kind]) : "";
+  // §10 decision 1: Base can run as several blocks, each with this checkpoint — the next one is "the next block", not a move up.
+  const same = !!next && next.kind === cp.kind;
+  const head = { ready: same ? "Ready for your next block" : "Ready to move up", nearly: "Nearly there", notyet: "Not yet" }[v.verdict];
+  const nextName = next ? (next.kind === "race" ? "your race block" : roadLegName(cp.legs, next.i)) : "";
   const held = weekMondayOf(todayIso()) >= cp.endIso;
   const opts = [
-    { id: "up", t: next ? "Move up to " + nextName : "Move up",
+    { id: "up", t: next ? (same ? "Start " + nextName : "Move up to " + nextName) : "Move up",
       s: next ? ROAD_STAGE_JOB[next.kind] + " It starts " + (held ? "next Monday" : "on Monday") + "." : "" },
     { id: "more", t: "One more week of " + ROAD_STAGE_LABEL[cp.kind],
       s: "Another week like this one, and this checkpoint again at the end of it." },
@@ -9913,12 +10009,28 @@ function roadCheckpointHtml() {
       '<button class="perf-a" id="roadInjury">Injury &amp; symptoms ›</button>'
     : "";
   // ⚠️ BASE'S KEY RUN MUST BE SOMETHING THE RUNNER CAN DO FROM HERE: the plan schedules no test run, so a checkpoint that
-  // asked for one and offered no way to it could never be passed by following the app. The existing 2 km trial flow
-  // (startTrialFlow, wired for every [data-trialstart]) is the test; its time goes straight into the paces and the target.
-  const trial = cp.kind === "base" && !v.met.keyRun
-    ? '<button class="perf-a" data-trialstart="1">Do the 2 km test run \u203a</button>'
-    : "";
-  return '<div class="re-card road-sheet" id="roadSheet"><div class="sheet-h">Checkpoint · end of ' + esc(ROAD_STAGE_LABEL[cp.kind]) + '</div>' +
+  // asked for one and offered no way to it could never be passed by following the app.
+  // ⚠️⚠️ §10 DECISION 5 — ONLY THE TESTS THIS RUNNER IS OFFERED (RC.blockTestsFor, in its order): the strong-but-controlled
+  // 2 km for a habit-builder or anybody back from injury, the all-out 2 km trial only where a maximal test is allowed, and
+  // a parkrun or 5 km only once the longest run of the last 30 days is about 4.5 km — counted by the runner's own tap on
+  // the run. Time on feet needs no button: it is their own long run. ⚠️ data-roadtrial, NOT data-trialstart: wire() binds
+  // every [data-trialstart] in the document to the all-out trial, so a render while this sheet is open would have
+  // turned the controlled 2 km into a maximal one and started it behind the sheet.
+  let trial = "";
+  const kr = facts.keyRun;
+  if (cp.kind === "base" && !v.met.keyRun && kr.kind === "test") {
+    const offer = kr.offer || [];
+    if (offer.indexOf("controlled-2k") >= 0) trial += '<button class="perf-a" data-roadtrial="controlled">Do the 2 km — strong but controlled ›</button>';
+    if (offer.indexOf("trial-2k") >= 0) trial += '<button class="perf-a" data-roadtrial="max">Do the 2 km test run ›</button>';
+    if (offer.indexOf("parkrun") >= 0) {
+      const c = roadParkrunCandidates(cp, todayIso());
+      trial += c.length
+        ? c.map((r) => '<button class="perf-a" data-roadtest="' + esc(r.id) + '">Count your ' + (Number(r.distKm) || 0).toFixed(1) +
+          ' km run on ' + esc(runDateLabelIso(r.dateIso)) + ' as your parkrun or 5 km test ›</button>').join("")
+        : '<p class="mp-note">Or run a parkrun or a 5 km — once it is saved as a run, you can count it here.</p>';
+    }
+  }
+  return '<div class="re-card road-sheet" id="roadSheet"><div class="sheet-h">Checkpoint · end of ' + esc(roadLegName(cp.legs, cp.i)) + '</div>' +
     '<div class="db-body"><p class="road-verdict road-' + v.verdict + '"><b>' + esc(head) + '</b></p>' +
     '<ul class="road-why">' + v.reasons.map((x) => '<li>' + esc(x) + '</li>').join("") + '</ul>' + trial + pain + target + shortNote +
     '<p><b>What would you like to do?</b></p></div>' +
@@ -9938,10 +10050,14 @@ function openRoadCheckpoint() {
   $("sheetBody").innerHTML = html;
   $("sheetOv").classList.add("on");
   document.querySelectorAll("#sheetBody [data-road]").forEach((b) => { b.onclick = () => { closeSheet(); answerRoad(b.dataset.road); }; });
+  // Opened at all today — by itself or from the Plan screen — counts as today's showing: it does not pop up again today.
+  try { localStorage.setItem(ROADPOP_KEY, html && currentRoadCheckpoint() ? currentRoadCheckpoint().endIso + "|" + todayIso() : ""); } catch (e) {}
   const later = $("roadLater"); if (later) later.onclick = closeSheet;
   // ⚠️ NAVIGATES, NOT JUST state.support: from Today a [data-hub] button only set the field and re-drew Today.
   const inj = $("roadInjury"); if (inj) inj.onclick = () => { closeSheet(); state.screen = null; state.tab = "support"; state.support = "redflags"; render(); };
-  document.querySelectorAll("#sheetBody [data-trialstart]").forEach((b) => { b.onclick = () => { closeSheet(); startTrialFlow(); }; });
+  document.querySelectorAll("#sheetBody [data-roadtrial]").forEach((b) => { b.onclick = () => { closeSheet(); startTrialFlow(b.dataset.roadtrial === "controlled" ? "controlled" : null, "road"); }; });
+  // A counted parkrun: the checkpoint is re-read at once, so the runner sees it count (and the pace offer waits on Today).
+  document.querySelectorAll("#sheetBody [data-roadtest]").forEach((b) => { b.onclick = () => { if (countRoadTest(b.dataset.roadtest)) { openRoadCheckpoint(); render(); } }; });
   return true;
 }
 /**
@@ -9957,12 +10073,15 @@ function maybeRoadPopup() {
     if (EXTRAS || ($("extrasOv") && $("extrasOv").classList.contains("on"))) return;
     if ($("sheetOv") && $("sheetOv").classList.contains("on")) return;
     if (liveRunning()) return;
+    // ⚠️ NOR OVER A TEST WAITING ON TODAY: a 2 km started from the checkpoint renders Today with its card, and this ran on
+    // that render — the checkpoint popped straight back up over the test the runner had just chosen to do.
+    if (state.trialPending) return;
     const cp = currentRoadCheckpoint();
     if (!cp) return;
     const mark = cp.endIso + "|" + todayIso();
     if (localStorage.getItem(ROADPOP_KEY) === mark) return;
     setTimeout(() => {
-      if (state.tab !== "today" || state.screen || $("welcomeback") || GUIDE) return;
+      if (state.tab !== "today" || state.screen || $("welcomeback") || GUIDE || state.trialPending) return;
       if ($("sheetOv") && $("sheetOv").classList.contains("on")) return;
       if (openRoadCheckpoint()) { try { localStorage.setItem(ROADPOP_KEY, mark); } catch (e) {} }
     }, 600);
@@ -10007,7 +10126,7 @@ function answerRoad(choice) {
   saveProfileStore();
   computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks);
-  const said = choice === "up" ? "Moving up to " + (cp.next && cp.next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[(cp.next || {}).kind] || "the next stage") + "."
+  const said = choice === "up" ? (cp.next && cp.next.kind === cp.kind ? "On to " + roadLegName(cp.legs, cp.next.i) + "." : "Moving up to " + (cp.next && cp.next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[(cp.next || {}).kind] || "the next stage") + ".")
     : choice === "more" ? "One more week of " + ROAD_STAGE_LABEL[cp.kind] + "."
     : "Easing back: next week is lighter and easy running only.";
   toastUndo(said, () => {
@@ -10037,7 +10156,7 @@ function roadTimelineHtml(legs, here) {
     const when = roadDayLabel(l.fromIso) + " – " + roadDayLabel(isoAdd(last, 6).toISOString().slice(0, 10));
     const state = here == null ? "" : i < here ? "Done" : i === here ? "You are here" : "Ahead";
     return '<div class="road-row' + (i === here ? " on" : "") + '" style="--rc:' + ROAD_COLOUR[l.kind] + '">' +
-      '<i aria-hidden="true"></i><div class="road-rt"><b>' + esc(ROAD_STAGE_LABEL[l.kind]) + '</b> · ' + roadWeeksLabel(l.weeks) +
+      '<i aria-hidden="true"></i><div class="road-rt"><b>' + esc(roadLegName(legs, i)) + '</b> · ' + roadWeeksLabel(l.weeks) +
       '<span class="road-when">' + esc(when) + '</span>' +
       (i === here || here == null ? '<span class="road-job">' + esc(ROAD_STAGE_JOB[l.kind]) + '</span>' : "") + '</div>' +
       (state ? '<span class="road-st">' + state + '</span>' : "") + '</div>';
@@ -10055,10 +10174,10 @@ function roadPlanCard() {
   const r = roadOf(profile);
   const ans = cur && r ? roadAnswerAt(r, cur.endIso) : null;
   const next = legs[here + 1];
-  const nextName = next ? (next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[next.kind]) : "";
+  const nextName = next ? (next.kind === "race" ? "your race block" : roadLegName(legs, here + 1)) : "";
   const cpLine = !cur || cur.kind === "race" ? ""
     : ans && ans.answer === "up" && next
-      ? '<p class="mp-note">You chose to move up: ' + nextName + ' starts on Monday ' + roadDayLabel(cur.endIso) + '.</p>'
+      ? '<p class="mp-note">You chose to ' + (next.kind === cur.kind ? "go on" : "move up") + ': ' + nextName + ' starts on Monday ' + roadDayLabel(cur.endIso) + '.</p>'
       : thisMonday >= roadMondayAfter(cur.endIso, -1)
         ? '<p class="mp-note">Your checkpoint is this week. You choose whether to move up — nothing harder arrives until you do.</p>' +
           (currentRoadCheckpoint() ? '<button class="perf-a" id="roadOpen">Open your checkpoint ›</button>' : "")
@@ -10087,7 +10206,7 @@ function wizRoadHtml(prop, pf) {
     : "";
   return '<div class="road-wiz"><div class="road-wiz-h">Here’s your road</div><p class="road-wiz-l">' + esc(roadLine(road.stages)) + '</p>' +
     roadTimelineHtml(legs, null) +
-    '<p class="mp-note">Each stage ends with a checkpoint. You choose then whether to move up, take one more week, or ease back — the app never moves you up on its own.</p>' +
+    '<p class="mp-note">Each stage before your race block ends with a checkpoint, never more than six weeks apart. You choose then whether to move up, take one more week, or ease back — the app never moves you up on its own.</p>' +
     short + '</div>';
 }
 
@@ -10107,8 +10226,11 @@ function viewToday() {
   if (state.trialPending) {
     return weekStrip() +
       '<h2 class="sec">Today\\'s workout</h2><div class="card">' + trialTodayCard() + '</div>' +
-      '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added a <b>2 km time trial</b> to today. Warm up as guided — only the 2 km itself is timed, and its time goes straight to your profile.</div>' +
-      '<button class="primary" id="startTrial">' + ICON.play + ' Start time trial</button>' +
+      (trialControlled()
+        ? '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added your checkpoint test to today: <b>2 km, strong but controlled</b> — never flat out. Warm up as guided; only the 2 km itself is timed.</div>' +
+          '<button class="primary" id="startTrial">' + ICON.play + ' Start the 2 km</button>'
+        : '<div class="plan-note" style="border-left-color:var(--accent)">We\\'ve added a <b>2 km time trial</b> to today. Warm up as guided — only the 2 km itself is timed, and its time goes straight to your profile.</div>' +
+          '<button class="primary" id="startTrial">' + ICON.play + ' Start time trial</button>') +
       '<button class="primary" id="cancelTrial" style="background:var(--surface-2);color:var(--ink-soft);margin-top:8px">Not today — back to my plan</button>';
   }
   // A run under way on the wrist is the most important thing on this screen; the CTA to start
@@ -28707,17 +28829,34 @@ const TRIAL_PARTS = [
   ["easy", "Cool-down", "5–10 min easy jog to recover"],
 ];
 // Send the runner from the setup form into a trial session that's been added to Today.
-function startTrialFlow() { state.trialPending = true; state.screen = null; state.tab = "today"; render(); }
+/**
+ * ⚠️ §10 DECISION 5 — TWO KINDS OF 2 km. The default is the time trial (all-out: "the fastest pace you can hold"). A
+ * checkpoint asks a habit-builder, or anybody back from injury, for a 2 km STRONG BUT CONTROLLED instead (Galloway's
+ * "Magic Mile" style, never flat out): mode "controlled". Every other caller passes nothing and gets the trial as it
+ * always was. from "road": the checkpoint started it, so the result goes back to the checkpoint.
+ */
+function startTrialFlow(mode, from) {
+  state.trialPending = true; state.trialMode = mode === "controlled" ? "controlled" : null; state.trialFrom = from || null;
+  state.screen = null; state.tab = "today"; render();
+}
+/** Is the 2 km under way the strong-but-controlled one (a checkpoint's test), not the all-out trial? */
+function trialControlled() { return state.trialMode === "controlled"; }
+/**
+ * The controlled 2 km, in the runner's words. ⚠️ FOR THE CLINICAL REVIEWER (STAGES.md §10): it is the test offered to
+ * somebody back from injury in place of a time trial.
+ */
+const TRIAL_CONTROLLED_TITLE = "2 km, strong but controlled";
+const TRIAL_CONTROLLED_HOW = "Quicker than your usual runs, but never flat out — settle into a pace you could hold for a little longer, and finish knowing you had more in you";
 // ⚠️ The trial's warm-up is GENERATED now, from the same rules as every other session, so it scales
 // with ability and shortens in heat — and, being a formal test, it is declined rather than
 // compressed when there is not enough time. TRIAL_PARTS is the fallback shape if generation fails.
 function trialWarmupRows() {
   const mock = {
-    type: "race", title: "2 km time trial",
-    targetRpe: { min: 9, max: 10 },
+    type: "race", title: trialControlled() ? TRIAL_CONTROLLED_TITLE : "2 km time trial",
+    targetRpe: trialControlled() ? { min: 7, max: 8 } : { min: 9, max: 10 },
     steps: [
       { kind: "warmup", label: "Easy", durationSeconds: 900, targetRpe: { min: 2, max: 3 } },
-      { kind: "rep", label: "2 km", distanceMeters: 2000, targetRpe: { min: 9, max: 10 } },
+      { kind: "rep", label: "2 km", distanceMeters: 2000, targetRpe: trialControlled() ? { min: 7, max: 8 } : { min: 9, max: 10 } },
     ],
   };
   let w = null;
@@ -28738,14 +28877,15 @@ function trialTodayCard() {
         (p.phase === "raise" ? "Warm-up" : p.phase === "mobilise" ? "Mobilise" : "Strides") +
         '</div><div class="sm" style="color:var(--ink-soft)">' + esc(lab) + '</div></div></div>';
     }).join("") +
-      '<div class="sess"><span class="dot hard"></span><div><div class="st">2 km time trial</div>' +
-      '<div class="sm" style="color:var(--ink-soft)">The fastest pace you can hold for the whole 2 km — aim to make the second kilometre at least as quick as the first</div></div></div>' +
+      '<div class="sess"><span class="dot hard"></span><div><div class="st">' + (trialControlled() ? TRIAL_CONTROLLED_TITLE : "2 km time trial") + '</div>' +
+      '<div class="sm" style="color:var(--ink-soft)">' + (trialControlled() ? TRIAL_CONTROLLED_HOW : "The fastest pace you can hold for the whole 2 km — aim to make the second kilometre at least as quick as the first") + '</div></div></div>' +
       '<div class="sess"><span class="dot easy"></span><div><div class="st">Cool-down</div>' +
       '<div class="sm" style="color:var(--ink-soft)">5–10 min easy jog to recover</div></div></div>';
-    return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">2 km time trial</div><div class="sub">Added to today · ' + gen.totalMinutes + '′ warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
+    return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">' + (trialControlled() ? TRIAL_CONTROLLED_TITLE : "2 km time trial") + '</div><div class="sub">Added to today · ' + gen.totalMinutes + '′ warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
   }
-  const rows = TRIAL_PARTS.map((p) => '<div class="sess"><span class="dot ' + p[0] + '"></span><div><div class="st">' + p[1] + '</div><div class="sm" style="color:var(--ink-soft)">' + p[2] + '</div></div></div>').join("");
-  return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">2 km time trial</div><div class="sub">Added to today · warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
+  const parts = trialControlled() ? TRIAL_PARTS.map((p) => p[0] === "hard" ? ["hard", TRIAL_CONTROLLED_TITLE, TRIAL_CONTROLLED_HOW] : p) : TRIAL_PARTS;
+  const rows = parts.map((p) => '<div class="sess"><span class="dot ' + p[0] + '"></span><div><div class="st">' + p[1] + '</div><div class="sm" style="color:var(--ink-soft)">' + p[2] + '</div></div></div>').join("");
+  return '<div class="wk-card" style="--c:var(--eff-hard)"><div class="b"><div class="t">' + (trialControlled() ? TRIAL_CONTROLLED_TITLE : "2 km time trial") + '</div><div class="sub">Added to today · warm-up included</div><div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">' + rows + '</div></div></div>';
 }
 let TRIALRUN = null;
 function beginTrialRun() { TRIALRUN = { phase: "warmup", wStart: performance.now(), start: 0, secs: 0, raf: null }; state.screen = "trialrun"; render(); }
@@ -28762,7 +28902,7 @@ function viewTrialRun() {
   const back = '<button class="backbtn" id="trBack">‹ Today</button>';
   if (p === "warmup") {
     return back +
-      '<div class="card live-hero"><div class="eyebrow">2 km time trial · step 1 of 2</div><div class="live-title">Warm up first</div>' +
+      '<div class="card live-hero"><div class="eyebrow">' + (trialControlled() ? TRIAL_CONTROLLED_TITLE : "2 km time trial") + ' · step 1 of 2</div><div class="live-title">Warm up first</div>' +
       '<div class="live-metrics" style="grid-template-columns:1fr"><div><div class="lk">Warm-up time</div><div class="lv num" id="twClock">0:00</div></div></div></div>' +
       '<div class="card"><div class="subhead" style="margin-top:0">Do this before the effort</div><div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">' +
       '<div class="sess"><span class="dot easy"></span><div><div class="st">Easy jog ~10 min</div><div class="sm" style="color:var(--ink-soft)">Raise your heart rate gradually — conversational pace.</div></div></div>' +
@@ -28770,6 +28910,14 @@ function viewTrialRun() {
       '<div class="sess"><span class="dot hard"></span><div><div class="st">Catch your breath</div><div class="sm" style="color:var(--ink-soft)">Then start the 2 km when you feel ready.</div></div></div></div></div>' +
       '<div class="trial-controls"><button class="primary" id="twGo">' + ICON.play + ' Start the 2 km</button></div>' +
       '<div class="trial-foot" style="border:0;text-align:center">Only the 2 km itself is timed and saved to your profile.</div>';
+  }
+  if (p === "run" && trialControlled()) {
+    return back +
+      '<div class="card live-hero" style="border-color:var(--peak)"><div class="eyebrow" style="color:var(--peak)">' + TRIAL_CONTROLLED_TITLE + '</div>' +
+      '<div class="trial-clock num" id="twClock" style="margin:14px 0 6px">0:00.0</div>' +
+      '<div style="color:var(--ink-soft);font-size:13.5px">' + TRIAL_CONTROLLED_HOW + '. Tap <b>Finish</b> the instant you complete it.</div></div>' +
+      '<div class="trial-controls"><button class="primary" id="twFinish" style="background:var(--peak)">Finish — 2 km done</button></div>' +
+      '<div class="trial-foot" style="border:0;text-align:center">Not a race: keep something in reserve all the way to the finish.</div>';
   }
   if (p === "run") {
     return back +
@@ -28787,10 +28935,11 @@ function viewTrialRun() {
   // yet ask for. Better an honest number than a confident one.
   const vel = inRange ? (2000 / secs) : 0;
   return back +
-    '<div class="card live-hero"><div class="eyebrow">2 km time trial · done</div>' +
+    '<div class="card live-hero"><div class="eyebrow">' + (trialControlled() ? TRIAL_CONTROLLED_TITLE : "2 km time trial") + ' · done</div>' +
     '<div class="trial-clock num" style="margin:14px 0 8px">' + fmtTimeFull(secs) + '</div>' +
     (inRange
-      ? '<div style="color:var(--ink-soft);font-size:13.5px">That is <b>' + fmtPace(Math.round(secs / 2)) + '/km</b> \u00b7 ' + vel.toFixed(2) + ' m/s. Saving it calibrates every pace in your plan.</div>'
+      ? '<div style="color:var(--ink-soft);font-size:13.5px">That is <b>' + fmtPace(Math.round(secs / 2)) + '/km</b> \u00b7 ' + vel.toFixed(2) + ' m/s. ' +
+        (trialControlled() ? "Saving it counts as your checkpoint test. It can only make your paces quicker, never slower — a controlled effort is not your limit." : "Saving it calibrates every pace in your plan.") + '</div>'
       : '<div style="color:var(--ease);font-size:13.5px">' + (secs < RC.TWO_KM_RULES.minSeconds ? "That's too quick to be a measured 2 km — check the route and give it another go." : "That's longer than a hard 2 km should take — check the distance, have a rest and try again.") + '</div>') +
     '</div>' +
     (inRange
@@ -28838,8 +28987,13 @@ function priorTwoKm(rec) {
   return loadTwoKm().filter((r) => r && r.id !== rec.id && r.environment === rec.environment)[0] || null;
 }
 function trialSaveResult() {
-  profile.twoKmS = TRIALRUN.secs;
-  saveTwoKmRecord(TRIALRUN.secs);
+  // ⚠️⚠️ §10 — A CONTROLLED 2 km IS A FLOOR ON FITNESS, NOT A MEASURE OF IT. It is saved as what it was (effort
+  // "controlled", so no later reader takes it for an all-out test), and it becomes the 2 km anchor only where there is
+  // none or it is quicker: a controlled run must never pull down paces an all-out test set. applyProfile already uses
+  // a 2 km only where it projects a faster 5 km than the runner's own, so it can lift the paces and never lower them.
+  const controlled = trialControlled(), secsDone = TRIALRUN.secs;
+  if (!controlled || !(profile.twoKmS > 0) || TRIALRUN.secs < profile.twoKmS) profile.twoKmS = TRIALRUN.secs;
+  saveTwoKmRecord(TRIALRUN.secs, controlled ? { effort: "controlled" } : undefined);
   profile.personalized = true;
   // Re-anchoring moves every week's start, so today has to be relocated in the new plan too — not just
   // the paces rescaled. Without computeToday() the old week/day indices stay and point at the wrong day.
@@ -28849,6 +29003,16 @@ function trialSaveResult() {
   state.trialPending = false; TRIALRUN = null;
   // The scheduled trial has now happened — clear it so Today does not keep offering it forever.
   clearScheduledTrial();
+  const fromRoad = state.trialFrom === "road";
+  state.trialMode = null; state.trialFrom = null;
+  // ⚠️ STARTED FROM A CHECKPOINT, IT GOES BACK TO THE CHECKPOINT: the runner did the test to answer it, so they land on
+  // Today with it open again and the test counted, rather than on About you with the question nowhere in sight.
+  if (fromRoad) {
+    state.trialSaved = null; state.screen = null; state.tab = "today"; render();
+    toast("Your 2 km is saved: " + fmtTimeFull(secsDone) + ".");
+    openRoadCheckpoint();
+    return;
+  }
   state.screen = "setup"; render();
 }
 // The gating first question: current running status decides which fields we ask for.
@@ -43450,6 +43614,8 @@ function currentWeeklyReview() {
       inTaperOrRaceWeek: /taper|race/i.test(phase),
       // Anything the runner has told us that makes a maximal effort the wrong idea.
       unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+      // ⚠️ §10 DECISION 5: and who they are — no maximal test for somebody just getting started or back from injury.
+      noMaximalTest: !RC.maximalTestAllowed({ level: resolvedStatus(profile), injured: returnKind(profile) === "injury" }),
       addDay: addDayEvidence(phase),
       easeWeek: ev,
     });
@@ -43766,11 +43932,12 @@ function fitSuggestBanner() {
   const faster = fs.dir === "better";
   const impliedPace = fmtPace(fs.implied / 5);
   const race = fs.race && fs.race.iso ? fs.race : null;
-  const head = race ? "Your race says your fitness has changed"
+  // §10: a parkrun or 5 km the runner counted as their end-of-block test (countRoadTest) is read the same way as a race.
+  const head = race ? (fs.test ? "Your 5 km test says your fitness has changed" : "Your race says your fitness has changed")
     : faster ? "You\\u2019re running stronger than your plan assumes" : "That run was tougher than your plan expects";
   // B9: a race is the runner's own result, not a training run read against its target, so it says so.
   const body = race
-    ? "Your " + (RACE_LABEL[race.goal] || "race") + " on " + runDateLabelIso(race.iso) + " took " + fmtTimeFull(race.sec) +
+    ? "Your " + (fs.test ? "5 km test" : (RACE_LABEL[race.goal] || "race")) + " on " + runDateLabelIso(race.iso) + " took " + fmtTimeFull(race.sec) +
       ", about a " + fmtTimeFull(fs.implied) + " 5K" + (fs.from ? ". Your paces use " + fmtTimeFull(fs.from) + "." : ".") +
       (fs.from ? " Update them to match?" : " Use it to set your paces?")
     : faster
@@ -44177,7 +44344,7 @@ function render() {
     return;
   }
   if (state.screen === "trialrun") {
-    $("topTitle").textContent = "2 km time trial";
+    $("topTitle").textContent = trialControlled() ? "2 km test" : "2 km time trial";
     v.innerHTML = viewTrialRun(); v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wireTrialRun();
@@ -45296,7 +45463,7 @@ function wire() {
   document.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => { const k = b.dataset.done; state.done[k] = !state.done[k]; render(); });
   // 2 km time-trial session wiring
   const startTrial = $("startTrial"); if (startTrial) startTrial.onclick = beginTrialRun;
-  const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; render(); };
+  const cancelTrial = $("cancelTrial"); if (cancelTrial) cancelTrial.onclick = () => { state.trialPending = false; state.trialMode = null; state.trialFrom = null; render(); };
   // Live session wiring
   // ⚠️ NO startSession HANDLER. The day's card opens the preview now (owner, 2026-08-21), and the
   // preview's own Start is what reaches openStartWhereSheet — so a binding here would be a lookup for

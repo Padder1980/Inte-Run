@@ -29376,16 +29376,16 @@ const COACH = {
   manifest: null, ready: false, byKey: {},
   audio: null, current: null, queue: [], unlocked: false,
   history: RC.newPromptHistory(), halfwayDone: false, finalDone: false,
-  settleDone: false, lastTechAt: -999, highEffortSince: 0,
+  settleDone: false, techSlot: -1, highEffortSince: 0,
   paceSince: 0, paceWas: "", lastPaceCueAt: -999, paceCorrectionPending: false,
-  whyDone: false, whyShown: null, lastKeepGoingAt: -999,
+  whyDone: false, whyShown: null, keepSlot: -1,
   personal: null, personalTried: "",
   // ONE <audio> ELEMENT, FOUR WRITERS. coachPlay, coachSaySequence, the permanent "ended" listener
   // and the permanent "error" listener all reach the same element, and until 2026-08-16 nothing
   // told them apart. seq is the token a stitched sentence holds while it owns the element;
   // pendingNums is a pace readout waiting for the coach to finish their own line first.
   seq: 0, pendingNums: null, numT: 0, native: false, playAt: 0, reschedAt: 0, reschedEta: null,
-  sectionHalfKey: "", lastHalfwayAt: -999,
+  sectionHalfKey: "", lastHalfwayAt: -999, schedPosted: false,
 };
 function coachEnabled() { return !!(COACH.cfg && COACH.cfg.enabled); }
 function saveCoachCfg() { try { localStorage.setItem(COACH_STORE, JSON.stringify(COACH.cfg)); } catch (e) {} }
@@ -29673,14 +29673,14 @@ function coachStop() {
 function coachResetSession(keepAudio) {
   COACH.history = RC.newPromptHistory(); COACH.halfwayDone = false; COACH.finalDone = false;
   COACH.paceSince = 0; COACH.paceWas = ""; COACH.lastPaceCueAt = -999; COACH.paceCorrectionPending = false;
-  COACH.whyDone = false; COACH.whyShown = null; COACH.lastKeepGoingAt = -999;
-  COACH.settleDone = false; COACH.lastTechAt = -999; COACH.highEffortSince = 0;
+  COACH.whyDone = false; COACH.whyShown = null; COACH.keepSlot = -1;
+  COACH.settleDone = false; COACH.techSlot = -1; COACH.highEffortSince = 0;
   // ⚠️ RESET WITH THE REST, or the second run of an app session starts believing it has already
   // called the midpoint of section one. Same trap coachResetSession exists for.
   COACH.sectionHalfKey = ""; COACH.lastHalfwayAt = -999;
   // ⚠️ WITH THE REST. Left behind, run two of an app session inherits run one's predicted finish and
   // the drift gate answers "nothing has moved" — so its schedule is never refreshed at all.
-  COACH.reschedAt = 0; COACH.reschedEta = null; COACH.playAt = 0;
+  COACH.reschedAt = 0; COACH.reschedEta = null; COACH.playAt = 0; COACH.schedPosted = false;
   if (!keepAudio) coachStop();
 }
 // Map a live step to the right trigger when it begins.
@@ -29827,11 +29827,53 @@ function coachWhyTick(snap, type, nowSec) {
   // Showing the card must never be able to silence the coach: the cue matters more than the paint.
   try { renderLiveNow(); } catch (e) {}
 }
-// A grind cue for the closing stretch of the hardest work, independent of pace.
-function coachKeepGoing(type, nowSec) {
-  if (nowSec - COACH.lastKeepGoingAt < 300) return;
-  COACH.lastKeepGoingAt = nowSec;
-  coachTrigger("keep-going", type, nowSec);
+// ---- The coach's REGULAR reminders, on one clock for both players -------------------------------
+//
+// ⚠️⚠️ A 70-MINUTE LONG RUN HEARD FIVE LINES. Owner, 2026-11-18: "there were no regular voice
+// commands. The only commands i received were; start, pause, restart, halfway through the session
+// and then the end message." Those five are exactly the moments a WRIST-recorded run handed the
+// phone (the speakOnPhone calls in WorkoutManager.swift). Nothing else had a sender on that path:
+// the form reminder and the kilometre line lived only in coachTick here, which does not run on a
+// watch run (the wrist records, LIVE is null) or on a locked phone (the web process is suspended),
+// and the locked-phone schedule carried step changes and the finish and nothing in between. On a
+// one-step long run that is an hour of silence either way.
+//
+// ⚠️ ONE GRID, SO TWO PLAYERS CANNOT REPEAT EACH OTHER. The page and the native schedule place
+// these on fixed seconds of the run: a form reminder two minutes in and every four after (the
+// rhythm coachTick always had), keep-going every five minutes from 80% (likewise). A SLOT, once its
+// second has passed, is spent whoever held the clock. The old "time since the last one" stamps could
+// not do that: the native player cannot tell a FROZEN page what it said, so on unlock the page found
+// four minutes had passed since its own last reminder and said another one straight away.
+const COACH_TECH_FIRST_S = 120;
+const COACH_TECH_EVERY_S = 240;
+const COACH_KEEP_FROM = 0.8;
+const COACH_KEEP_EVERY_S = 300;
+/** Relaxed running, where a runner has the attention to spare for their form. */
+function coachTechType(type) { return type === "easy" || type === "long" || type === "recovery"; }
+/** The form-reminder slot a second of the run falls in; -1 before the first is due. */
+function coachTechSlot(sec) {
+  return sec > COACH_TECH_FIRST_S ? Math.floor((sec - COACH_TECH_FIRST_S) / COACH_TECH_EVERY_S) : -1;
+}
+/** The second a slot is spoken at: just past the boundary where coachTechSlot first returns it. */
+function coachTechAt(slot) { return COACH_TECH_FIRST_S + slot * COACH_TECH_EVERY_S + 1; }
+/** The grind: the closing stretch of the hardest work, independent of pace. */
+function coachKeepType(type) { return type === "threshold" || type === "vo2" || type === "long"; }
+function coachKeepSlot(sec, target) {
+  const from = target * COACH_KEEP_FROM;
+  return target > 0 && sec >= from ? Math.floor((sec - from) / COACH_KEEP_EVERY_S) : -1;
+}
+function coachKeepAt(slot, target) { return Math.ceil(target * COACH_KEEP_FROM + slot * COACH_KEEP_EVERY_S) + 1; }
+/**
+ * Is the native schedule holding the clock right now? Only while the page is hidden, and only in a
+ * mode that posts one (a treadmill run does not — see startIndoor). Then a reminder that is a
+ * function of time belongs to Swift, and the page spends its slot in silence.
+ */
+function coachNativeOwnsClock() {
+  // ⚠️ AND ONLY IF ONE WAS ACTUALLY POSTED FOR THIS RUN. A free run has no steps, so
+  // coachNativeSchedule returns before posting anything; going quiet there would hand the clock to a
+  // player holding nothing, and the page's own reminders on its wakes are all that run gets.
+  try { return coachNativeAvailable() && !!document.hidden && !!LIVE && LIVE.mode !== "indoor" && !!COACH.schedPosted; }
+  catch (e) { return false; }
 }
 // Ambient / milestone checker, called each UI tick with a fresh snapshot.
 // ---- The coach with the phone locked ---------------------------------------
@@ -29867,11 +29909,14 @@ function coachNativeAvailable() {
  * their wordings all live here, so the native side cannot resolve a trigger without it.
  * ⚠️ Every trigger the wrist can send must be in this list, or that cue is the one that goes quiet —
  * the list is taken from the speakOnPhone call sites in WorkoutManager/WorkoutVoice.
- * ⚠️ Two entries are AHEAD of the wrist rather than taken from it: "keep-going" and
- * "milestone-distance" have clips in the map and no wrist sender yet (the wrist's keepGoing
- * synthesises directly — wiring it through the phone is an open decision with the owner, because
- * its personalised variant speaks a NAME and no shared clip can). Listed so the day they are wired
- * the audio already works; do not read their presence as proof of a sender.
+ * ⚠️ "milestone-distance" and "technique" are sent from the wrist since 2026-11-18 (a kilometre
+ * line and a form reminder every four minutes on relaxed running — the regular cues a watch-recorded
+ * long run never had; see COACH_TECH_FIRST_S). "keep-going" is still AHEAD of the wrist: its keepGoing
+ * synthesises directly, and wiring it through the phone is an open decision with the owner, because
+ * its personalised variant speaks a NAME and no shared clip can. Listed so the day it is wired the
+ * audio already works; do not read its presence as proof of a sender.
+ * ⚠️ AN OLDER WATCH NEVER SENDS THE NEW TWO, and this page reaches the phone over the air before the
+ * watch is rebuilt — so carrying them here is harmless until it does, and ready the moment it does.
  */
 /**
  * THE FOUR BEATS OF THE COUNT-IN, EACH AS ITS OWN TRIGGER, MAPPED TO ITS OWN FIXED CLIP.
@@ -29900,7 +29945,7 @@ function coachNativeAvailable() {
 const WATCH_COUNT_CLIPS = { "count-3": "count_3", "count-2": "count_2", "count-1": "count_1", "count-go": "count_go" };
 const WATCH_CUE_TRIGGERS = ["session-start", "session-complete", "paused", "resumed",
   "warmup-start", "interval-start", "recovery-start", "cooldown-start", "easy-settle",
-  "tempo-start", "long-run-settle", "milestone-distance", "keep-going", "halfway"]
+  "tempo-start", "long-run-settle", "milestone-distance", "keep-going", "halfway", "technique"]
   .concat(Object.keys(WATCH_COUNT_CLIPS));
 function coachPushWatchCueMap(type) {
   if (!COACH.manifest || !coachEnabled()) return;
@@ -29908,7 +29953,7 @@ function coachPushWatchCueMap(type) {
   WATCH_CUE_TRIGGERS.forEach((t) => {
     const files = [];
     for (let i = 0; i < 4; i++) {
-      const p = coachScheduledPrompt(t, i, type);
+      const p = coachSchedulePick(t, i, type);
       if (p && p.file && files.indexOf(p.file) < 0) files.push(p.file);
     }
     if (files.length) map[t] = files;
@@ -29956,6 +30001,20 @@ function coachScheduledPrompt(trigger, idx, type) {
     }
   } catch (e) {}
   return null;
+}
+/**
+ * The pick for anything handed to Swift — the locked-phone schedule and the wrist's cue map — with
+ * the runner's "how often" setting applied.
+ * ⚠️ THE LIVE COACH HAS ALWAYS DROPPED A LINE THAT SETTING RULES OUT (coachFrequencyAllows) AND THE
+ * TWO LISTS HANDED TO SWIFT NEVER ASKED, so "Minimal" was minimal only while the phone was in the
+ * runner's hand. It mattered little while those lists held step changes and the finish; it matters
+ * now that they carry a form reminder every four minutes.
+ */
+function coachSchedulePick(trigger, idx, type) {
+  const pick = coachScheduledPrompt(trigger, idx, type);
+  if (!pick) return null;
+  const def = RC.ALL_PROMPTS.find((p) => p.id === pick.id);
+  return (!def || coachFrequencyAllows(def)) ? pick : null;
 }
 // Every step boundary still ahead of us, as {id, inMs, file}. Built from the session the runner is
 // actually running, at the elapsed time they are actually at.
@@ -30021,7 +30080,7 @@ function coachNativeSchedule() {
   // different feature. And this is not theoretical: stopLive() posts it and every bottom-nav button
   // calls stopLive() whenever a run is not live, so simply tapping Today during a wrist-recorded run
   // wiped the map and silenced the coach for the rest of it, with nothing to show why.
-  if (!LIVE || !LIVE.started || LIVE.done || !coachEnabled()) { coachNativePost({ action: "clearSchedule" }); return; }
+  if (!LIVE || !LIVE.started || LIVE.done || !coachEnabled()) { COACH.schedPosted = false; coachNativePost({ action: "clearSchedule" }); return; }
   const steps = (LIVE.session && LIVE.session.steps) || [];
   if (!steps.length) return;
   const nowSec = liveNowMs() / 1000;
@@ -30044,14 +30103,17 @@ function coachNativeSchedule() {
     return stepSecs(st);
   };
   let at = 0;
+  // Where each step sits on the run's clock, so a reminder can ask what the runner is doing then.
+  const spans = [];
   for (let i = 0; i < steps.length; i++) {
     const st = steps[i];
     // The cue lands when the step STARTS. The first step's cue has already gone by definition.
     if (i > 0 && at > nowSec) {
       const trig = coachStepTrigger(st, type);
-      const pick = trig ? coachScheduledPrompt(trig, i, type) : null;
+      const pick = trig ? coachSchedulePick(trig, i, type) : null;
       if (pick) cues.push({ id: pick.id, inMs: Math.round((at - nowSec) * 1000), file: pick.file });
     }
+    spans.push({ from: at, to: at + secsFor(st), kind: st.kind });
     // ⚠️ stepSecs, NOT st.durationSeconds. A DISTANCE-gated step — "6 × 1 km cruise", every hill
     // rep, every 80 m stride — carries no duration at all, so summing durations left the clock frozen
     // through it and every later cue was scheduled that much too early. Measured across a real plan:
@@ -30068,10 +30130,72 @@ function coachNativeSchedule() {
   // which on a locked phone means on unlock.
   const distGated = steps.some((st) => !st.durationSeconds && st.distanceMeters);
   if (at > nowSec && !distGated) {
-    const done = coachScheduledPrompt("session-complete", 0, type);
+    const done = coachSchedulePick("session-complete", 0, type);
     if (done) cues.push({ id: done.id, inMs: Math.round((at - nowSec) * 1000), file: done.file });
   }
+  coachScheduleReminders(cues, spans, type, nowSec, at, distGated);
+  // In the order they will sound. Swift takes the first due cue in list order, so a list that is
+  // not in time order could hold a later line ahead of an earlier one that is also due.
+  cues.sort((a, b) => a.inMs - b.inMs);
+  COACH.schedPosted = true;
   coachNativePost({ action: "schedule", cues: cues });
+}
+/**
+ * THE REGULAR REMINDERS FOR THE LOCKED PHONE — everything coachTick says on the clock alone.
+ *
+ * ⚠️ THE KILOMETRE LINE IS NOT HERE, AND CANNOT BE. It is a fact about ground covered, and a guess
+ * at when a kilometre will pass is a coach saying "another kilometre done" when it is not — the
+ * same reason a distance session's finish is never scheduled above. The page says it on its next
+ * wake. Everything here is a function of the clock, which is why it can be placed in advance as
+ * honestly as a step change.
+ * ⚠️ ON THE SAME GRID AS THE PAGE (coachTechSlot, coachKeepSlot) and starting after the slots the
+ * page has already spent, so a reminder the page has just said in the foreground is not handed to
+ * Swift to say again when the phone locks.
+ */
+function coachScheduleReminders(cues, spans, type, nowSec, end, distGated) {
+  const target = (LIVE.session && LIVE.session.estimatedDurationSeconds) || 0;
+  if (!(end > 0) || !isFinite(end)) return;
+  const add = (trigger, idx, at) => {
+    const pick = coachSchedulePick(trigger, idx, type);
+    if (pick) cues.push({ id: pick.id, inMs: Math.round((at - nowSec) * 1000), file: pick.file });
+  };
+  const kindAt = (sec) => {
+    for (const sp of spans) if (sec >= sp.from && sec < sp.to) return sp.kind;
+    return "";
+  };
+  // Halfway, for a session measured in MINUTES. A session measured in kilometres has its halfway at
+  // a distance only the page can see, so it stays the page's to say (see sessionHalfwayReached).
+  if (!COACH.halfwayDone && target > 120 && !sessionDistanceDriven(LIVE.session)) {
+    const at = Math.ceil(target * 0.5) + 1;
+    if (at > nowSec && at < end) add("halfway", 0, at);
+  }
+  // Keep-going in the closing fifth of a timed session — never in a cool-down or a recovery jog,
+  // where "this is the part that counts" is the wrong instruction.
+  if (coachKeepType(type) && target > 0 && !distGated) {
+    const k0 = Math.max(COACH.keepSlot, coachKeepSlot(nowSec, target)) + 1;
+    for (let k = k0; k < k0 + 200; k++) {
+      const at = coachKeepAt(k, target);
+      if (!(at < end - 60)) break;
+      if (at <= nowSec) continue;
+      const kind = kindAt(at);
+      if (kind === "cooldown" || kind === "recovery") continue;
+      add("keep-going", k, at);
+    }
+  }
+  // A form reminder on relaxed running, never within thirty seconds of another line: two voices
+  // queued back to back is a coach talking over itself. A distance session stops short of its
+  // PREDICTED finish, because a runner who speeds up gets there first.
+  if (coachTechType(type)) {
+    const last = distGated ? end * 0.9 : end - 60;
+    const taken = cues.map((c) => nowSec + c.inMs / 1000);
+    const k0 = Math.max(COACH.techSlot, coachTechSlot(nowSec)) + 1;
+    for (let k = k0; k < k0 + 400; k++) {
+      const at = coachTechAt(k);
+      if (!(at < last)) break;
+      if (at <= nowSec || taken.some((x) => Math.abs(x - at) < 30)) continue;
+      add("technique", k, at);
+    }
+  }
 }
 // Swift telling us a line has been spoken while we were frozen, so our own history matches and the cue is
 // not repeated the instant the runner unlocks the phone.
@@ -30154,6 +30278,11 @@ function coachSectionTick(snap, type, nowSec) {
 function coachTick(snap) {
   if (!coachEnabled() || !LIVE || !LIVE.started || LIVE.done) return;
   const t = LIVE.session.type, nowSec = (LIVE.mode === "sim" ? LIVE.vms : liveElapsedMs()) / 1000;
+  // ⚠️ WHILE THE APP IS HIDDEN THE NATIVE SCHEDULE SPEAKS THE CLOCK-DRIVEN REMINDERS, and the page
+  // spends their slots in silence on whatever wake it gets. Speaking them here as well is the same
+  // line twice; spending nothing is the page catching up on unlock with a reminder from minutes ago.
+  const quiet = coachNativeOwnsClock();
+  let spoke = false;
   coachPaceTick(snap, t, nowSec);
   coachWhyTick(snap, t, nowSec);
   const target = (LIVE.session.estimatedDurationSeconds || 0);
@@ -30169,19 +30298,37 @@ function coachTick(snap) {
   // halfway worth announcing" is a question about time, and 120s is the judgement that already
   // shipped. Converting it to a distance would need a pace, which is the thing that varies.
   if (!COACH.halfwayDone && target > 120 && sessionHalfwayReached(snap)) {
-    COACH.halfwayDone = true; COACH.lastHalfwayAt = nowSec; coachTrigger("halfway", t, nowSec);
+    COACH.halfwayDone = true; COACH.lastHalfwayAt = nowSec;
+    // A halfway in MINUTES is on the native schedule; one in kilometres is not, because only this
+    // page can see the ground covered — so that one is still said here, late or not.
+    if (!quiet || sessionDistanceDriven(LIVE.session)) { coachTrigger("halfway", t, nowSec); spoke = true; }
   }
   coachSectionTick(snap, t, nowSec);
   // Final effort — entering the last step (unless it's a cool-down), once.
   if (!COACH.finalDone && snap.step && snap.step.total > 1 && snap.step.index === snap.step.total - 1 && snap.step.kind !== "cooldown") {
     COACH.finalDone = true; coachTrigger("final-effort", t, nowSec);
-  } else if (target > 0 && snap.elapsedSeconds >= target * 0.8 && (t === "threshold" || t === "vo2" || t === "long")) {
-    coachKeepGoing(t, nowSec);
+  } else if (coachKeepType(t)) {
+    // Keep-going, on its grid (coachKeepSlot). ⚠️ Never in a cool-down or a recovery jog: it used to
+    // fire in both, and "this is the part that counts" is the wrong thing to hear while easing off.
+    const ks = coachKeepSlot(nowSec, target);
+    if (ks > COACH.keepSlot) {
+      COACH.keepSlot = ks;
+      const easing = !!(snap.step && (snap.step.kind === "cooldown" || snap.step.kind === "recovery"));
+      if (!quiet && !easing) { coachTrigger("keep-going", t, nowSec); spoke = true; }
+    }
   }
-  // Periodic technique cue on relaxed running (frequency-gated by selection + repeat window).
-  if ((t === "easy" || t === "long" || t === "recovery") && nowSec - COACH.lastTechAt > 240 && snap.elapsedSeconds > 120) {
-    COACH.lastTechAt = nowSec; coachTrigger("technique", t, nowSec);
+  // A form reminder on relaxed running, on its grid (coachTechSlot). The runner's "how often"
+  // setting still decides whether it is heard: coachTrigger drops it under Minimal.
+  if (coachTechType(t)) {
+    const ts = coachTechSlot(nowSec);
+    if (ts > COACH.techSlot) {
+      COACH.techSlot = ts;
+      if (!quiet) { coachTrigger("technique", t, nowSec); spoke = true; }
+    }
   }
+  // ⚠️ A REMINDER SAID HERE COMES OFF THE NATIVE LIST NOW. Left on it, the phone locking within the
+  // next second hands Swift a line that is due and not yet stale, and the runner hears it twice.
+  if (spoke && !quiet && coachNativeAvailable()) coachNativeSchedule();
   // Safety: sustained very high effort, only where we actually have heart-rate data + a max.
   const hr = snap.heartRateBpm || (LIVE.mode === "sim" ? Math.round(LIVE.hr) : null);
   const maxHr = maxHrEstimate();
@@ -30894,6 +31041,7 @@ function indoorUiTick() {
   const at = liveElapsedMs();
   if (LIVE.rt.getStatus() === "active") LIVE.rt.update(LIVE.watchHr ? { atMs: at, distanceMeters: 0, heartRateBpm: LIVE.watchHr } : { atMs: at, distanceMeters: 0 }).forEach(liveCue);
   renderLiveNow();
+  coachTickOffScreen(at);
   // ⚠️ NOT inside renderLiveNow(): that returns early when the live screen is not mounted, which is
   // exactly the backgrounded case where the lock-screen card matters most.
   pushLiveActivity(LIVE.rt.snapshot(at));
@@ -31420,6 +31568,7 @@ function gpsUiTick() {
     checkSplits();
   }
   renderLiveNow();
+  coachTickOffScreen(at);
   // ⚠️ THE MAP IS DRAWN FROM HERE, before the run and during it. wire() runs before any position exists,
   // so the first fix is what makes it drawable at all — and now that one screen serves the whole session
   // this is also what advances the route and the dot. It costs a running session nothing in tiles: the
@@ -31439,6 +31588,20 @@ function gpsStatusText() {
   if (acc != null) return "GPS · ±" + Math.round(acc) + " m";
   if (LIVE.mode === "gps") return "GPS";
   return "Waiting for GPS…";
+}
+/**
+ * THE COACH LISTENS ON EVERY SCREEN, NOT ONLY THE LIVE ONE.
+ *
+ * ⚠️ coachTick rides on liveUpdate, and renderLiveNow skips liveUpdate when the live screen is not
+ * mounted (it reaches for elements by id). That guard was written to stop a tick throwing into the
+ * void, and it silenced the coach as a side effect: a runner who glanced at their plan mid-run lost
+ * the form reminders, halfway, keep-going and the pace calls until they came back. The run itself
+ * never stopped — only the voice did.
+ * ⚠️ ONLY WHEN THE SCREEN IS NOT MOUNTED, so coachTick still runs exactly once per tick.
+ */
+function coachTickOffScreen(atMs) {
+  if (!LIVE || !LIVE.rt || $("lElapsed")) return;
+  try { coachTick(LIVE.rt.snapshot(atMs)); } catch (e) {}
 }
 function renderLiveNow() {
   if (!LIVE) return;

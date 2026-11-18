@@ -58,6 +58,11 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var paceWindow: [(at: Date, p: Double)] = []
     /// Halfway is announced once per run, in the session's own currency — see the ticker.
     private var halfwaySpoken = false
+    /// The last form-reminder slot handed to the phone this run (see `techniqueSlot`); -1 = none yet.
+    private var techniqueSlotSpoken = -1
+    /// When the wrist last handed the phone a line, so a reminder never lands on top of another one.
+    /// The phone plays one clip at a time and answers a second as "already playing" — it is dropped.
+    private var lastPhoneCueAt = Date.distantPast
     /// One-shot: the prescription has run out and `end()` has been called for it. See
     /// `finishPrescribedSession`, and note that this is cleared in `reset()` like every other
     /// per-run flag — the manager outlives a run.
@@ -298,6 +303,20 @@ final class WorkoutManager: NSObject, ObservableObject {
     var isHardSession: Bool {
         ["threshold", "vo2max", "vo2", "intervals", "long", "tempo", "race"].contains(plan?.type ?? "")
     }
+    /// Relaxed running, where the runner has attention to spare for their form — the phone's
+    /// `coachTechType` list, and the sessions where running slower than the band is fine.
+    var isRelaxedSession: Bool {
+        ["easy", "long", "recovery"].contains(plan?.type ?? "")
+    }
+    /// Form reminders: the first two minutes in, then every four — the phone's own grid
+    /// (`COACH_TECH_FIRST_S` / `COACH_TECH_EVERY_S` in web/app.ts, held equal by a test), so a run
+    /// sounds the same whichever device records it. nil before the first one is due.
+    static let techniqueFirst: TimeInterval = 120
+    static let techniqueEvery: TimeInterval = 240
+    static func techniqueSlot(elapsed: TimeInterval) -> Int? {
+        guard elapsed > techniqueFirst else { return nil }
+        return Int((elapsed - techniqueFirst) / techniqueEvery)
+    }
     var currentStep: PlannedStep? { stepIndex < steps.count ? steps[stepIndex] : nil }
 
     /// Distance covered inside the current step.
@@ -353,7 +372,7 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// long run's goal-pace block is still coached even though its kind is "steady").
     /// ⚠️ Too FAST is never fine and is untouched by this.
     var slowIsFine: Bool {
-        guard ["easy", "long", "recovery"].contains(plan?.type ?? "") else { return false }
+        guard isRelaxedSession else { return false }
         guard let st = currentStep else { return true }
         return st.kind != "rep" && st.work != true
     }
@@ -485,6 +504,10 @@ final class WorkoutManager: NSObject, ObservableObject {
         paceWindow = []
         paceRef = nil
         halfwaySpoken = false
+        // ⚠️ Per run, like every flag here: left behind, run two would believe run one's reminders
+        // were its own and stay quiet until it had run past them.
+        techniqueSlotSpoken = -1
+        lastPhoneCueAt = .distantPast
         // ⚠️ A completion flag left set makes run two of an app session start already finished —
         // the documented reason this whole function exists.
         autoCompleted = false
@@ -740,6 +763,22 @@ final class WorkoutManager: NSObject, ObservableObject {
                         self.halfwaySpoken = true
                         _ = self.speakOnPhone("halfway")
                     }
+                    // ⚠️⚠️ THE REGULAR REMINDERS, WHICH A WATCH RUN NEVER HAD. Owner, 2026-11-18, after a
+                    // 70-minute long run recorded here: "there were no regular voice commands. The only
+                    // commands i received were; start, pause, restart, halfway through the session and
+                    // then the end message." That is this file's speakOnPhone list, word for word. The
+                    // phone's own coach says a form reminder every four minutes on relaxed running and a
+                    // line at every kilometre (see recordSplits); neither had a sender on the wrist, so
+                    // a watch-recorded run was silent between those five moments however long it went.
+                    // The phone plays the recorded clip; the wrist's fallback is deliberate silence,
+                    // never a robot reading out encouragement.
+                    if self.isRelaxedSession,
+                       let slot = Self.techniqueSlot(elapsed: self.elapsed),
+                       slot > self.techniqueSlotSpoken,
+                       Date().timeIntervalSince(self.lastPhoneCueAt) > 20 {
+                        self.techniqueSlotSpoken = slot
+                        _ = self.speakOnPhone("technique")
+                    }
                     let target = self.targetSeconds
                     self.voice?.whyMoment(elapsed: self.elapsed, target: target, hard: self.isHardSession)
                     self.voice?.keepGoing(elapsed: self.elapsed, target: target, hard: self.isHardSession)
@@ -868,13 +907,22 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     private func recordSplits() {
+        var crossed = 0
         while distanceMetres - lastSplitMetre >= 1000 {
             lastSplitMetre += 1000
             let at = elapsed * (lastSplitMetre / max(distanceMetres, 1))
             splits.append(Int((at - lastSplitElapsed).rounded()))
             lastSplitElapsed = at
             if WatchSettings.shared.hapticOnLap { WKInterfaceDevice.current().play(.notification) }
+            crossed += 1
         }
+        // The kilometre line, in the coach's recorded voice on the phone — the one the phone's own
+        // run has always had (a "split" cue -> milestone-distance) and the wrist never sent. See the
+        // ticker for the report that found it.
+        // ⚠️ ONCE, HOWEVER MANY KILOMETRES ONE BATCH CROSSED. A late HealthKit sum can carry two at
+        // once, and "another kilometre done" twice in a row is a coach who has lost count.
+        // ⚠️ Only while running: a sum that lands during a pause must not speak over the pause line.
+        if crossed > 0, phase == .running { _ = speakOnPhone("milestone-distance") }
     }
 
     /// The finished run, in the shape the phone's plan already understands.
@@ -1042,6 +1090,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard s.activationState == .activated, s.isReachable else { return false }
         var msg: [String: Any] = ["cue": trigger]
         if let text { msg["text"] = text }
+        lastPhoneCueAt = Date()
         // ⚠️ THIS RETURNS TRUE ON *SEND*, NOT ON SPEECH, AND THAT IS DELIBERATE — BUT IT NEEDS AN ACK
         // BEHIND IT. Every caller reads the Bool as "the phone has this, stay quiet", so when the phone
         // was reachable but played nothing the two halves were each silent for a different reason and

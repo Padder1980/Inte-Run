@@ -96,7 +96,10 @@ final class WorkoutVoice {
         case "cooldown-start":   say(line("cooldown-start", "Ease down."))
         case "tempo-start":      say(line("tempo-start", "Lift it here."))
         case "easy-settle", "long-run-settle": say(line(trigger, "Settle in."))
-        case "milestone-distance", "keep-going": return   // encouragement is not worth a robot
+        // Encouragement and form reminders are not worth a robot. The kilometre line and the form
+        // reminder now come from the wrist (2026-11-18), so this is the branch they land in whenever
+        // the phone is out of range: silence, by choice, not a synthesised version of the coach.
+        case "milestone-distance", "keep-going", "technique": return
         default: return
         }
     }

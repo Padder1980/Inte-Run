@@ -112,7 +112,14 @@ function plan(opts: Partial<Athlete> = {}) {
  * real builder is what stops the two shapes drifting apart in this file.
  */
 function summary(opts: Partial<Athlete> = {}) {
-  return buildPlanSummary({ ...ATH, ...opts, startDateIso: "2026-09-21" } as Athlete, GOAL);
+  // ⚠️ THE START GOES IN THE OPTIONS, the same as plan() above, or the two halves of the fixture are
+  // built from different Mondays. generatePlan reads its start from options.startDateIso and falls
+  // back to TODAY; the athlete field is not read. While "today" sat before the capped block's own start
+  // (2026-10-26, twenty weeks before race Monday) both halves landed on the same weeks by accident; from
+  // mid-November the summary began at today's Monday, every week index named a different Monday from
+  // the raw plan's, and the migration matched nothing. The app builds PLAN and RAW from one start.
+  return buildPlanSummary({ ...ATH, ...opts, startDateIso: "2026-09-21" } as Athlete, GOAL,
+    { startDateIso: "2026-09-21" });
 }
 function strengthSessions(p: ReturnType<typeof generatePlan>): { wk: number; s: Session }[] {
   const out: { wk: number; s: Session }[] = [];

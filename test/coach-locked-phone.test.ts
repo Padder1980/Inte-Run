@@ -32,10 +32,15 @@ test("the schedule is built from a DETERMINISTIC lookup, not the live selector",
   // is stateful and time-relative: asked for a line at a future moment against a history that has not
   // reached it, it returns null. Every step cue came back empty and the failure was invisible — the
   // runner would simply have heard less.
-  const body = lift("coachNativeSchedule");
+  // ⚠️ THREE BODIES NOW, since the regular reminders (2026-11-18): the builder, the reminder pass it
+  // calls, and the frequency-aware wrapper both of them pick through. A selectPrompt in any of them
+  // is the same empty schedule.
+  const body = lift("coachNativeSchedule") + "\n" + lift("coachScheduleReminders") + "\n" + lift("coachSchedulePick");
   assert.ok(!/RC\.selectPrompt/.test(body),
-    "coachNativeSchedule uses selectPrompt again — it returns null for future moments and the schedule will build empty");
-  assert.match(body, /coachScheduledPrompt\(/, "no deterministic picker in the schedule builder");
+    "the schedule uses selectPrompt again — it returns null for future moments and the schedule will build empty");
+  assert.match(lift("coachNativeSchedule"), /coachSchedulePick\(/, "no deterministic picker in the schedule builder");
+  assert.match(lift("coachSchedulePick"), /coachScheduledPrompt\(/,
+    "the wrapper no longer goes through the deterministic picker");
   assert.match(lift("coachScheduledPrompt"), /RC\.promptsFor\(/,
     "the picker no longer asks the catalogue for this trigger's candidates");
 });

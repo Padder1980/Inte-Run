@@ -205,11 +205,12 @@ function run(t: Trace) {
     // ⚠️ coachRunTick IS STUBBED FOR THE SAME REASON. It is the coach's own clock work — releasing a
     // line whose reply was lost while the page was frozen, and refreshing the locked-phone schedule —
     // and both are asserted in test/coach-schedule.test.ts, against the real functions. This file is
-    // about metres.
-    "pushLiveActivity", "stopLive", "liveFinish", "drawLiveMap", "coachRunTick",
+    // about metres. coachTickOffScreen likewise (the coach ticking while another screen is up) — it is
+    // driven against the real function in test/coach-regular-reminders.test.ts.
+    "pushLiveActivity", "stopLive", "liveFinish", "drawLiveMap", "coachRunTick", "coachTickOffScreen",
     src + "; return { onGpsPos: onGpsPos, pedoEntry: pedoEntry, gpsUiTick: gpsUiTick };",
   )(LIVE, FakeDate, elapsed, elapsed, (c: any) => cues.push(c), (x: number) => String(Math.round(x)),
-    noop, noop, noop, noop, noop, noop);
+    noop, noop, noop, noop, noop, noop, noop);
   rt.start(0).forEach((c: any) => cues.push(c));
 
   const acc = t.accuracy == null ? 8 : t.accuracy;

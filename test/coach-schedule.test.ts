@@ -47,8 +47,12 @@ function liftConst(html: string, name: string): string {
 
 const NAMES = ["coachNativeSchedule", "coachPredictedEndSec", "coachRescheduleTick",
   "coachRunTick", "coachReleaseStale", "stepSecs", "coachOnEnded", "coachDequeue",
-  "coachStepTrigger", "isStrideStep"];
-const CONSTS = ["COACH_RESCHED_MS", "COACH_RESCHED_DRIFT_S", "COACH_STALE_MS"];
+  "coachStepTrigger", "isStrideStep",
+  // The regular reminders (2026-11-18) — the real grid, not a copy of it.
+  "coachScheduleReminders", "sessionDistanceDriven", "coachTechType", "coachTechSlot", "coachTechAt",
+  "coachKeepType", "coachKeepSlot", "coachKeepAt"];
+const CONSTS = ["COACH_RESCHED_MS", "COACH_RESCHED_DRIFT_S", "COACH_STALE_MS",
+  "COACH_TECH_FIRST_S", "COACH_TECH_EVERY_S", "COACH_KEEP_FROM", "COACH_KEEP_EVERY_S"];
 
 type Posted = { action: string; cues?: { id: string; inMs: number; file: string }[] };
 type Env = {
@@ -68,7 +72,7 @@ type Env = {
  * @param elapsedSec  how long the run has been going
  * @param coveredM    how far the runner has actually got in that time
  */
-function env(steps: unknown[], elapsedSec: number, coveredM: number, type = "easy"): Env {
+function env(steps: unknown[], elapsedSec: number, coveredM: number, type = "easy", targetSec = 0): Env {
   const html = readFileSync(PAGE, "utf8");
   const posts: Posted[] = [];
   const src = NAMES.map((n) => lift(html, n)).join("\n")
@@ -80,19 +84,22 @@ function env(steps: unknown[], elapsedSec: number, coveredM: number, type = "eas
     posts,
     COACH: { current: null as unknown, queue: [] as unknown[], seq: 0, playAt: 0,
              reschedAt: 0, reschedEta: null as number | null, audio: { pause() {} },
-             pendingNums: null, numT: 0, cfg: { volume: 1 } },
+             pendingNums: null, numT: 0, cfg: { volume: 1 },
+             techSlot: -1, keepSlot: -1, halfwayDone: false, schedPosted: false },
     LIVE: {
       started: true, done: false, mode: "gps",
-      session: { type, steps, estimatedDurationSeconds: 0 },
+      session: { type, steps, estimatedDurationSeconds: targetSec },
       rt: { snapshot: () => ({ distanceMeters: coveredM }) },
     },
     now: 1_000_000,
   };
 
   // Everything the lifted functions reach that is not part of what is under test.
+  // ⚠️ coachSchedulePick is STUBBED, not lifted: it reaches into RC's catalogue and the runner's
+  // frequency setting, neither of which is what these tests measure. Its own guard is below.
   const fn = new Function(
     "COACH", "LIVE", "ctx",
-    "coachNativeAvailable", "coachEnabled", "coachNativePost", "coachScheduledPrompt",
+    "coachNativeAvailable", "coachEnabled", "coachNativePost", "coachSchedulePick",
     "coachClip", "liveNowMs", "Date", "coachFlushNumbers", "clearTimeout", "coachPlay",
     src,
   );
@@ -153,7 +160,10 @@ test("BLOCKER: and a LATER step's cue therefore starts at the honest second", ()
   const all = e.last();
   assert.ok(all && all.cues && all.cues.length >= 1, "no cues at all: " + JSON.stringify(all));
   // Step 2 begins when step 1 finishes: ~660 s into a run that is 330 s old, so ~330 s from now.
-  const later = all!.cues!.slice(-1)[0]!;
+  // ⚠️ BY ITS ID, not by being last: the list now also carries form reminders and is in time order,
+  // so the last entry is whichever line falls latest, not the step change.
+  const later = all!.cues!.find((c) => c.id.startsWith("easy-settle"))!;
+  assert.ok(later, "the second step's cue is missing: " + JSON.stringify(all));
   assert.ok(later.inMs > 240_000,
     "the second step was placed using the prescribed pace, not the pace being run: "
     + JSON.stringify(all));

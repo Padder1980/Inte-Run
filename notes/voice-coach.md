@@ -541,3 +541,81 @@ Not a defect, a legibility problem. See **`WATCH-REDESIGN.md`** for the full bri
 reference screenshots that no longer exist. Read that file rather than re-deriving it.
 
 ---
+
+## THE REGULAR REMINDERS — A 70-MINUTE LONG RUN HEARD FIVE LINES (owner, 2026-11-18)
+
+*"I did a 70 minute long run on Sunday and there were no regular voice commands. The only commands i received
+were; start, pause, restart, halfway through the session and then the end message."*
+
+⚠️ **THOSE FIVE ARE THE WRIST'S `speakOnPhone` LIST, WORD FOR WORD** (`WorkoutManager.swift`: session-start,
+paused, resumed, halfway, session-complete — plus the count-in and step changes, and a one-step long run has
+no step changes). That identifies the run as **watch-recorded** without seeing it: a phone-recorded run with
+the phone locked would not have said halfway (it was never on the native schedule). The diagnosis rests on
+that match, not on his data — ask him if a later report doesn't fit it.
+
+**Three holes, one symptom:**
+1. ⚠️ **The wrist never sent the regular cues.** The form reminder (`technique`, every 4 min on easy / long /
+   recovery) and the kilometre line (`milestone-distance`) lived only in the page's `coachTick`, and `coachTick`
+   does not run on a watch run (`LIVE` is null — the wrist records). `recordSplits` played a haptic and said
+   nothing. The cue map had carried `milestone-distance` clips for months "ahead of the wrist" — no sender.
+2. ⚠️ **The locked-phone schedule (phone-recorded runs) carried step changes and the finish and nothing else** —
+   no form reminders, no halfway, no keep-going. On a one-step long run: an hour of silence.
+3. ⚠️ **`coachTick` rode on `liveUpdate`, which `renderLiveNow` skips when the live screen is not mounted** — so
+   glancing at another screen mid-run silenced every reminder and pace call until the runner came back. The
+   guard was written to stop DOM errors; silencing the coach was a side effect.
+
+**The fix (web layer over the air + one native build for the wrist):**
+- **Wrist:** `recordSplits` sends `milestone-distance` **once per batch, after the loop, only while running**
+  (a late HealthKit sum can cross two km at once). The ticker sends `technique` on the phone's own grid
+  (`techniqueFirst` 120 s / `techniqueEvery` 240 s, held equal to `COACH_TECH_FIRST_S` / `_EVERY_S` by a test)
+  for `isRelaxedSession` (easy / long / recovery — the same list as `coachTechType`, and now what `slowIsFine`
+  reads), and **never within 20 s of the last line it handed the phone** (`lastPhoneCueAt`, stamped in
+  `speakOnPhone`): the phone plays one clip at a time and answers a second as "already playing", which drops it.
+  Both reset per run in `reset()`. Out of range, the wrist's fallback for both is **silence** (no robot).
+- **Page:** `technique` joins `WATCH_CUE_TRIGGERS`. **`keep-going` is still ahead of the wrist** (its keepGoing
+  speaks a NAME; wiring it through the phone is still the owner's open decision).
+- **One grid for both players.** Form reminders and keep-going now sit on fixed seconds of the run
+  (`coachTechSlot` / `coachKeepSlot`), not "time since the last one". A slot is spent once its second passes,
+  whoever held the clock. ⚠️ The old stamps could not do this: the native player cannot tell a FROZEN page what
+  it said, so on unlock the page found four minutes since its own last reminder and said another at once.
+- **`coachNativeOwnsClock()`** — hidden page + native available + not indoor + **a schedule actually posted**
+  (`COACH.schedPosted`; a free run has no steps and posts none, so it keeps the page's own reminders). While it
+  holds, `coachTick` spends the reminder slots silently. ⚠️ **A halfway in KILOMETRES is still the page's to say**
+  (only the page can see distance; it is never on the schedule).
+- **`coachScheduleReminders`** adds to the locked-phone schedule: form reminders (skipped within 30 s of any other
+  line; a distance session stops at 90% of its PREDICTED finish), halfway for a session measured in minutes, and
+  keep-going from 80% for a timed session, **never in a cool-down or a recovery jog** (the page used to say "this
+  is the part that counts" during cool-downs — fixed in both). ⚠️ **The kilometre line cannot be scheduled**: a
+  guess at when a km passes is the coach saying something untrue. The page says it on its next wake.
+- ⚠️ **A reminder the page says in the foreground re-pushes the schedule**, and the schedule starts after the slots
+  already spent — or the phone locking within the next second hands Swift a due, not-yet-stale line to say again.
+- **`coachSchedulePick`** applies the runner's "how often" setting to both lists handed to Swift. ⚠️ "Minimal" was
+  minimal only while the phone was in the hand: the live coach always dropped P_AMBIENT lines, the schedule and
+  the wrist map never asked. It mattered little with step cues only; it matters with a reminder every 4 minutes.
+- **`coachTickOffScreen(at)`** from `gpsUiTick` and `indoorUiTick`: ticks the coach only when `#lElapsed` is NOT
+  mounted, so it still runs exactly once per tick.
+- The schedule is now sorted by time — Swift takes the first DUE cue in list order.
+
+**Tests:** `test/coach-regular-reminders.test.ts` (18): his 70-minute run locked from the start has no silence over
+5 minutes; no form reminder within 30 s of another line; a distance session gets no scheduled halfway/keep-going;
+no keep-going in a cool-down (schedule and page); a just-said reminder is not handed over again; the page keeps
+the old rhythm in the hand (121 s, then every 240 s); **locked mid-run and unlocked: every reminder once, by one
+player, nothing said on unlock**; Minimal holds on the locked phone; the wrist sends both cues, once per batch,
+on the page's grid, waits 20 s, resets per run, stays silent out of range; the off-screen tick. **8 of 8
+re-breaks caught** (4 page, 4 Swift; files copied aside and restored byte-for-byte).
+⚠️ The locked-moment test unlocks at 2950 s, not 3000 s: 3000 is itself a reminder boundary (120 + 240 × 12), so a
+line there is the next reminder on time, not a catch-up, and the test could not tell them apart.
+
+⚠️ **UNPROVEN ON HARDWARE.** The page half reaches the phone over the air on push; the wrist half needs a native
+build on his watch (TestFlight 562 predates it). A watch run with the phone in a pocket is the proof: expect a
+line at every kilometre and a form reminder every four minutes, and `coach:` in Support › Your data showing
+`wrist N/N` climbing.
+
+### Also found the same day (pre-existing, not the coach)
+
+`test/strength-log.test.ts` "the migration carries v1 rows across" had started failing **on the unchanged
+build** (proved in a scratch worktree of HEAD): its `summary()` fixture passed the start date on the athlete,
+which `generatePlan` never reads (`options.startDateIso ?? goal.startDateIso ?? isoToday()`), so the summary
+was built from TODAY while the raw plan was built from 2026-09-21. The two agreed by accident until today passed
+the capped block's own start; from mid-November every week index named a different Monday and the migration
+matched nothing. A fixture fault, not an app fault — the app builds PLAN and RAW from one start.

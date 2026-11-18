@@ -664,3 +664,36 @@ memoises it per answers.
 builders, `applyProfile` and `profileImpact` lifted from the built page, 8), and the dial sweep in
 `test/session-library.test.ts`. **29 of 31 re-breaks caught** (PLAN.md's own "Steady at 0.9" among them); the two
 that escape are the never-firing guards above.
+
+---
+
+## A RETURNING HABIT-BUILDER NEVER GETS A HARDER SESSION — AND NOTHING MOVES THEM UP (owner, 2026-11-18)
+
+Reported from his own new plan: half marathon in May 2027, target 1:35:00, status **"Building the habit"** chosen
+on purpose (coming back from a long-term injury), comeback answer **"After an injury"**. The plan was ~21 weeks
+of easy/explore runs and long runs only.
+
+**Measured** (real `applyProfile` lifted from the built page, over the real engine; start Mon 2026-11-23, 4 days):
+every week is three easy runs plus the long run, **0 quality sessions**, long run peaking at ~102′ (10 km with
+the seeded 37:30 5k) or ~66′ (12 km with a 5:30 easy pace typed). The same profile **without** the comeback
+answer has **19** quality sessions; the Regular runner card with "after an injury" has 18 and a long run to 132′.
+
+**Cause:** `beginnerQualityFor` returns null when `ctx.returning` (src/plan/generate-plan.ts ~:2257) and
+`beginnerHillDose` returns 0 (~:2335); `returning` is set once per plan from the comeback answer and handed to
+every beginner week. Deliberate — the Hudson beginner diet of 2026-09-01, "the owner's to overturn" (notes/
+plan-coaching-book.md), guarded by `test/beginner-quality.test.ts` ("a returning beginner gets none"). Nothing
+promotes a runner between tracks (no silent promotion, 2026-08-25), `addDayOffer` refuses beginners and injured
+runners, and the flag never clears itself (only a profile edit does; a 4-week pause and B6's "Start again" set it).
+
+⚠️ **STALE COMMENT, NOT YET FIXED:** the comment above `STATUS_OPTS` in web/app.ts still says the comeback answer
+"changes NOTHING" on the beginner track (0 of 140 sessions differ). True when written; false since 2026-09-01 —
+on the beginner track it now removes every quality session and the hill sprints. The earlier paragraph in this
+file that says the same is stale for the same reason.
+
+⚠️ **TWO MODULES DISAGREE ABOUT HIM:** with a 5:30 easy pace, feasibility calls 1:35 "comfortable" (predicts
+1:32:55) while the plan cannot get him there. Same defect class as the one already ruled on: fix the plan, don't
+downgrade the verdict.
+
+**The proposed answer is `STAGES.md`** (a road of stages with a checkpoint between each, the runner choosing at
+every one). Not built — it needs his decisions, listed at its end, and the returning-beginner ruling goes to the
+clinical reviewer. Until then his current plan is safe for its first weeks, which are exactly a Rebuild stage.

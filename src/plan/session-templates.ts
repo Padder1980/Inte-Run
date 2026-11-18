@@ -520,6 +520,34 @@ function assembleRunWalk(
   return assemble("easy", title, desc, "easy", steps, { min: 2, max: 4 });
 }
 
+/**
+ * STAGES.md §10 (decision 2) — A WALK-RUN BLOCK'S SESSION AT ONE LEVEL: the run blocks with a walk between, or — one
+ * block — a run without stopping. `keyMin`: the block's KEY RUN, that many minutes non-stop at a chatting pace, marked
+ * `keyRun` so the checkpoint can find it. ⚠️ ITS WORDS GO TO THE CLINICAL REVIEWER WITH THE REST OF §10.
+ */
+export function walkRunSession(p: TrainingPaces, runBlocks: number[], walkSec: number, keyMin?: number): SessionContent {
+  if (runBlocks.length === 1) {
+    const min = Math.round(runBlocks[0]! / 60);
+    const s = assembleRunWalk(
+      p,
+      runBlocks,
+      0,
+      keyMin ? `${min}′ without stopping — your key run` : `${min}′ without stopping`,
+      keyMin
+        ? `This block's key run: ${min} minutes of running without stopping, at a pace you could chat at. Go as slowly as you need — the only aim is not to stop. If anything hurts, walk, and say so after the run.`
+        : `${min} minutes of easy running without stopping. Go as slowly as you need to keep going — a chatting pace the whole way.`,
+    );
+    return keyMin ? { ...s, keyRun: { minutes: keyMin } } : s;
+  }
+  return assembleRunWalk(
+    p,
+    runBlocks,
+    walkSec,
+    `Run–walk · ${runBlocks.length} × (${clock(runBlocks[0]!)} run / ${clock(walkSec)} walk)`,
+    "Alternate easy running and walking. Run at a comfortable, chatty effort — walk breaks are part of the plan, not a failure.",
+  );
+}
+
 // ---- Beginner run–walk flavours (rotate for variety) ----------------------
 
 export function rwSteady(p: TrainingPaces, s: BeginnerSpec): SessionContent {

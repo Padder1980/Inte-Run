@@ -67,7 +67,7 @@ export type EasyRunKey = { needMin: number; bestMin: number | null; bestIso?: st
 
 export type CheckpointFacts = {
   /** The stage whose checkpoint this is. */
-  stage: "rebuild" | "base";
+  stage: "walkrun1" | "walkrun2" | "rebuild" | "base";
   /** Runs the plan asked for in the stage's last two weeks, up to today. */
   planned: number;
   /** Of those, how many were run (logged on their day, or linked to the session). */
@@ -82,7 +82,12 @@ export type CheckpointFacts = {
    * own longest planned run against the longest easy-feeling run logged in it.
    */
   keyRun: ({ kind: "easy-run" } & EasyRunKey)
-    | { kind: "test"; doneIso: string | null; label?: string | null; offer?: BlockTest[]; timeOnFeet?: EasyRunKey | null };
+    | { kind: "test"; doneIso: string | null; label?: string | null; offer?: BlockTest[]; timeOnFeet?: EasyRunKey | null }
+    /**
+     * §10 decision 2 — a walk-run block's key run: its target, `needMin` minutes without stopping at a chatting pace
+     * (the plan's own key session, done and rated easy), and when it is in the plan if not yet done.
+     */
+    | { kind: "target-run"; needMin: number; doneIso: string | null; plannedIso?: string | null };
 };
 
 /** "a strong-but-controlled 2 km, or a parkrun or 5 km" — the offered tests in the runner's words. */
@@ -125,7 +130,7 @@ export function evaluateCheckpoint(f: CheckpointFacts): CheckpointVerdict {
   const easyMet = (e: EasyRunKey | null | undefined) => !!e && e.bestMin != null && e.bestMin >= e.needMin;
   // A test logged in the stage, or — where time on feet counts — the block's own longest run, easy and unbroken.
   const tofMet = k.kind === "test" && easyMet(k.timeOnFeet);
-  const keyRun = k.kind === "easy-run" ? easyMet(k) : !!k.doneIso || tofMet;
+  const keyRun = k.kind === "easy-run" ? easyMet(k) : k.kind === "target-run" ? !!k.doneIso : !!k.doneIso || tofMet;
   const reasons: string[] = [];
   reasons.push(planned === 0
     ? "No runs were planned in the last two weeks, so there is nothing to count yet."
@@ -143,6 +148,11 @@ export function evaluateCheckpoint(f: CheckpointFacts): CheckpointVerdict {
       : k.bestMin != null
         ? `Your longest easy-feeling run so far is ${k.bestMin} minutes; this stage's key run is ${k.needMin} minutes without stopping.`
         : `No run of ${k.needMin} minutes that felt easy yet — your long run is the chance.`);
+  } else if (k.kind === "target-run") {
+    // ⚠️ "AT A CHATTING PACE" IS WHAT THE RUNNER RATED, never inferred: the app counts the key run only when it was rated easy.
+    reasons.push(k.doneIso
+      ? `You ran ${k.needMin} minutes without stopping on ${k.doneIso}, at a chatting pace.`
+      : `This block’s key run is ${k.needMin} minutes without stopping, at a chatting pace${k.plannedIso ? " — it is in your plan on " + k.plannedIso : ""}.`);
   } else if (k.doneIso) {
     reasons.push(`You did your test run on ${k.doneIso}${k.label ? " (" + k.label + ")" : ""}.`);
   } else if (tofMet) {

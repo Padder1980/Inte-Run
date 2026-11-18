@@ -7,7 +7,7 @@
 import type { Athlete, Goal, StageKind } from "../domain/types.ts";
 import { youthLimitsFor } from "../domain/youth.ts";
 import { addDays, dayOfWeekMondayZero, weeksBetween } from "./dates.ts";
-import { type GenerateOptions, type RoadStage, roadFoundationNeed } from "./generate-plan.ts";
+import { type GenerateOptions, type RoadStage, roadFoundationNeed, WALKRUN_LEVELS } from "./generate-plan.ts";
 import { RACE_BLOCK_WEEKS } from "./periodization.ts";
 
 /**
@@ -37,6 +37,20 @@ export function blockSplit(weeks: number): number[] {
 
 /** How long Rebuild runs when the time allows (STAGES.md §3: 4–6 weeks) — one block. */
 export const REBUILD_WEEKS = BLOCK_WEEKS;
+/**
+ * §10 DECISION 2 — the two walk-run blocks before Rebuild for a runner just getting started: about 5 weeks to 20
+ * minutes without stopping, then about 4 to 30 (as NHS Couch to 5K paces it). One level a week (WALKRUN_LEVELS), so a
+ * block is as long as its levels. ⚠️ NEVER CUT: a runway too short for both blocks and the shortest race block lays no
+ * road at all, and the runner keeps today's run-walk plan.
+ */
+export const WALKRUN_WEEKS = { walkrun1: WALKRUN_LEVELS.walkrun1.length, walkrun2: WALKRUN_LEVELS.walkrun2.length } as const;
+/** Each walk-run block's key run, in minutes without stopping — its last level's (20, then 30). */
+export const WALKRUN_KEY_MIN = {
+  walkrun1: WALKRUN_LEVELS.walkrun1[WALKRUN_LEVELS.walkrun1.length - 1]!.keyMin!,
+  walkrun2: WALKRUN_LEVELS.walkrun2[WALKRUN_LEVELS.walkrun2.length - 1]!.keyMin!,
+} as const;
+/** The shortest race block a road keeps (the engine's own shortest block). */
+const MIN_RACE_WEEKS = 4;
 /** The shortest Base worth calling one (§3: 4–8 weeks typical). */
 export const BASE_MIN_WEEKS = 4;
 /**
@@ -71,17 +85,15 @@ export type RoadProposal = {
 /**
  * Where a runner STARTS on the ladder (STAGES.md §3–§4.1), or null for a runner this stage does not yet place.
  *
- * ⚠️ PLACED TODAY: the beginner track's continuous runner ("Building the habit"), comeback or not — the runner the
- * owner's own plan failed (a habit-builder coming back from injury had no harder session in any week), and the one
- * whose foundation the engine builds with the week builder it already has. ⚠️ NOT YET PLACED, each for a reason
- * recorded in notes/plan-profile.md: run-walk (the ladder's stage 0 — its own exit test, 25–30 minutes continuous);
- * a 12–17 runner (their ceilings are a separate review); and a regular runner, whether coming back or far from race
- * day (their foundation must start from the mileage they state, which the beginner builder does not read). For all
- * of them the plan is exactly what it was.
+ * ⚠️ PLACED: the beginner track's continuous runner ("Building the habit"), comeback or not — the runner the owner's
+ * own plan failed — at Rebuild; and (§10 decision 2) the run-walk runner ("Just getting started") at Walk-run 1, two
+ * walk-run blocks before that same Rebuild. ⚠️ NOT YET PLACED, each for a reason recorded in notes/plan-profile.md: a
+ * 12–17 runner (their ceilings are a separate review), and a regular runner (§10 decision 3, a later piece: their
+ * foundation must start from the mileage they state). For them the plan is exactly what it was.
  */
 export function roadStartFor(athlete: Athlete): StageKind | null {
-  if (athlete.runWalk) return null;
   if (youthLimitsFor(athlete.age)) return null;
+  if (athlete.runWalk) return "walkrun1";
   if (athlete.experience !== "beginner") return null;
   return "rebuild";
 }
@@ -99,16 +111,21 @@ export function roadFor(athlete: Athlete, goal: Goal, startIso: string, options:
   const startMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
   const total = Math.max(0, weeksBetween(startMonday, raceMonday) + 1);
   const fullRaceWeeks = RACE_BLOCK_WEEKS[goal.distance];
+  // §10 decision 2: the walk-run blocks come first and are never the part cut (WALKRUN_WEEKS).
+  const wr = startStage === "walkrun1" ? WALKRUN_WEEKS.walkrun1 + WALKRUN_WEEKS.walkrun2 : 0;
+  if (wr > 0 && total - wr < MIN_RACE_WEEKS) return null;
+  const avail = total - wr;
   const need = Math.max(REBUILD_WEEKS + BASE_MIN_WEEKS, roadFoundationNeed(athlete, goal, options).weeks);
-  const shortWeeks = Math.max(0, need + fullRaceWeeks - total);
+  const shortWeeks = Math.max(0, wr + need + fullRaceWeeks - total);
   // The foundation: what the runway leaves after the full race block, never less than the runner needs, never more
   // than FOUNDATION_MAX_WEEKS. Short: the race block gives up the difference (down to the engine's shortest block).
-  const foundation = Math.min(FOUNDATION_MAX_WEEKS, Math.max(need, total - fullRaceWeeks));
-  const raceWeeks = Math.max(4, Math.min(fullRaceWeeks, total - foundation));
-  const fWeeks = Math.max(0, Math.min(foundation, total - raceWeeks));
+  const foundation = Math.min(FOUNDATION_MAX_WEEKS, Math.max(need, avail - fullRaceWeeks));
+  const raceWeeks = Math.max(4, Math.min(fullRaceWeeks, avail - foundation));
+  const fWeeks = Math.max(0, Math.min(foundation, avail - raceWeeks));
   const rebuild = Math.min(REBUILD_WEEKS, fWeeks);
   const base = fWeeks - rebuild;
   const stages: RoadStage[] = [];
+  if (wr > 0) stages.push({ kind: "walkrun1", weeks: WALKRUN_WEEKS.walkrun1 }, { kind: "walkrun2", weeks: WALKRUN_WEEKS.walkrun2 });
   if (rebuild > 0) stages.push({ kind: "rebuild", weeks: rebuild });
   // ⚠️ DECISION 1 (§10): BASE IS LAID OUT AS BLOCKS, each ending in a checkpoint — never more than six weeks without
   // one. Consecutive stages of one kind ARE consecutive blocks: the engine builds them as one stretch of Base (its
@@ -121,8 +138,8 @@ export function roadFor(athlete: Athlete, goal: Goal, startIso: string, options:
     rampWeeks: fWeeks,
     startStage,
     fullRaceWeeks,
-    needFoundationWeeks: need,
+    needFoundationWeeks: wr + need,
     shortWeeks,
-    fullFitsRaceMondayIso: addDays(startMonday, (need + fullRaceWeeks - 1) * 7),
+    fullFitsRaceMondayIso: addDays(startMonday, (wr + need + fullRaceWeeks - 1) * 7),
   };
 }

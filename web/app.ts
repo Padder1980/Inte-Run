@@ -6605,8 +6605,11 @@ const HANDOVER_KEY = "interun_handover_v1";
  * BECAUSE applyProfile READS THEM (effectiveRoad → roadOf): declared beside the road's other code, ten thousand lines
  * down, they would sit in their temporal dead zone at launch, throw inside applyProfile, and no plan would build.
  */
-const ROAD_STAGE_LABEL = { rebuild: "Rebuild", base: "Base", race: "Race block" };
+const ROAD_STAGE_LABEL = { walkrun1: "Walk-run 1", walkrun2: "Walk-run 2", rebuild: "Rebuild", base: "Base", race: "Race block" };
 const ROAD_STAGE_JOB = {
+  // §10 decision 2: the two walk-run blocks before Rebuild for a runner just getting started.
+  walkrun1: "Run–walk sessions that build to 20 minutes of running without stopping, at a chatting pace. Repeating a week is completely normal.",
+  walkrun2: "From 20 to 30 minutes of running without stopping, at a chatting pace — the run–walk becomes a run.",
   rebuild: "Easy running only, so running feels normal again. The long run grows gently; strength twice a week.",
   base: "More running and a first taste of speed: one gentle fartlek a week, and hill sprints.",
   race: "The structured plan for your race: threshold and race-pace work, the longest long runs, then the taper.",
@@ -6617,7 +6620,7 @@ const ROAD_MIN_RACE_WEEKS = 4;
 const ROADPOP_KEY = "interun_roadpop_v1";
 // ⚠️ NOT var(--ease) FOR REBUILD: it is the same orange as var(--peak) within a few shades, and the two stages sat side
 // by side looking like one. The rows name each stage in words too — colour is never the only label.
-const ROAD_COLOUR = { rebuild: "var(--ready)", base: "var(--base)", race: "var(--peak)" };
+const ROAD_COLOUR = { walkrun1: "var(--taper)", walkrun2: "var(--taper)", rebuild: "var(--ready)", base: "var(--base)", race: "var(--peak)" };
 /**
  * The plan-determining fields, and nothing else. See journalSync for why not the plan itself.
  * ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), BECAUSE journalSync READS IT FROM INSIDE adoptPlan. It sat
@@ -9694,7 +9697,10 @@ function effectiveRoad(pf, ath, goal) {
     // way keeps its end, so the checkpoint the runner is heading for never moves under them.
     const lastFrom = roadMondayAfter(r.fromIso, stages.slice(0, -2).reduce((n, s) => n + s.weeks, 0));
     const fresh = lastF.kind === "base" && lastFrom > weekMondayOf(todayIso());
-    const weeks = RC.blockSplit((fresh ? lastF.weeks : 0) + diff).map((w) => ({ kind: "base", weeks: w }));
+    // Straight after the walk-run blocks (a road too short for Rebuild when it was made), Rebuild comes first.
+    const head = roadWalkRun(lastF.kind) ? Math.min(RC.BLOCK_WEEKS, diff) : 0;
+    const weeks = (head ? [{ kind: "rebuild", weeks: head }] : [])
+      .concat(RC.blockSplit((fresh ? lastF.weeks : 0) + diff - head).map((w) => ({ kind: "base", weeks: w })));
     stages.splice(stages.length - (fresh ? 2 : 1), fresh ? 1 : 0, ...weeks);
   } else if (diff > 0) lastF.weeks += diff;
   else if (diff < 0) {
@@ -9711,7 +9717,9 @@ function effectiveRoad(pf, ath, goal) {
     for (let j = lastF0; j >= 0; j--) if (order.indexOf(j) < 0) order.push(j);
     for (const j of order) {
       if (j < 0 || need <= 0) continue;
-      const floor = stages[j].kind === "race" ? ROAD_MIN_RACE_WEEKS : (firstBase >= 0 && j > firstBase ? 0 : 1);
+      // ⚠️ §10 DECISION 2: A WALK-RUN BLOCK IS NEVER CUT — its key run is in its last week.
+      const floor = stages[j].kind === "race" ? ROAD_MIN_RACE_WEEKS : roadWalkRun(stages[j].kind) ? stages[j].weeks
+        : (firstBase >= 0 && j > firstBase ? 0 : 1);
       const t = Math.min(need, Math.max(0, stages[j].weeks - floor));
       stages[j].weeks -= t; need -= t;
     }
@@ -9826,7 +9834,8 @@ function roadFacts(cp) {
   });
   const easy = { bestMin: best, bestIso: bestIso ? runDateLabelIso(bestIso) : null };
   let keyRun;
-  if (cp.kind === "rebuild") {
+  if (roadWalkRun(cp.kind)) keyRun = roadTargetRun(cp, today);
+  else if (cp.kind === "rebuild") {
     keyRun = Object.assign({ kind: "easy-run", needMin: Math.min(RC.REBUILD_KEY_RUN_MIN, longestPlanned || RC.REBUILD_KEY_RUN_MIN) }, easy);
   } else {
     // ⚠️ §10 DECISION 5 — THE TEST BY LEVEL (RC.blockTestsFor, the one definition): never a maximal test for somebody just
@@ -9842,6 +9851,34 @@ function roadFacts(cp) {
     }
   }
   return { stage: cp.kind, planned: planned, done: done, painRuns: painRuns, keyRun: keyRun };
+}
+/**
+ * ⚠️ §10 DECISION 2 — A WALK-RUN BLOCK'S KEY RUN: the plan's own key session in the block (its session carries keyRun —
+ * 20 minutes without stopping, then 30), DONE AND RATED EASY: a run linked to it, or a run on its day at least that long.
+ * "At a chatting pace" is the runner's own rating (RC.EASY_RPE_MAX or under), never inferred — an unrated run is not yet
+ * evidence, exactly as Rebuild's key run. Not done yet: the day it is in the plan, so the sheet can say when.
+ */
+function roadTargetRun(cp, today) {
+  let need = 0, doneIso = null, plannedIso = null;
+  const easyEnough = (r) => r && Number(r.rpe) > 0 && Number(r.rpe) <= RC.EASY_RPE_MAX;
+  (PLAN && PLAN.weeks || []).forEach((w, wi) => {
+    const rw = RAW && RAW.weeks && RAW.weeks[wi];
+    if (!rw || !w.startIso) return;
+    (rw.sessions || []).forEach((s) => {
+      if (!s || !s.keyRun) return;
+      const iso = isoAdd(w.startIso, effDay(s)).toISOString().slice(0, 10);
+      if (iso < cp.fromIso || iso >= cp.endIso) return;
+      need = Math.max(need, Number(s.keyRun.minutes) || 0);
+      const rid = linkedRunFor(w.index, s.id);
+      const linked = rid ? (state.logged || []).find((r) => r && r.id === rid) : null;
+      const onDay = (state.logged || []).find((r) => r && r.dateIso === iso && easyEnough(r) &&
+        Number(r.sec) >= (Number(s.keyRun.minutes) || 0) * 60);
+      if (iso <= today && (easyEnough(linked) || onDay)) { if (!doneIso) doneIso = iso; }
+      else if (iso >= today && !plannedIso) plannedIso = iso;
+    });
+  });
+  return { kind: "target-run", needMin: need || RC.WALKRUN_KEY_MIN[cp.kind], doneIso: doneIso ? runDateLabelIso(doneIso) : null,
+    plannedIso: plannedIso ? runDateLabelIso(plannedIso) : null };
 }
 /** "9:40" for a whole number of seconds. */
 function roadClock(sec) { const s = Math.round(Number(sec) || 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
@@ -9909,8 +9946,12 @@ function roadLegName(legs, i) {
   const l = legs[i];
   if (!l) return "";
   const all = legs.filter((x) => x.kind === l.kind);
-  return ROAD_STAGE_LABEL[l.kind] + (all.length > 1 ? " " + (all.indexOf(l) + 1) : "");
+  // Walk-run 1 and 2 carry their number already; an eased week of one is still that block.
+  const numbered = l.kind === "rebuild" || l.kind === "base";
+  return ROAD_STAGE_LABEL[l.kind] + (numbered && all.length > 1 ? " " + (all.indexOf(l) + 1) : "");
 }
+/** §10 decision 2: is this one of the two walk-run blocks? */
+function roadWalkRun(kind) { return kind === "walkrun1" || kind === "walkrun2"; }
 /** The road in one line, as the wizard and the Plan screen say it: "4 weeks Rebuild → 5 weeks Base → 16 weeks race block". */
 function roadLine(stages) {
   const legs = [];
@@ -9928,15 +9969,25 @@ function roadAnswered(cp, choice) {
   const r = roadOf(profile);
   if (!r || !cp) return null;
   const stages = cp.legs.map((l) => ({ kind: l.kind, weeks: l.weeks }));
+  // ⚠️ §10: THE WEEK COMES FROM BASE FIRST, then the race block (never under its shortest), then Rebuild — and NEVER
+  // FROM A WALK-RUN BLOCK, whose key run is in its last week (a "more" in Walk-run 1 taking a week from Walk-run 2 would
+  // have dropped its 30-minute run from the plan).
   const take = (from, n) => {
-    for (let j = from; j < stages.length && n > 0; j++) {
+    const order = [];
+    for (let j = from; j < stages.length; j++) if (stages[j].kind === "base") order.push(j);
+    for (let j = from; j < stages.length; j++) if (stages[j].kind === "race") order.push(j);
+    for (let j = from; j < stages.length; j++) if (stages[j].kind === "rebuild") order.push(j);
+    for (const j of order) {
+      if (n <= 0) break;
       const t = Math.min(n, Math.max(0, stages[j].weeks - (stages[j].kind === "race" ? ROAD_MIN_RACE_WEEKS : 0)));
       stages[j].weeks -= t; n -= t;
     }
     return n === 0;
   };
   if (choice === "more") { if (!take(cp.i + 1, 1)) return null; stages[cp.i].weeks += 1; }
-  if (choice === "ease") { if (!take(cp.i + 1, 1)) return null; stages.splice(cp.i + 1, 0, { kind: "rebuild", weeks: 1 }); }
+  // Easing back: a lighter week of easy running (Rebuild) — or, in a walk-run block, a lighter week of that run–walk
+  // (continuous running would be the harder week for somebody not yet running 20 minutes).
+  if (choice === "ease") { if (!take(cp.i + 1, 1)) return null; stages.splice(cp.i + 1, 0, { kind: roadWalkRun(cp.kind) ? cp.kind : "rebuild", weeks: 1 }); }
   const rec = { dueIso: cp.endIso, kind: cp.kind, answer: choice, answeredIso: todayIso() };
   return Object.assign({}, r, { stages: stages.filter((s) => s.weeks > 0), checkpoints: (r.checkpoints || []).concat([rec]) });
 }
@@ -9965,9 +10016,10 @@ function roadCheckpointHtml() {
     { id: "up", t: next ? (same ? "Start " + nextName : "Move up to " + nextName) : "Move up",
       s: next ? ROAD_STAGE_JOB[next.kind] + " It starts " + (held ? "next Monday" : "on Monday") + "." : "" },
     { id: "more", t: "One more week of " + ROAD_STAGE_LABEL[cp.kind],
-      s: "Another week like this one, and this checkpoint again at the end of it." },
+      s: roadWalkRun(cp.kind) ? "Another week like this one — repeating a week is completely normal — and this checkpoint again at the end of it."
+        : "Another week like this one, and this checkpoint again at the end of it." },
     { id: "ease", t: "Ease back",
-      s: "A lighter week of easy running only, then this checkpoint again." },
+      s: roadWalkRun(cp.kind) ? "A lighter week of run–walk, then this checkpoint again." : "A lighter week of easy running only, then this checkpoint again." },
   ];
   // ⚠️ STEP 6, DECISION 4 — WHEN A WEEK MORE WOULD CUT INTO THE RACE BLOCK, SAY SO, and say what else there is. The app
   // never shortens the race block by itself: it happens only if the runner picks the answer that says it will.
@@ -10128,7 +10180,7 @@ function answerRoad(choice) {
   seedDone(); restoreTicks(ticks);
   const said = choice === "up" ? (cp.next && cp.next.kind === cp.kind ? "On to " + roadLegName(cp.legs, cp.next.i) + "." : "Moving up to " + (cp.next && cp.next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[(cp.next || {}).kind] || "the next stage") + ".")
     : choice === "more" ? "One more week of " + ROAD_STAGE_LABEL[cp.kind] + "."
-    : "Easing back: next week is lighter and easy running only.";
+    : roadWalkRun(cp.kind) ? "Easing back: next week is a lighter week of run–walk." : "Easing back: next week is lighter and easy running only.";
   toastUndo(said, () => {
     const t2 = todayTicks();
     restore();

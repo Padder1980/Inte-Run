@@ -939,3 +939,77 @@ offer on Today, and a long road as Base 1–4 with "Start Base 2" and "You chose
 The no-maximal-test rule and the retest gate; the controlled 2 km's words ("quicker than your usual runs, but never flat
 out…", "Not a race: keep something in reserve all the way to the finish"); time on feet as an injured returner's key run
 (the block's own longest planned run, felt easy, unbroken); the parkrun gate (longest run ≥ 4.5 km in 30 days).
+
+## ✅ §10 — PIECE 2: TWO WALK-RUN BLOCKS FOR "JUST GETTING STARTED" (2026-11-18)
+
+Decision 2: a run-walk runner (status "new", `runWalk`) is now placed on a road — **Walk-run 1 (5 weeks, to 20 minutes
+without stopping) → Walk-run 2 (4 weeks, to 30) → Rebuild → Base blocks → race block**. Before this they had no road.
+
+- **Stage kinds `walkrun1` / `walkrun2`** (`StageKind`). `roadStartFor` returns "walkrun1" for a run-walk adult (12–17 still
+  unplaced). `roadFor` puts both blocks first and **never cuts them**: `WALKRUN_WEEKS` = the level counts (5 + 4); a runway
+  too short for both and the shortest race block (4) lays **no road** (today's run-walk plan, unchanged); otherwise Rebuild/Base
+  are budgeted after them exactly as before, and the honest numbers (`needFoundationWeeks`, `fullFitsRaceMondayIso`) include them.
+- **The levels are the app's own** (`WALKRUN_LEVELS`, generate-plan.ts), paced to Couch to 5K's running minutes per session but
+  not copied: 8 × 1′/1′30″ → 6 × 1′30″/1′30″ → 4 × 2′30″ (long 3 × 4′) → 3 × 5′ (long 2 × 9′) → 2 × 8′ + **the key run, 20′
+  without stopping**; then 2 × 10′ + 22′ → 22′ + 25′ → 25′ + 28′ → 25′ + **the key run, 30′**. Built by the beginner week builder
+  with a level override (`WeekContext.walkRun` → `walkRunSession`), so days, strength and mobility are the run-walk track's own.
+  No quality, no hill sprints, every rep RPE ≤ 4, and **no lighter week inside walk-run** (the walks are the recovery).
+- ⚠️ **The level is counted from the road's first week of each kind** (weeks before the plan began included), and a week past the
+  last level REPEATS it (key run and all) — so "one more week" and a week held at an unanswered checkpoint are a repeat ("repeating
+  a week is totally okay", C25K), and no answer changes a week already run. Re-broken: wrapping to level 1 was caught.
+- ⚠️ **Rebuild after walk-run is the habit-builder's own Rebuild**: walk-run weeks are built apart, and Rebuild/Base keep their ramp,
+  lighter weeks and dose counted from the first Rebuild/Base week. Walk-run 2's 30′ joins Rebuild's ≤30′ opening long run
+  (`beginnerOpenMin` caps at 30) — guarded, re-broken by lifting that cap.
+- **The key run is marked on the session** (`Session.keyRun = { minutes }`, absent everywhere else). The app's `roadTargetRun` counts
+  it only when the plan's own key session was DONE AND RATED EASY (≤ `EASY_RPE_MAX`): a run linked to it, or a run on its day at
+  least that long. An unrated run is not evidence (as Rebuild's key run). Not yet done: the sheet says the day it is in the plan.
+- **The answers in walk-run**: "one more week" never takes a week from a walk-run block (`take` now takes from Base, then the race
+  block, then Rebuild — re-broken: the old in-order take cut Walk-run 2 and dropped its 30′ key run); "ease back" inserts a week of
+  the SAME walk-run block (not Rebuild — continuous running would be the harder week), plus the existing easier-week row.
+  `effectiveRoad` never shrinks a walk-run block, and a later race after a walk-run-only road adds Rebuild before Base.
+- Names: "Walk-run 1" / "Walk-run 2" (never numbered again); colour `var(--taper)`; the sheet says "Move up to Walk-run 2" and
+  "repeating a week is completely normal".
+
+**Tests:** `test/road-walkrun.test.ts` (8, engine) and `test/road-walkrun-app.test.ts` (4, lifted from the built page);
+road-stages' placement line restated (run-walk is placed now); road-app and road-blocks-app harnesses gained `roadWalkRun`.
+**Re-breaks: 16 of 16 caught.** Driven in a browser at phone size, light and dark: Walk-run 1's checkpoint before the key run
+("in your plan on 27 Dec", one more week suggested) and after it (Ready, move up to Walk-run 2), ease back (a Walk-run 1 week
+inserted, Base giving the week, Undo restoring both), and the road on the Plan screen.
+
+### ⚠️ Found, NOT fixed (pre-existing, shared, its own piece of work)
+
+**`easeWeek` (src/adapt/missed-sessions.ts) makes a week lighter only on paper for time-based sessions.** It replaces the week's
+hardest session with an easy run, then "trims" long and easy sessions with `scaleSessionDistance`, which scales the ESTIMATED
+distance and duration but not the steps — and these runs are prescribed by duration. So a week with no hard session (a Rebuild
+ease week from B14, a walk-run ease week, "make a week easier" on any beginner week) is prescribed exactly as before: measured on
+Walk-run 1's eased week, the key run still asks for 20′ without stopping while its estimate says 24′ instead of 28′. Fixing it
+changes a shared function and what "easier" means (clinical) — for the owner to decide.
+
+### For the clinical reviewer
+
+The walk-run levels (the table above), the key-run words ("If anything hurts, walk, and say so after the run"), counting the key
+run only when rated easy, and easing back as a repeat of the block's last week made easier.
+
+## ☐ §10 — HAND-OVER FOR PIECES 3 AND 4 (not built; 2026-11-18)
+
+Each is as large as pieces 1 and 2 together, so each is its own session (CLAUDE.md: one stage per session).
+
+**Piece 3 — decision 3, regular and competitive runners.**
+- *Placement* (`roadStartFor`): an adult on the main track coming back (injury or break) → Rebuild; otherwise Base when the runway is
+  longer than the race block (`RACE_BLOCK_WEEKS`), else a race-only road. Today every main-track runner gets null (no road).
+- *Base from the mileage they state* (`pf.volKm` → `weeklyVolumeKmCurrent`; blank = the plan's own defaults): the beginner builder
+  cannot read it. The natural builder is the main track's own week builder in its base phase, volume ramped from the stated km to
+  the race block's first week (the foundation's aim-at-the-race-block trick), lighter week every fourth week of the road — held to
+  the same guards as the foundation: volume carries across the boundary, the easy floor, past weeks never change. A returning
+  regular runner's Rebuild needs the same builder with no quality (not the beginner Rebuild).
+- *A checkpoint every 4 weeks inside the race block*: consecutive `race` stage entries (as Base blocks are), built as ONE race block
+  byte for byte, with a checkpoint at each entry's end. ⚠️ Open: what "one more week" means inside it — §10 says it "eats into the
+  block, with decision 4's choices", which needs the engine to hold or repeat a week inside a block it lays back from race day
+  (it cannot yet); "ease back" there is only the easier-week row (and see `easeWeek` above).
+- *Re-baselining*: the key run is the level's test — `blockTestsFor` already returns the regular runner's parkrun (gated on 4.5 km)
+  or the 2 km trial; a 2 km re-sets paces through `twoKmS`, a counted parkrun through the pace offer (`countRoadTest`).
+
+**Piece 4 — decision 4, no-race goals** (overturns decision 5's "later"). PLAN.md's non-race round: every reader of a race in the
+app must tolerate none — `profile.raceDate`/`goalDist`/`targetS`, feasibility, the race-day handover (B9), Alfie's race facts, the
+calendar export, the plan journal, the wizard's goal step. Inventory first. Engine: rolling 4-week blocks, each planned from the
+last block's test (today `generateRoadPlan` falls back to the plain plan when a road has no race stage).

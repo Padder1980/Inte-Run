@@ -46,7 +46,7 @@ function harness(today: string, road: unknown) {
     experienceFor: (p: any) => (p.status === "building" || p.status === "new" ? "beginner" : "recreational"),
   };
   const fns = ["roadOf", "roadWeeksBetween", "roadMondayAfter", "roadAnswerAt", "effectiveRoad", "roadAthleteOf", "roadLegsNow",
-    "roadCheckpoint", "roadAnswered", "roadRaceWeeks", "weekMondayOf"];
+    "roadCheckpoint", "roadAnswered", "roadRaceWeeks", "weekMondayOf", "roadWalkRun"];
   const src = [constDecl("ROAD_STAGE_LABEL"), constDecl("ROAD_MIN_RACE_WEEKS"), ...fns.map(fnBody)].join("\n");
   const names = Object.keys(env);
   const api = new Function(...names, src + "\nreturn { " + fns.join(", ") + " };")(...names.map((n) => env[n]));

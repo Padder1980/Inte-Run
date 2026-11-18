@@ -210,8 +210,9 @@ test("roadFor places the runners it is built for, and says honestly when the run
   // Placed: the beginner track's continuous runner, coming back or not.
   assert.equal(roadStartFor(athlete), "rebuild");
   assert.equal(roadStartFor({ ...athlete, returningFromInjury: false }), "rebuild");
-  // Not yet placed (each recorded in notes/plan-profile.md): run-walk, a 12-17 runner, a regular runner.
-  assert.equal(roadStartFor({ ...athlete, runWalk: true }), null);
+  // §10 decision 2 (2026-11-18): a run-walk runner starts at Walk-run 1 now (test/road-walkrun.test.ts). Not yet placed
+  // (each recorded in notes/plan-profile.md): a 12-17 runner, a regular runner.
+  assert.equal(roadStartFor({ ...athlete, runWalk: true }), "walkrun1");
   assert.equal(roadStartFor({ ...athlete, age: 15 }), null);
   assert.equal(roadStartFor({ ...athlete, experience: "recreational" }), null);
   // Short: ten weeks to the same race. The foundation he needs is kept; the race block is the part shortened, and

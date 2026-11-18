@@ -240,3 +240,10 @@ from a 2 km trial, and already offers one every 28 days — `RETEST_DUE_DAYS`). 
 
 **Build note:** each of 2–4 is its own stage for a fresh session (CLAUDE.md: one stage per session). Nothing changes
 an existing plan by itself: like Stages, a road reaches a runner's plan only through the wizard (decision 2).
+
+**Build status (2026-11-18).** ✅ Piece 1 — decisions 1 and 5 on the existing road: Base in blocks of 4 weeks (6 at most),
+the end-of-block test by level (`blockTestsFor`), no maximal test for "Just getting started" or anyone back from injury
+(the weekly review's 2 km retest too), a parkrun only once the longest run of 30 days is about 4.5 km. ✅ Piece 2 —
+decision 2: Walk-run 1 (to 20 minutes non-stop) and Walk-run 2 (to 30) before Rebuild for a run-walk runner. ☐ Piece 3 —
+decision 3 (regular and competitive runners' roads, Base from their stated mileage, a checkpoint every 4 weeks in the race
+block). ☐ Piece 4 — decision 4 (no-race goals). Build history and the hand-over for 3 and 4: `notes/plan-profile.md`.

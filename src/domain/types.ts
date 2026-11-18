@@ -322,6 +322,11 @@ export type Session = {
   /** Present on strength sessions: the exercises to perform, for a full breakdown and logging. */
   exercises?: StrengthExercise[];
   source: "generated" | "manual";
+  /**
+   * STAGES.md §10: this is a walk-run block's KEY RUN — `minutes` without stopping, at a chatting pace — the evidence its
+   * checkpoint looks for. Absent on every other session, so a plan without a walk-run block is exactly what it was.
+   */
+  keyRun?: { minutes: number };
 };
 
 export type PlannedWeek = {
@@ -351,8 +356,10 @@ export type PlannedWeek = {
 /**
  * Stage B14 — the stages of a road to a race (STAGES.md §3). "rebuild": running made normal again, no fast running.
  * "base": more running and a first taste of speed. "race": the structured race block, laid back from race day.
+ * §10 (decision 2): "walkrun1" builds a runner just getting started to 20 minutes without stopping, "walkrun2" from
+ * there to 30 — the two walk-run blocks before Rebuild.
  */
-export type StageKind = "rebuild" | "base" | "race";
+export type StageKind = "walkrun1" | "walkrun2" | "rebuild" | "base" | "race";
 
 export type Plan = {
   goal: Goal;

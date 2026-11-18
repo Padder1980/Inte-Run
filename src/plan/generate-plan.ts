@@ -61,6 +61,7 @@ import {
   rwLadder,
   rwLong,
   rwSteady,
+  walkRunSession,
   type SessionContent,
   strengthSession,
   taperSession,
@@ -889,11 +890,47 @@ const BASE_DOSE_WEEKS = 8;
 const MIN_RACE_BLOCK_WEEKS = 4;
 /** What each stage's ordinary week is for, in the runner's words (a lighter week keeps its own wording). */
 const STAGE_FOCUS = {
+  walkrun1: "Walk-run 1 — run–walk sessions building to 20 minutes without stopping",
+  walkrun2: "Walk-run 2 — from 20 to 30 minutes of running without stopping",
   rebuild: "Rebuild — easy running only, so running feels normal again",
   base: "Base — more running and a first taste of speed",
 } as const;
 /** How a stage is named in the plan's own note. */
-export const STAGE_LABEL: Record<StageKind, string> = { rebuild: "Rebuild", base: "Base", race: "race block" };
+export const STAGE_LABEL: Record<StageKind, string> = {
+  walkrun1: "Walk-run 1", walkrun2: "Walk-run 2", rebuild: "Rebuild", base: "Base", race: "race block",
+};
+const ROAD_KINDS = new Set<StageKind>(["walkrun1", "walkrun2", "rebuild", "base", "race"]);
+const isWalkRun = (k: StageKind): k is "walkrun1" | "walkrun2" => k === "walkrun1" || k === "walkrun2";
+
+/**
+ * ⚠️⚠️ §10 DECISION 2 — "JUST GETTING STARTED" GETS TWO WALK-RUN BLOCKS BEFORE REBUILD (owner, 2026-11-18: "yes to all
+ * five, build it"). Walk-run 1 builds to 20 minutes of running without stopping, Walk-run 2 from there to 30 — the
+ * research pass's timing: NHS Couch to 5K has the first 20-minute non-stop run in week 5 and three 30-minute runs in
+ * week 9, and the Dutch Start to Run programme takes 6 weeks. Each block's LAST level carries its KEY RUN (the target,
+ * non-stop, at a chatting pace) on the long-run day — the checkpoint's evidence — and a week beyond the last level
+ * (one more week, or a week held at an unanswered checkpoint) repeats it: "repeating a week is totally okay".
+ *
+ * Each level: the ordinary sessions' run blocks (seconds) and walk, then the long-run day's. ⚠️ THE LEVELS ARE THIS
+ * APP'S OWN, paced to those programmes' running minutes per session (8 → 9 → 10/12 → 15/18 → 16 + the 20 non-stop;
+ * then 20/22, 22/25, 25/28, 25 + the 30) and NOT copied from either; they go to the clinical reviewer with §10.
+ */
+export type WalkRunLevel = { run: number[]; walk: number; long: number[]; longWalk: number; keyMin?: number };
+const minS = (n: number) => n * 60;
+export const WALKRUN_LEVELS: Record<"walkrun1" | "walkrun2", WalkRunLevel[]> = {
+  walkrun1: [
+    { run: Array(8).fill(minS(1)), walk: 90, long: Array(8).fill(minS(1)), longWalk: 90 },
+    { run: Array(6).fill(90), walk: 90, long: Array(6).fill(90), longWalk: 90 },
+    { run: Array(4).fill(150), walk: 90, long: Array(3).fill(minS(4)), longWalk: 120 },
+    { run: Array(3).fill(minS(5)), walk: 120, long: Array(2).fill(minS(9)), longWalk: 120 },
+    { run: Array(2).fill(minS(8)), walk: 120, long: [minS(20)], longWalk: 0, keyMin: 20 },
+  ],
+  walkrun2: [
+    { run: Array(2).fill(minS(10)), walk: 120, long: [minS(22)], longWalk: 0 },
+    { run: [minS(22)], walk: 0, long: [minS(25)], longWalk: 0 },
+    { run: [minS(25)], walk: 0, long: [minS(28)], longWalk: 0 },
+    { run: [minS(25)], walk: 0, long: [minS(30)], longWalk: 0, keyMin: 30 },
+  ],
+};
 
 /**
  * The runner a road's race block is built for. A BEGINNER who has come through the foundation is on the main track
@@ -985,7 +1022,7 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
   const { road, ...rest } = options;
   const stages = (road?.stages ?? [])
     .map((st) => ({ kind: st.kind, weeks: Math.max(0, Math.floor(Number(st.weeks) || 0)) }))
-    .filter((st) => st.weeks > 0 && (st.kind === "rebuild" || st.kind === "base" || st.kind === "race"));
+    .filter((st) => st.weeks > 0 && ROAD_KINDS.has(st.kind));
   const raceAt = stages.findIndex((st) => st.kind === "race");
   // A road without a race block is not one this engine builds: the plan it would otherwise have been.
   if (raceAt < 0) return generatePlan(athlete, goal, rest);
@@ -998,14 +1035,24 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
   const raceWeeks = Math.max(1, Math.min(totalWeeks, Math.max(MIN_RACE_BLOCK_WEEKS, stages[raceAt]!.weeks)));
   // The foundation, one stage kind per calendar week in road order. Where the road reaches back before the plan's
   // first week, what does not fit is its EARLIEST weeks (they would be before the runner began).
-  const kinds = stages.slice(0, raceAt).flatMap((st) => Array.from({ length: st.weeks }, () => st.kind));
+  // ⚠️ §10: WALK-RUN WEEKS LEAD THE ROAD (W of them) and are built from their own levels below; the Rebuild/Base weeks
+  // after them are built exactly as on a road that starts at Rebuild — their ramp, lighter weeks and dose counted from
+  // the first Rebuild/Base week — so a runner who came through walk-run gets the habit-builder's own Rebuild. A walk-run
+  // week after a week of running is not a road this engine builds, and is left out.
+  const all = stages.slice(0, raceAt).flatMap((st) => Array.from({ length: st.weeks }, () => st.kind));
+  let W = 0;
+  while (W < all.length && isWalkRun(all[W]!)) W++;
+  const kinds = all.slice(W).filter((k) => !isWalkRun(k));
   const room = Math.max(0, totalWeeks - raceWeeks);
-  const offset = Math.max(0, kinds.length - room);
+  const offsetAll = Math.max(0, W + kinds.length - room);
+  const wDrop = Math.min(W, offsetAll);
+  const offset = offsetAll - wDrop;
   const fKinds = kinds.slice(offset);
   const F = fKinds.length;
+  const Wk = W - wDrop;
   const raceStartMonday = addDays(raceMonday, -(raceWeeks - 1) * 7);
   // A race block that is the whole runway starts on the runner's own start day, partial first week and all.
-  const raceStartIso = F === 0 && raceWeeks >= totalWeeks ? startIso : raceStartMonday;
+  const raceStartIso = F + Wk === 0 && raceWeeks >= totalWeeks ? startIso : raceStartMonday;
   const raceBlock = generatePlan(raceTrack, goal, { ...rest, startDateIso: raceStartIso });
   const weeksOut: PlannedWeek[] = [];
 
@@ -1067,14 +1114,34 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
       w.stage = kind;
       if (!w.isDeload) w.focus = STAGE_FOCUS[kind];
     });
-    applyPartialFirstWeek(foundation, startIso);
+    if (Wk === 0) applyPartialFirstWeek(foundation, startIso);
     weeksOut.push(...foundation);
   }
-  raceBlock.weeks.forEach((w, i) => {
-    w.index = F + i + 1;
-    w.stage = "race";
-  });
+  if (Wk > 0) {
+    // ⚠️ THE LEVEL IS COUNTED FROM THE ROAD'S FIRST WEEK OF EACH KIND, weeks before the plan began included, and a week
+    // past the last level repeats it: so a week more at a checkpoint, or easing back, never changes a week already run.
+    const seen = { walkrun1: 0, walkrun2: 0 };
+    const wp = annotate([{ phase: "base", isDeload: false }])[0]!;
+    const walk: PlannedWeek[] = [];
+    all.slice(0, W).forEach((k, j) => {
+      const kind = k as "walkrun1" | "walkrun2";
+      const levels = WALKRUN_LEVELS[kind];
+      const level = levels[Math.min(levels.length - 1, seen[kind]++)]!;
+      if (j < wDrop) return;
+      const ctx: WeekContext = { athlete: { ...athlete, experience: "beginner", runWalk: true }, goal, paces: raceBlock.paces,
+        returning: true, longMin: Math.round(level.long.reduce((a, b) => a + b, 0) / 60), walkRun: level };
+      const w = buildBeginnerWeek(j + 1, addDays(raceStartMonday, -(F + W - j) * 7), wp, ctx, 1, true);
+      w.stage = kind;
+      w.focus = STAGE_FOCUS[kind];
+      walk.push(w);
+    });
+    applyPartialFirstWeek(walk, startIso);
+    weeksOut.unshift(...walk);
+  }
+  raceBlock.weeks.forEach((w) => { w.stage = "race"; });
   weeksOut.push(...raceBlock.weeks);
+  // Every week numbered in road order (as before when the road starts at Rebuild: the foundation 1…F, the race block on).
+  weeksOut.forEach((w, i) => { w.index = i + 1; });
 
   // The road, as delivered: consecutive weeks of one stage are one leg of it.
   const legs: Array<{ kind: StageKind; weeks: number }> = [];
@@ -1648,6 +1715,8 @@ type WeekContext = {
    */
   easyCapMin?: number;
   easyCapKm?: number;
+  /** §10: a walk-run block's week — its level's sessions (WALKRUN_LEVELS). Absent everywhere else. */
+  walkRun?: WalkRunLevel;
 };
 
 /**
@@ -2632,10 +2701,15 @@ function beginnerRun(
   capMin?: number,
   ladderMin?: number,
   roadEasyMin?: number,
+  walkRun?: WalkRunLevel,
 ): SessionContent {
   // ⚠️ ONLY THE LONG RUN IS EVENT-AWARE. The midweek runs stay on their original gentle ramp: what a
   // new runner needs on a Tuesday is the habit, and it is the same habit whatever they have entered.
   // Stretching every session toward the race is how a beginner plan becomes an intermediate one.
+  // §10: a walk-run block's week is its level's own sessions (WALKRUN_LEVELS), not this ramp.
+  if (runWalk && walkRun) {
+    return long ? walkRunSession(paces, walkRun.long, walkRun.longWalk, walkRun.keyMin) : walkRunSession(paces, walkRun.run, walkRun.walk);
+  }
   if (runWalk) {
     const runSec = Math.round(lerp(60, 300, f) / 15) * 15; // 1′ → 5′ run
     const walkSec = Math.max(30, Math.round(lerp(90, 45, f) / 15) * 15); // 90″ → 45″ walk
@@ -2719,7 +2793,7 @@ function buildBeginnerWeek(
   // endpoint — see that function. Run–walk plans are untouched and cannot be affected: every session
   // in one is typed `easy`, so they contain no long run to be longest.
   sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin, ctx.longMinFloor, undefined,
-    ease && !ctx.easeFromRung ? undefined : ctx.begLongMin));
+    ease && !ctx.easeFromRung ? undefined : ctx.begLongMin, undefined, ctx.walkRun));
   dayOf.push(longDay);
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
@@ -2755,7 +2829,7 @@ function buildBeginnerWeek(
     const begHills = ei === sprintSlot ? beginnerHillDose(index, runWalk, ease, ctx.returning ?? false) : 0;
     const make = (cap?: number) => (begHills > 0
       ? contHillSprints(ctx.paces, Math.min(cap ?? Infinity, beginnerEasyMin(f, ease, ctx.begEasyMin)), begHills)
-      : beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap, undefined, ctx.begEasyMin));
+      : beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap, undefined, ctx.begEasyMin, ctx.walkRun));
     let built = make();
     if (ctx.easyCapMin != null || ctx.easyCapKm != null) {
       // The belt, for the weeks the lift cannot reach: a deload (never lifted, by design), and the

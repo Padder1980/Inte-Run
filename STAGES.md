@@ -161,3 +161,82 @@ that is PLAN.md's separate planning round for non-race modes; this proposal stay
    the risk). The app explains; it never picks one by itself.
 5. **Scope:** race goals first; non-race goals in their own planning round later. *Recommended: yes.*
    **→ Owner, 2026-11-18: yes** — no-race goals stay on the list as their own project, not dropped.
+
+## 10. Blocks for every long-term goal — APPROVED BY THE OWNER, 2026-11-18 ("yes to all five, build it")
+
+**His ask, the evening Stages was built** (word for word): *"I want the block approach to be for all plans that the
+user chooses if it's a long term goal (not just for returning from injury)..... I need you to research and recommend
+the maximum length a block should be for any running plan before its recommended that the runner would then move up.
+I can't imagine that anything longer than 4-6 weeks would be necessary for the 'Just getting started' and 'building
+the habit plans' (check this with research). If this is the case then I need the app to recommend blocks and
+progression to the next stage. It might be that at the end of the block, the last session is a timed 5km/park run or
+a 2k time trial if the user hasn't identified a race. This would then give the app a new baseline to plan the next
+block from (does that make sense?)"*
+
+### What the research says (a research pass over 42 sources, 2026-11-18; the key ones listed)
+
+- **4–6 weeks as a review point holds at every level from "Building the habit" up.** Daniels: most of a routine's
+  benefit comes "in a matter of four to six weeks"; he updates training paces every 3–6 weeks. Hudson: a recovery
+  week every 3rd–4th week for trained runners (notes/plan-coaching-book.md). Issurin's block periodisation uses 2–4-week
+  blocks (trained athletes only). Kiely 2018 (Sports Med 48:753): there are no proven rules for cycle length — he
+  recommends "starting points, checkpoints, and endpoints" adjusted to the person, which is exactly a road of stages.
+- **No study sets a maximum** after which a block stops working: aerobic gains start within 3 weeks (Murias 2010) and
+  untrained adults kept improving for ~6 months on one routine (Scharhag-Rosenberger 2009). So 6 weeks is a limit on
+  how long to go WITHOUT A CHECKPOINT, not a limit on adaptation. Tissues lag fitness (bone remodels over ~3 months,
+  stress fractures show 3–4 weeks after a load error — Warden 2021), so each move up should be a small step.
+- ⚠️ **"Just getting started" needs TWO blocks, not one.** NHS Couch to 5K: the first 20-minute non-stop run is week 5,
+  three 30-minute runs week 9, and repeating a week is "totally okay". The Dutch Start to Run programme is 6 weeks
+  (Kluitenberg 2015, 10.9% injured). An 8-week plan injured no more than a 13-week one (Buist 2008: 20.3% vs 20.8%).
+  So: ~5 weeks to 20 minutes non-stop, then ~4 weeks to 30 — each block inside his 4–6, with "repeat" a normal answer.
+- ⚠️ **Coming back from injury moves on symptoms, not the calendar.** Stanford FASTR's bone-stress protocol: pain →
+  a rest day and repeat the last pain-free session; again → 3 days off; again → drop back two levels and see a
+  clinician. A full return usually takes 2–6 months (Hoenig 2023).
+- ⚠️ **The race block itself is longer** (Hudson 12–20 weeks); 4–6 weeks applies to the checkpoints INSIDE it.
+- **The 10% weekly rule did not protect novices** (Buist 2008), and the weekly-percentage evidence is weak. The
+  strongest recent signal is per run: a run more than 10% longer than your longest in the last 30 days raised injury
+  risk 52–128% (Frandsen 2025, BJSM 59:1203) — which matters for choosing an end-of-block test.
+
+### The end-of-block test — his idea, made safe level by level
+
+Yes, it makes sense: a test at the end of each block gives the next block real paces (the app already re-baselines
+from a 2 km trial, and already offers one every 28 days — `RETEST_DUE_DAYS`). But not the same test for everyone:
+
+| Level | End-of-block test | Why |
+|---|---|---|
+| Just getting started | **No time trial.** The block's target run, non-stop at chatting pace (20, then 30 minutes), and no pain the next day. | Cooper Institute: running tests are for the already active; hard unaccustomed effort carries the highest short-term risk in the least active (AHA/ACSM 2007). |
+| Building the habit | A **strong-but-controlled 2 km** (Galloway's "Magic Mile" style, not all-out), or a **parkrun once the longest run is about 4.5 km**. | A 5 km for someone whose longest run is 3 km is the >10% single-run jump (Frandsen 2025). |
+| Regular / Competitive | **parkrun or a 5 km time trial** (or a race) every 4–6 weeks, or the 2 km trial. | 5 km varies ~2% test to test (Laursen 2007); parkrun has been used as the test in trials; serious events ~0.26 per 100,000 runs (Pedlar 2021). |
+| Back from injury | **No time trial until running is back to normal**; symptom checks instead. | Stanford FASTR. |
+
+### The recommendation
+
+1. **Every long-term goal is a road of blocks.** A block is **4 weeks** as standard, **6 at most** before a
+   checkpoint, at every level; the runner can always repeat one.
+2. **Who starts where:** Just getting started → **Walk-run 1** (~5 weeks, to 20 minutes non-stop) → **Walk-run 2**
+   (~4 weeks, to 30) → Rebuild/Base; Building the habit or coming back → Rebuild → Base (built); a regular or
+   competitive runner far from race day → **Base blocks built from the mileage they state** → the race block.
+3. **Inside the race block, a checkpoint every 4 weeks** that re-baselines paces from the test; "one more week" there
+   eats into the block, with decision 4's choices.
+4. **No race set: rolling 4-week blocks**, each ending in the level's test, the next block planned from it. ⚠️ This
+   brings forward decision 5's "no-race goals later, as their own project".
+5. **Injury returns progress on symptoms**: the per-run pain rule above, on top of the checkpoint (clinical review).
+
+### Decisions that are the owner's (asked and answered, 2026-11-18)
+
+1. A block is 4 weeks, 6 at most before a checkpoint, for every level. *Recommended: yes.*
+   **→ Owner, 2026-11-18: "yes to all five, build it".**
+2. "Just getting started" gets two walk-run blocks (~5 + ~4 weeks) before Rebuild. *Recommended: yes.*
+   **→ Owner, 2026-11-18: "yes to all five, build it".**
+3. Regular and competitive runners get roads too (Base blocks from their stated mileage), and race blocks get a
+   checkpoint every 4 weeks. *Recommended: yes.*
+   **→ Owner, 2026-11-18: "yes to all five, build it".**
+4. No-race goals now, as rolling test-ended blocks (overturns decision 5's "later"). *Recommended: yes, built after 3.*
+   **→ Owner, 2026-11-18: "yes to all five, build it".**
+5. The end-of-block test by level, as in the table — including **no maximal test for beginners or injury returners**,
+   which changes the Base checkpoint built today (a 2 km test run) to "strong but controlled" for a returner.
+   *Recommended: yes, with the clinical reviewer.*
+   **→ Owner, 2026-11-18: "yes to all five, build it".** The injury-return wording still goes to the clinical reviewer
+   before release.
+
+**Build note:** each of 2–4 is its own stage for a fresh session (CLAUDE.md: one stage per session). Nothing changes
+an existing plan by itself: like Stages, a road reaches a runner's plan only through the wizard (decision 2).

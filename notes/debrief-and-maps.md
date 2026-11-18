@@ -472,3 +472,60 @@ reversible at identical offsets in both directions.
 `tools/debrief-shots.mjs` captures the three states headlessly at the reference's 450×954 canvas.
 ⚠️ It emulates a **44pt status bar**, which the reference PNGs include and a headless viewport does
 not — without it every landmark reads 44px high and the systematic error hides the real ones.
+
+---
+
+## THE MAPS "STOPPED WORKING": CARTO PUT ITS FREE TILES BEHIND A KEY, AND THE APP CACHED THE GREY SQUARES (2026-11-18)
+
+Owner: *"I want the maps to work, they worked previously and need you to investigate this and fix why theyve
+stopped working."*
+
+**What "previously" was.** In the phone app the maps have been **CARTO's free tiles since 2026-08-17**: his
+Mapbox token is URL-restricted, `interun://app` matches no URL, Mapbox refuses it, and `routeMapFor` falls
+back (this file's own chapter above). So the maps that worked were CARTO's.
+
+**What changed (measured live, 2026-11-18, and first seen 2026-10-05):** every CARTO tile, in every style the
+app uses (`rastertiles/voyager`, `dark_all`, `light_all`), comes back **200 OK, `access-control-allow-origin: *`,
+as a 256-px grey square reading "API KEY REQUIRED · carto.com/basemaps/apikey"** — 2,049 bytes (light) / 2,513
+(dark), byte-identical whatever tile is asked for, `ETag: "wm-…-light"`. A real tile is 30–45 KB.
+Keyless alternatives were checked the same day and none is usable for an App Store app: OSM's own tiles and
+OpenTopoMap serve real tiles but their usage policies forbid an app's heavy use; Esri's need an ArcGIS
+account. Mapbox with no token answers 401 "Not Authorized".
+
+⚠️⚠️ **NOTHING FAILED, SO THE APP DREW THE SQUARES — AND CACHED THEM.** Each placeholder loads cleanly (CORS
+and all), `routeMapFor` composites it, and the one-render cache keeps the picture for ever. Every run opened
+since CARTO's change had a grey "API KEY REQUIRED" map stored as its map.
+
+**The fix (web layer, over the air):**
+- **`loadTileImage(url, allowTainted, minW)` refuses a tile narrower than it was asked for.** Every tile is
+  requested @2x (512 px); the placeholder is a fixed 256 px. The giveaway costs nothing — no fetch, no hash, no
+  byte size (an `Image` cannot see bytes) — and a real tile of empty sea is still 512 px, so it cannot misfire
+  on a quiet tile. `naturalWidth` 0 is let through rather than guessed at.
+- **A placeholder is an answer, not a fault:** no uncached retry (that would fetch the same squares again and
+  draw them), `MAPDIAG.cartoRefused` is set, and `loadRouteMap` refuses CARTO for the rest of the SESSION
+  without a request — each one sent where the runner ran to a service that will not draw it. A fresh launch
+  checks again, so CARTO coming back would be noticed.
+- **`MAPCACHE_GEN = 2`, in both cache key forms.** Refusing new squares fixes only runs nobody has opened; the
+  generation retires every stored picture at once (old entries age out under LRU). Bump it again only when
+  stored pictures are known to be wrong — on Mapbox each redraw is ~8 billed tiles.
+- The route then shows on the plain background the run page already draws before tiles arrive — less
+  information, nothing false. Shown side by side in the browser against CARTO's live servers: before, grey
+  lettering across the route; after, the clean line.
+- **The Maps card** said "Standard maps — Free, no account" for six weeks after it stopped being true. It now
+  says "Route only, no street map" (with the paste hint only where there is a paste field), and a token Mapbox
+  refuses reads **"Mapbox refused this token … a URL restriction cannot work inside the app"** instead of
+  "Mapbox — Outdoors". `MAPDIAG.mapboxRefused` carries that, and the `map:` diagnostic line now reads e.g.
+  *"mapbox refused, and the free maps (CARTO) now need a key, so the route is drawn without a street map"*.
+
+**Tests:** `test/map-key-required.test.ts` (7), driving the real `loadTileImage`, `loadRouteMap`, `routeMapFor`
+and `mapTokenCard` with a fake network. **5 of 5 re-breaks caught.** Verified live in the browser against
+CARTO: tile refused; 6 requests for the first map, **0** for the second.
+
+⚠️ **THE STREET MAP ITSELF NEEDS A KEY, AND THE ONLY ONE THAT FITS IS MAPBOX WITH NO URL RESTRICTION.** The
+decision this file parked on 2026-08-17 ("accept CARTO in the app, or keep Mapbox for the shared card only")
+is gone: CARTO is no longer free, and every keyed provider puts a key in the app. The owner chose Mapbox
+Outdoors; a separate public token for the app, with no URL restriction, in gitignored `ios/mapbox-token.txt`,
+is the answer — `WebHost` injects it and it outranks a pasted token. An archive refuses to build without it
+(make-project.py), which is what stopped build 582 on 2026-11-18. ⚠️ A shipped `pk.` token can be extracted
+by anyone; that is true of every Mapbox app, and the per-run cache keeps the bill near zero (200,000 free tiles
+a month; a run is ~8). If abuse ever shows, the next step is the Worker proxying tiles so no key is in the app.

@@ -25557,10 +25557,19 @@ function liveActivityStatus() {
 function mapTokenCard() {
   const prov = mapProviderFor(MAP_STYLE_RUN);
   const injected = (function () { try { return typeof window.__interunMapboxToken === "string"; } catch (e) { return false; } })();
-  const state = prov.kind === "mapbox"
+  // ⚠️ THIS CARD SAID "Standard maps — Free, no account" FOR SIX WEEKS AFTER IT STOPPED BEING TRUE:
+  // CARTO's free tiles now all read API KEY REQUIRED (see loadTileImage). And a token Mapbox refuses — one
+  // limited to a website, which interun://app can never match — read as "Mapbox — Outdoors" while every
+  // map fell back. The card now says what the maps actually do.
+  const canPaste = !injected && mapDevMode();
+  const state = prov.kind === "mapbox" && MAPDIAG.mapboxRefused
+    ? '<div class="bk-val">Mapbox refused this token</div><div class="bk-lab" style="margin-top:4px">A token limited to a website (a URL restriction) cannot work inside the app. ' +
+      (canPaste ? "Make one with no URL restriction and paste it below." : "This build needs one with no URL restriction.") + '</div>'
+    : prov.kind === "mapbox"
     ? '<div class="bk-val">Mapbox — Outdoors</div><div class="bk-lab" style="margin-top:4px">Trails, footpaths and contour lines' +
       (injected ? " \u00b7 from this build" : " \u00b7 from the token below") + '</div>'
-    : '<div class="bk-val">Standard maps</div><div class="bk-lab" style="margin-top:4px">Free, no account. Paste a Mapbox token below to switch.</div>';
+    : '<div class="bk-val">Route only, no street map</div><div class="bk-lab" style="margin-top:4px">The free street maps this used now need a paid key, so your route is drawn on a plain background.' +
+      (canPaste ? " Paste a Mapbox token below to bring street maps back." : "") + '</div>';
   return '<div class="card"><div class="subhead" style="margin-top:0">Maps</div>' +
     '<div class="bk-box">' + state + '</div>' +
     // ⚠️ THE PASTE FIELD IS FOR WHOEVER BUILT THE APP, NOT FOR A RUNNER. Shipped as-is it invites
@@ -35906,14 +35915,35 @@ function mercY(lat, z) { const s = Math.sin(lat * Math.PI / 180); return (0.5 - 
 // ⚠️ THE UNCACHED RETRY IS ALLOWED ON CARTO ONLY. CARTO tiles are free; Mapbox tiles are billed per
 // request, and an uncacheable Mapbox map would re-fetch every time a run was opened — which is
 // precisely the bill the cache was built to prevent. On Mapbox it fails visibly and says why.
-const MAPDIAG = { tried: 0, cors: 0, tainted: 0, failed: 0, why: "no map drawn yet" };
-function loadTileImage(url, allowTainted) {
+const MAPDIAG = { tried: 0, cors: 0, tainted: 0, failed: 0, why: "no map drawn yet", cartoRefused: false, mapboxRefused: false };
+/**
+ * One map tile, or a rejection.
+ *
+ * ⚠️⚠️ A TILE THAT ARRIVES IS NOT NECESSARILY A MAP. Owner, 2026-11-18: "I want the maps to work, they
+ * worked previously". They did — on CARTO's free tiles, which is what the phone app has drawn since
+ * 2026-08-17 (his Mapbox token is URL-restricted, and interun://app matches no URL, so Mapbox refuses
+ * it and routeMapFor falls back). CARTO then put its free basemaps behind a key: every tile, every
+ * style, now comes back 200 OK, CORS-clean, as a grey square reading "API KEY REQUIRED
+ * carto.com/basemaps/apikey" (measured again 2026-11-18: 2,049 bytes light / 2,513 dark, byte-identical
+ * whatever tile is asked for, ETag "wm-…"). Nothing failed, so the app composited those squares into
+ * every run's map — and CACHED the result, so each run viewed since then kept its grey picture.
+ * ⚠️ THE GIVEAWAY IS THE SIZE. Every tile here is asked for at double resolution (@2x, 512 px) and the
+ * placeholder is a fixed 256 px picture whatever is asked for. So a tile narrower than minW is refused
+ * as "placeholder": the caller's plain-background route then stands in, which says less but says
+ * nothing false. naturalWidth 0 (an engine that will not say) is let through rather than guessed at.
+ */
+function loadTileImage(url, allowTainted, minW) {
   return new Promise((res, rej) => {
     MAPDIAG.tried++;
     const img = new Image();
     if (!allowTainted) img.crossOrigin = "anonymous";
     const to = setTimeout(() => rej(new Error("timeout")), 6000);
-    img.onload = () => { clearTimeout(to); if (allowTainted) MAPDIAG.tainted++; else MAPDIAG.cors++; res(img); };
+    img.onload = () => {
+      clearTimeout(to);
+      if (minW && img.naturalWidth && img.naturalWidth < minW) { rej(new Error("placeholder")); return; }
+      if (allowTainted) MAPDIAG.tainted++; else MAPDIAG.cors++;
+      res(img);
+    };
     img.onerror = () => { clearTimeout(to); rej(new Error(allowTainted ? "err" : "cors")); };
     img.src = url;
   });
@@ -36000,6 +36030,18 @@ function mapProviderFor(styles) {
 //   3. Every miss must be silent and harmless. If IndexedDB is unavailable — private browsing, a
 //      quota refusal, an old engine — the map still draws, straight from tiles, exactly as before.
 const MAPCACHE_DB = "interun_mapcache_v1", MAPCACHE_STORE = "maps", MAPCACHE_MAX = 120;
+/**
+ * The generation of every stored picture, part of every cache key.
+ *
+ * ⚠️ 2 SINCE 2026-11-18: EVERY CARTO PICTURE STORED SINCE CARTO PUT ITS FREE MAPS BEHIND A KEY IS A GRID
+ * OF GREY "API KEY REQUIRED" SQUARES (see loadTileImage), and a cached picture is served for ever —
+ * the cache exists precisely so a run is never drawn twice. Refusing new placeholder tiles fixes only
+ * the runs nobody has opened yet. Bumping the generation retires every stored picture at once; the
+ * old entries are never read again and age out under MAPCACHE_MAX's least-recently-used eviction.
+ * ⚠️ The cost is one redraw per run that is opened again. On Mapbox that is billed — about eight tiles
+ * a run — which is why this is bumped only when stored pictures are known to be wrong.
+ */
+const MAPCACHE_GEN = 2;
 function mapCacheOpen() {
   return new Promise((resolve) => {
     try {
@@ -36117,8 +36159,8 @@ function routeMapFor(route, pw, ph, styles, forceCarto, frame) {
   // how far in it is zoomed; the pixel origins already carry both, rounded, so nothing else is needed.
   const key = frame
     ? "pt|" + frame.z + "|" + Math.round(frame.originX) + "," + Math.round(frame.originY) +
-      "|" + pw + "x" + ph + "|" + prov.kind + ":" + prov.style
-    : routeMapKey(route, pw, ph, prov.kind + ":" + prov.style);
+      "|" + pw + "x" + ph + "|" + prov.kind + ":" + prov.style + "|g" + MAPCACHE_GEN
+    : routeMapKey(route, pw, ph, prov.kind + ":" + prov.style + "|g" + MAPCACHE_GEN);
   const fromBlob = (blob, z, ox, oy) => new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob), img = new Image();
     img.onload = () => { URL.revokeObjectURL(url); resolve({ image: img, proj: (p) => [mercX(p.lng, z) - ox, mercY(p.lat, z) - oy] }); };
@@ -36153,6 +36195,7 @@ function routeMapFor(route, pw, ph, styles, forceCarto, frame) {
     .catch((err) => {
       if (prov.kind === "mapbox" && !forceCarto) {
         MAPDIAG.why = "mapbox refused; drew the free map instead";
+        MAPDIAG.mapboxRefused = true;
         return routeMapFor(route, pw, ph, st, true, frame);
       }
       throw err;
@@ -36222,6 +36265,10 @@ function loadRouteMap(route, pw, ph, prov, frame) {
     // remembered. A framing supplied by the caller also lifts the two-point requirement, which exists
     // only because routeMapFraming cannot fit a box to one coordinate.
     if (!frame && (!route || route.length < 2)) return reject(new Error("no route"));
+    // ⚠️ ONCE CARTO HAS ANSWERED WITH ITS KEY PLACEHOLDER IT IS NOT ASKED AGAIN THIS SESSION. Every
+    // request would cost a round trip, send where the runner ran (tile coordinates) to a service that
+    // will not draw it, and come back grey. Not stored: a fresh launch checks again.
+    if (prov.kind === "carto" && MAPDIAG.cartoRefused) return reject(new Error("placeholder"));
     const fr = frame || routeMapFraming(route, pw, ph);
     const z = fr.z, originX = fr.originX, originY = fr.originY;
     const n = Math.pow(2, z), specs = [];
@@ -36238,11 +36285,24 @@ function loadRouteMap(route, pw, ph, prov, frame) {
         specs.push({ url: url, dx: tx * MAP_TILE - originX, dy: ty * MAP_TILE - originY });
       }
     if (!specs.length || specs.length > 40) return reject(new Error("tile count"));
+    // Both URLs above ask for @2x, so a real tile is two MAP_TILEs wide (see loadTileImage).
     const fetchAll = (allowTainted) =>
-      Promise.all(specs.map((sp) => loadTileImage(sp.url, allowTainted).then((img) => ({ img, dx: sp.dx, dy: sp.dy }))));
+      Promise.all(specs.map((sp) => loadTileImage(sp.url, allowTainted, MAP_TILE * 2).then((img) => ({ img, dx: sp.dx, dy: sp.dy }))));
     const done = (tiles) => resolve({ tiles, z: z, originX: originX, originY: originY,
       proj: (p) => [mercX(p.lng, z) - originX, mercY(p.lat, z) - originY] });
     fetchAll(false).then((tiles) => { MAPDIAG.why = "ok, cached"; done(tiles); }).catch((e) => {
+      // ⚠️ A PLACEHOLDER IS AN ANSWER, NOT A NETWORK FAULT: no uncached retry, which would fetch the same
+      // grey squares a second time and draw them anyway.
+      if (e && e.message === "placeholder") {
+        MAPDIAG.failed++;
+        if (prov.kind === "carto") MAPDIAG.cartoRefused = true;
+        // Say whether Mapbox was refused first, or the line hides the half of the story that is fixable.
+        MAPDIAG.why = prov.kind === "carto"
+          ? (MAPDIAG.mapboxRefused ? "mapbox refused, and " : "") +
+            "the free maps (CARTO) now need a key, so the route is drawn without a street map"
+          : "tiles came back as placeholders, so the route is drawn without a street map";
+        return reject(e);
+      }
       // ⚠️ ONLY CARTO MAY RETRY WITHOUT CORS. See loadTileImage: an uncacheable Mapbox map re-fetches
       // billed tiles on every view, which is the bill the cache exists to prevent.
       if (prov.kind !== "carto") {

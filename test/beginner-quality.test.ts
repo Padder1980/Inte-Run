@@ -39,6 +39,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, PlannedWeek, Session } from "../src/domain/types.ts";
 import { generatePlan } from "../src/plan/generate-plan.ts";
+import { roadFor } from "../src/plan/road.ts";
 import { computeDistribution, honoursModel } from "../src/science/intensity-distribution.ts";
 
 const TT: Record<string, number> = { "5k": 1500, "10k": 3200, half: 7500 };
@@ -236,12 +237,18 @@ test("BLOCKER: the easy floor holds on every beginner week", () => {
     `worst beginner easy fraction is ${(worst * 100).toFixed(1)}% — the quality session has grown too big`);
 });
 
-test("BLOCKER: a run–walk beginner and a returning beginner get none", () => {
+test("BLOCKER: a run–walk beginner gets none, and a returning beginner gets none in Rebuild only", () => {
   // ⚠️ THE SAME SCOPING DECISION AS THE HILL-SPRINT STAPLE, and for the same reason: somebody who cannot
   // yet run twenty minutes continuously is below the lowest tier the book addresses, and their plan is
   // already interval-shaped. Hudson's Freshman Plan — for a runner brand new to structured training —
   // still assumes continuous easy runs of three miles.
-  // ⚠️ AND COMING BACK FROM A BREAK IS NOT THE MOMENT TO MEET FAST RUNNING FOR THE FIRST TIME.
+  // ⚠️⚠️ THE RETURNING HALF OF THIS GUARD WAS RESTATED BY THE OWNER, 2026-11-18 (STAGES.md decision 1): "none in
+  // the Rebuild stage; they return once the runner passes its checkpoint". It used to read "a returning beginner
+  // gets none" for the WHOLE block, and that is what left his own half-marathon plan — habit-builder, back from
+  // injury, target 1:35 — without one harder session in 21 weeks. On a road the rule is per stage: coming back is
+  // still not the moment to meet fast running for the first time (Rebuild), and the harder sessions return in Base.
+  // Off a road the plan is exactly what it was — none — until its runner chooses a road (test/road-stages.test.ts).
+  // The wording goes to the clinical reviewer before release.
   for (const dist of ["5k", "10k"]) {
     const rw = plan({ dist, days: 3, runWalk: true });
     for (const w of rw.weeks) {
@@ -252,11 +259,25 @@ test("BLOCKER: a run–walk beginner and a returning beginner get none", () => {
   }
   for (const dist of ["5k", "half"]) {
     const ret = plan({ dist, returning: true });
+    // Off a road: unchanged, none.
     for (const w of ret.weeks) {
       assert.equal(qualityOf(w).length, 0,
-        `returning ${dist} week ${w.index}: "${qualityOf(w).map((s) => s.title).join(" | ")}"`);
+        `returning ${dist} week ${w.index}, no road: "${qualityOf(w).map((s) => s.title).join(" | ")}"`);
     }
     assert.ok(ret.weeks.length > 10, `the returning ${dist} fixture built only ${ret.weeks.length} weeks`);
+    // On a road: none in Rebuild, and back in Base.
+    const athlete = { ...ret.athlete };
+    const road = roadFor(athlete, ret.goal, START);
+    assert.ok(road, `a returning ${dist} beginner is not placed on a road`);
+    const onRoad = generatePlan(athlete, ret.goal, { startDateIso: START, road: { stages: road.stages, rampWeeks: road.rampWeeks } });
+    const rebuild = onRoad.weeks.filter((w) => w.stage === "rebuild");
+    const base = onRoad.weeks.filter((w) => w.stage === "base");
+    assert.ok(rebuild.length >= 4 && base.length >= 1, `the ${dist} road has ${rebuild.length} Rebuild and ${base.length} Base weeks`);
+    for (const w of rebuild) {
+      assert.equal(qualityOf(w).length, 0,
+        `returning ${dist} Rebuild week ${w.index}: "${qualityOf(w).map((s) => s.title).join(" | ")}"`);
+    }
+    for (const w of base) assert.equal(qualityOf(w).length, 1, `returning ${dist} Base week ${w.index} has no quality session`);
   }
 });
 

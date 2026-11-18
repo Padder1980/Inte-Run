@@ -80,6 +80,21 @@ export const MAX_STRUCTURED_WEEKS_BEGINNER: Record<RaceDistanceKey, number> = {
   marathon: 28,
 };
 
+/**
+ * Stage B14 — THE RACE BLOCK A ROAD ENDS WITH: Hudson's own block lengths (ch12 — 5K 12, 10K 14, half 16,
+ * marathon 20; the mile scaled down with them). STAGES.md §3 names exactly these. `MAX_STRUCTURED_WEEKS` is these
+ * plus the four-week introductory period; on a road that period is the foundation stages instead (Rebuild, Base),
+ * so the race block itself is the book's length and the weeks before it are planned rather than left empty.
+ * Derived from `MAX_STRUCTURED_WEEKS`, so the two tables cannot drift apart.
+ */
+export const RACE_BLOCK_WEEKS: Record<RaceDistanceKey, number> = {
+  "1mile": MAX_STRUCTURED_WEEKS["1mile"] - 4,
+  "5k": MAX_STRUCTURED_WEEKS["5k"] - 4,
+  "10k": MAX_STRUCTURED_WEEKS["10k"] - 4,
+  half: MAX_STRUCTURED_WEEKS.half - 4,
+  marathon: MAX_STRUCTURED_WEEKS.marathon - 4,
+};
+
 /** How long the concentrated, race-specific BUILD phase runs at most, per distance. Extra time is
  *  spent extending the base, not stretching the specific work (which should stay concentrated). */
 const BUILD_CAP: Record<RaceDistanceKey, number> = {

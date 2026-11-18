@@ -28387,13 +28387,17 @@ function typeCeilingFor(status) {
 
 const STATUS_OPTS = [
   // ⚠️ THE "or coming back after a long break" CLAUSE WAS REMOVED, AND IT WAS A MISROUTE RATHER THAN
-  // A WORDING PREFERENCE. It pointed a detrained veteran at the run-walk beginner track — and on that
-  // track the dedicated "Coming back to running?" question they answer two sections later changes
-  // NOTHING: measured, returningFromBreak and returningFromInjury produce a byte-identical session
-  // list for a beginner (0 of 140 sessions differ), against 158 of 170 on the recreational track. So
-  // the one card that named their situation sent them to the one track that ignores it. A runner
-  // coming back picks the card that matches what they can do TODAY, and the returning question then
-  // does its job.
+  // A WORDING PREFERENCE. It pointed a detrained veteran at the run-walk beginner track, the one track
+  // where the dedicated "Coming back to running?" question they answer two sections later changed
+  // nothing when it was measured (0 of 140 sessions differed, against 158 of 170 on the recreational
+  // track). A runner coming back picks the card that matches what they can do TODAY, and the returning
+  // question then does its job.
+  // ⚠️⚠️ THAT MEASUREMENT IS OUT OF DATE FOR "Building the habit" (corrected 2026-11-18). Since the
+  // beginner track gained its quality sessions (2026-09-01), the comeback answer on it REMOVES every
+  // quality session and the hill sprints for the whole block (beginnerQualityFor, beginnerHillDose) —
+  // which is how the owner's own habit-builder half marathon, back from injury, had no harder session
+  // in any week. Stage B14 makes it per stage on a road (STAGES.md decision 1): none in Rebuild, back in
+  // Base once the runner passes the Rebuild checkpoint. Off a road, the whole-block rule still holds.
   ["new", "Just getting started", "New to running and building up from walking. We\\'ll start with walk\\u2013run."],
   ["building", "Building the habit", "I can jog 20\\u201330 minutes non-stop. Focused on being consistent."],
   ["regular", "Regular runner", "I run 3\\u20135\\u00d7 a week and can finish a 10K or half comfortably."],

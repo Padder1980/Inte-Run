@@ -340,7 +340,19 @@ export type PlannedWeek = {
    * without one.
    */
   secondaryRace?: { role: "before" | "race" | "after"; distance: RaceDistanceKey; dateIso: string };
+  /**
+   * Stage B14: the stage of the runner's road this week belongs to (STAGES.md). Present on every week of a plan
+   * built with `GenerateOptions.road`, and absent on every week of a plan without one — so a plan built the old way
+   * is exactly what it was.
+   */
+  stage?: StageKind;
 };
+
+/**
+ * Stage B14 — the stages of a road to a race (STAGES.md §3). "rebuild": running made normal again, no fast running.
+ * "base": more running and a first taste of speed. "race": the structured race block, laid back from race day.
+ */
+export type StageKind = "rebuild" | "base" | "race";
 
 export type Plan = {
   goal: Goal;

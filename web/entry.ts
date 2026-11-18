@@ -11,7 +11,10 @@ export { parseDuration } from "../src/domain/units.ts";
 // ⚠️ HARD_BEFORE_RACE and sessionIdFor: the race-eve set and the one definition of a session's id, so the
 // app refuses a week-move onto race eve with the engine's own list (stage B4) and can carry an id written
 // in the old week-number form across to the calendar-week form without a second copy of the format.
-export { generatePlan, HARD_BEFORE_RACE, sessionIdFor, secondaryRaceWindow, longRunRangeFor } from "../src/plan/generate-plan.ts";
+export { generatePlan, HARD_BEFORE_RACE, sessionIdFor, secondaryRaceWindow, longRunRangeFor, STAGE_LABEL } from "../src/plan/generate-plan.ts";
+// B14 — the road to a race: where a runner starts and how the weeks are budgeted (STAGES.md). The app asks it when a
+// plan is made and stores what the runner accepted; the engine builds exactly that road.
+export { roadFor, roadStartFor } from "../src/plan/road.ts";
 export { LiveSession } from "../src/live/session-runtime.ts";
 export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session-runtime.ts";
 // Spoken-coaching catalogue + selection (drives the app's audio controller).

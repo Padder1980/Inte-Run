@@ -37,6 +37,8 @@ export type WeekView = {
   sessions: SessionView[];
   /** Stage B7: the week is shaped around a smaller race inside the plan (see PlannedWeek). */
   secondaryRace?: PlannedWeek["secondaryRace"];
+  /** Stage B14: the road's stage this week belongs to (see PlannedWeek). */
+  stage?: PlannedWeek["stage"];
 };
 
 export type PlanSummary = {
@@ -175,6 +177,8 @@ export function weekView(w: PlannedWeek): WeekView {
     // ⚠️ ONLY WHEN THERE IS ONE: a key holding undefined is a different object to a strict comparison, and every
     // week of every plan without a B-race must project exactly as it did.
     ...(w.secondaryRace ? { secondaryRace: w.secondaryRace } : {}),
+    // B14 — the road's stage, the same way: only on a plan built with a road.
+    ...(w.stage ? { stage: w.stage } : {}),
   };
 }
 

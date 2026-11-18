@@ -19,6 +19,7 @@ import type {
   RaceDistanceKey,
   Session,
   SessionType,
+  StageKind,
   TrainingPaces,
 } from "../domain/types.ts";
 import {
@@ -38,7 +39,7 @@ import { youthLimitsFor } from "../domain/youth.ts";
 import { strengthSessionsFor } from "../domain/strength-days.ts";
 import { taperFor } from "../science/taper.ts";
 import { addDays, dayOfWeekMondayZero, daysBetween, isoToday, weeksBetween } from "./dates.ts";
-import { type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
+import { RACE_BLOCK_WEEKS, type WeekPlan, phaseSchedule, structuredWeekCount } from "./periodization.ts";
 import {
   contExplore,
   contPickups,
@@ -82,7 +83,22 @@ export type GenerateOptions = {
   startDateIso?: string;
   /** A B-race (applySecondaryRace). Absent, or outside secondaryRaceWindow, the plan is exactly what it was. */
   secondaryRace?: SecondaryRace;
+  /**
+   * Stage B14: the runner's road to the race (STAGES.md) — foundation stages, then the race block. Absent, the plan
+   * is exactly what it was. See `generateRoadPlan`.
+   */
+  road?: Road;
 };
+
+/** Stage B14: one stage of a road, and how many calendar weeks it lasts. */
+export type RoadStage = { kind: StageKind; weeks: number };
+/**
+ * Stage B14: a road — foundation stages ("rebuild", "base", in any order the runner's checkpoints made), then exactly
+ * one "race" stage, the race block, last. `rampWeeks` is how many weeks the foundation's ramp was laid over when the
+ * road was made (absent: the foundation as it stands). It is stored rather than re-derived so that a checkpoint
+ * answer — a week more here, or easing back — can never re-pace the weeks already run (see `generateRoadPlan`).
+ */
+export type Road = { stages: RoadStage[]; rampWeeks?: number };
 
 const PEAK_LONG_MIN: Record<Goal["distance"], number> = {
   "1mile": 55,
@@ -679,6 +695,9 @@ const longRunDayOf = (a: Athlete) => ((a.longRunDay ?? 6) % 7 + 7) % 7;
  * own worst, the runner gets the balanced plan and is told why. Every other plan is built once, as before.
  */
 export function generatePlan(athlete: Athlete, goal: Goal, options: GenerateOptions = {}): ReturnType<typeof generatePlanCore> {
+  // ⚠️ B14 — A ROAD IS DISPATCHED FIRST, AND ONLY WHEN ONE IS GIVEN: every plan built without `road` takes the path
+  // below, untouched, so no existing plan can change by this stage existing.
+  if (options.road) return generateRoadPlan(athlete, goal, options);
   const v = athlete.volumeGrowth;
   const stated = athlete.weeklyVolumeKmCurrent;
   if (!v || v === "progressive" || !stated || !Number.isFinite(stated) || stated <= 0) return withLongCap(athlete, goal, options);
@@ -857,6 +876,232 @@ export function longRunRangeFor(
     for (let c = t; c < next && c <= top && c <= t + 10; c += 5) if (keeps(c)) { choices.push(c); break; }
   });
   return { minMinutes: choices[0] ?? maxMinutes, maxMinutes, choices };
+}
+
+// ---- B14: a road of stages (STAGES.md) ---------------------------------------------------------------------------
+
+/** A Base stage's quality dose ramps over this many of its weeks — the fartlek from 4 × 30″ toward 8 × 45″, the
+ *  beginner track's own progression. STAGES.md §3 puts a Base at 4–8 weeks, so a long one arrives at the full dose
+ *  and a short one stays gentle. Counted from Base's first week, so a later week added to it never changes an
+ *  earlier week's dose. */
+const BASE_DOSE_WEEKS = 8;
+/** The shortest race block a road builds: the engine's own shortest block (periodization.ts MIN_STRUCTURED_WEEKS). */
+const MIN_RACE_BLOCK_WEEKS = 4;
+/** What each stage's ordinary week is for, in the runner's words (a lighter week keeps its own wording). */
+const STAGE_FOCUS = {
+  rebuild: "Rebuild — easy running only, so running feels normal again",
+  base: "Base — more running and a first taste of speed",
+} as const;
+/** How a stage is named in the plan's own note. */
+export const STAGE_LABEL: Record<StageKind, string> = { rebuild: "Rebuild", base: "Base", race: "race block" };
+
+/**
+ * The runner a road's race block is built for. A BEGINNER who has come through the foundation is on the main track
+ * there (STAGES.md §3: the race block is for a runner who has "passed Base, or a regular runner"); a regular or
+ * competitive runner keeps their own. ⚠️ THE COMEBACK FLAGS STAY, so a returner's race block is thinned at first
+ * exactly as today's main track thins it (§3: "main track; thinned at first for a returner").
+ */
+function raceTrackAthlete(a: Athlete): Athlete {
+  return a.experience === "beginner" || a.runWalk ? { ...a, experience: "recreational", runWalk: false } : a;
+}
+
+/**
+ * ⚠️⚠️ B14 — A ROAD: FOUNDATION STAGES, THEN THE RACE BLOCK, IN ONE PLAN (STAGES.md, approved 2026-11-18).
+ *
+ * THE RACE BLOCK IS TODAY'S PLAN, NOT A COPY OF IT. It is `generatePlan` itself, laid back from race day on the track
+ * the runner reaches (`raceTrackAthlete`) for the race stage's weeks — dials, volume fit, B-race and all — so it is
+ * exactly the block today's engine builds for those weeks, and every guard on that engine still holds over it.
+ *
+ * THE FOUNDATION FILLS THE WEEKS BEFORE IT, which until now were left un-planned (the "lead-in" note). It is built
+ * by the beginner track's own week builder, one stage per week:
+ *   * a REBUILD week carries no fast running for anyone — `returning` set, so no quality and no hill sprints;
+ *   * a BASE week carries the beginner track's gentle quality (fartlek, hill reps every fourth week) and its hill
+ *     sprints — decision 1: harder sessions return once the runner has passed the Rebuild checkpoint.
+ *
+ * ⚠️ VOLUME CARRIES ACROSS THE BOUNDARY BECAUSE THE FOUNDATION IS AIMED AT THE RACE BLOCK'S OWN FIRST WEEK. Its
+ * long-run ladder climbs from the beginner track's opening to the long run the race block opens with, on the
+ * beginner ladder's own step limit (BEG_LONG_STEP_MAX), and holds there once arrived — so the race block's first
+ * week is the next step of the foundation rather than a jump to a different plan.
+ *
+ * ⚠️⚠️ AND NOTHING ALREADY RUN CAN CHANGE WHEN A LATER CHECKPOINT IS ANSWERED. Every input a foundation week reads is
+ * counted from the road's FIRST week: its deload (every fourth week of the road), its ramp position (`rampWeeks`,
+ * fixed when the road was made), its Base dose (Base weeks so far), and the destination — the first week of a
+ * race block of the book's own length (RACE_BLOCK_WEEKS), not of whatever the race block has become. So a week
+ * more in Rebuild, a week of easing back, or a shorter race block changes the weeks from there on and none before.
+ */
+/** The foundation's two ends: where its long run opens (the beginner track's own opening, ≤ 30 minutes) and where it
+ *  is going (the long run the race block opens with). Never past a young runner's ceiling. */
+function foundationEnds(athlete: Athlete, goal: Goal, paces: TrainingPaces, ref: { weeks: PlannedWeek[] }): { open: number; dest: number; destEasy: number } {
+  const easySecPerKm = (paces.easy.minSecPerKm + paces.easy.maxSecPerKm) / 2;
+  const youth = youthLimitsFor(athlete.age);
+  const youthCapMin = youth ? Math.round((youth.maxSessionKm * easySecPerKm) / 60) : Infinity;
+  const begPeak = Math.min(BEGINNER_LONG_CEILING_MIN, Math.round((BEGINNER_LONG_KM[goal.distance] * easySecPerKm) / 60), youthCapMin);
+  // ⚠️ NEVER SHORTER THAN THE WEEK'S OWN EASY RUNS. The beginner ladder opens at 45% of its race endpoint, which for a
+  // 5 km is 14 minutes — beside 22-minute easy runs, so the delivered plan lifts it to 22 anyway (the long run is the
+  // week's longest). Opening the road's ladder there says what the runner is actually given, and it is inside what the
+  // "Building the habit" card says they can do ("20–30 minutes non-stop"). The half, the owner's race, opens at 30.
+  const open = Math.min(youthCapMin, Math.max(BEG_EASY_OPEN_MIN, beginnerOpenMin(begPeak)));
+  const dest = Math.min(youthCapMin, Math.max(open, longRunMinutesOf(ref.weeks[0]!)));
+  // The race block's first-week easy runs, on average — where the foundation's easy running is going. Never above
+  // the long run it is heading for (the long run is the week's longest), never below the beginner track's opening.
+  const easy = ref.weeks[0]!.sessions.filter((s) => AEROBIC_RUN_TYPES.has(s.type)).map((s) => sessionMinutes(s));
+  const destEasy = Math.max(BEG_EASY_OPEN_MIN, Math.min(dest, easy.length ? easy.reduce((a, b) => a + b, 0) / easy.length : BEG_EASY_OPEN_MIN));
+  return { open, dest, destEasy };
+}
+/** Where a beginner's ordinary run opens (`beginnerEasyMin` at the start of its ramp). */
+const BEG_EASY_OPEN_MIN = 22;
+/** The foundation's weeks: a deload every fourth week of the ROAD (from its first week, so a later week never moves
+ *  one), where this runner keeps recovery weeks at all — a beginner and a returner always do. */
+function foundationSchedule(athlete: Athlete, goal: Goal, weeks: number, offset = 0): WeekPlan[] {
+  const recovery = schedulesRecoveryWeeks(athlete, goal);
+  return Array.from({ length: weeks }, (_, i) => ({ phase: "base" as Phase, isDeload: recovery && (offset + i + 1) % 4 === 0 }));
+}
+
+/**
+ * B14 — HOW MANY FOUNDATION WEEKS THIS RUNNER NEEDS before the race block, measured on the engine's own ladder: the
+ * fewest weeks whose long run arrives within one step (LONG_LIFT_STEP_MAX) of the long run the race block opens
+ * with, so the step into it is no bigger than any step inside it. Null when the race block opens no longer than
+ * the foundation does. The road builder (src/plan/road.ts) budgets the time with it, and says so when it is short.
+ */
+export function roadFoundationNeed(athlete: Athlete, goal: Goal, options: GenerateOptions = {}): { weeks: number; openMin: number; destMin: number } {
+  const { road: _road, ...rest } = options;
+  const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
+  const refWeeks = RACE_BLOCK_WEEKS[goal.distance];
+  const ref = generatePlan(raceTrackAthlete(athlete), goal, { ...rest, secondaryRace: undefined, startDateIso: addDays(raceMonday, -(refWeeks - 1) * 7) });
+  const { open, dest } = foundationEnds(athlete, goal, ref.paces, ref);
+  for (let F = 1; F <= 52; F++) {
+    const schedule = foundationSchedule(athlete, goal, F);
+    const ladder = quantisedLadder(open, dest, rampFractions(schedule, F), schedule, LONG_LIFT_STEP_MAX);
+    const last = Math.max(0, ...ladder);
+    // ⚠️ ONE MINUTE UNDER THE LIMIT, BECAUSE A RUNG IS NOT QUITE WHAT IS DELIVERED: the long run is built from it and
+    // its length comes back off a rounded distance. Measured on a 5K road, a 36-minute rung was delivered as 35, and a
+    // need computed on the rung alone let the step into the race block reach 1.114.
+    if (dest <= Math.floor(last * LONG_LIFT_STEP_MAX) - 1) return { weeks: F, openMin: open, destMin: dest };
+  }
+  return { weeks: 52, openMin: open, destMin: dest };
+}
+
+function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions): ReturnType<typeof generatePlanCore> {
+  const { road, ...rest } = options;
+  const stages = (road?.stages ?? [])
+    .map((st) => ({ kind: st.kind, weeks: Math.max(0, Math.floor(Number(st.weeks) || 0)) }))
+    .filter((st) => st.weeks > 0 && (st.kind === "rebuild" || st.kind === "base" || st.kind === "race"));
+  const raceAt = stages.findIndex((st) => st.kind === "race");
+  // A road without a race block is not one this engine builds: the plan it would otherwise have been.
+  if (raceAt < 0) return generatePlan(athlete, goal, rest);
+  const startIso = rest.startDateIso ?? goal.startDateIso ?? isoToday();
+  const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
+  const startWeekMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
+  const totalWeeks = Math.max(0, weeksBetween(startWeekMonday, raceMonday) + 1);
+  const raceTrack = raceTrackAthlete(athlete);
+  // The race block: never longer than the runway, never shorter than the engine's own shortest block.
+  const raceWeeks = Math.max(1, Math.min(totalWeeks, Math.max(MIN_RACE_BLOCK_WEEKS, stages[raceAt]!.weeks)));
+  // The foundation, one stage kind per calendar week in road order. Where the road reaches back before the plan's
+  // first week, what does not fit is its EARLIEST weeks (they would be before the runner began).
+  const kinds = stages.slice(0, raceAt).flatMap((st) => Array.from({ length: st.weeks }, () => st.kind));
+  const room = Math.max(0, totalWeeks - raceWeeks);
+  const offset = Math.max(0, kinds.length - room);
+  const fKinds = kinds.slice(offset);
+  const F = fKinds.length;
+  const raceStartMonday = addDays(raceMonday, -(raceWeeks - 1) * 7);
+  // A race block that is the whole runway starts on the runner's own start day, partial first week and all.
+  const raceStartIso = F === 0 && raceWeeks >= totalWeeks ? startIso : raceStartMonday;
+  const raceBlock = generatePlan(raceTrack, goal, { ...rest, startDateIso: raceStartIso });
+  const weeksOut: PlannedWeek[] = [];
+
+  if (F > 0) {
+    const paces = raceBlock.paces;
+    // ⚠️ THE DESTINATION IS A RACE BLOCK OF THE BOOK'S LENGTH, NOT THIS ONE. A race block shortened later (a week more
+    // in Base, carried into it) opens on the same week as the full one for a runner with no stated mileage, but its
+    // quality reference can move a minute — and the destination must not, or the weeks already run would.
+    const refWeeks = RACE_BLOCK_WEEKS[goal.distance];
+    const ref = raceWeeks === refWeeks && raceStartIso === raceStartMonday && !rest.secondaryRace
+      ? raceBlock
+      : generatePlan(raceTrack, goal, { ...rest, secondaryRace: undefined, startDateIso: addDays(raceMonday, -(refWeeks - 1) * 7) });
+    const { open, dest, destEasy } = foundationEnds(athlete, goal, paces, ref);
+    // Deloads every fourth week OF THE ROAD, counted from its first week (the beginner track's own cadence, and a
+    // beginner or a returner always keeps them — schedulesRecoveryWeeks).
+    const schedule = foundationSchedule(athlete, goal, F, offset);
+    const annotated = annotate(schedule);
+    const rampEnd = Math.max(1, Math.round(road?.rampWeeks ?? kinds.length) - offset);
+    const frac = rampFractions(schedule, rampEnd);
+    // ⚠️ ON THE MAIN TRACK'S STEP LIMIT (LONG_LIFT_STEP_MAX, 1.10), NOT THE BEGINNER LADDER'S 1.09. The foundation is
+    // the road's way ONTO the main track, and the step that matters most is the one into the race block, which the
+    // main track's own ladder takes at 1.10. Measured on the owner's own road (4 Rebuild + 5 Base, two deloads): at
+    // 1.09 the foundation stopped at 46 minutes and the race block opened at 51, a 1.109 step across the boundary;
+    // at 1.10 it arrives at 50 and the step is 1.02. (1.09 is the beginner track's margin for a guard that measures
+    // its minutes in KILOMETRES — the road's guards measure the long run in the minutes it is built in.)
+    const ladder = quantisedLadder(open, dest, frac, schedule, LONG_LIFT_STEP_MAX);
+    let baseOrd = 0;
+    const specs = fKinds.map((kind, i) => {
+      const wp = annotated[i]!;
+      const weekIndex = i + 1;
+      if (kind === "base" && !wp.isDeload) baseOrd++;
+      const begQualFrac = kind === "base"
+        ? BEG_INTRO_FRAC + (1 - BEG_INTRO_FRAC) * Math.min(1, Math.max(0, Math.max(1, baseOrd) - 1) / (BASE_DOSE_WEEKS - 1))
+        : undefined;
+      const ctx: WeekContext = {
+        athlete: { ...athlete, experience: "beginner", runWalk: false },
+        goal, paces,
+        // Rebuild: no fast running, whoever the runner is. Base: the gentle beginner quality and the hill sprints.
+        returning: kind === "rebuild",
+        longMin: dest,
+        begFrac: frac[weekIndex] ?? 1,
+        // A deload that opens the road (only where it was trimmed) has no rung yet; it derives its own.
+        begLongMin: ladder[weekIndex] || undefined,
+        easeFromRung: true,
+        begQualFrac,
+        // The easy runs climb on the same ramp as the long run, from the beginner track's opening to the race
+        // block's own first-week length, so the whole week arrives together rather than the long run alone.
+        begEasyMin: Math.round(lerp(BEG_EASY_OPEN_MIN, destEasy, frac[weekIndex] ?? 1)),
+      };
+      return { weekIndex, startDateIso: addDays(raceStartMonday, -(F - i) * 7), wp, ceilMin: dest, ctx, kind };
+    });
+    const buildOne = (i: number, over?: Partial<WeekContext>): PlannedWeek => {
+      const sp = specs[i]!;
+      return buildBeginnerWeek(sp.weekIndex, sp.startDateIso, sp.wp, over ? { ...sp.ctx, ...over } : sp.ctx, F + 1, false);
+    };
+    const foundation = enforceLongRunIsLongest(specs.map((_, i) => buildOne(i)), specs, buildOne);
+    foundation.forEach((w, i) => {
+      const kind = specs[i]!.kind as "rebuild" | "base";
+      w.stage = kind;
+      if (!w.isDeload) w.focus = STAGE_FOCUS[kind];
+    });
+    applyPartialFirstWeek(foundation, startIso);
+    weeksOut.push(...foundation);
+  }
+  raceBlock.weeks.forEach((w, i) => {
+    w.index = F + i + 1;
+    w.stage = "race";
+  });
+  weeksOut.push(...raceBlock.weeks);
+
+  // The road, as delivered: consecutive weeks of one stage are one leg of it.
+  const legs: Array<{ kind: StageKind; weeks: number }> = [];
+  for (const w of weeksOut) {
+    const last = legs[legs.length - 1];
+    if (last && last.kind === w.stage) last.weeks++;
+    else legs.push({ kind: w.stage!, weeks: 1 });
+  }
+  const notes = [
+    `Your road to race day: ${legs.map((l) => `${l.weeks} week${l.weeks === 1 ? "" : "s"} ${STAGE_LABEL[l.kind]}`).join(" → ")}.`,
+    ...raceBlock.notes,
+  ];
+  const gap = totalWeeks - weeksOut.length;
+  if (gap > 1) {
+    notes.splice(1, 0, `You have ~${gap} weeks before your road begins (${weeksOut[0]?.startDateIso ?? ""}). Use them to ` +
+      "build easy-running consistency and a weekly long run — consistency is the biggest driver of improvement.");
+  }
+  return {
+    goal,
+    athlete,
+    createdAtIso: raceBlock.createdAtIso,
+    intensityModel: raceBlock.intensityModel,
+    paces: raceBlock.paces,
+    totalWeeks,
+    weeks: weeksOut,
+    notes,
+  };
 }
 
 function generatePlanCore(
@@ -1367,6 +1612,22 @@ type WeekContext = {
    * ramp's own value, and a rung is the un-eased length.
    */
   begLongMin?: number;
+  /**
+   * B14 — a FOUNDATION week's eased long run comes off `begLongMin` too (the rung the ladder holds through a deload),
+   * eased as any deload is. Absent on the beginner track, whose eased weeks derive their own length, as before.
+   */
+  easeFromRung?: boolean;
+  /**
+   * B14 — where a BASE week sits in its quality progression (BEG_INTRO_FRAC at Base's first week, 1 at the end of its
+   * dose ramp). Read by `beginnerQualityFor` in place of `begFrac`, so the quality dose follows the weeks of Base the
+   * runner has actually reached rather than the long run's ramp. Absent on the beginner track.
+   */
+  begQualFrac?: number;
+  /**
+   * B14 — a FOUNDATION week's easy-run length in minutes (before a lighter week's easing), on the road's own ramp
+   * toward the race block's first week. Absent on the beginner track, whose easy runs keep their own ramp.
+   */
+  begEasyMin?: number;
   /**
    * The mean duration, in minutes, of ONE quality session in this plan — measured from a first pass over
    * the plan itself, never a constant. The easy running compensates toward it so a week whose quality
@@ -2254,8 +2515,12 @@ function beginnerQualityFor(
   if (runWalk) return null;
   // ⚠️ AND A RUNNER RETURNING FROM A BREAK GETS NONE, matching `beginnerHillDose`. Coming back is not
   // the moment to meet fast running for the first time.
+  // ⚠️⚠️ B14 (owner, 2026-11-18, STAGES.md decision 1): ON A ROAD THIS IS PER STAGE, NOT PER PLAN. A Rebuild week is
+  // built with `returning` set whoever the runner is — Rebuild is "no fast running" — and a Base week without it, so
+  // the harder sessions return once the runner has passed the Rebuild checkpoint. Off a road, `returning` is still the
+  // comeback answer for the whole block, exactly as before. The wording goes to the clinical reviewer before release.
   if (ctx.returning) return null;
-  const frac = Math.min(1, Math.max(0, ctx.begFrac ?? 1));
+  const frac = Math.min(1, Math.max(0, ctx.begQualFrac ?? ctx.begFrac ?? 1));
   // The introductory period: easy running and hill sprints only. Hudson's Level 1 gives it three weeks
   // of twelve (25%) and the Freshman Plan six of twelve (50%); this is the more forward of the two,
   // because unlike the Freshman Plan our runner has a race to reach.
@@ -2310,8 +2575,10 @@ const CONT_FLAVOURS = [
  * and the day they drifted, a beginner's sprint day would silently be a different length from the easy
  * run beside it. The ease multiplier belongs inside it for the same reason.
  */
-function beginnerEasyMin(f: number, ease: boolean): number {
-  const minutes = Math.round(lerp(22, 38, f));
+function beginnerEasyMin(f: number, ease: boolean, roadMin?: number): number {
+  // B14: a road's foundation sets this week's length itself (WeekContext.begEasyMin), aimed at the race block's own
+  // first week; the beginner track keeps its ramp. One definition either way, eased the same way.
+  const minutes = roadMin != null ? Math.round(roadMin) : Math.round(lerp(22, 38, f));
   return ease ? Math.round(minutes * 0.75) : minutes;
 }
 
@@ -2364,6 +2631,7 @@ function beginnerRun(
   longMinFloor?: number,
   capMin?: number,
   ladderMin?: number,
+  roadEasyMin?: number,
 ): SessionContent {
   // ⚠️ ONLY THE LONG RUN IS EVENT-AWARE. The midweek runs stay on their original gentle ramp: what a
   // new runner needs on a Tuesday is the habit, and it is the same habit whatever they have entered.
@@ -2389,8 +2657,8 @@ function beginnerRun(
   // and it must stay in step with the ladder — both read `beginnerOpenMin`.
   let minutes = long
     ? (ladderMin ?? Math.round(geomLerp(beginnerOpenMin(longPeakMin), longPeakMin, f)))
-    : beginnerEasyMin(f, false);
-  if (ease) minutes = long ? Math.round(minutes * 0.75) : beginnerEasyMin(f, true);
+    : beginnerEasyMin(f, false, roadEasyMin);
+  if (ease) minutes = long ? Math.round(minutes * 0.75) : beginnerEasyMin(f, true, roadEasyMin);
   // ⚠️ AFTER the ease multiplier, not before: a deload or taper week is meant to be shorter than the
   // week beside it, and a floor applied first would be scaled straight back out of existence.
   // `enforceLongRunIsLongest` never asks for a floor on an eased week, so this only ever binds where
@@ -2450,7 +2718,8 @@ function buildBeginnerWeek(
   // `longMinFloor` is what `enforceLongRunIsLongest` uses to close it, clamped to this track's own
   // endpoint — see that function. Run–walk plans are untouched and cannot be affected: every session
   // in one is typed `easy`, so they contain no long run to be longest.
-  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin, ctx.longMinFloor, undefined, ease ? undefined : ctx.begLongMin));
+  sessions.push(beginnerRun(ctx.paces, f, true, runWalk, ease, 0, ctx.longMin, ctx.longMinFloor, undefined,
+    ease && !ctx.easeFromRung ? undefined : ctx.begLongMin));
   dayOf.push(longDay);
 
   // Other easy days — each draws a different flavour, and the set rotates every week.
@@ -2485,8 +2754,8 @@ function buildBeginnerWeek(
     // would leave the sprint day as the one session a low-mileage beginner's cap never trimmed.
     const begHills = ei === sprintSlot ? beginnerHillDose(index, runWalk, ease, ctx.returning ?? false) : 0;
     const make = (cap?: number) => (begHills > 0
-      ? contHillSprints(ctx.paces, Math.min(cap ?? Infinity, beginnerEasyMin(f, ease)), begHills)
-      : beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap));
+      ? contHillSprints(ctx.paces, Math.min(cap ?? Infinity, beginnerEasyMin(f, ease, ctx.begEasyMin)), begHills)
+      : beginnerRun(ctx.paces, f, false, runWalk, ease, index + ei, ctx.longMin, undefined, cap, undefined, ctx.begEasyMin));
     let built = make();
     if (ctx.easyCapMin != null || ctx.easyCapKm != null) {
       // The belt, for the weeks the lift cannot reach: a deload (never lifted, by design), and the

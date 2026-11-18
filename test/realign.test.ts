@@ -89,7 +89,9 @@ const FNS = ["currentHandover", "racePassed", "isoAdd", "dmon", "runDateLabelIso
   "pauseTierFor", "pauseDaysLabel", "planStartIso", "blockStartIso", "firstShownWeek", "computeToday", "saveDayOverride", "loadReentry", "saveReentry", "reentryCapture",
   "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "realignGapDays", "realignLongGapDays",
   "loadRealign", "saveRealign", "realignEvidence", "realignWeekAt", "realignPreview", "realignPickup", "realignOptions",
-  "currentRealign", "realignCard", "answerRealign", "weeklyReviewCard"];
+  "currentRealign", "realignCard", "answerRealign", "weeklyReviewCard",
+  // B14: the weekly review is also silent while a stage checkpoint is open (no road here, so it never is).
+  "currentRoadCheckpoint", "roadCheckpoint", "roadOf", "roadLegsNow"];
 const CONSTS = ["MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "REENTRY_KEY", "REENTRY_MODES", "REENTRY_ASK_DAYS",
   "REALIGN_KEY", "REALIGN_RANK", "REALIGN_MIN_MISSES", "PAUSE_TIERS", "ADJ_MODES", "ADJ_QUALITY", "ADJ_RUN", "PRIMARY_TYPES", "XWEEK"];
 
@@ -262,7 +264,8 @@ test("BLOCKER: one question at a time — it replaces the weekly review, and wai
   box.api.answerRealign("carry");
   assert.ok(box.api.weeklyReviewCard(), "the review stayed silent after the question was answered");
   // B9: after race day "what next?" comes first — the plan is over — then this order, unchanged.
-  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
+  // B14: a stage's checkpoint ("move up, one more week, or ease back?") comes after B6's, before the review.
+  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), roadCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
   assert.match(decomment(fnBody("currentRealign")), /if \(currentReentry\(\)\) return null;/, "both coming-back questions can show at once");
   assert.match(decomment(SRC), /document\.querySelectorAll\("\[data-realign\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => answerRealign\(b\.dataset\.realign\); \}\);/,
     "the answers render and do nothing");

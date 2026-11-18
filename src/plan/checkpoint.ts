@@ -70,7 +70,7 @@ export function evaluateCheckpoint(f: CheckpointFacts): CheckpointVerdict {
   // ⚠️ "YOU DID NOT FLAG", NEVER "NOTHING HURT": a run whose "Did anything hurt?" was never answered is absent, not
   // fine (painAskHtml's rule), so the sentence says only what the runner told us.
   reasons.push(noPain
-    ? "You didn't flag pain on any run in the last two weeks."
+    ? "You didn’t flag pain on any run in the last two weeks."
     : `You said ${f.painRuns === 1 ? "one run" : plural(f.painRuns, "run")} in the last two weeks hurt.`);
   if (k.kind === "easy-run") {
     reasons.push(keyRun

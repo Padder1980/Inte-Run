@@ -1,7 +1,7 @@
 # Stages — the road to a long-term goal
 
 > **APPROVED BY THE OWNER, 2026-11-18 — all five decisions in the last section, each recorded there.
-> Nothing here is built yet.** It is `PLAN.md` stage **B14**; when to build it (before or after sending to
+> BUILT THE SAME DAY** (§8 steps 1–7; the build history and what is not yet placed are in `notes/plan-profile.md`). It is `PLAN.md` stage **B14**; when to build it (before or after sending to
 > Apple) is his call, listed on the development plan page (`docs/plan/`). Record the build history in
 > `notes/plan-profile.md`. ⚠️ Decisions 1 and 3 touch injury return: the wording goes to the clinical
 > reviewer before release.

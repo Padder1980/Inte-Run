@@ -88,7 +88,9 @@ const FNS = ["currentHandover", "racePassed", "isoAdd", "dmon", "runDateLabelIso
   "reentryCapture", "reentryWeeks", "reentryOptions", "currentReentry", "reentryWeekLine", "reentryKm", "reentryCard",
   "answerReentry", "genDay", "effDay", "ovTo", "planStartIso", "blockStartIso", "loadLinks", "legacySid", "planSessionRef", "linkedRunFor",
   "realignGapDays", "realignLongGapDays", "loadRealign", "saveRealign", "realignEvidence", "realignWeekAt", "realignPreview",
-  "realignPickup", "realignOptions", "currentRealign", "weeklyReviewCard"];
+  "realignPickup", "realignOptions", "currentRealign", "weeklyReviewCard",
+  // B14: the weekly review is also silent while a stage checkpoint is open (no road here, so it never is).
+  "currentRoadCheckpoint", "roadCheckpoint", "roadOf", "roadLegsNow"];
 const CONSTS = ["MONTHS", "MON_SHORT", "ADJUST_KEY", "SKIP_KEEP_DAYS", "LINK_KEY", "REENTRY_KEY", "REENTRY_MODES",
   "REENTRY_ASK_DAYS", "REALIGN_KEY", "REALIGN_RANK", "REALIGN_MIN_MISSES", "PAUSE_TIERS", "ADJ_MODES", "ADJ_QUALITY", "ADJ_RUN",
   "PRIMARY_TYPES", "XWEEK"];
@@ -240,7 +242,8 @@ test("BLOCKER: one question at a time — the weekly review says nothing while t
   assert.ok(box.api.weeklyReviewCard(), "the review stayed silent after the question was answered");
   // And it is the attention item: first in Today's cards (B6's "getting back on track" next, which waits for it).
   // B9: after race day "what next?" comes first — the plan is over — then this order, unchanged.
-  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
+  // B14: a stage's checkpoint ("move up, one more week, or ease back?") comes after B6's, before the review.
+  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), roadCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
 });
 
 test("BLOCKER: an answer is remembered, Undo asks again, and the question goes after the first week back", () => {

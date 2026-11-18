@@ -47,7 +47,7 @@ test("Not yet: any run that hurt, whatever else was done — and easing back is 
 
 test("the words say only what was observed: an unanswered pain question is never 'nothing hurt'", () => {
   const v = evaluateCheckpoint(rebuild());
-  assert.equal(v.reasons[1], "You didn't flag pain on any run in the last two weeks.");
+  assert.equal(v.reasons[1], "You didn’t flag pain on any run in the last two weeks.");
   assert.ok(!v.reasons.some((r) => /nothing hurt|no pain/i.test(r)));
   // Nothing planned is not a pass: there is nothing to count.
   const none = evaluateCheckpoint(rebuild({ planned: 0, done: 0 }));

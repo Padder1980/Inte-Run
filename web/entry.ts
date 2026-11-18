@@ -15,6 +15,8 @@ export { generatePlan, HARD_BEFORE_RACE, sessionIdFor, secondaryRaceWindow, long
 // B14 — the road to a race: where a runner starts and how the weeks are budgeted (STAGES.md). The app asks it when a
 // plan is made and stores what the runner accepted; the engine builds exactly that road.
 export { roadFor, roadStartFor } from "../src/plan/road.ts";
+// B14 — the checkpoint's judgement (Ready / Nearly / Not yet), pure over the facts the app gathers.
+export { evaluateCheckpoint, REBUILD_KEY_RUN_MIN, EASY_RPE_MAX } from "../src/plan/checkpoint.ts";
 export { LiveSession } from "../src/live/session-runtime.ts";
 export type { Telemetry, Cue, LiveSnapshot, StepView } from "../src/live/session-runtime.ts";
 // Spoken-coaching catalogue + selection (drives the app's audio controller).

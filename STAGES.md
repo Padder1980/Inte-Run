@@ -1,9 +1,10 @@
 # Stages — the road to a long-term goal
 
-> **PROPOSAL, 2026-11-18. Nothing here is built.** Written at the owner's request after his own plan
-> showed the problem. It needs his decisions (the last section) before any work starts. When it is
-> approved, add it to `PLAN.md` and the development plan (`docs/plan/`) as its own stage, and record
-> the build history in `notes/plan-profile.md`.
+> **APPROVED BY THE OWNER, 2026-11-18 — all five decisions in the last section, each recorded there.
+> Nothing here is built yet.** It is `PLAN.md` stage **B14**; when to build it (before or after sending to
+> Apple) is his call, listed on the development plan page (`docs/plan/`). Record the build history in
+> `notes/plan-profile.md`. ⚠️ Decisions 1 and 3 touch injury return: the wording goes to the clinical
+> reviewer before release.
 
 ## 1. The problem, in his own plan
 
@@ -144,12 +145,19 @@ that is PLAN.md's separate planning round for non-race modes; this proposal stay
 1. **The returning-beginner rule.** Today: a returning beginner gets no harder sessions for the whole
    plan. Proposed: **none in the Rebuild stage; they return once the runner passes its checkpoint.**
    *Recommended: yes.* It changes a recorded ruling and touches injury return, so it goes to the
-   clinical reviewer too.
+   clinical reviewer too. **→ Owner, 2026-11-18: yes** — build it this way; the wording still goes to the
+   clinical reviewer before release.
 2. **Moving up only through a checkpoint the runner accepts.** Keeps "no silent promotion" intact.
-   *Recommended: yes.*
+   *Recommended: yes.* **→ Owner, 2026-11-18: yes.**
 3. **What a checkpoint asks for.** Proposed defaults: at least 80% of the stage's last two weeks done;
    no pain flagged in those two weeks; the stage's key run done. *Recommended: yes, with the pain rule
-   checked by the clinical reviewer.*
+   checked by the clinical reviewer.* **→ Owner, 2026-11-18: yes** — Ready (all three), Nearly (one
+   missing: a week more), Not yet (pain flagged: ease back, with the injury guidance); the runner still
+   chooses (decision 2).
 4. **When time runs short**, the app proposes (later race / revised target / shorter foundation) and
-   never shortens the race block on its own. *Recommended: yes.*
+   never shortens the race block on its own. *Recommended: yes.* **→ Owner, 2026-11-18: "all options
+   available"** — every choice is offered to the runner, none withheld: keep the race and adjust the target,
+   keep the target and pick a later race, or carry on with the shorter race block (with an honest note on
+   the risk). The app explains; it never picks one by itself.
 5. **Scope:** race goals first; non-race goals in their own planning round later. *Recommended: yes.*
+   **→ Owner, 2026-11-18: yes** — no-race goals stay on the list as their own project, not dropped.

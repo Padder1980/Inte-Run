@@ -697,3 +697,13 @@ downgrade the verdict.
 **The proposed answer is `STAGES.md`** (a road of stages with a checkpoint between each, the runner choosing at
 every one). Not built — it needs his decisions, listed at its end, and the returning-beginner ruling goes to the
 clinical reviewer. Until then his current plan is safe for its first weeks, which are exactly a Rebuild stage.
+
+**Approved by the owner the same day (2026-11-18), all five decisions — recorded word for word at the end of
+`STAGES.md`:** (1) harder sessions return after the Rebuild checkpoint, overturning the 2026-09-01
+returning-beginner rule for the rest of the plan (clinical review of the wording before release); (2) moving up
+only through a checkpoint the runner accepts; (3) a checkpoint is ≥80% of the last two weeks done, no pain
+flagged, the stage's key run done → Ready / Nearly / Not yet; (4) *"all options available"* when time runs
+short — adjust the target, a later race, or carry on with a shorter race block, never chosen by the app; (5) race
+goals first, no-race goals later as their own planning round. It is `PLAN.md` **B14**; **when to build it (before
+or after D4) is still his call**, listed on `docs/plan/`. The stale `STATUS_OPTS` comment above is still unfixed
+— fix it when B14 touches the returning flag.

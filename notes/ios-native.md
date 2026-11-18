@@ -624,3 +624,41 @@ under Profile.
 2. Install from TestFlight; **Profile › Your data › This version** must say 562 — PLAN.md's verify step.
 3. Optionally the App Store Connect key (App Manager), so `node tools/testflight-distribute.mjs 562
    "Internal Testers"` can do step 1's last part and report it — the other half of the verify step.
+
+---
+
+## BUILD 583 ON TESTFLIGHT — AND TWO THINGS THAT STOOD IN FRONT OF IT (2026-11-18)
+
+**Uploaded 2026-11-18 18:15 ("Upload succeeded … Uploaded package is processing").** Carries the watch half of the
+regular-reminder coach fix (notes/voice-coach.md, end) and, for the first time, an embedded Mapbox token, so
+street maps work in the app (notes/debrief-and-maps.md, end). Archived with the RELEASE Xcode (26.6); the build
+log said *"embedded a Mapbox token — maps will use Mapbox"* and *"personal voice packs left out"*. Checked
+inside the archive before upload: build 583 on the phone app, watch app and widget; `web/mapbox-token.txt` a
+`pk.` token; no `web/voices-personal`; the new web code present; and the watch binary carrying
+`techniqueSlotSpoken` / `lastPhoneCueAt`. ⚠️ `strings` cannot find the literal `"technique"` in the watch binary:
+Swift stores a string of 15 bytes or fewer INLINE in the code (small-string optimisation), so short literals
+never reach the string table. `"milestone-distance"` (18) does. Prove a Swift change with a property name or a
+long literal, never a short one. Not yet distributed: like 562 it reaches him through the "Internal Testers"
+group (automatic distribution) once Apple has processed it — never report an upload as a distribution.
+
+⚠️ **THE BUILD NUMBER WAS 583, NOT THE 563 I FIRST TOLD HIM.** It is the commit count (`build_number()` in
+make-project.py), and twenty-one commits had landed since 562. Read it, never add one to the last build.
+
+⚠️ **STOP 1: THE ARCHIVE REFUSED TO RUN WITHOUT A MAPBOX TOKEN — CORRECTLY.** make-project.py's embed phase stops
+an archive with no `pk.` token in `ios/mapbox-token.txt` (2026-10-05), because CARTO's free tiles now all read
+API KEY REQUIRED. The owner's call (2026-11-18): *"I want the maps to work"* — not the
+`INTERUN_NO_MAP_TOKEN_OK=1` override. He made a key; ⚠️ **it was URL-restricted, and that is diagnosable
+without seeing his account:** the same tile request returned **200 with `Referer: https://padder1980.github.io/
+Inte-Run/` and 403 `{"message":"Forbidden"}` with no referrer or with `Origin: interun://app`**. A URL restriction
+is exactly that asymmetry; a missing scope would refuse both. He removed the restriction in Mapbox (the key text
+does not change, so the file needed no re-paste) and the next request returned a 512-px, 60 KB Outdoors tile with
+`access-control-allow-origin: *`. `GET /tokens/v2?access_token=…` confirms `TokenValid` and `usage: pk` but lists
+neither scopes nor URL restrictions for a public token — it cannot replace the referrer test.
+
+⚠️ **STOP 2: "PLA Update available" + "No signing certificate 'iOS Distribution' found".** The first export
+failed with both, and the second line is a consequence of the first: this Mac holds only an Apple Development
+identity, and the distribution certificate is cloud-managed — issued at export time through
+`-allowProvisioningUpdates` — which Apple refuses until the account holder accepts an updated Apple Developer
+Program License Agreement. Only the owner can (developer.apple.com/account, his Apple ID). After he accepted,
+the SAME archive exported and uploaded unchanged; no rebuild. If the pair appears again, it is the agreement,
+not the keychain.

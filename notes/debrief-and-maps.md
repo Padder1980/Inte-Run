@@ -529,3 +529,7 @@ is the answer — `WebHost` injects it and it outranks a pasted token. An archiv
 (make-project.py), which is what stopped build 582 on 2026-11-18. ⚠️ A shipped `pk.` token can be extracted
 by anyone; that is true of every Mapbox app, and the per-run cache keeps the bill near zero (200,000 free tiles
 a month; a run is ~8). If abuse ever shows, the next step is the Worker proxying tiles so no key is in the app.
+
+✅ **Done the same evening:** he made the key, it turned out URL-restricted (200 as his website, 403 as the app —
+see notes/ios-native.md, "Build 583"), he removed the restriction, and **build 583 is the first build with a
+working Mapbox token embedded.** The web-layer fix above reaches every copy over the air regardless.

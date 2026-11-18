@@ -831,6 +831,21 @@ absent, not fine (painAskHtml's rule).
   light and dark: Ready (5 of 5 runs, no pain flagged, a 41-minute easy run), Move up (toast with Undo, the answer stored,
   the Plan screen's road), and Not yet with a run that hurt (Ease back suggested, the injury door).
 
+### ✅ THE CHECKPOINT IS A POP-UP, NOT A CARD (owner, 2026-11-18, the same evening)
+
+*"I want the check point to appear as a pop up on the screen rather than it appearing above the 'Hi, Adam' part of the
+today screen. It looks too cluttered and as if it's just been wedged on to the screen."* Done: `roadCheckpointHtml` is the
+content of the app's bottom sheet (`openRoadCheckpoint`); it is no longer one of `todayCards` (the two order guards are back
+to the order they had). `maybeRoadPopup` opens it by itself **once a day while unanswered** (`ROADPOP_KEY` =
+"<checkpoint Monday>|<day shown>"), beside `maybeAutoGuide` at its three moments and with its holds — never over the splash
+or welcome-back, the sessions guide (which goes first), the extras offer, another sheet, or a run. "Not now" closes it; the
+Plan screen's road has **"Open your checkpoint ›"** whenever one is up. Unanswered, the runner stays in the stage (the hold).
+⚠️ **A real defect found in doing it**: the card's "Injury & symptoms ›" was a `[data-hub]` button, which only sets
+`state.support` — from Today it re-drew Today and went nowhere. The sheet's button navigates (`state.tab = "support"`),
+as Alfie's does. Driven in a browser, light and dark: it opens after the welcome, "Not now" closes it, it does not return the
+same day, the Plan screen reopens it, and the injury door lands on Injury & symptoms. **Re-breaks 3 of 3** (back among
+Today's cards; popping again the same day; the injury door not navigating) — **20 of 20 for the stage.**
+
 ### ⚠️ His own plan does not have a road yet
 
 It was made before roads existed, and nothing gives an existing plan a road on its own (decision 2). He gets it by making

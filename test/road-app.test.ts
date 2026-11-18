@@ -150,7 +150,7 @@ test("BLOCKER: one question at a time — the checkpoint waits behind the others
   const cur = decomment(fnBody("currentRoadCheckpoint"));
   assert.match(cur, /if \(currentHandover\(\) \|\| currentReentry\(\) \|\| currentRealign\(\)\) return null;/);
   assert.match(decomment(fnBody("weeklyReviewCard")), /if \(currentRoadCheckpoint\(\)\) return "";/);
-  assert.match(decomment(fnBody("roadCard")), /cp = currentRoadCheckpoint\(\)/);
+  assert.match(decomment(fnBody("roadCheckpointHtml")), /cp = currentRoadCheckpoint\(\)/);
   assert.match(decomment(fnBody("answerRoad")), /cp = currentRoadCheckpoint\(\)/);
   // Driven: with another question up, no checkpoint; with none, the checkpoint.
   const h = harness("2026-12-16", ROAD());
@@ -162,9 +162,30 @@ test("BLOCKER: one question at a time — the checkpoint waits behind the others
 });
 
 test("Base's test run can be started from the checkpoint itself — the plan schedules none", () => {
-  const card = decomment(fnBody("roadCard"));
-  assert.match(card, /cp\.kind === "base" && !v\.met\.keyRun/);
-  assert.match(card, /data-trialstart="1"/);
-  // And that button is wired to the one trial flow, for every [data-trialstart] on any screen.
-  assert.match(SRC, /document\.querySelectorAll\("\[data-trialstart\], \[data-trialopen\]"\)\.forEach\(\(b\) => b\.onclick = \(\) => startTrialFlow\(\)\)/);
+  const html = decomment(fnBody("roadCheckpointHtml"));
+  assert.match(html, /cp\.kind === "base" && !v\.met\.keyRun/);
+  assert.match(html, /data-trialstart="1"/);
+  // Wired by the sheet itself (wire() runs on a render, not when a sheet opens) to the one trial flow.
+  assert.match(decomment(fnBody("openRoadCheckpoint")), /#sheetBody \[data-trialstart\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => \{ closeSheet\(\); startTrialFlow\(\); \}; \}\)/);
+});
+
+test("BLOCKER: the checkpoint is a pop-up, never a card wedged onto Today — once a day, never stacked", () => {
+  // The owner, 2026-11-18: "I want the check point to appear as a pop up ... rather than above the 'Hi, Adam' part".
+  assert.doesNotMatch(decomment(fnBody("todayCards")), /road/i, "the checkpoint is back among Today's cards");
+  const pop = decomment(fnBody("maybeRoadPopup"));
+  for (const hold of [/\$\("splash"\) \|\| \$\("welcomeback"\)/, /GUIDE \|\| !guideSeen\(\)/, /EXTRAS/, /\$\("sheetOv"\)\.classList\.contains\("on"\)/, /liveRunning\(\)/])
+    assert.match(pop, hold, "the pop-up does not wait for " + hold);
+  assert.match(pop, /const mark = cp\.endIso \+ "\|" \+ todayIso\(\);/);
+  assert.match(pop, /if \(localStorage\.getItem\(ROADPOP_KEY\) === mark\) return;/, "it pops again the same day");
+  // Opened at the same three moments as the sessions guide, which goes first.
+  assert.equal((SRC.match(/maybeAutoGuide\(\); maybeRoadPopup\(\);/g) || []).length, 3);
+  // Every button in it does what it says: the answers, Not now, and the injury door — which NAVIGATES to it.
+  const open = decomment(fnBody("openRoadCheckpoint"));
+  assert.match(open, /#sheetBody \[data-road\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => \{ closeSheet\(\); answerRoad\(b\.dataset\.road\); \}; \}\)/);
+  assert.match(open, /\$\("roadLater"\); if \(later\) later\.onclick = closeSheet;/);
+  assert.match(open, /state\.tab = "support"; state\.support = "redflags"; render\(\);/);
+  assert.match(decomment(fnBody("roadCheckpointHtml")), /id="roadInjury"/);
+  // And the Plan screen's road opens it at any time it is up.
+  assert.match(decomment(fnBody("roadPlanCard")), /id="roadOpen"/);
+  assert.match(SRC, /const ro = \$\("roadOpen"\); if \(ro\) ro\.onclick = \(\) => openRoadCheckpoint\(\);/);
 });

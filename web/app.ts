@@ -992,7 +992,9 @@ select.sel { font-size: 16px; border-radius: 11px; padding: 12px 13px; cursor: p
 .road-row.on .road-st { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 .road-why { margin: 6px 0 10px; padding-left: 18px; font-size: var(--t-meta); line-height: 1.55; color: var(--ink); }
 .road-why li { margin: 3px 0; }
-.road-card .perf-a { margin: 4px 0 8px; }
+.road-card .perf-a, .road-sheet .perf-a { margin: 4px 0 8px; }
+.road-sheet .sheet-h { margin-bottom: 8px; }
+button.primary.road-later { background: var(--surface-2); color: var(--ink-soft); box-shadow: none; margin-top: 4px; }
 .road-wiz { margin-top: 16px; text-align: left; }
 .road-wiz-h { font-weight: 700; font-size: var(--t-card); color: var(--ink); }
 .road-wiz-l { margin: 4px 0 12px; color: var(--ink-soft); font-size: var(--t-body); }
@@ -6611,6 +6613,8 @@ const ROAD_STAGE_JOB = {
 };
 /** The shortest race block a road keeps (the engine's own shortest block). */
 const ROAD_MIN_RACE_WEEKS = 4;
+/** The checkpoint pop-up's last showing: "<the checkpoint's Monday>|<the day shown>" — once a day while unanswered. */
+const ROADPOP_KEY = "interun_roadpop_v1";
 // ⚠️ NOT var(--ease) FOR REBUILD: it is the same orange as var(--peak) within a few shades, and the two stages sat side
 // by side looking like one. The rows name each stage in words too — colour is never the only label.
 const ROAD_COLOUR = { rebuild: "var(--ready)", base: "var(--base)", race: "var(--peak)" };
@@ -9846,10 +9850,12 @@ function roadAnswered(cp, choice) {
 function roadRaceWeeks(stages) { const s = stages[stages.length - 1]; return s && s.kind === "race" ? s.weeks : 0; }
 function roadBookRaceWeeks() { return ({ "1mile": 10, "5k": 12, "10k": 14, half: 16, marathon: 20 })[profile.goalDist] || 16; }
 /**
- * B14 — THE CHECKPOINT CARD (STAGES.md §5; B5/B6/B9's pattern): what the app saw, Ready / Nearly / Not yet with the
- * reasons, and three answers with the one the judgement puts first marked. Nothing changes until the runner chooses.
+ * B14 — THE CHECKPOINT, AS A POP-UP (STAGES.md §5): what the app saw, Ready / Nearly / Not yet with the reasons, and three
+ * answers with the one the judgement puts first marked. Nothing changes until the runner chooses.
+ * ⚠️ A POP-UP, NOT A CARD ON TODAY (owner, 2026-11-18): as a card it sat above "Hi, Adam" and read as wedged onto the
+ * screen. It opens by itself once a day while unanswered (maybeRoadPopup), and from the Plan screen's road at any time.
  */
-function roadCard() {
+function roadCheckpointHtml() {
   let cp = null;
   try { cp = currentRoadCheckpoint(); } catch (e) { cp = null; }
   if (!cp) return "";
@@ -9904,7 +9910,7 @@ function roadCard() {
   // ⚠️ PAIN COMES WITH THE INJURY GUIDANCE, NOT A NUDGE TO PUSH ON (decision 3). The wording is for the clinical reviewer.
   const pain = !v.met.noPain
     ? '<p><b>Something hurt.</b> Easing back is the safer choice, and it is worth checking what you felt against the warning signs.</p>' +
-      '<button class="perf-a" data-hub="redflags">Injury &amp; symptoms ›</button>'
+      '<button class="perf-a" id="roadInjury">Injury &amp; symptoms ›</button>'
     : "";
   // ⚠️ BASE'S KEY RUN MUST BE SOMETHING THE RUNNER CAN DO FROM HERE: the plan schedules no test run, so a checkpoint that
   // asked for one and offered no way to it could never be passed by following the app. The existing 2 km trial flow
@@ -9912,13 +9918,55 @@ function roadCard() {
   const trial = cp.kind === "base" && !v.met.keyRun
     ? '<button class="perf-a" data-trialstart="1">Do the 2 km test run \u203a</button>'
     : "";
-  return '<div class="card wk-review re-card road-card" id="roadCard"><div class="db-head"><span class="db-ic">' + ICON.alfie + '</span>' +
-    '<span>Checkpoint · end of ' + esc(ROAD_STAGE_LABEL[cp.kind]) + '</span></div>' +
+  return '<div class="re-card road-sheet" id="roadSheet"><div class="sheet-h">Checkpoint · end of ' + esc(ROAD_STAGE_LABEL[cp.kind]) + '</div>' +
     '<div class="db-body"><p class="road-verdict road-' + v.verdict + '"><b>' + esc(head) + '</b></p>' +
     '<ul class="road-why">' + v.reasons.map((x) => '<li>' + esc(x) + '</li>').join("") + '</ul>' + trial + pain + target + shortNote +
     '<p><b>What would you like to do?</b></p></div>' +
     '<div class="re-opts">' + opts.map(opt).join("") + '</div>' +
-    '<p class="mp-note">You choose — the app never moves you up on its own. Nothing changes until you pick, and you can undo straight after.</p></div>';
+    '<button class="primary road-later" id="roadLater" type="button">Not now</button>' +
+    '<p class="mp-note">You choose — the app never moves you up on its own. Nothing changes until you pick, and you can undo straight after. ' +
+    'Until you choose, you stay in ' + esc(ROAD_STAGE_LABEL[cp.kind]) + '.</p></div>';
+}
+/**
+ * Open the checkpoint as the app's bottom sheet, its buttons wired here (wire() runs on a render, not when a sheet opens).
+ */
+function openRoadCheckpoint() {
+  let html = "";
+  try { html = roadCheckpointHtml(); } catch (e) { html = ""; }
+  if (!html) return false;
+  ensureSheet(); SHEET_CTX = null;
+  $("sheetBody").innerHTML = html;
+  $("sheetOv").classList.add("on");
+  document.querySelectorAll("#sheetBody [data-road]").forEach((b) => { b.onclick = () => { closeSheet(); answerRoad(b.dataset.road); }; });
+  const later = $("roadLater"); if (later) later.onclick = closeSheet;
+  // ⚠️ NAVIGATES, NOT JUST state.support: from Today a [data-hub] button only set the field and re-drew Today.
+  const inj = $("roadInjury"); if (inj) inj.onclick = () => { closeSheet(); state.screen = null; state.tab = "support"; state.support = "redflags"; render(); };
+  document.querySelectorAll("#sheetBody [data-trialstart]").forEach((b) => { b.onclick = () => { closeSheet(); startTrialFlow(); }; });
+  return true;
+}
+/**
+ * ONCE A DAY, WHILE UNANSWERED, AND NEVER STACKED: held while the launch overlays, the sessions guide, the extras offer or
+ * another sheet are up, and never during a run (the guide's own holds — maybeAutoGuide). It returns the next day; the
+ * Plan screen's road opens it any time. Answering it is the only thing that ends it (decision 2: no answer, no move).
+ */
+function maybeRoadPopup() {
+  try {
+    if (!profile.personalized || state.tab !== "today" || state.screen) return;
+    if ($("splash") || $("welcomeback")) return;
+    if (GUIDE || !guideSeen()) return;
+    if (EXTRAS || ($("extrasOv") && $("extrasOv").classList.contains("on"))) return;
+    if ($("sheetOv") && $("sheetOv").classList.contains("on")) return;
+    if (liveRunning()) return;
+    const cp = currentRoadCheckpoint();
+    if (!cp) return;
+    const mark = cp.endIso + "|" + todayIso();
+    if (localStorage.getItem(ROADPOP_KEY) === mark) return;
+    setTimeout(() => {
+      if (state.tab !== "today" || state.screen || $("welcomeback") || GUIDE) return;
+      if ($("sheetOv") && $("sheetOv").classList.contains("on")) return;
+      if (openRoadCheckpoint()) { try { localStorage.setItem(ROADPOP_KEY, mark); } catch (e) {} }
+    }, 600);
+  } catch (e) {}
 }
 /**
  * Act on the answer: ONE commit, ONE Undo (the standing pattern). Undo puts back the road, the "make a week easier"
@@ -10012,7 +10060,8 @@ function roadPlanCard() {
     : ans && ans.answer === "up" && next
       ? '<p class="mp-note">You chose to move up: ' + nextName + ' starts on Monday ' + roadDayLabel(cur.endIso) + '.</p>'
       : thisMonday >= roadMondayAfter(cur.endIso, -1)
-        ? '<p class="mp-note">Your checkpoint is this week, on Today. You choose whether to move up — nothing harder arrives until you do.</p>'
+        ? '<p class="mp-note">Your checkpoint is this week. You choose whether to move up — nothing harder arrives until you do.</p>' +
+          (currentRoadCheckpoint() ? '<button class="perf-a" id="roadOpen">Open your checkpoint ›</button>' : "")
         : '<p class="mp-note">Your next checkpoint is the week of ' + roadDayLabel(roadMondayAfter(cur.endIso, -1)) +
           '. You choose then whether to move up — nothing harder arrives until you do.</p>';
   return '<h2 class="sec">Your road</h2><div class="card road-card">' + roadTimelineHtml(legs, here) + cpLine + '</div>';
@@ -10044,7 +10093,7 @@ function wizRoadHtml(prop, pf) {
 
 function todayCards() {
   try { raceFitCheck(); } catch (e) {}
-  return [handoverCard(), reentryCard(), realignCard(), roadCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
+  return [handoverCard(), reentryCard(), realignCard(), trainFlagBanner(), weeklyReviewCard(), fitSuggestBanner(), autoPaceBanner()];
 }
 function todayAttention() {
   return todayCards().find((x) => x && x.trim()) || "";
@@ -29794,7 +29843,7 @@ function closeExtras() {
   const ov = $("extrasOv"); if (ov) ov.classList.remove("on");
   EXTRAS = null;
   // Now the session-shorthand walkthrough can fire (it was gated on our popup being open).
-  try { if (state.tab === "today" && !state.screen) maybeAutoGuide(); } catch (e) {}
+  try { if (state.tab === "today" && !state.screen) { maybeAutoGuide(); maybeRoadPopup(); } } catch (e) {}
 }
 // The popup's coach cards: a tap on the card picks that coach; a tap on its Preview pill plays a
 // sample without selecting it (stopPropagation, and the card handler ignores taps that land on the
@@ -43802,7 +43851,7 @@ function showWelcomeBack() {
     // second dismissal harmless; this stops the work happening at all.
     if (timer) { clearTimeout(timer); timer = 0; }
     ov.classList.add("hide"); syncThemeColor();
-    setTimeout(() => { ov.remove(); syncThemeColor(); if (state.tab === "today" && !state.screen) maybeAutoGuide(); }, 500);
+    setTimeout(() => { ov.remove(); syncThemeColor(); if (state.tab === "today" && !state.screen) { maybeAutoGuide(); maybeRoadPopup(); } }, 500);
   };
   // ⚠️ NO BUTTON, AND THE SCREEN IS STILL TAPPABLE. The owner removed the requirement to press anything,
   // not the ability to move on — so a tap anywhere skips the wait. Nobody is held for four seconds who
@@ -44199,7 +44248,7 @@ function render() {
   // screen the runner is not on — and a control in the top bar of every screen that only means something
   // on one of them is a control most taps on it get wrong.
   syncClubNew();
-  if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); }
+  if (state.tab === "today") { fetchWeather(); v.innerHTML = viewToday(); maybeAutoGuide(); maybeRoadPopup(); }
   else if (state.tab === "plan") v.innerHTML = viewPlan();
   else if (state.tab === "activities") v.innerHTML = viewActivities();
   else if (state.tab === "community") v.innerHTML = viewCommunity();
@@ -45174,7 +45223,7 @@ function wire() {
   // B6 — each answer to "how do you want to pick it back up?" acts, with an Undo that re-asks.
   document.querySelectorAll("[data-realign]").forEach((b) => { b.onclick = () => answerRealign(b.dataset.realign); });
   // B14 — the checkpoint's three answers, and the wizard's "carry on with the shorter race block".
-  document.querySelectorAll("[data-road]").forEach((b) => { b.onclick = () => answerRoad(b.dataset.road); });
+  { const ro = $("roadOpen"); if (ro) ro.onclick = () => openRoadCheckpoint(); }
   { const rs = $("s_roadshort"); if (rs) rs.onchange = () => { draft.roadShort = rs.checked ? "1" : ""; }; }
   const wrNoEase = $("wrNoEase"); if (wrNoEase) wrNoEase.onclick = declineEaseOffer;
   const fitApply = $("fitApply"); if (fitApply) fitApply.onclick = applyFitSuggest;

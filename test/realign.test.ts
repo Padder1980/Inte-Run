@@ -264,8 +264,8 @@ test("BLOCKER: one question at a time — it replaces the weekly review, and wai
   box.api.answerRealign("carry");
   assert.ok(box.api.weeklyReviewCard(), "the review stayed silent after the question was answered");
   // B9: after race day "what next?" comes first — the plan is over — then this order, unchanged.
-  // B14: a stage's checkpoint ("move up, one more week, or ease back?") comes after B6's, before the review.
-  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), roadCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
+  // B14: a stage's checkpoint is a pop-up (maybeRoadPopup), not one of Today's cards — the order is unchanged.
+  assert.match(decomment(fnBody("todayCards")), /return \[handoverCard\(\), reentryCard\(\), realignCard\(\), trainFlagBanner\(\), weeklyReviewCard\(\)/);
   assert.match(decomment(fnBody("currentRealign")), /if \(currentReentry\(\)\) return null;/, "both coming-back questions can show at once");
   assert.match(decomment(SRC), /document\.querySelectorAll\("\[data-realign\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => answerRealign\(b\.dataset\.realign\); \}\);/,
     "the answers render and do nothing");

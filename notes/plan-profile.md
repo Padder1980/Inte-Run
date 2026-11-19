@@ -1288,3 +1288,13 @@ nothing said.** "Add it now" closed the sheet and focused an `s_easypace` that n
   and the sheet's older values overwrite what was typed in `draft.__f` (later in document order wins). Measured 2026-11-19: a
   date typed as 14 Mar 2027 came back as 1 Nov 2026. Reads are unaffected (`$` finds `#view`'s field first). Roadmap
   `pc-setup-stale-sheet`.
+
+### And a landmine removed the same day (2026-11-19)
+
+`tmpprobe/` (two throwaway probes committed by accident in 7c3e3ef, 2026-08-07: console output, one test literally named
+"probe") read `web/app.html` from a HARD-CODED absolute path into `.claude/worktrees/relaxed-curie-682fd0`, so every checkout on
+this Mac ran them against whatever that one worktree last built. They fail against any build since 2026-08-16
+(`watchSessionPayload` calls `heatApplied`, which they never supplied) — checked against main's own committed build. Other
+sessions' `npm run verify` passed, so that worktree evidently held an older build until it was refreshed for this fix; from then
+on they failed every verify on this Mac, and once the worktree is deleted they would fail to load at all. Removed. A test reads
+the build through `new URL("../web/app.html", import.meta.url)`, never an absolute path.

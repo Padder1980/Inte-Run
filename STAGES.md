@@ -255,4 +255,9 @@ decision 2: Walk-run 1 (to 20 minutes non-stop) and Walk-run 2 (to 30) before Re
 decision 3 (built 2026-11-19): regular and competitive runners' roads (Rebuild when coming back, Base built from the mileage
 they state, a race-only road where none is needed) and a checkpoint every 4 weeks in the race block, never in the taper, with
 the level's test; it holds nobody, and an answer there moves no week. "One more week" inside the race block: the owner chose
-none (decision 3 above, 2026-11-19) — there the checkpoint offers carrying on or easing back. ☐ Piece 4 — decision 4 (no-race goals). Build history and the hand-over for 3 and 4: `notes/plan-profile.md`.
+none (decision 3 above, 2026-11-19) — there the checkpoint offers carrying on or easing back. ✅ Piece 4 — decision 4
+(built 2026-11-19, the owner: "Yes, all your picks"): goals without a race. Plan setup asks "Are you training for a race?"
+(adults only); with no race, one question — the distance to be fit for — and no date and no target. The plan is its road,
+laid out a block at a time (the block in hand plus the next), each block ending in a checkpoint with the level's test and the
+tests shown side by side in place of a target; it climbs to a race block's first week for that distance, then holds. Every
+reader of the race copes with none. **All four pieces are built.** Build history: `notes/plan-profile.md`.

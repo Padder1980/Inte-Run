@@ -42,7 +42,9 @@ export type WeekView = {
 };
 
 export type PlanSummary = {
-  goal: { race: string; target: string; raceDate: string; startDate: string };
+  /** §10 piece 4: `noRace` — a plan with no race (Road.noRace). Its raceDate is then only the end of the weeks laid out, and
+   *  its target the engine's own: never to be shown as the runner's. */
+  goal: { race: string; target: string; raceDate: string; startDate: string; noRace?: boolean };
   athlete: { summary: string };
   feasibility: {
     verdict: string;
@@ -222,6 +224,7 @@ export function buildPlanSummary(athlete: Athlete, goal: Goal, options: Generate
       target: formatDuration(goal.targetTimeSeconds),
       raceDate: humanDate(goal.raceDateIso),
       startDate: humanDate(goal.startDateIso ?? isoToday()),
+      ...(options.road?.noRace ? { noRace: true } : {}),
     },
     athlete: { summary: athleteSummary(athlete) },
     feasibility: {

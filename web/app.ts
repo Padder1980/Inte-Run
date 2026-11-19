@@ -6622,6 +6622,13 @@ const ROAD_STAGE_JOB_MAIN = {
   rebuild: "Easy running only, building back from the running you do now. No hard sessions until you choose to move up.",
   base: "Your running built up from where it is now: one quality session a week, and the long run growing towards your race block’s.",
 };
+/**
+ * §10 piece 4 — a regular or competitive runner's Base on a road with NO RACE: it holds once race-ready rather than leading
+ * into a race block, so the words cannot promise one (the beginner words promise nothing about a race and stay).
+ */
+const ROAD_STAGE_JOB_NORACE = {
+  base: "Your running built up from where it is now, then held there: one quality session a week, and a test run at the end of each block.",
+};
 /** The shortest race block a road keeps (the engine's own shortest block). */
 const ROAD_MIN_RACE_WEEKS = 4;
 /** The checkpoint pop-up's last showing: "<the checkpoint's Monday>|<the day shown>" — once a day while unanswered. */
@@ -6640,7 +6647,9 @@ const ROAD_COLOUR = { walkrun1: "var(--taper)", walkrun2: "var(--taper)", rebuil
 const PLAN_PROF_FIELDS = ["status", "goalDist", "targetS", "targetSet", "raceDate", "startDateIso",
   "longRunDay", "fitSrc", "recentDistM", "recentTimeS", "noRecent", "easyPaceS", "twoKmS",
   "daysPerWeek", "volKm", "strength", "strengthDays", "strengthMin", "strengthLevel", "strengthGoal",
-  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks", "bRace", "volGrowth", "hardDays", "longMax"];
+  "strengthKit", "returning", "age", "sex", "autoPace", "blockFromIso", "pauseWeeks", "bRace", "volGrowth", "hardDays", "longMax",
+  // §10 piece 4: a plan with no race (isNoRace) — a stored plan started again is the kind it was.
+  "noRace"];
 /**
  * B9 — THE FIELDS THAT DESCRIBE THE RUNNER RATHER THAN THE PLAN THEY CHOSE: fitness, weekly mileage, status, age. A
  * plan started from stored answers (a plan saved for later, the next plan after race day, a past plan used again)
@@ -7126,15 +7135,20 @@ function applyProfile(pf) {
   // ⚠️ A PAUSE THAT PICKS UP WHERE YOU LEFT OFF lays the block out from an earlier day than it starts on
   // (blockStartIso), and the days before the start are then held empty (holdBeforeStart).
   const blockFrom = blockStartIso(pf);
-  const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: pf.raceDate, startDateIso: blockFrom };
+  // §10 piece 4: a plan with no race has no race date — the goal's date is the end of the weeks laid out (below).
+  const noRace = pf.noRace === true;
+  const goal = { distance: pf.goalDist, targetTimeSeconds: pf.targetS, raceDateIso: noRace ? "" : pf.raceDate, startDateIso: blockFrom };
   // ⚠️ B7: A B-RACE GOES TO THE ENGINE, WHICH SHAPES ITS WEEKS (or, outside secondaryRaceWindow, ignores it). One
   // options object for both, so the summary and the prescription never disagree about the fortnight around it.
-  const opts = pf.bRace && pf.bRace.distance && pf.bRace.dateIso
+  // §10 piece 4: never on a plan with no race — there is no main race for it to be on the way to.
+  const opts = !noRace && pf.bRace && pf.bRace.distance && pf.bRace.dateIso
     ? { secondaryRace: { distance: pf.bRace.distance, dateIso: pf.bRace.dateIso } } : {};
+  // §10 piece 4: a plan with no race is its road, and its goal's date only where that road's weeks end (noRaceGoalRoad).
+  if (noRace) noRaceGoalRoad(pf, ath, goal, blockFrom, opts);
   // ⚠️ B14 — THE RUNNER'S ROAD AS IT STANDS TODAY (effectiveRoad: fitted to the runway, held at a checkpoint not yet
   // answered). The engine builds exactly that road. ASKED ONLY WHEN THE PROFILE CARRIES ONE, so a profile without a
   // road takes exactly the path it always took.
-  if (pf.road) { const road = effectiveRoad(pf, ath, goal); if (road) opts.road = road; }
+  else if (pf.road) { const road = effectiveRoad(pf, ath, goal); if (road) opts.road = road; }
   const plan = RC.buildPlanSummary(ath, goal, opts); // may throw
   const raw = RC.generatePlan(ath, goal, opts); // raw sessions with steps, for the live runtime
   if (blockFrom < startDateIso) holdBeforeStart(plan, raw, startDateIso);
@@ -7618,7 +7632,9 @@ function xwRefusal(s, home, ti, to, ov, rows, weeks) {
   if (!(to >= 0 && to <= 6)) return "edge";
   if (Math.abs(ti - home) > 1) return "far";
   const last = RAW.weeks.length - 1;
-  if (ti !== home && (ti === last || home === last)) return "race";
+  // ⚠️ §10 PIECE 4: RACE WEEK IS THE WEEK WITH THE RACE IN IT (xwRaceIso), not the last week by position — a plan with no
+  // race ends on an ordinary week, and a move into it was refused as "Race week keeps its own sessions".
+  if (ti !== home && (ti === last || home === last) && xwRaceIso()) return "race";
   if (ti !== home && rows && (eased(PLAN.weeks[ti], rows) || eased(PLAN.weeks[home], rows))) return "eased";
   const iso = isoAdd(PLAN.weeks[ti].startIso, to).toISOString().slice(0, 10);
   if (PLAN.weeks[ti].beforeStart || (RAW.weeks[ti].startDateIso && iso < RAW.weeks[ti].startDateIso)) return "start";
@@ -8532,7 +8548,9 @@ function realignPreview(changes) {
  * new start is never after today, or the plan would read as paused.
  */
 function realignPickup(ev) {
-  if (!profile.raceDate) return null;
+  // §10 piece 4: a plan with no race picks up too — its road moves with the block (noRaceShifted), and it has no date to move.
+  const nr = (profile.noRace === true);
+  if (!profile.raceDate && !nr) return null;
   const today = todayIso();
   const nowI = realignWeekAt(today);
   let stopI = realignWeekAt(isoAdd(ev.active, 1).toISOString().slice(0, 10));
@@ -8542,13 +8560,18 @@ function realignPickup(ev) {
   // ⚠️ AFTER A PAUSE THE BLOCK IS LAID OUT FROM AN EARLIER DAY THAN IT STARTED AGAIN ON (blockStartIso). That day is
   // the one that moves; the day it started again stays, and so do the weeks held before it. Moving the start
   // instead would hide more weeks and leave the runner exactly where they were.
-  const race = isoAdd(profile.raceDate, 7 * w).toISOString().slice(0, 10);
+  const race = nr ? "" : isoAdd(profile.raceDate, 7 * w).toISOString().slice(0, 10);
   let start = isoAdd(blockStartIso(profile), 7 * w).toISOString().slice(0, 10);
   let changes;
   if (start < planStartIso(profile)) changes = { blockFromIso: start, raceDate: race };
   else {
     if (start > today) start = today;
     changes = { startDateIso: start, blockFromIso: "", raceDate: race };
+  }
+  if (nr) {
+    // The road moves by the weeks the block moved (fewer, where the start could not pass today).
+    delete changes.raceDate;
+    changes.road = noRaceShifted(profile.road, Math.max(0, roadWeeksBetween(weekMondayOf(blockStartIso(profile)), weekMondayOf(start))));
   }
   const pre = realignPreview(changes);
   return pre ? { start: start, race: race, weeks: w, pre: pre, changes: changes } : null;
@@ -8572,7 +8595,8 @@ function realignOptions(ev) {
   const cw = PLAN.weeks[CURRENT_WEEK];
   const out = [];
   if (!cw) return out;
-  const carry = { id: "carry", t: "Carry on as planned", s: "This is week " + cw.index + " of " + PLAN.weeks.length + ": " +
+  // §10 piece 4: a plan with no race has no length — "of 8" would be only the weeks laid out so far.
+  const carry = { id: "carry", t: "Carry on as planned", s: "This is week " + cw.index + ((profile.noRace === true) ? "" : " of " + PLAN.weeks.length) + ": " +
     reentryKm(cw.distanceKm) + " km" + (cw.longRunMin ? ", with a " + cw.longRunMin + "-minute long run" : "") + "." };
   if (ev.tier === "misses") {
     const today = todayIso();
@@ -8591,9 +8615,11 @@ function realignOptions(ev) {
     if (p) out.push({ id: "pickup", t: "Pick up where you left off", pick: p, rec: tierId === "nudge" || tierId === "resume",
       s: "Back to week " + p.pre.index + " (" + reentryKm(p.pre.km) + " km)" + (race ? ", and your target date moves from " + race + " to " + runDateLabelIso(p.race) : "") + "." });
   }
-  const changes = long ? { startDateIso: todayIso(), blockFromIso: "", pauseWeeks: 0, returning: "break" }
+  const changes0 = long ? { startDateIso: todayIso(), blockFromIso: "", pauseWeeks: 0, returning: "break" }
     : { startDateIso: todayIso(), blockFromIso: "", pauseWeeks: 0 };
-  const r = realignPreview(changes);
+  // §10 piece 4: starting a plan with no race again is a new road from this week (noRaceRestart).
+  const changes = (profile.noRace === true) ? noRaceRestart(changes0) : changes0;
+  const r = changes ? realignPreview(changes) : null;
   if (r) out.push({ id: "restart", t: "Start again from this week", changes: changes, rec: !long && tierId === "rebuild",
     s: "Week 1 from this week (" + reentryKm(r.km) + " km)" + (race ? ", still building to " + race + " over " + r.weeks + " weeks" : "") +
       (long ? ", with the gentler start for time off" : "") + "." });
@@ -8658,12 +8684,15 @@ function answerRealign(choice) {
   if (choice === "newplan") { startWizard(); return; }
   const beforeRows = JSON.stringify(loadAdjust());
   const beforeProf = { raceDate: profile.raceDate, startDateIso: profile.startDateIso, returning: profile.returning,
-    blockFromIso: profile.blockFromIso, pauseWeeks: profile.pauseWeeks };
+    blockFromIso: profile.blockFromIso, pauseWeeks: profile.pauseWeeks,
+    // §10 piece 4: a plan with no race moves or replaces its road here, so the Undo puts it back.
+    road: JSON.stringify(profile.road || null) };
   const beforeOv = JSON.stringify(state.dayOverride || {});
   const restore = () => {
     try { localStorage.setItem(ADJUST_KEY, beforeRows); } catch (e) {}
     profile.raceDate = beforeProf.raceDate; profile.startDateIso = beforeProf.startDateIso; profile.returning = beforeProf.returning;
     profile.blockFromIso = beforeProf.blockFromIso; profile.pauseWeeks = beforeProf.pauseWeeks;
+    try { profile.road = JSON.parse(beforeProf.road); } catch (e) {}
     try { state.dayOverride = JSON.parse(beforeOv); } catch (e) {}
     saveDayOverride();
     saveRealign(beforeRec);
@@ -8869,6 +8898,35 @@ function normalizeWeekStarts() {
  * means today; every path that adopts a real plan now writes a date, so "" is never stored for one.
  */
 function planStartIso(pf) { return (pf && pf.startDateIso) || todayIso(); }
+/**
+ * ⚠️⚠️ §10 PIECE 4 — IS THIS A PLAN WITH NO RACE? (STAGES.md §10 decision 4; the owner, 2026-11-19: "yes, all your picks".)
+ * Set only by the wizard's "No race — keep getting fitter", and carried by a stored plan started again. Its race date is
+ * blank and its target the engine's own (targetSet false), never shown. EVERY READER OF THE RACE ASKS THIS FIRST: the
+ * Plan screen's header, the race-week badge, Alfie, the pause sheet, the B-race row, the plan's name.
+ */
+// ⚠️ THE READERS THAT EXISTED BEFORE IT (pause, Alfie, Manage plan…) READ (profile.noRace === true) INLINE — the same
+// definition — because tests lift each of them into a sandbox of exactly what it used before, and a race plan's path must
+// call nothing new. The new functions call this.
+function isNoRace(pf) { return !!(pf && pf.noRace === true); }
+/**
+ * ⚠️⚠️ §10 PIECE 4 — A PLAN WITH NO RACE IS ITS ROAD (the owner, 2026-11-19). Gives applyProfile's options the road as it
+ * stands today — held at a checkpoint not yet answered, laid out a block ahead (noRaceRoadNow) — and the goal the date the
+ * last week laid out ends on: NEVER STORED, and read by the engine only to say where the weeks end
+ * (generateNoRaceRoadPlan reads no race date).
+ * ⚠️ NEVER THROWS FOR AN ADULT: a profile with no road yet is given its first two blocks here, so a launch can never fall
+ * back to the example plan. A 12–17 runner is never placed on one (RC.roadNoRaceFor is null): the wizard does not offer
+ * it, and the profile form and a stored plan refuse it before anything is saved.
+ */
+function noRaceGoalRoad(pf, ath, goal, blockFrom, opts) {
+  let road = pf.road ? effectiveRoad(pf, ath, goal) : null;
+  if (!road) {
+    const prop = RC.roadNoRaceFor(ath, goal, blockFrom);
+    if (!prop) throw new Error("A plan without a race is for runners 18 and over.");
+    road = noRaceRoadNow({ v: 1, noRace: true, fromIso: weekMondayOf(blockFrom), stages: prop.stages, rampWeeks: prop.rampWeeks, checkpoints: [] });
+  }
+  opts.road = road;
+  goal.raceDateIso = isoAdd(road.fromIso, road.stages.reduce((n, s) => n + s.weeks, 0) * 7 - 1).toISOString().slice(0, 10);
+}
 /**
  * WHERE THE BLOCK IS LAID OUT FROM: the day it starts (planStartIso), unless a pause picks up where the runner left
  * off (2026-10-04, the owner: "make a pause pick up where you left off"). Then profile.blockFromIso is the earlier
@@ -9714,7 +9772,10 @@ function roadOf(pf) {
   const r = pf && pf.road;
   if (!r || typeof r !== "object" || r.v !== 1 || !r.fromIso || !Array.isArray(r.stages) || !r.stages.length) return null;
   if (!r.stages.every((s) => s && ROAD_STAGE_LABEL[s.kind] && Number(s.weeks) > 0)) return null;
-  return r.stages[r.stages.length - 1].kind === "race" ? r : null;
+  // ⚠️ §10 PIECE 4: A ROAD WITH NO RACE (noRace, no race stage) IS ONLY EVER THE ROAD OF A PLAN WITH NO RACE, and a race road
+  // only of a plan with one — a stored plan of the other kind started over it must not inherit it (adoptProf).
+  if (r.noRace === true) return pf.noRace === true && r.stages.every((s) => s.kind !== "race") ? r : null;
+  return r.stages[r.stages.length - 1].kind === "race" && pf.noRace !== true ? r : null;
 }
 /** Whole weeks from one Monday to another. */
 function roadWeeksBetween(aIso, bIso) {
@@ -9725,6 +9786,8 @@ function roadMondayAfter(iso, weeks) { return isoAdd(iso, 7 * weeks).toISOString
 function roadProposalFor(pf) {
   let out;
   try { out = applyProfile(Object.assign({}, pf, { road: null })); } catch (e) { return null; }
+  // §10 piece 4: with no race, the engine places the runner and lays out their first two blocks (RC.roadNoRaceFor).
+  if (pf && pf.noRace === true) { try { return RC.roadNoRaceFor(out.ath, out.goal, blockStartIso(pf)) || null; } catch (e) { return null; } }
   try { return RC.roadFor(out.ath, out.goal, blockStartIso(pf)) || null; } catch (e) { return null; }
 }
 /**
@@ -9739,6 +9802,10 @@ function wizRoadFor(pf, prop) {
 }
 /** The stored road for a proposal: its first Monday counted back from race week, so the stages fill it exactly. */
 function roadFromProposal(prop, pf) {
+  // ⚠️ §10 PIECE 4: A ROAD WITH NO RACE STARTS ON THE PLAN'S OWN FIRST MONDAY and is laid forward from it — there is no
+  // race week to count back from (isoAdd("") is 1900).
+  if (pf && pf.noRace === true) return { v: 1, noRace: true, fromIso: weekMondayOf(blockStartIso(pf)),
+    stages: prop.stages.map((s) => ({ kind: s.kind, weeks: s.weeks })), rampWeeks: prop.rampWeeks, checkpoints: [] };
   const weeks = prop.stages.reduce((n, s) => n + s.weeks, 0);
   const road = { v: 1, fromIso: roadMondayAfter(weekMondayOf(pf.raceDate), -(weeks - 1)),
     stages: prop.stages.map((s) => ({ kind: s.kind, weeks: s.weeks })), rampWeeks: prop.rampWeeks, checkpoints: [] };
@@ -9762,6 +9829,8 @@ function effectiveRoad(pf, ath, goal) {
   const r = roadOf(pf);
   if (!r) return null;
   try { if (!RC.roadStartFor(ath)) return null; } catch (e) { return null; }
+  // §10 piece 4: a road with no race has no race day to fit — it is held, then laid out a block ahead (noRaceRoadNow).
+  if (r.noRace === true) return noRaceRoadNow(r);
   // ⚠️ §10 PIECE 3 — THE RACE BLOCK IS ONE STAGE HERE, however it is stored: its blocks of four (each with a checkpoint) are
   // merged, the road fitted and held exactly as before, and the block cut into its blocks again at the end (roadSplitRace),
   // so its checkpoints always follow the race block as it now stands. A road stored before the race block had checkpoints
@@ -9846,6 +9915,42 @@ function roadSplitRace(stages, goalDist) {
   try { cut = RC.raceBlockSplit(last.weeks, goalDist || "half"); } catch (e) {}
   return merged.slice(0, -1).concat(cut.map((w) => ({ kind: "race", weeks: w })));
 }
+/**
+ * ⚠️⚠️ §10 PIECE 4 — A ROAD WITH NO RACE, AS IT STANDS TODAY (STAGES.md §10 decision 4; the owner, 2026-11-19: "yes, all
+ * your picks"). The stored stages, then:
+ *   HELD, AS ON A RACE ROAD: a block whose checkpoint Monday has come with no "up" recorded runs on through this week —
+ *   the app never moves anybody on by itself. Nothing is taken from what follows: the road has no end to keep, so the
+ *   blocks after it simply begin later.
+ *   EXTENDED A BLOCK AT A TIME (the owner's A): past the stored stages come the next blocks — Walk-run 1 → Walk-run 2 →
+ *   Rebuild → Base → Base… (RC.noRaceNextKind, at RC.noRaceBlockWeeks) — until the road reaches at least a full block
+ *   past the end of the block the runner is in: the block in hand plus the next, and never more.
+ * ⚠️ THE WEEKS IT LAYS OUT NEVER CHANGE AS IT GROWS: the engine counts every week from the road's first Monday and its
+ * stored ramp (generateNoRaceRoadPlan), so a block added on Monday re-lays nothing already laid out.
+ */
+function noRaceRoadNow(r) {
+  const stages = r.stages.map((s) => ({ kind: s.kind, weeks: Math.max(1, Math.round(Number(s.weeks))) }));
+  const after = (k) => { const n = RC.noRaceNextKind(k); return { kind: n, weeks: RC.noRaceBlockWeeks(n) }; };
+  const thisMonday = weekMondayOf(todayIso());
+  let at = r.fromIso, cur = 0;
+  // Ten years of blocks at most: a guard, never a limit anybody reaches.
+  for (let i = 0; i < 600; i++) {
+    if (i >= stages.length) stages.push(after(stages[stages.length - 1].kind));
+    const end = roadMondayAfter(at, stages[i].weeks);
+    cur = i;
+    if (end > thisMonday) break;
+    const ans = roadAnswerAt(r, end);
+    if (!(ans && ans.answer === "up")) { stages[i].weeks += roadWeeksBetween(end, thisMonday) + 1; break; }
+    at = end;
+  }
+  // The block in hand, then blocks until the road reaches a full block past its end.
+  let k = cur + 1, ahead = 0;
+  while (ahead < RC.BLOCK_WEEKS) {
+    if (k >= stages.length) stages.push(after(stages[stages.length - 1].kind));
+    ahead += stages[k].weeks;
+    k++;
+  }
+  return { noRace: true, fromIso: r.fromIso, stages: stages.slice(0, k), rampWeeks: r.rampWeeks };
+}
 /** The minimum the road needs about the runner to know whether it still places them: their track and age. */
 function roadAthleteOf(pf) {
   return { experience: experienceFor(pf), runWalk: pf.status === "new", age: RC.ageAnswer(pf.age) || undefined };
@@ -9856,7 +9961,8 @@ function roadAthleteOf(pf) {
  */
 function roadLegsNow(pf) {
   const r = roadOf(pf);
-  if (!r || !pf.raceDate) return null;
+  // §10 piece 4: a road with no race needs no race date.
+  if (!r || (r.noRace !== true && !pf.raceDate)) return null;
   const eff = effectiveRoad(pf, roadAthleteOf(pf), { raceDateIso: pf.raceDate });
   if (!eff) return null;
   let at = r.fromIso;
@@ -9879,8 +9985,9 @@ function roadCheckpoint() {
   const thisMonday = weekMondayOf(todayIso());
   for (const leg of legs) {
     // ⚠️ §10 PIECE 3: every leg ends in a checkpoint — the race block's blocks of four too — except the last, which ends on
-    // race day (B9's after-race handover asks that question).
-    if (leg.i === legs.length - 1) return null;
+    // race day (B9's after-race handover asks that question). §10 piece 4: with no race there is no race day, and every
+    // block ends in one.
+    if (leg.i === legs.length - 1 && r.noRace !== true) return null;
     if (thisMonday >= leg.endIso) continue;
     if (thisMonday < roadMondayAfter(leg.endIso, -1)) return null;
     if (roadAnswerAt(r, leg.endIso)) return null;
@@ -10040,6 +10147,51 @@ function countRoadTest(id) {
   }
   return true;
 }
+/**
+ * ⚠️⚠️ §10 PIECE 4 — EACH BLOCK'S TEST BESIDE THE LAST ONES, IN PLACE OF A TARGET (decision 2, the owner's A: "2 km: 9:40 →
+ * 9:21"). Only what the runner did, block by block in road order: the 2 km from the trial flow, a run they counted as
+ * their parkrun or 5 km test (run.test), a walk-run block's non-stop run (its key run, done and rated easy — roadTargetRun),
+ * and — only where time on feet is this runner's test (RC.blockTestsFor) — the longest run in the block they rated easy.
+ * One result a block (its latest); a block with none is left out, never shown as nothing; never a prediction.
+ */
+function roadTestTrail(legs, upto) {
+  const today = todayIso();
+  const runs = state.logged || [];
+  const two = (loadTwoKm() || []).filter((x) => x && x.completedAt && Number(x.elapsedSeconds) > 0)
+    .slice().sort((x, y) => (String(x.completedAt) < String(y.completedAt) ? -1 : 1));
+  const tof = roadTestOffer(profile).indexOf("time-on-feet") >= 0;
+  const out = { two: [], five: [], walk: [], tof: [] };
+  (legs || []).slice(0, Math.max(0, upto + 1)).forEach((l) => {
+    const inLeg = (iso) => !!iso && iso >= l.fromIso && iso < l.endIso && iso <= today;
+    if (roadWalkRun(l.kind)) {
+      const k = roadTargetRun(l, today);
+      if (k.doneIso) out.walk.push(k.needMin + " min");
+      return;
+    }
+    const t = two.filter((x) => inLeg(String(x.completedAt).slice(0, 10))).pop();
+    if (t) out.two.push(roadClock(t.elapsedSeconds));
+    const f = runs.filter((x) => x && x.test === "5k" && Number(x.sec) > 0 && inLeg(x.dateIso))
+      .sort((x, y) => (x.dateIso < y.dateIso ? -1 : 1)).pop();
+    if (f) out.five.push(fmtTimeFull(Number(f.sec)));
+    if (tof) {
+      let best = 0;
+      runs.forEach((x) => { if (x && inLeg(x.dateIso) && Number(x.rpe) > 0 && Number(x.rpe) <= RC.EASY_RPE_MAX) best = Math.max(best, Math.round((Number(x.sec) || 0) / 60)); });
+      if (best > 0) out.tof.push(best + " min");
+    }
+  });
+  const lines = [];
+  if (out.walk.length) lines.push("Non-stop run: " + out.walk.join(" → "));
+  if (out.two.length) lines.push("2 km: " + out.two.join(" → "));
+  if (out.five.length) lines.push("5 km: " + out.five.join(" → "));
+  if (out.tof.length) lines.push("Longest easy run: " + out.tof.join(" → "));
+  return lines;
+}
+/** The trail as a line on the Plan screen's road and at a checkpoint — "" until there is a result to show. */
+function roadTestTrailHtml(legs, upto) {
+  let lines = [];
+  try { lines = roadTestTrail(legs, upto); } catch (e) { lines = []; }
+  return lines.length ? '<p class="mp-note road-trail"><b>Your tests, block by block:</b> ' + esc(lines.join(" · ")) + '</p>' : "";
+}
 /** "4 weeks" / "1 week". */
 function roadWeeksLabel(n) { return n + (n === 1 ? " week" : " weeks"); }
 /**
@@ -10069,6 +10221,7 @@ function roadStageJob(kind, pf) {
   const p = pf || profile;
   let main = false;
   try { main = p.status !== "new" && experienceFor(p) !== "beginner"; } catch (e) {}
+  if (main && p && p.noRace === true && ROAD_STAGE_JOB_NORACE[kind]) return ROAD_STAGE_JOB_NORACE[kind];
   return (main && ROAD_STAGE_JOB_MAIN[kind]) || ROAD_STAGE_JOB[kind] || "";
 }
 /** The road in one line, as the wizard and the Plan screen say it: "4 weeks Rebuild → 5 weeks Base → 16 weeks race block". */
@@ -10087,6 +10240,16 @@ function roadLine(stages) {
 function roadAnswered(cp, choice) {
   const r = roadOf(profile);
   if (!r || !cp) return null;
+  // ⚠️⚠️ §10 PIECE 4 — A ROAD WITH NO RACE HAS NO END TO KEEP. "Move up" starts the next block as laid; "one more week" and
+  // "ease back" each add a week to THIS block (easing back makes it the lighter week — answerRoad's row — then this
+  // checkpoint again, which is what a race road's eased week comes to once its hold has taken it), and nothing is taken
+  // from what follows: the blocks after it begin a week later. The road stored is the effective one (a hold made real).
+  if (r.noRace === true) {
+    const st = cp.legs.map((l) => ({ kind: l.kind, weeks: l.weeks }));
+    if (choice === "more" || choice === "ease") st[cp.i].weeks += 1;
+    return Object.assign({}, r, { stages: st,
+      checkpoints: (r.checkpoints || []).concat([{ dueIso: cp.endIso, kind: cp.kind, answer: choice, answeredIso: todayIso() }]) });
+  }
   // ⚠️ §10 PIECE 3: AT A RACE-BLOCK CHECKPOINT NOTHING MOVES. "Carry on" is the plan as laid, and "ease back" is the easier-week
   // row alone (answerRoad) — no Rebuild week inserted, no week taken: the race block is laid back from race day and only the
   // runner may shorten it (decision 4).
@@ -10192,6 +10355,9 @@ function roadCheckpointHtml() {
   const target = f && fLine && profile.targetSet !== false
     ? '<p class="road-target"><b>Your target, ' + esc(PLAN.goal.target) + ':</b> ' + fLine + '</p>'
     : "";
+  // §10 piece 4 (decision 2, the owner's A): with no race there is no target — each block's test beside the last ones.
+  const trailRoad = roadOf(profile);
+  const trail = trailRoad && trailRoad.noRace === true ? roadTestTrailHtml(cp.legs, cp.i) : "";
   // ⚠️ §10 PIECE 3 — THE OWNER'S B (2026-11-19, "B: No "One more week" there"): inside the race block there is no week more to
   // suggest, so where the judgement would suggest one it suggests carrying on — the reasons and the test buttons say what is
   // missing (a missing TEST is answered by doing the test, never by repeating a week). Pain still suggests easing back.
@@ -10230,7 +10396,7 @@ function roadCheckpointHtml() {
   }
   return '<div class="re-card road-sheet" id="roadSheet"><div class="sheet-h">Checkpoint · end of ' + esc(roadLegName(cp.legs, cp.i)) + '</div>' +
     '<div class="db-body"><p class="road-verdict road-' + v.verdict + '"><b>' + esc(head) + '</b></p>' +
-    '<ul class="road-why">' + v.reasons.map((x) => '<li>' + esc(x) + '</li>').join("") + '</ul>' + trial + pain + target + shortNote +
+    '<ul class="road-why">' + v.reasons.map((x) => '<li>' + esc(x) + '</li>').join("") + '</ul>' + trial + pain + trail + target + shortNote +
     '<p><b>What would you like to do?</b></p></div>' +
     '<div class="re-opts">' + opts.map(opt).join("") + '</div>' +
     '<button class="primary road-later" id="roadLater" type="button">Not now</button>' +
@@ -10305,7 +10471,8 @@ function answerRoad(choice) {
   profile.road = road;
   if (choice === "ease") {
     const wk = road.stages.slice(0, cp.i + 1).reduce((n, s) => n + s.weeks, 0);
-    const from = roadMondayAfter(road.fromIso, wk);
+    // §10 piece 4: with no race the eased week is the one added to this block — the week of the checkpoint's Monday.
+    const from = road.noRace === true ? cp.endIso : roadMondayAfter(road.fromIso, wk);
     const rows = loadAdjust();
     rows.unshift({ id: "adj-" + Date.now(), kind: "recovery", from: from,
       to: isoAdd(from, 6).toISOString().slice(0, 10), mode: "recovery", dropNonRun: false });
@@ -10350,13 +10517,17 @@ function roadDayLabel(iso) {
  * dates and where the runner is — text, never colour alone. Used by the Plan screen (with "you are here") and by the
  * wizard before saving (no position yet). The legs are [{ kind, weeks, fromIso, endIso }].
  */
-function roadTimelineHtml(legs, here, pf) {
+function roadTimelineHtml(legs, here, pf, from) {
   if (!legs || !legs.length) return "";
+  // §10 piece 4: from — the first leg shown. A road with no race grows a block at a time for as long as the runner runs, so
+  // the Plan screen shows the block before this one onwards; names still count from the road's start ("Base 7").
+  const lo = Math.max(0, Number(from) || 0);
   // Before saving (no position yet) each stage's job is said once — on its first block, not on all four race blocks.
   const firstOfKind = (i) => legs.findIndex((x) => x.kind === legs[i].kind) === i;
-  const bar = '<div class="road-tl" aria-hidden="true">' + legs.map((l, i) =>
+  const bar = '<div class="road-tl" aria-hidden="true">' + legs.map((l, i) => i < lo ? "" :
     '<span class="road-seg' + (i === here ? " on" : "") + '" style="flex:' + l.weeks + ';--rc:' + ROAD_COLOUR[l.kind] + '"></span>').join("") + '</div>';
   const rows = legs.map((l, i) => {
+    if (i < lo) return "";
     const last = roadMondayAfter(l.endIso, -1);
     const when = roadDayLabel(l.fromIso) + " – " + roadDayLabel(isoAdd(last, 6).toISOString().slice(0, 10));
     const state = here == null ? "" : i < here ? "Done" : i === here ? "You are here" : "Ahead";
@@ -10382,7 +10553,9 @@ function roadPlanCard() {
   const nextName = next ? (next.kind === "race" && (!cur || cur.kind !== "race") ? "your race block" : roadLegName(legs, here + 1)) : "";
   // §10 piece 3: a race-block checkpoint is a look at the block and a test run, not a move up — and nothing waits on it.
   const inRace = !!cur && cur.kind === "race";
-  const cpLine = !cur || here === legs.length - 1 ? ""
+  // §10 piece 4: with no race every block ends in a checkpoint — a test run, then the runner's choice of what comes next.
+  const noRace = !!r && r.noRace === true;
+  const cpLine = !cur || (here === legs.length - 1 && !noRace) ? ""
     : ans && ans.answer === "up" && next
       ? '<p class="mp-note">You chose to ' + (next.kind === cur.kind ? "go on" : "move up") + ': ' + nextName + ' starts on Monday ' + roadDayLabel(cur.endIso) + '.</p>'
       // §10 piece 3: easing back inside the race block moves no week, so the answer stands against this block (found in the
@@ -10392,11 +10565,24 @@ function roadPlanCard() {
       : thisMonday >= roadMondayAfter(cur.endIso, -1)
         ? (inRace
           ? '<p class="mp-note">Your checkpoint is this week: a test run, and a look at how this block went.</p>'
-          : '<p class="mp-note">Your checkpoint is this week. You choose whether to move up — nothing harder arrives until you do.</p>') +
+          : noRace
+            ? '<p class="mp-note">Your checkpoint is this week: a test run, and you choose what comes next — nothing harder arrives until you do.</p>'
+            : '<p class="mp-note">Your checkpoint is this week. You choose whether to move up — nothing harder arrives until you do.</p>') +
           (currentRoadCheckpoint() ? '<button class="perf-a" id="roadOpen">Open your checkpoint ›</button>' : "")
         : '<p class="mp-note">Your next checkpoint is the week of ' + roadDayLabel(roadMondayAfter(cur.endIso, -1)) +
           (inRace ? ': a test run that keeps your paces honest, and a look at how the block went.</p>'
+            : noRace ? ': a test run, and you choose then what comes next — nothing harder arrives until you do.</p>'
             : '. You choose then whether to move up — nothing harder arrives until you do.</p>');
+  if (noRace) {
+    // ⚠️ §10 PIECE 4 — THE BLOCK BEFORE THIS ONE, THIS ONE AND THE NEXT: the road grows a block at a time for as long as the
+    // runner runs, so the blocks before are counted in a line rather than drawn; and in place of a target, each block's
+    // test beside the last ones (decision 2, the owner's A — roadTestTrail).
+    const lo = Math.max(0, here - 1);
+    return '<h2 class="sec">Your road</h2><div class="card road-card">' +
+      (lo > 0 ? '<p class="mp-note">' + lo + (lo === 1 ? " block" : " blocks") + ' done since ' + roadDayLabel(legs[0].fromIso) + '.</p>' : "") +
+      roadTimelineHtml(legs, here, null, lo) + cpLine + roadTestTrailHtml(legs, here) +
+      '<p class="mp-note">No race: your plan is laid out a block at a time. Want a race? Start a new plan with it in plan setup.</p></div>';
+  }
   return '<h2 class="sec">Your road</h2><div class="card road-card">' + roadTimelineHtml(legs, here) + cpLine + '</div>';
 }
 /**
@@ -10406,6 +10592,7 @@ function roadPlanCard() {
  */
 function wizRoadHtml(prop, pf) {
   if (!prop) return "";
+  if (pf && pf.noRace === true) return wizNoRaceRoadHtml(prop, pf);
   const road = roadFromProposal(prop, pf);
   let at = road.fromIso;
   const legs = road.stages.map((s) => { const f = at; at = roadMondayAfter(at, s.weeks); return { kind: s.kind, weeks: s.weeks, fromIso: f, endIso: at }; });
@@ -10427,6 +10614,31 @@ function wizRoadHtml(prop, pf) {
       ? '<p class="mp-note">Your race block has a checkpoint every four weeks too: a test run that keeps your paces honest, and a look at how the block went.</p>'
       : "") +
     short + '</div>';
+}
+
+/**
+ * ⚠️ §10 PIECE 4 — THE WIZARD'S ROAD WITH NO RACE: the first two blocks (the block the runner starts in and the next), the
+ * rule that every block ends in a checkpoint the runner answers, and where the running is going — measured, not promised
+ * (noRaceOutlook). Saved exactly as shown: wizardFinish stores the same proposal.
+ */
+function wizNoRaceRoadHtml(prop, pf) {
+  const road = roadFromProposal(prop, pf);
+  let at = road.fromIso;
+  const legs = road.stages.map((s) => { const f = at; at = roadMondayAfter(at, s.weeks); return { kind: s.kind, weeks: s.weeks, fromIso: f, endIso: at }; });
+  const o = noRaceOutlook(pf);
+  const dist = RACE_LABEL[pf.goalDist] || "";
+  const outlook = !o ? ""
+    : o.climbWeeks > 0 && o.holdKm > o.startKm
+      ? "Your running builds for about " + o.climbWeeks + " weeks, to about " + o.holdKm + " km a week with a " + o.holdLongMin +
+        "-minute long run, then holds there."
+      : "You already run what a " + dist + " race block starts with, so your plan holds there: about " + o.holdKm +
+        " km a week, with a " + o.holdLongMin + "-minute long run.";
+  return '<div class="road-wiz"><div class="road-wiz-h">Here’s your road</div><p class="road-wiz-l">' + esc(roadLine(road.stages)) +
+    ' → then a block at a time</p>' + roadTimelineHtml(legs, null, pf) +
+    '<p class="mp-note">No race, so no end date. Each block ends with a checkpoint and a test run. You choose then whether to move up, ' +
+    'take one more week, or ease back — the app never moves you up on its own.</p>' +
+    (outlook ? '<p class="mp-note">' + esc(outlook) + ' The sessions keep changing, and your paces follow your tests.</p>' : "") +
+    '<p class="mp-note">Want a race later? Start a new plan with it in plan setup.</p></div>';
 }
 
 function todayCards() {
@@ -12533,6 +12745,10 @@ function alfieNextSession() {
 }
 function alfieRaceFacts() {
   const g = PLAN.goal || {};
+  // ⚠️ §10 PIECE 4: A PLAN WITH NO RACE HAS NONE TO TELL — no race, target or date, on the phone or sent online (the Worker
+  // describes whatever it is sent, and it was sent "your race" with the end of the weeks laid out as its date).
+  if ((profile.noRace === true)) return { race: "No race: getting fitter for " + (RACE_LABEL[profile.goalDist] || "a distance"), target: null,
+    date: null, daysAway: null, weeksAway: null, noRace: true };
   let away = null;
   try { const rd = profile.raceDate; if (rd) away = Math.round((isoAdd(rd, 0) - isoAdd(todayIso(), 0)) / 86400000); } catch (e) {}
   return { race: g.race || "your race", target: g.target || null, date: g.raceDate || null, daysAway: away, weeksAway: away != null ? Math.max(0, Math.round(away / 7)) : null };
@@ -12679,8 +12895,11 @@ function alfieIntents() {
       return "<p>These come from your current fitness, so they\\u2019re yours, not a generic table:</p><ul class=\\"alf-ul\\">" + rows.join("") + "</ul>" +
         "<p>If a pace feels wrong on the day, run by <b>effort</b> \— heat, hills, wind and fatigue all move the number.</p>";
     } },
+    // §10 piece 4: where the next checkpoint is, from the road itself — asked by the chip a plan with no race shows.
+    { k: ["checkpoint", "next block", "my road"], a: () => alfieCheckpointAnswer() },
     { k: ["race", "goal", "how long until", "how far away", "race day", "countdown"], a: () => {
       const f = alfieRaceFacts();
+      if (f.noRace) return alfieNoRaceAnswer();
       const when = f.daysAway == null ? "" : f.daysAway < 0 ? " \— that date has passed." : f.daysAway === 0 ? " \— that\\u2019s <b>today</b>." : " \— <b>" + f.daysAway + " days</b> away (about " + f.weeksAway + " weeks).";
       return "<p>You\\u2019re training for <b>" + esc(f.race) + "</b>" + (f.target ? " with a target of <b>" + esc(f.target) + "</b>" : "") + (f.date ? ", on " + esc(f.date) : "") + when + "</p>" +
         "<p class=\\"alf-dim\\">The Plan tab shows the whole block and how the weeks build.</p>";
@@ -12713,6 +12932,33 @@ function alfieIntents() {
     { k: ["who are you", "what are you", "what can you", "help me with", "alfie"], a: () => "<p>I\\u2019m <b>Alfie</b>, built into Inte-Run. I can see your plan, so I can answer things like:</p><ul class=\\"alf-ul\\"><li>What\\u2019s my next session, and how should it feel?</li><li>What pace should I run this at?</li><li>Why is this week easier?</li><li>Should I run if I\\u2019m sore or it\\u2019s hot?</li><li>General running, training and fitness questions.</li></ul><p>I\\u2019m not a doctor \— for pain or health symptoms I\\u2019ll point you to proper help.</p>" },
   ];
 }
+/**
+ * §10 piece 4 — Alfie on a plan with no race: what it builds and where the next checkpoint is, from the road itself
+ * (roadLegsNow) — never a race, a date or a target the runner did not choose.
+ */
+function alfieNoRaceAnswer() {
+  const d = RACE_LABEL[profile.goalDist] || "your distance";
+  return '<p>You’re not training for a race: your plan builds your fitness for <b>' + esc(d) + '</b> a block at a time, then ' +
+    'holds it there. Each block ends with a checkpoint and a test run, and you choose what comes next.</p>' + alfieCheckpointLine() +
+    '<p class="alf-dim">Want a race? Start a new plan with it in plan setup.</p>';
+}
+/** The block the runner is in and the week its checkpoint falls in — "" with no road, or in a race road's last block. */
+function alfieCheckpointLine() {
+  let legs = null;
+  try { legs = roadLegsNow(profile); } catch (e) { legs = null; }
+  if (!legs) return "";
+  const mon = weekMondayOf(todayIso());
+  const i = legs.findIndex((l) => mon >= l.fromIso && mon < l.endIso);
+  const l = legs[i];
+  if (!l || (i === legs.length - 1 && l.kind === "race")) return "";
+  return '<p>You’re in <b>' + esc(roadLegName(legs, i)) + '</b>. Its checkpoint is the week of <b>' +
+    esc(roadDayLabel(roadMondayAfter(l.endIso, -1))) + '</b>.</p>';
+}
+function alfieCheckpointAnswer() {
+  const line = alfieCheckpointLine();
+  return line ? line + '<p class="alf-dim">The Plan tab shows your road, block by block, and what each checkpoint asks.</p>'
+    : '<p>There is no checkpoint ahead on your plan. Checkpoints come with a road of blocks, which plan setup lays out for a new plan.</p>';
+}
 function alfieLocalAnswer(question) {
   const q = alfieNorm(question);
   const flags = alfieRedFlags(q);
@@ -12736,7 +12982,8 @@ function alfiePlanContext() {
   return {
     goal: f.race, target: f.target, raceDate: f.date, daysToRace: f.daysAway,
     week: wk.index, phase: wk.phase, deload: !!wk.isDeload, weekKm: wk.distanceKm,
-    paces: { easy: p.easy || null, threshold: p.threshold || null, goal: p.goal || null },
+    // §10 piece 4: a plan with no race has no race pace to send (the engine's own, from a target nobody set).
+    paces: { easy: p.easy || null, threshold: p.threshold || null, goal: f.noRace ? null : (p.goal || null) },
     today: today, experience: profile.status || null, daysPerWeek: dayAnswerOf(profile) || null,
   };
 }
@@ -12828,7 +13075,8 @@ function alfieClear() {
   render();
 }
 function viewAlfie() {
-  const chips = ALFIE_CHIPS.map((c) => '<button class="alf-chip" data-alfq="' + esc(c) + '">' + c + "</button>").join("");
+  // §10 piece 4: a plan with no race is never asked how far away its race is — it is asked where the next checkpoint is.
+  const chips = ((profile.noRace === true) ? ALFIE_CHIPS.slice(0, -1).concat(["When is my next checkpoint?"]) : ALFIE_CHIPS).map((c) => '<button class="alf-chip" data-alfq="' + esc(c) + '">' + c + "</button>").join("");
   return '<button class="backbtn" id="alfBack">\\u2039 Back</button>' +
     '<div class="alf-head"><div class="alf-hero">' + ICON.alfie + '</div><div><div class="alf-name">Ask Alfie</div><div class="alf-sub">Your coach \— knows your plan</div></div></div>' +
     alfieLimits() +
@@ -16787,8 +17035,10 @@ function managePlanHtml() {
     '<span class="mp-mid"><span class="mp-t">' + title +
     '</span><span class="mp-s">' + sub + '</span></span><span class="mp-chev" aria-hidden="true">' +
     "\u203a" + '</span></button>';
+  // §10 piece 4: a plan with no race is named for what it is; it has no race date to show, and no B-race to add.
+  const nr = (profile.noRace === true);
   return '<div class="eyebrow">Manage plan</div>' +
-    '<h3 class="sheet-h">' + esc(PLAN.goal.race) + ' · ' + esc(PLAN.goal.raceDate) + '</h3>' +
+    '<h3 class="sheet-h">' + (nr ? "Keep getting fitter · " + esc(RACE_LABEL[profile.goalDist] || PLAN.goal.race) : esc(PLAN.goal.race) + ' · ' + esc(PLAN.goal.raceDate)) + '</h3>' +
     plannedBreaksHtml() +
     '<div class="mp-list">' +
       // ⚠️ THREE OF THE SIX CARRY A MEANING THAT GENUINELY TRANSFERS AND THREE ARE PURE WAYFINDING,
@@ -16809,16 +17059,18 @@ function managePlanHtml() {
       // 2026-11-18: every run is shorter now, and a walk-run or Rebuild week has no hard session to swap (shortenSession).
       row("easier", "Make a week easier", "Shorter runs, and the hardest session made easy", "timer", "var(--taper)") +
       // B7: --brass, the medal colour, which no other row uses (and declared in all four theme blocks).
-      row("race", bRaceAhead() ? "Your race" : "Add a race", bRaceAhead()
+      (nr ? "" : row("race", bRaceAhead() ? "Your race" : "Add a race", bRaceAhead()
         ? esc(B_RACE_NAME[bRaceAhead().distance] || "Race") + " on " + esc(runDateLabelIso(bRaceAhead().dateIso)) + " \u2014 change it here"
-        : "A smaller race on the way to your main one", "rRace", "var(--brass)") +
+        : "A smaller race on the way to your main one", "rRace", "var(--brass)")) +
       row("prefs", "Training preferences", "Days, mileage, long-run day, how hard it feels", "gauge", "var(--accent)") +
       row("new", "Start a new plan", "A different goal or a different date", "plus", "var(--build)") +
       row("plans", "Your plans", planListSub(), "journal", "var(--taper)") +
     '</div>' +
-    '<p class="mp-note">Pausing stops the plan and picks it up later. Going away and easing off leave ' +
+    (nr ? '<p class="mp-note">Pausing stops the plan and picks it up later. Going away and easing off take sessions out of ' +
+      'the days you choose \u2014 so the block keeps its shape and you are not carrying work you were never going to do.</p>'
+    : '<p class="mp-note">Pausing stops the plan and picks it up later. Going away and easing off leave ' +
     'your target date alone and take sessions out of the days you choose \u2014 so the block keeps its ' +
-    'shape and you are not carrying work you were never going to do.</p>';
+    'shape and you are not carrying work you were never going to do.</p>');
 }
 
 // ---- PAUSE ---------------------------------------------------------------------------------
@@ -16889,20 +17141,48 @@ function pauseChanges(kind, days) {
   const live = TODAY_IN_PLAN && !(profile.startDateIso && profile.startDateIso > today);
   const later = (iso, n) => iso ? isoAdd(iso, n).toISOString().slice(0, 10) : iso;
   const restart = Object.assign({ startDateIso: back, blockFromIso: "", pauseWeeks: 0 }, tier === "reentry" ? { returning: true } : {});
+  // ⚠️⚠️ §10 PIECE 4 — A PLAN WITH NO RACE HAS NO TARGET DATE TO KEEP OR MOVE (its race date is blank, so later() leaves it
+  // so). Picking up moves the ROAD with the block — its first Monday and every answer's Monday, by the weeks away — so the
+  // runner comes back to the block and the week they left (moving the block alone would have re-dated the road under its
+  // answers and held them at a checkpoint already passed). Starting again is a new road from the day they start, placed
+  // for them then (noRaceRestart — after a long break, with the "after time off" start). "Keep my target date" is not
+  // offered.
+  const noRace = profile.noRace === true;
   if (kind === "pickup") {
     const w = days / 7;
     if (!live || (tier !== "resume" && tier !== "rebuild") || w !== Math.round(w)) return null;
-    return { startDateIso: back, blockFromIso: later(blockStartIso(profile), 7 * w), raceDate: later(profile.raceDate, 7 * w), pauseWeeks: w };
+    const ch = { startDateIso: back, blockFromIso: later(blockStartIso(profile), 7 * w), raceDate: later(profile.raceDate, 7 * w), pauseWeeks: w };
+    if (noRace) ch.road = noRaceShifted(profile.road, w);
+    return ch;
   }
   if (kind === "keep") {
+    if (noRace) return null;
     if (live && (tier === "nudge" || tier === "resume") && profile.raceDate && back < profile.raceDate)
       return { startDateIso: back, blockFromIso: blockStartIso(profile), pauseWeeks: 0 };
     return restart;
   }
-  if (kind === "shift") return Object.assign({}, restart, { raceDate: later(profile.raceDate, days) });
+  if (kind === "shift") return noRace ? noRaceRestart(restart) : Object.assign({}, restart, { raceDate: later(profile.raceDate, days) });
   return null;
 }
 
+/**
+ * §10 piece 4 — a road with no race moved later by whole weeks: its first Monday and the Monday of every answer, together,
+ * so the blocks and the answers given at their ends move as one (a pause or a lapse picked up where it left off).
+ */
+function noRaceShifted(r, w) {
+  if (!r || !(w > 0)) return r || null;
+  return Object.assign({}, r, { fromIso: roadMondayAfter(r.fromIso, w),
+    checkpoints: (r.checkpoints || []).map((c) => Object.assign({}, c, { dueIso: roadMondayAfter(c.dueIso, w) })) });
+}
+/**
+ * §10 piece 4 — starting a plan with no race again: the changes given, and a NEW road from the day it starts, placed for the
+ * runner as they are then (their first two blocks). Null when no road can be placed (nothing then changes).
+ */
+function noRaceRestart(changes) {
+  const pf = Object.assign({}, profile, changes, { road: null });
+  const prop = roadProposalFor(pf);
+  return prop ? Object.assign({}, changes, { road: roadFromProposal(prop, pf) }) : null;
+}
 // The pause sheet. It asks how long, says what that length means, and then ends in a CHOICE -- never
 // in a change. Standing instruction, 2026-08-03: the app may observe and it may propose; it may never
 // change a pace, a plan or a target on its own.
@@ -16943,8 +17223,9 @@ function pausePlanHtml() {
   const pickup = pick && PLAN.weeks[CURRENT_WEEK]
     ? opt("pickup", t.id === "resume", "Pick up where you left off",
         "Your plan stops now and picks up on <b>" + esc(runDateLabelIso(resumeIso)) + "</b> in <b>week " +
-        PLAN.weeks[CURRENT_WEEK].index + "</b>, where you left off. Nothing is scheduled in between, and your " +
-        "target date becomes <b>" + esc(runDateLabelIso(pick.raceDate)) + "</b>.")
+        PLAN.weeks[CURRENT_WEEK].index + "</b>, where you left off. Nothing is scheduled in between" +
+        // §10 piece 4: a plan with no race has no target date to move.
+        (pick.raceDate ? ", and your target date becomes <b>" + esc(runDateLabelIso(pick.raceDate)) + "</b>." : "."))
     : "";
   const shift = t.id === "nudge" || (t.id === "resume" && pickup)
     ? ""
@@ -16962,6 +17243,8 @@ function pausePlanHtml() {
     : "Nothing is scheduled until <b>" + esc(runDateLabelIso(resumeIso)) + "</b>, and the plan then starts again from " +
       "week 1 and runs to the date you already have, so it gets shorter rather than later." +
       (t.id === "reentry" ? " With a break this long the rebuild also starts you further back." : ""));
+  // §10 piece 4: with no race there is no target date to keep.
+  const keepOpt = (profile.noRace === true) ? "" : keep;
   const nothing = opt("none", t.id === "nudge", "Leave my plan alone",
     "Nothing is removed and nothing moves. The sessions you are away for stay in the plan and you " +
     "pick up wherever you are when you get back.");
@@ -16972,7 +17255,7 @@ function pausePlanHtml() {
         '" data-pausedays="' + d + '" aria-pressed="' + (d === days) + '">' + pauseDaysLabel(d) + '</button>').join("") +
     '</div>' +
     '<div class="po-verdict"><b>' + t.head + '</b><span>' + t.why + '</span></div>' +
-    pickup + shift + keep + nothing +
+    pickup + shift + keepOpt + nothing +
     '<p class="mp-note">Whichever you pick, nothing is saved until you choose it, and you can undo it ' +
     'from the toast straight afterwards.</p>';
 }
@@ -16995,12 +17278,15 @@ function applyPause(kind) {
   const days = PAUSE_DAYS;
   const before = { raceDate: profile.raceDate, returning: profile.returning,
     startDateIso: profile.startDateIso, blockFromIso: profile.blockFromIso, pauseWeeks: profile.pauseWeeks,
+    // §10 piece 4: a plan with no race moves its road (pauseChanges), so the Undo puts the road back too.
+    road: JSON.stringify(profile.road || null),
     overrides: JSON.stringify(state.dayOverride || {}) };
   // The profile as it was, for the Undo and for a rebuild that throws (which used to leave the start date moved).
   const putBack = () => {
     profile.raceDate = before.raceDate; profile.returning = before.returning;
     profile.startDateIso = before.startDateIso;
     profile.blockFromIso = before.blockFromIso; profile.pauseWeeks = before.pauseWeeks;
+    try { profile.road = JSON.parse(before.road); } catch (e) {}
   };
   if (kind === "none") { closeSheet(); toast("Nothing changed — pick up with today's session."); return; }
   const ticks = todayTicks();
@@ -17031,7 +17317,8 @@ function applyPause(kind) {
   seedDone(); restoreTicks(ticks); saveProfileStore();
   closeSheet();
   const msg = kind === "pickup" ? "Paused. You pick up in week " + week + " on " + runDateLabelIso(ch.startDateIso) + "."
-    : kind === "shift" ? "Target date moved back " + pauseDaysLabel(days) + "."
+    : kind === "shift" ? ((profile.noRace === true) ? "Paused. Your plan starts again on " + runDateLabelIso(ch.startDateIso) + "."
+      : "Target date moved back " + pauseDaysLabel(days) + ".")
     : ch.blockFromIso ? "Paused until " + runDateLabelIso(ch.startDateIso) + ". Your target date stays the same."
     : "Plan rebuilt to your existing date.";
   toastUndo(msg, () => {
@@ -17177,7 +17464,8 @@ function viewPlans() {
       '<span class="rp-badge" style="--pc:' + planHue(j, isLive) + '">' +
         esc(planBadge(j)) + '</span>' +
       '<span class="rp-mid"><span class="rp-t">' + esc(planName(j)) + '</span>' +
-      '<span class="rp-s">' + j.weeks + (j.weeks === 1 ? " week" : " weeks") +
+      // §10 piece 4: a plan with no race has no length — its weeks are only those laid out so far.
+      '<span class="rp-s">' + (j.prof && j.prof.noRace === true ? "No race" : j.weeks + (j.weeks === 1 ? " week" : " weeks")) +
         (planDistLabel(j) ? " · " + planDistLabel(j) : "") + '</span>' +
       (raceLine(j, isLive) ? '<span class="rp-s">' + esc(raceLine(j, isLive)) + '</span>' : "") +
       (planCreatedIso(j) ? '<span class="rp-s">Created ' + esc(runDateLabelIso(planCreatedIso(j))) + '</span>' : "") +
@@ -17216,6 +17504,8 @@ function viewPlans() {
  */
 function planFinished(j) {
   if (!j || !j.endedIso) return false;
+  // §10 piece 4: a plan with no race has no end of its own — when the runner moves on, it is done, never "stopped early".
+  if (j.prof && j.prof.noRace === true) return true;
   const race = j.prof && j.prof.raceDate;
   if (race) return j.endedIso >= race;
   return j.endedIso >= isoAdd(j.startIso, Math.max(1, Number(j.weeks) || 1) * 7 - 7).toISOString().slice(0, 10);
@@ -17235,8 +17525,9 @@ function queueCard(q, upIdx) {
   return '<div class="rp-card">' +
     '<span class="rp-badge" style="--pc:' + planHue(j, false) + '">' + esc(planBadge(j)) + '</span>' +
     '<span class="rp-mid"><span class="rp-t">' + esc(name) + '</span>' +
-      '<span class="rp-s">' + (q.weeks ? q.weeks + (q.weeks === 1 ? " week" : " weeks") : "") +
-        (planDistLabel(j) ? (q.weeks ? " · " : "") + planDistLabel(j) : "") + '</span>' +
+      // §10 piece 4: a plan with no race saved for later has no length either.
+      '<span class="rp-s">' + (pf.noRace === true ? "No race · " : q.weeks ? q.weeks + (q.weeks === 1 ? " week" : " weeks") : "") +
+        (planDistLabel(j) ? (q.weeks && pf.noRace !== true ? " · " : "") + planDistLabel(j) : "") + '</span>' +
       (race ? '<span class="rp-s">' + esc(race) + '</span>' : "") +
       '<span class="rp-s">' + esc(when) + '</span></span>' +
     '<span class="rp-acts">' +
@@ -17362,7 +17653,7 @@ function queueRemove(id) {
 }
 /** The plan next in line after this one's race: the first marked to start after it. */
 function queueNext() { return loadQueue().find((q) => q.status === "upcoming") || null; }
-function queueName(q) { return (q && q.name) ? String(q.name) : planName({ goal: q && q.prof && q.prof.goalDist }); }
+function queueName(q) { return (q && q.name) ? String(q.name) : planName({ goal: q && q.prof && q.prof.goalDist, prof: q && q.prof }); }
 /**
  * The dates a stored plan starts on and races to. ⚠️ A RACE DAY ON OR BEFORE THE START IS PULLED FORWARD by the
  * plan's own length, as reusePlan always did: a target in the past builds a plan with no weeks in it.
@@ -17376,13 +17667,15 @@ function storedDates(src, startIso) {
 /** The state a start writes over, kept whole so Undo can put every part of it back. */
 function adoptSnapshot() {
   const get = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  return { prof: planProfSnapshot(), stateAt: profile.stateAt, stateSig: profile.stateSig,
+  // §10 piece 4: and the road, which a start now sets (adoptProf) — Undo puts it back as it was.
+  return { prof: planProfSnapshot(), road: JSON.stringify(profile.road || null), stateAt: profile.stateAt, stateSig: profile.stateSig,
     journal: get(JOURNAL_KEY), queue: get(QUEUE_KEY), handover: get(HANDOVER_KEY),
     overrides: JSON.stringify(state.dayOverride || {}) };
 }
 function adoptRestore(snap) {
   for (const k of PLAN_PROF_FIELDS) { if (snap.prof[k] === undefined) delete profile[k]; else profile[k] = snap.prof[k]; }
   profile.stateAt = snap.stateAt; profile.stateSig = snap.stateSig;
+  if (snap.road !== undefined) { try { profile.road = JSON.parse(snap.road); } catch (e) {} }
   const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   put(JOURNAL_KEY, snap.journal); put(QUEUE_KEY, snap.queue); put(HANDOVER_KEY, snap.handover);
   // ⚠️ THE OVERRIDES GO BACK BEFORE THE REBUILD: applyCrossWeekMoves reads the store (B4's lesson).
@@ -17411,10 +17704,23 @@ function adoptProf(prof, o) {
     if (keepState && RUNNER_STATE_FIELDS.indexOf(k) >= 0) continue;
     profile[k] = prof[k];
   }
-  profile.raceDate = o.raceDate;
+  // ⚠️⚠️ §10 PIECE 4 — THE KIND OF PLAN IS THE STORED PLAN'S. A plan stored before plans could have no race is a race plan
+  // (its answers have no key), so the key is set or cleared here — never left over from the plan being replaced. With no
+  // race there is no date to invent (storedDates would make one up), and the plan IS its road: a new one is made here,
+  // from the day it starts. A road of the other kind is never carried over (roadOf would refuse it anyway); a race plan
+  // started over a road with no race gets the road the wizard would give it, where its runway is long enough.
+  if (prof.noRace === true) profile.noRace = true; else delete profile.noRace;
+  profile.raceDate = profile.noRace ? "" : o.raceDate;
   profile.startDateIso = o.startIso;
   profile.blockFromIso = ""; profile.pauseWeeks = 0;
   profile.bRace = null;
+  if (profile.noRace) {
+    const prop = roadProposalFor(Object.assign({}, profile, { road: null }));
+    profile.road = prop ? roadFromProposal(prop, profile) : null;
+  } else if (profile.road && profile.road.noRace === true) {
+    const prop = roadProposalFor(Object.assign({}, profile, { road: null }));
+    profile.road = prop && !(prop.shortWeeks > 0) ? roadFromProposal(prop, profile) : null;
+  }
   const ticks = todayTicks();
   try { recompute({ newPlan: true }); } catch (e) { adoptRestore(snap); return null; }
   if (o.name) { const rows = loadJournals(); if (rows[0] && !rows[0].endedIso) journalUpdate(rows[0].sig, { name: o.name }); }
@@ -17445,9 +17751,13 @@ function planStartSheet(src) {
   ensureSheet(); SHEET_CTX = null;
   $("sheetBody").innerHTML = '<div class="eyebrow">Your plans</div>' +
     '<h3 class="sheet-h">' + esc(src.title) + '</h3>' +
-    '<p class="mp-note">' + (src.weeks ? esc(src.weeks + " weeks") + ". " : "") +
+    // §10 piece 4: a plan with no race has no race day (storedDates would invent one) and no length — it is laid out a
+    // block at a time from the day it starts.
+    (src.prof && src.prof.noRace === true
+      ? '<p class="mp-note">No race: it is laid out a block at a time from the day it starts, with a checkpoint at the end of each block.</p>'
+      : '<p class="mp-note">' + (src.weeks ? esc(src.weeks + " weeks") + ". " : "") +
       (d.stale ? "Its race day has passed, so starting it today sets a new one: <b>" + esc(runDateLabelIso(d.raceDate)) + "</b>."
-        : "Race day: <b>" + esc(runDateLabelIso(d.raceDate)) + "</b>.") + '</p>' +
+        : "Race day: <b>" + esc(runDateLabelIso(d.raceDate)) + "</b>.") + '</p>') +
     (storedFitnessLine(src) ? '<p class="mp-note">' + esc(storedFitnessLine(src)) + '</p>' : "") +
     '<button class="primary" id="psNow">Start it today</button>' +
     (after ? '<button class="ctrl ps-alt" id="psAfter">Start it after your race on ' + esc(runDateLabelIso(liveRace)) + '</button>' : "") +
@@ -17620,7 +17930,9 @@ function handoverCard() {
   const opts = [];
   if (q.next) {
     const d = storedDates({ prof: q.next.prof, weeks: q.next.weeks }, todayIso());
-    opts.push({ id: "next", t: "Start " + nameOf(q.next), s: "It starts today, with race day on " + runDateLabelIso(d.raceDate) + "." });
+    opts.push({ id: "next", t: "Start " + nameOf(q.next), s: q.next.prof && q.next.prof.noRace === true
+      // §10 piece 4: a plan with no race next has no race day to quote.
+      ? "It starts today, with no race: laid out a block at a time." : "It starts today, with race day on " + runDateLabelIso(d.raceDate) + "." });
   } else if (q.saved) {
     opts.push({ id: "saved", t: "Start one of your saved plans", s: q.saved === 1 ? "You have one in Your plans." : "You have " + q.saved + " in Your plans." });
   } else {
@@ -18002,11 +18314,14 @@ function viewPlan() {
   const phaseLegend = phasesInPlan.map((ph) =>
     '<span class="phase-key" style="--phase:' + PHASE[ph] + '"><i aria-hidden="true"></i>' + phaseNames[ph] +
     '<b class="pk-wk">' + phaseRange(ph) + '</b></span>').join("")
-    + '<span class="phase-key" style="--phase:var(--rest)"><i aria-hidden="true"></i>Race day</span>';
+    // §10 piece 4: a plan with no race has no race day to mark.
+    + (g.noRace ? "" : '<span class="phase-key" style="--phase:var(--rest)"><i aria-hidden="true"></i>Race day</span>');
   // The coach's note: the block should visibly END on the race. It does now — race day is a real
   // session in the last week (see applyRaceDay), so the final bar is flagged and the chart closes
   // with a race marker rather than trailing off into an unexplained short week.
-  const raceWeekIdx = shown.length - 1;
+  // ⚠️ §10 PIECE 4: ONLY A PLAN WITH A RACE ENDS ON ONE. With no race the last week laid out is an ordinary week of the next
+  // block, and flagging it by position put a 🏁 on it.
+  const raceWeekIdx = g.noRace ? -1 : shown.length - 1;
   const bars = shown.map((w, i) => {
     const phaseStart = i === 0 || shown[i - 1].phase !== w.phase;
     const h = Math.max(6, Math.round(w.distanceKm / peak * 100));
@@ -18015,7 +18330,7 @@ function viewPlan() {
     return '<button class="bar-btn' + (phaseStart ? " phase-start" : "") + (isRace ? " race-week" : "") + '" data-phase="' + w.phase + '" data-wk="' + w.index + '" aria-label="' + aria + '" aria-pressed="' + (w.index===state.planWeek) + '"><div class="bar' + (w.isDeload?" deload":"") + '" style="height:' + h + '%;--phase:' + (isRace ? "var(--rest)" : PHASE[w.phase]) + '"></div><div class="bl">' + (isRace ? "\uD83C\uDFC1" : w.index) + '</div></button>';
   }).join("");
   const lead = s.totalWeeks - s.structuredWeeks;
-  const note = lead >= 2 ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
+  const note = lead >= 2 && !g.noRace ? '<div class="plan-note">Your race is <b>' + s.totalWeeks + ' weeks</b> away — this is your <b>' + s.structuredWeeks + '-week</b> structured build. Until it begins, keep running easy and consistent to bank the base.</div>' : "";
   let srcMsg = "";
   if (profile.status === "new") srcMsg = "Built for a <b>total beginner</b> — walk\\u2013run to start, sharpening as you log runs.";
   else if (profile.status === "building" || profile.noRecent) srcMsg = "Built to <b>grow your consistency</b> — it sharpens as you log runs or record a 2 km trial.";
@@ -18052,17 +18367,43 @@ function viewPlan() {
   // ⚠️ The example banner belongs here too — see examplePlanBanner. This screen is the one a new
   // tester reaches first, and it was the one screen that never said the numbers were invented.
   return examplePlanBanner() +
-    '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' + g.race + ' · ' + g.target + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
-    '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
-    feasibilityWhy() +
-    planActionsHtml() +
-    '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div><div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div></div></div>' +
+    planHeadHtml(g, s) +
     starterNote +
     mileageNote +
     note +
     roadPlanCard() +
     '<h2 class="sec">Training block</h2><div class="card"><div class="chart" id="chart">' + bars + '</div><div class="phase-legend">' + phaseLegend + '</div></div>' +
     '<h2 class="sec">Your weeks</h2><div id="weekDetail">' + weekList() + '</div>';
+}
+/**
+ * The Plan screen's header card.
+ * ⚠️⚠️ §10 PIECE 4 — A PLAN WITH NO RACE SAYS WHAT IT IS, and nothing a race plan would: no race, date or target, no verdict
+ * on a target nobody chose (the engine's feasibility is computed against the end of the weeks laid out, which is not a
+ * race), no plan length or peak (a rolling plan has neither), no race pace. It says the week the runner is in, this
+ * week's running and the easy pace, which is the pace most of it is run at.
+ * ⚠️ AND A RACE PLAN WITH NO TARGET CHOSEN NO LONGER SHOWS A WORKED-OUT TIME AS ITS GOAL (found on the way, 2026-11-19): a
+ * habit-builder who left the time blank was shown "Half marathon · 2:31:00", a Riegel projection, as if they had set
+ * it — with a verdict on it and its race pace. targetChosen is the one definition (the checkpoint's honest target
+ * already reads it).
+ */
+function planHeadHtml(g, s) {
+  if (g.noRace) {
+    const cw = PLAN.weeks[CURRENT_WEEK] || PLAN.weeks[firstShownWeek()] || {};
+    return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">Keep getting fitter · ' + esc(RACE_LABEL[profile.goalDist] || g.race) + '</div>' +
+      '<div class="when">No race · laid out a block at a time</div>' +
+      planActionsHtml() +
+      '<div class="statrow"><div class="stat"><div class="k">Week</div><div class="v num">' + (cw.index || 1) + '</div></div>' +
+      '<div class="stat"><div class="k">This week</div><div class="v num">' + (Number(cw.distanceKm) || 0).toFixed(1) + ' km</div></div>' +
+      '<div class="stat"><div class="k">Easy pace</div><div class="v num">' + esc(String(PLAN.paces.easy || "").replace("/km", "")) + '</div></div></div></div>';
+  }
+  const chosen = targetChosen(profile);
+  return '<div class="card plan-head"><div class="eyebrow">Your plan</div><div class="goal">' +
+    (chosen ? g.race + ' · ' + g.target : esc(FINISH_LABEL[profile.goalDist] || g.race)) + '</div><div class="when">' + g.raceDate + ' · ' + s.structuredWeeks + '-week plan</div>' +
+    (chosen ? '<span class="pill" style="--pc:' + (PLAN.feasibility.verdict==="achievable"?"var(--accent)":"var(--peak)") + '">' + PLAN.feasibility.verdict + '</span>' +
+      feasibilityWhy() + planActionsHtml() : planActionsHtml()) +
+    '<div class="statrow"><div class="stat"><div class="k">Weeks</div><div class="v num">' + s.structuredWeeks + '</div></div><div class="stat"><div class="k">Peak/wk</div><div class="v num">' + s.peakKm + ' km</div></div>' +
+    (chosen ? '<div class="stat"><div class="k">Goal pace</div><div class="v num">' + PLAN.paces.goal.replace("/km","") + '</div></div>'
+      : '<div class="stat"><div class="k">Easy pace</div><div class="v num">' + String(PLAN.paces.easy || "").replace("/km","") + '</div></div>') + '</div></div>';
 }
 // The training-block chart scrolls horizontally, so a long plan renders it at week 1 while
 // state.planWeek is usually the CURRENT week — leaving "Week detail" naming a week whose highlighted
@@ -18262,7 +18603,8 @@ function pausedWeekRow() {
 }
 
 function weekList() {
-  const raceIdx = PLAN.weeks.length;
+  // §10 piece 4: with no race, no week is race week.
+  const raceIdx = PLAN.goal && PLAN.goal.noRace ? -1 : PLAN.weeks.length;
   // state.planWeek of 0 means nothing is open, which is a legitimate state: the chart still shows the
   // shape of the block and every week reads as a one-line summary.
   return pausedWeekRow() + PLAN.weeks.slice(firstShownWeek()).map((w) =>
@@ -24000,7 +24342,8 @@ function planProfSnapshot() {
 function planName(j) {
   if (j && j.name) return String(j.name);
   const g = j && j.goal;
-  return (RACE_LABEL[g] || "Training") + " plan";
+  // §10 piece 4: a plan with no race is named for what it builds ("10 km fitness plan"), not as a race plan.
+  return (RACE_LABEL[g] || "Training") + (j && j.prof && j.prof.noRace === true ? " fitness plan" : " plan");
 }
 function planCreatedIso(j) { return (j && (j.createdIso || j.startIso)) || ""; }
 function planDistLabel(j) {
@@ -24337,7 +24680,8 @@ function commProfile() {
   const weeks = PLAN && PLAN.weeks ? PLAN.weeks.length : 0;
   const wk = weeks ? Math.min(weeks, CURRENT_WEEK + 1) : 0;
   const goal = RACE_LABEL[profile.goalDist] || "";
-  const plan = (goal && weeks) ? goal.toLowerCase() + " block, week " + wk + " of " + weeks : "";
+  // §10 piece 4: a plan with no race has no length to quote ("week 3 of 8" was the weeks laid out so far).
+  const plan = (goal && weeks) ? ((profile.noRace === true) ? goal.toLowerCase() + " fitness, week " + wk : goal.toLowerCase() + " block, week " + wk + " of " + weeks) : "";
   return { name: name, initials: initials(name) || "–", avatar: profile.avatar || "", plan: plan };
 }
 /**
@@ -24819,6 +25163,8 @@ function profPlanStatus() {
   if (!PLAN || !PLAN.weeks || !PLAN.weeks.length) return "No plan yet";
   const total = PLAN.weeks.length;
   const wk = TODAY_IN_PLAN ? curWeekNo() : null;
+  // §10 piece 4: a plan with no race has no length — "of 8" was only the weeks laid out so far.
+  if ((profile.noRace === true)) return (RACE_LABEL[profile.goalDist] || "") + " fitness" + (wk ? " \u00b7 Week " + wk : "");
   return (RACE_LABEL[profile.goalDist] || "") + " plan" +
     (wk ? " \u00b7 Week " + wk + " of " + total : " \u00b7 " + total + " weeks");
 }
@@ -28515,7 +28861,7 @@ function viewSetup() {
 
   // 3 · Your goal (goalCardInner supplies its own inner markup; keep the id for syncStatus)
   const secGoal = goalCardInner(p.status || "regular", { dist: p.goalDist, date: p.raceDate,
-    target: targetChosen(p) ? fmtTimeFull(p.targetS) : "" });
+    target: targetChosen(p) ? fmtTimeFull(p.targetS) : "", noRace: (p.noRace === true) });
 
   // 4 · A few details
   // ⚠️ THE FORM'S SECTIONS NOW MATCH THE PROFILE PAGE'S ROWS, which is what makes a scoped
@@ -28913,9 +29259,22 @@ function draftFromForm() {
   // byte-identical. goalsForAge returns its argument untouched for an adult, so for them this line
   // IS the old one; only a 12-17 answer can move.
   const goalDist = goalsForAge([rawGoal]).length ? rawGoal : goalsForAge(goalCfg.dists)[0];
+  // ⚠️⚠️ §10 PIECE 4 — A PLAN WITH NO RACE: no date and no time to read. Its target is the engine's own (Goal needs one, and a
+  // road with no race reads none), NEVER SHOWN (targetSet false). The wizard asks which kind; the profile form keeps the
+  // plan's own. ⚠️ AND NEVER FOR A 12–17 RUNNER: an age changed on the profile form of a plan with no race is refused here,
+  // before anything is saved — the plan's builders do not carry a young runner's limits (YOUTH.md).
+  // (goalNoRaceNow's rule, inline: the wizard's answer, until given the plan's own kind; a young runner in the wizard was
+  // never asked, so gets the race plan the goal step showed.)
+  const wantsNoRace = state.screen === "wizard" ? (draft.goalkind ? draft.goalkind === "norace" : profile.noRace === true) : profile.noRace === true;
+  const youthNow = wantsNoRace && !!RC.youthLimitsFor(RC.ageAnswer(wizFieldVal("s_age")));
+  if (youthNow && state.screen !== "wizard") {
+    throw new Error("A plan with no race is for runners 18 and over. To keep training, start a new plan with a race in plan setup.");
+  }
+  const noRace = wantsNoRace && !youthNow;
   let targetS, targetSet;
-  const targetRaw = goalCfg.time ? wizFieldVal("s_target").trim() : "";
-  if (goalCfg.time === "optional" && !targetRaw) {
+  const targetRaw = goalCfg.time && !noRace ? wizFieldVal("s_target").trim() : "";
+  // §10 piece 4: and with no race there is no time to ask for — the engine's own target, never shown.
+  if (noRace || (goalCfg.time === "optional" && !targetRaw)) {
     // ⚠️ BLANK IS A REAL ANSWER, AND IT STILL LEAVES THE ENGINE A TARGET. Goal.targetTimeSeconds is
     // required; what blank turns off is showing it back as a goal, which targetSet records.
     targetS = derivedGoalS(recentTimeS, goalDist, volRaw);
@@ -28930,20 +29289,20 @@ function draftFromForm() {
     targetS = derivedGoalS(recentTimeS, goalDist, volRaw);
     targetSet = false;
   }
-  const raceDate = wizFieldVal("s_date");
-  if (!raceDate) throw new Error("Pick your " + (goalCfg.time === true ? "race" : "target") + " date.");
-  if (raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time === true ? "race" : "target") + " date needs to be in the future.");
+  const raceDate = noRace ? "" : wizFieldVal("s_date");
+  if (!noRace && !raceDate) throw new Error("Pick your " + (goalCfg.time === true ? "race" : "target") + " date.");
+  if (!noRace && raceDate <= todayIso()) throw new Error("Your " + (goalCfg.time === true ? "race" : "target") + " date needs to be in the future.");
   const _ld = wizFieldVal("s_longday");
   const longRunDay = _ld !== "" ? Number(_ld) : (profile.longRunDay != null ? profile.longRunDay : 6);
   const strengthDays = Math.max(0, Math.min(RC.STRENGTH_MAX_PER_WEEK, Number(draft.strength) || 0));
   const startDateIso = formStartIso(wizFieldVal("s_startdate"), state.screen === "wizard", profile.startDateIso || "", todayIso());
-  if (startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
+  if (!noRace && startDateIso && startDateIso >= raceDate) throw new Error("Your start date needs to be before your race date.");
   // ⚠️ PAUSE: AN EDIT KEEPS WHERE THE BLOCK IS LAID OUT FROM (blockStartIso) while the start is unchanged. This
   // object replaces the profile whole, so a field it leaves out is gone: saving a new name after a pause that
   // picked up would have started the block again from week 1, formStartIso's own defect one field over. A new
   // plan (the wizard) or a new start date lays the block out from that start.
   const keepsBlock = state.screen !== "wizard" && startDateIso === (profile.startDateIso || "") && !!profile.blockFromIso;
-  return {
+  const out = {
     // ⚠️ B7: AND AN EDIT KEEPS THE RUNNER'S B-RACE — the same whole-object replacement would drop it. A new plan does
     // not: its weeks are different, and the race is the runner's to add to it again.
     bRace: state.screen !== "wizard" && profile.bRace ? profile.bRace : null,
@@ -29007,6 +29366,19 @@ function draftFromForm() {
     road: state.screen === "wizard" ? null : (profile.road || null),
     personalized: true,
   };
+  if (noRace) {
+    // ⚠️ §10 PIECE 4 — A PLAN WITH NO RACE SAYS SO (isNoRace; a race plan carries no key at all), and has no B-race: there
+    // is no main race for one to be on the way to.
+    out.noRace = true;
+    out.bRace = null;
+    // ⚠️ A ROAD WITH NO RACE THAT HAS NOT BEGUN starts on the plan's new first Monday. A race road is laid back from race
+    // day; this one is laid FORWARD from its first Monday, and a start moved before it began would leave the weeks
+    // before it empty. One that has begun, or has an answer, keeps its weeks.
+    const r = out.road;
+    if (r && r.noRace === true && !(r.checkpoints || []).length && startDateIso && r.fromIso > weekMondayOf(todayIso()))
+      out.road = Object.assign({}, r, { fromIso: weekMondayOf(startDateIso) });
+  }
+  return out;
 }
 /**
  * Keep what the runner has typed into the setup form across a trip to another tab.
@@ -29417,15 +29789,48 @@ function goalsForAge(dists) {
   // RC.screenRedFlags bare, one screen earlier.
   return RC.youthGoalsFrom(dists, currentAgeAnswer());
 }
+/**
+ * ⚠️ §10 PIECE 4 — IS THE GOAL BEING SET ONE WITH NO RACE? In the wizard, the runner's answer to "Are you training for a
+ * race?" (draft.goalkind), until they answer the kind of plan they are on; on the profile form, the plan's own kind — it
+ * cannot be switched there (an existing plan changes kind only through plan setup). Never for a 12–17 runner.
+ */
+function goalNoRaceNow() {
+  if (RC.youthLimitsFor(currentAgeAnswer())) return false;
+  if (state.screen === "wizard") return draft.goalkind ? draft.goalkind === "norace" : isNoRace(profile);
+  return isNoRace(profile);
+}
+/** §10 piece 4: is "Are you training for a race?" asked here — in the wizard, of an adult. */
+function goalKindAsked() { return state.screen === "wizard" && !RC.youthLimitsFor(currentAgeAnswer()); }
 function goalCardInner(status, cur) {
   const cfg = GOAL_BY_STATUS[status] || GOAL_BY_STATUS.regular;
   const dists = goalsForAge(cfg.dists);
   let dist = cur.dist; if (dists.indexOf(dist) < 0) dist = dists[0];
+  // ⚠️⚠️ §10 PIECE 4 — RACE, OR NO RACE (the owner, 2026-11-19: "yes, all your picks"). Asked FIRST, IN THE WIZARD ONLY, OF
+  // AN ADULT ONLY (cur.askKind — goalKindAsked): a plan with no race is a road with no end, and RC.roadNoRaceFor never
+  // places a 12–17 runner. With no race (cur.noRace — goalNoRaceNow) there is one question, the distance to be fit for,
+  // and no date and no time (decision 2: no target). ⚠️ THE CALLERS DECIDE BOTH, so a card drawn without them is
+  // exactly the race card it always was.
+  const noRace = !!cur.noRace;
+  const ask = cur.askKind
+    ? '<div class="q" style="margin-top:0"><label>Are you training for a race?</label>' +
+      seg("goalkind", [["race", "Training for a race"], ["norace", "No race — keep getting fitter"]], noRace ? "norace" : "race") + '</div>'
+    : "";
+  const top = ask ? "" : ' style="margin-top:0"';
+  if (noRace) {
+    const fit = dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + RACE_LABEL[k] + '</option>').join("");
+    // ⚠️ THE NOTE SITS INSIDE THE DISTANCE'S OWN QUESTION: the profile page's "Your goal" row shows only the questions that
+    // hold one of its fields (applySetupFocus), and a note in a question of its own was hidden there — the one place a
+    // runner editing a plan with no race reads what it is.
+    return ask + '<div class="q"' + top + '><label>The distance you want to be fit for</label><select class="sel" id="s_dist">' + fit + '</select>' +
+      '<div class="mas-hint" style="margin-top:8px">No race date and no target time. Your plan is laid out a block at a time: each block ' +
+      'ends with a checkpoint and a test run, and you choose what comes next.' +
+      (cur.askKind ? "" : " To train for a race instead, start a new plan in plan setup.") + '</div></div>';
+  }
   // ⚠️ === true, NOT TRUTHY. "building" now carries "optional", and a habit-builder's dropdown must
   // still read as finishing the distance — his card says "focused on being consistent", and the time
   // is an extra they may add rather than the frame of the question.
   const opts = dists.map((k) => '<option value="' + k + '"' + (k === dist ? " selected" : "") + '>' + (cfg.time === true ? RACE_LABEL[k] : FINISH_LABEL[k]) + '</option>').join("");
-  let h = '<div class="q" style="margin-top:0"><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
+  let h = ask + '<div class="q"' + top + '><label>' + cfg.q + '</label><select class="sel" id="s_dist">' + opts + '</select></div>';
   if (cfg.time === "optional") {
     // ⚠️ THE PILL SAYS OPTIONAL AND THE HINT SAYS WHAT BLANK MEANS, because a time box with no such
     // note reads as a question you have to answer — which is the pressure the old copy existed to
@@ -29519,6 +29924,7 @@ function refreshGoalBlock(st) {
       dist: $("s_dist") ? $("s_dist").value : profile.goalDist,
       date: $("s_date") ? $("s_date").value : profile.raceDate,
       target: $("s_target") ? $("s_target").value : (targetChosen(profile) ? fmtTimeFull(profile.targetS) : ""),
+      noRace: goalNoRaceNow(), askKind: goalKindAsked(),
     };
     gb.innerHTML = goalCardInner(st, cur);
     // ⚠️ RE-LINK. This block is rebuilt after wire() has run, so the labels inside it were
@@ -29639,6 +30045,32 @@ function wizHero(eyebrow, title, badge) {
 }
 // Generate 2-3 real plans by running applyProfile at different day counts. Deduped where a beginner cap
 // collapses two counts to the same plan. draft.days is set temporarily per candidate and restored.
+/**
+ * §10 PIECE 4 — WHERE A PLAN WITH NO RACE IS GOING, said before it is saved: { climbWeeks, startKm, holdKm, holdLongMin },
+ * or null. Measured on the engine's own weeks — the road laid out past its climb (RC.roadNoRaceFor), the hold read from
+ * its full weeks after the climb (a lighter week is not the hold) — never estimated. The wizard's cards and its summary
+ * read it, so what the runner picks from is what the plan builds.
+ */
+function noRaceOutlook(pf) {
+  try {
+    const out = applyProfile(Object.assign({}, pf, { road: null }));
+    const from = blockStartIso(pf);
+    const prop = RC.roadNoRaceFor(out.ath, out.goal, from);
+    if (!prop) return null;
+    const stages = prop.stages.map((s) => ({ kind: s.kind, weeks: s.weeks }));
+    const total = () => stages.reduce((n, s) => n + s.weeks, 0);
+    while (total() < prop.climbWeeks + 8) { const k = RC.noRaceNextKind(stages[stages.length - 1].kind); stages.push({ kind: k, weeks: RC.noRaceBlockWeeks(k) }); }
+    const p = RC.generatePlan(out.ath, out.goal, { road: { noRace: true, fromIso: weekMondayOf(from), stages: stages, rampWeeks: prop.rampWeeks } });
+    const full = (w) => w && !w.isDeload;
+    const km = (w) => Math.round((Number(w.plannedDistanceMeters) || 0) / 1000);
+    const longOf = (w) => Math.round(Math.max(0, ...w.sessions.filter((s) => s.type === "long").map((s) => (s.estimatedDurationSeconds || 0) / 60)));
+    const held = p.weeks.slice(prop.climbWeeks).filter(full);
+    const first = p.weeks.slice(1).find(full) || p.weeks[0];
+    if (!held.length || !first) return null;
+    return { climbWeeks: prop.climbWeeks, startKm: km(first),
+      holdKm: Math.round(held.reduce((n, w) => n + km(w), 0) / held.length), holdLongMin: Math.max(...held.map(longOf)) };
+  } catch (e) { return null; }
+}
 function wizVariants() {
   const st = draft.status || "regular";
   let cand, rec;
@@ -29656,10 +30088,12 @@ function wizVariants() {
     const sum = (out.plan && out.plan.summary) ? out.plan.summary : {};
     const weeks = sum.structuredWeeks || sum.totalWeeks || (out.plan && out.plan.weeks ? out.plan.weeks.length : 0);
     const peak = Math.round(sum.peakKm || 0);
-    const key = weeks + ":" + peak;
+    // §10 piece 4: a plan with no race has no length and no peak — it says where it starts and what it builds to.
+    const nr = goalNoRaceNow() ? noRaceOutlook(draftFromForm()) : null;
+    const key = nr ? nr.startKm + ":" + nr.holdKm : weeks + ":" + peak;
     if (seen[key]) continue;
     seen[key] = true;
-    built.push({ days: d, weeks: weeks, peak: peak, rec: d === rec });
+    built.push({ days: d, weeks: weeks, peak: peak, rec: d === rec, nr: nr });
   }
   draft.days = savedDays;
   if (built.length && !built.some((v) => v.rec)) built[Math.floor(built.length / 2)].rec = true;
@@ -29831,7 +30265,8 @@ function wizBody(id, p, st) {
       '<select class="sel" id="s_age" style="max-width:140px">' + ageOpts(Number(wizFieldVal("s_age")) || p.age) + '</select></div>';
   }
   if (id === "goal") {
-    const cur = { dist: wizFieldVal("s_dist") || p.goalDist, date: wizFieldVal("s_date") || p.raceDate || "", target: wizFieldVal("s_target") || "" };
+    const cur = { dist: wizFieldVal("s_dist") || p.goalDist, date: wizFieldVal("s_date") || p.raceDate || "", target: wizFieldVal("s_target") || "",
+      noRace: goalNoRaceNow(), askKind: goalKindAsked() };
     return '<p class="wz-lead">What are you working towards?</p>' +
       '<div id="goalBody" class="wz-fields">' + goalCardInner(st || "regular", cur) + '</div>';
   }
@@ -29866,7 +30301,8 @@ function wizBody(id, p, st) {
   }
   if (id === "plan") {
     const vars = wizVariants();
-    if (!vars.length) return '<p class="wz-lead">We couldn\\u2019t build a plan from those answers \— go back and check your goal date is far enough ahead.</p>';
+    if (!vars.length) return '<p class="wz-lead">We couldn\\u2019t build a plan from those answers \— go back and check ' +
+      (goalNoRaceNow() ? "them" : "your goal date is far enough ahead") + '.</p>';
     if (!draft.days) { const r = vars.find((v) => v.rec) || vars[Math.floor(vars.length / 2)]; if (r) draft.days = String(r.days); }
     const sel = Number(draft.days), minDays = vars[0].days;
     const cards = vars.map((v) => {
@@ -29877,7 +30313,7 @@ function wizBody(id, p, st) {
       return '<button type="button" class="wz-plan' + (v.days === sel ? " on" : "") + (v.rec ? " rec" : "") + '" data-wizdays="' + v.days + '">' +
         '<div class="wz-plan-tag">' + label + '</div>' +
         '<div class="wz-plan-h">' + v.days + ' runs / week</div>' +
-        '<div class="wz-plan-meta">' + v.weeks + ' weeks \\u00b7 peak ' + v.peak + ' km</div></button>';
+        '<div class="wz-plan-meta">' + (v.nr ? noRaceMeta(v.nr) : v.weeks + ' weeks \\u00b7 peak ' + v.peak + ' km') + '</div></button>';
     }).join("");
     return '<p class="wz-lead">Each is a real plan we\\u2019ve built for you. Pick the rhythm that fits your week \— you can change it later.</p><div class="wz-plans">' + cards + '</div>';
   }
@@ -29912,12 +30348,16 @@ function wizBody(id, p, st) {
     // something it is not.
     const days = dayAnswerOf({ status: draft.status || profile.status, daysPerWeek: Number(draft.days) }) || 0;
     const goalLbl = (GOAL_BY_STATUS[st] && GOAL_BY_STATUS[st].time === true) ? RACE_LABEL[dist] : FINISH_LABEL[dist];
+    // ⚠️ §10 PIECE 4: A PLAN WITH NO RACE HAS NO LENGTH AND NO PEAK — its weeks are the two blocks laid out so far. It says
+    // what a block is, and the running a week it builds to (noRaceOutlook, from the engine's own weeks).
+    const nrOut = goalNoRaceNow() ? (() => { try { return noRaceOutlook(draftFromForm()); } catch (e) { return null; } })() : null;
+    const tile = (n, l) => '<div class="wz-sum-tile"><div class="wz-sum-n">' + n + '</div><div class="wz-sum-l">' + l + '</div></div>';
     return '<div class="wz-summary">' +
-      '<div class="wz-sum-goal">' + esc(goalLbl || "Your plan") + '</div>' +
+      '<div class="wz-sum-goal">' + esc(goalNoRaceNow() ? "Keep getting fitter · " + (RACE_LABEL[dist] || "") : (goalLbl || "Your plan")) + '</div>' +
       '<div class="wz-sum-grid">' +
-        '<div class="wz-sum-tile"><div class="wz-sum-n">' + weeks + '</div><div class="wz-sum-l">weeks</div></div>' +
-        '<div class="wz-sum-tile"><div class="wz-sum-n">' + days + '</div><div class="wz-sum-l">runs / week</div></div>' +
-        '<div class="wz-sum-tile"><div class="wz-sum-n">' + peak + '</div><div class="wz-sum-l">peak km</div></div>' +
+        (goalNoRaceNow()
+          ? tile(RC.BLOCK_WEEKS, "weeks a block") + tile(days, "runs / week") + tile(nrOut ? nrOut.holdKm : "—", "km a week, built up")
+          : tile(weeks, "weeks") + tile(days, "runs / week") + tile(peak, "peak km")) +
       '</div>' + roadHtml +
       '</div>' +
       // ⚠️ B9: SAVE IT FOR LATER, only beside a plan already running — a first plan has nothing to carry on with, and
@@ -29929,6 +30369,12 @@ function wizBody(id, p, st) {
   }
   return "";
 }
+/** §10 piece 4: a plan with no race on a wizard card — "About 12 km a week, building to 18" (noRaceOutlook). */
+function noRaceMeta(o) {
+  return o.climbWeeks > 0 && o.holdKm > o.startKm
+    ? "About " + o.startKm + " km a week, building to " + o.holdKm
+    : "About " + o.holdKm + " km a week";
+}
 function wizStepError(id) {
   const mmss = (s) => /^\\d{1,2}:[0-5]\\d$/.test(s) || /^\\d{1,2}:[0-5]\\d:[0-5]\\d$/.test(s);
   const st = draft.status || "";
@@ -29937,8 +30383,15 @@ function wizStepError(id) {
   if (id === "safety") return wizSafetyAnswered() ? null : "Tick anything that applies, or \\u2018None of these\\u2019.";
   if (id === "level") return st ? null : "Tap the option that fits you best.";
   if (id === "goal") {
+    // §10 piece 4: with no race there is no date or time to check — the distance is a list, always answered.
+    if (goalNoRaceNow()) return null;
     const cfg = GOAL_BY_STATUS[st] || GOAL_BY_STATUS.regular;
-    if (cfg.time && !mmss(wizFieldVal("s_target").trim())) return "Enter your target time, e.g. 1:45:00.";
+    // ⚠️ "optional" MEANS BLANK IS AN ANSWER (draftFromForm takes it), so only a time typed in must read as one. This tested
+    // cfg.time truthy, and "optional" is truthy: "Building the habit" could not leave the box blank, though it says
+    // OPTIONAL (found on the way to §10 piece 4, 2026-11-19).
+    const tt = wizFieldVal("s_target").trim();
+    if (cfg.time === true && !mmss(tt)) return "Enter your target time, e.g. 1:45:00.";
+    if (cfg.time === "optional" && tt && !mmss(tt)) return "Enter your target time as h:mm:ss or m:ss, or leave it blank.";
     const d = wizFieldVal("s_date");
     if (!d) return "Pick your " + (cfg.time ? "race" : "target") + " date.";
     if (d <= todayIso()) return "That date needs to be in the future.";
@@ -30122,7 +30575,10 @@ function wizardFinish() {
   // once the runner has chosen it — wizStepError stops the step until they have.
   pf.road = wizRoadFor(pf);
   let out;
-  try { out = applyProfile(pf); } catch (e) { state.wizErr = "That goal can\\u2019t be planned yet — try a date further ahead."; render(); return; }
+  try { out = applyProfile(pf); } catch (e) {
+    state.wizErr = (pf.noRace === true) ? "That plan can\\u2019t be built from these answers — go back and check them." : "That goal can\\u2019t be planned yet — try a date further ahead.";
+    render(); return;
+  }
   const keptTicks = todayTicks();
   profile = pf; adoptPlan(out, { newPlan: true }); computeToday();
   state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
@@ -43920,7 +44376,9 @@ function addDayEvidence(phase) {
     return {
       daysPerWeek: Number(profile.daysPerWeek) || 5,
       phase: /taper/i.test(phase) ? "taper" : /peak/i.test(phase) ? "peak" : /build/i.test(phase) ? "build" : "base",
-      weeksRemaining: Math.max(0, PLAN.weeks.length - 1 - cur),
+      // ⚠️ §10 PIECE 4: A PLAN WITH NO RACE HAS NO END. Its weeks laid out are the block in hand and the next — four to
+      // eight — so counting them would read as a plan about to end, and the review would never offer a day more.
+      weeksRemaining: (profile.noRace === true) ? 52 : Math.max(0, PLAN.weeks.length - 1 - cur),
       weeksOnPlan: cur,
       recentWeeks,
       experience: experienceFor(profile),
@@ -45918,7 +46376,8 @@ function bindSegButtons(s) {
     // the runner said Yes to a trial; the reminder-time field only when reminders are On. A full
     // re-render is the simplest way to reveal/hide those without wiring per-toggle DOM surgery. Only
     // triggered inside the wizard, so the profile edit form is unchanged.
-    if (state.screen === "wizard" && (s.dataset.set === "trialWant" || s.dataset.set === "wizRemind")) {
+    // §10 piece 4: "Are you training for a race?" changes the questions under it (a race's date and time, or none).
+    if (state.screen === "wizard" && (s.dataset.set === "trialWant" || s.dataset.set === "wizRemind" || s.dataset.set === "goalkind")) {
       captureSetupFields(); render();
     }
     if ((state.screen === "setup" || PROFILE_EDIT_OPEN) && s.dataset.set === "trialWant") {

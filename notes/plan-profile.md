@@ -1331,3 +1331,107 @@ after `#view` (`ensureSheet` appends it to `.app`), so the hidden copy's OLD val
   past the goal step. Measured 2026-11-19 on a clean start (no old sheet involved). `draftFromForm` already treats blank as a
   real answer (`targetSet: false`), so the likely fix is `cfg.time === true` in that one check. Roadmap
   `pc-wizard-optional-target`.
+
+## ✅ §10 — PIECE 4: GOALS WITHOUT A RACE — ROLLING BLOCKS (2026-11-19)
+
+**The owner's answers, 2026-11-19, word for word: "Yes, all your picks"** — to four questions put after the inventory
+(`side-session-notes/…/p4-norace-inventory.md`): **1A** plan setup asks "Training for a race" / "No race — keep getting
+fitter", and with no race one question, the distance to be fit for (no date, no time); **2A** no target — each block's test
+shown beside the last ones; **3A** the block in hand plus the next laid out (4–8 weeks); **4A** climb to race-ready for the
+distance, then hold (sessions rotating, paces from each test). Decided without asking, and told to him: not for 12–17s; no
+B-race on a plan with no race; a pause picks up where you left off; an existing plan changes kind only through plan setup.
+
+### The engine — `generateNoRaceRoadPlan` (src/plan/generate-plan.ts), `roadNoRaceFor` (src/plan/road.ts)
+- `Road.noRace` + `Road.fromIso`: the stages are laid FORWARD from the road's first Monday, one kind per calendar week, by
+  the very builders a race road's foundation uses — lifted out of `generateRoadPlan` unchanged (`roadFoundationWeeks`,
+  `beginnerFoundation`, `roadWalkRunWeeks`). ⚠️ The lift is byte-identical for race roads: 160 race roads (5 runners × 4
+  distances × 4 runways × as-proposed and a week more) compared against the main checkout before committing, 0 differ.
+- **The destination** is the first week of a race block of the book's length (`road.destWeeks ?? RACE_BLOCK_WEEKS`),
+  anchored on the road's FIRST Monday. Measured: anchoring it on the horizon instead changes nothing today (the ref's first
+  week is date-independent), so the anchor is defensive; the guard is the invariant, "the plan never reads the horizon".
+- ⚠️⚠️ **`rampFractions` squeezes a ramp into the weeks it is given** (`end = min(rampEndWeek, schedule.length)`). A race road
+  always hands it every foundation week; a road laid out a block at a time does not, and measured without the fix the climb
+  was compressed into the weeks laid out — the walk-run road's week 11 changed when the road reached its next block. So the
+  foundation is BUILT at least `rampWeeks` long (phantom Base weeks, never kept; every builder walks forward, so they change
+  nothing laid out) and sliced to the weeks laid out.
+- Weeks before the plan's first week are counted (lighter weeks, dose, walk-run levels) and not laid out; the ramp then
+  opens again from the plan's first week, as on a race road (those weeks were not run) — never a longer long run.
+- **12–17: refused** (throws). The foundation builders do not repeat `generatePlanCore`'s youth limits (weekly = 2 × the
+  longest session), so a young runner's plan must stay a race plan. `roadNoRaceFor` is null for them (`roadStartFor`).
+- `roadNoRaceFor`: placed as a race road is (walk-run / Rebuild / Base), the first two blocks, and `rampWeeks` = the road's
+  own need (`roadFoundationNeed` for a beginner, ≥ Rebuild + the shortest Base; `mainFoundationNeed` for a regular runner,
+  0 when already at the race block's opening week). `noRaceNextKind`: walkrun1 → walkrun2 → rebuild → base → base…;
+  `noRaceBlockWeeks`: 5, 4, 4, 4.
+- Measured, climb then hold: building the habit for 10 km, 4 days: 30 → 61-minute long run, ~11 → 15 km a week over 11
+  weeks, then held (lighter weeks every fourth); just getting started for 5 km: 9 weeks of walk-run, then 30 → 50 minutes,
+  ~9 km; a regular runner at 30 km for 10 km holds ~27 km and a 47-minute long run from week 1.
+
+### In the app (web/app.ts)
+- **`profile.noRace === true`** (`isNoRace`), race date `""`, the engine's own target (`targetSet: false`), never shown; in
+  `PLAN_PROF_FIELDS`. ⚠️⚠️ **THE OLDER READERS READ `(profile.noRace === true)` INLINE, NOT `isNoRace()`.** Tests lift each of
+  them into a sandbox holding exactly what it used before, so a race plan's path must call nothing new: the first two full
+  runs failed 8 and then 14 tests on `isNoRace is not defined` / a missing `RC.youthLimitsFor`. Same rule for
+  `goalCardInner` (its callers decide `noRace` and `askKind`), `draftFromForm` (the wizard's answer decided inline) and
+  `applyProfile` (its race line kept as it was; the no-race path in `noRaceGoalRoad`).
+- **The road** `{ v: 1, noRace: true, fromIso, stages, rampWeeks, checkpoints }`; `roadOf` gives it only to a plan with no
+  race and a race road only to a plan with one. `noRaceRoadNow` (from `effectiveRoad`): HELD at an unanswered checkpoint
+  exactly as a race road, but **nothing is taken from what follows** (the blocks after begin later); then extended a block at
+  a time until it reaches a full block past the block in hand — never more.
+- **Answers** (`roadAnswered`): "up" as laid; "more" and "ease" each add a week to THIS block, nothing taken from the next.
+  ⚠️ That is what a race road's "ease" comes to as well: it inserts a 1-week Rebuild, and the hold at the eased Monday
+  consumes it (measured: `r4 r1 b4` stored → `r5 b4` effective). The eased week's row starts on the checkpoint's Monday.
+- **The goal's date** (`noRaceGoalRoad`) is the last day of the weeks laid out — NEVER STORED. Never throws for an adult (a
+  profile with no road yet is given its first two blocks), so a launch cannot fall back to the example plan: checked by a
+  full reload in the browser (week 8 of 12, still no race).
+- **Plan setup**: "Are you training for a race?" (`goalkind`, wizard only, adults only: `goalKindAsked`); the cards and the
+  summary say where it starts and what it builds to, measured from the engine's weeks past the climb (`noRaceOutlook`), and
+  the road card says it (`wizNoRaceRoadHtml`). The profile form keeps the kind (no switch), refuses an age of 12–17 on a plan
+  with no race, and moves a road that has not begun to the new first Monday.
+- **Every reader of the race that said something untrue now copes with none** (the inventory's list): `planHeadHtml` (the
+  Plan screen's header: no race, date, target, verdict, length, peak or race pace), the chart's 🏁 and "Race day" key, the
+  week list's "Race week", `xwRefusal` (the race-week refusal now needs `xwRaceIso()`, not the last week by position),
+  Manage plan (title, no B-race row, the note), Alfie (facts, answer, chip → "When is my next checkpoint?" with its own
+  answer, the online context: goal "No race: getting fitter for 10 km", no target/date/race pace), the pause (pick-up moves
+  the road and its answers' Mondays — `noRaceShifted`; start again is a new road — `noRaceRestart`; no "Keep my target date"),
+  B6 (the same two), a stored plan started again (`adoptProf`: the kind set or cleared, a new road, a race plan over a road
+  with no race gets the wizard's road; Undo restores the road), "Your plans" and after-race (no invented race day; a row
+  says "No race · 10 km", not the weeks laid out so far; a past one is filed under Finished — `planFinished` — never
+  "Stopped early", as it has no end of its own), the
+  profile's line, the club's line and a plan's name ("10 km fitness plan"), the weekly review (open-ended: weeksRemaining 52).
+- **2A, the test trail** (`roadTestTrail`): per block, its latest 2 km, counted 5 km, walk-run key run, or (where time on feet
+  is the runner's test) its longest easy-rated run — on the checkpoint sheet and the Plan screen's road. The road card shows
+  the block before this one onwards, and counts the earlier ones in a line.
+
+### Found on the way and fixed (both in the message the owner answered)
+1. The wizard refused a blank OPTIONAL time for "Building the habit" (`cfg.time` was tested truthy; "optional" is truthy).
+2. The Plan screen showed a worked-out time as the goal (`g.target` with `targetSet: false`), with a verdict on it and its
+   race pace. Now "Complete a 10K", no pill, the easy pace (`targetChosen`, the checkpoint's own rule).
+
+### Tests
+`test/road-norace.test.ts` (8, engine) and `test/road-norace-app.test.ts` (9, the app over the real engine): laid forward,
+no race or taper; adding blocks never changes a week laid out; the horizon never read; climb then hold; each stage's job;
+weeks before the start; placement; never 12–17; held/extended/answered; the weeks through checkpoint answers and a hold, a
+year on; never a race road for a plan with no race; builds without a stored road; plan setup; both fixes; every reader asks.
+**14 of 14 re-breaks caught** (the padding, the horizon, 12–17; the hold taking Base's weeks, promoting, an answer taking a
+week, throwing without a road, a saved race date, the optional time, the worked-out goal, laying out too far ahead; the
+race-week refusal by position, the pause Undo without the road, the weekly review's end).
+
+### Driven in the browser (phone size, light and dark)
+First run → plan setup with no race → the cards ("About 11 km a week, building to 15") → the summary → the Plan screen →
+Manage plan, the pause sheet, Alfie → a seeded road seven weeks in (Base 1's checkpoint: "2 km: 12:10 → 11:42") → "Start
+Base 2" (12 weeks unchanged), Undo, "One more week" and "Ease back" (8 weeks unchanged), a two-week pause (back in week 8),
+the profile form, a full reload. Screenshots: `side-session-notes/…/p4-norace-shots/`.
+
+### ⚠️ Found, NOT fixed (each its own piece of work)
+- **A runner already above a race block's first week is held below what they run** (decision 4's hold is that week): a
+  competitive runner at 55 km a week holds at ~36 km for a marathon focus (~55 for 10 km). A race road's Base does the same,
+  briefly. The owner's call — Road Map `pc-norace-holdcut`.
+- **"Add your easy pace?" loses an answer edited from the Profile page** (a habit-builder with no easy pace): the prompt
+  replaces the edit sheet without `captureSetupFields`, so the save reads the stored answer. Older than this piece; race
+  plans too. Road Map `pc-pace-prompt-edit`.
+- The Plan screen's week list says "Base" for a Rebuild week (it prints the PHASE, and a foundation's phase is "base") —
+  on race roads too.
+
+### For the clinical reviewer (added)
+An open-ended Base held at a race block's opening week, with one quality session a week and a test at the end of every block
+(the rule a race road applies to a few weeks, applied with no end); no plan without a race for 12–17s.

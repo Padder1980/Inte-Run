@@ -6700,6 +6700,51 @@ let EXTRA_READY = false;
  * an all-time best is never lowered by housekeeping.
  */
 const SLOG_MAX_ROWS = 12000;
+/**
+ * ⚠️ THE SET LOG IS HELD IN MEMORY AND THE DISK WRITE IS DEBOUNCED, because the weight box writes on
+ * every KEYSTROKE. Re-parsing and re-stringifying the whole log per character costs most for exactly
+ * the runner who has used the app longest — the same reasoning state.hist records for the run
+ * history, and the same split the run-note field uses: keep the value synchronously, debounce only
+ * the disk. Every path that can lose the page flushes first. See slogAll and slogFlush.
+ * ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), BECAUSE adoptPlan RUNS migrateSlog AT LAUNCH. Beside
+ * slogAll, seven thousand lines down, both sat in their temporal dead zone: the migration threw at every
+ * launch and the try in adoptPlan swallowed it, so it only ever ran on a later rebuild (2026-11-18,
+ * test/launch-order.test.ts).
+ */
+let SLOG = null;
+let SLOG_T = null;
+/**
+ * The strength answers' defaults, for a runner who has said how many strength days they want but not the
+ * rest (see strengthPrefsOf, in the strength preferences).
+ * ⚠️⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(), BECAUSE applyProfile READS THEM. Beside the strength
+ * preferences, twenty-one thousand lines down, they sat in their temporal dead zone at launch: a stored
+ * profile with strengthDays but no strengthMin threw inside applyProfile, and the launch's catch put
+ * DEFAULT_PROFILE in place of the runner's whole profile — their goal, their paces, their name — with
+ * nothing on screen to say so (found 2026-11-18; test/launch-order.test.ts).
+ */
+const STR_DEFAULT_MIN = 45;
+// ⚠️ INTERMEDIATE IS THE NEUTRAL DEFAULT BECAUSE IT REPRODUCES TODAY'S SET COUNTS (2 technique,
+// 3 heavy, 2 maintenance). Beginner would quietly take a set off every session of a runner who never
+// saw the question; advanced would add one.
+const STR_DEFAULT_LEVEL = "intermediate";
+const STR_DEFAULT_GOAL = "running";
+/**
+ * Whether the iPhone app's reminder and watch bridges are there, and the debounce timers of the two
+ * syncs that use them (syncNativeReminders, syncWatch). What each bridge is: its own section below.
+ * ⚠️ DECLARED UP HERE, ABOVE THE FIRST recompute(): adoptPlan calls both syncs, and each reads these on its
+ * first line. Beside them, four thousand lines down, both syncs threw in their temporal dead zone at every
+ * launch and the try in adoptPlan swallowed it; only the launch's closing initReminders() and syncWatch()
+ * covered for it (2026-11-18, test/launch-order.test.ts). Both debounce, so the launch still sends ONE
+ * schedule to iOS and ONE sync to the watch.
+ */
+const NATIVE_NOTIFY = (function () {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunNotify); } catch (e) { return false; }
+})();
+let NOTIFY_SYNC_T = null;
+const NATIVE_WATCH = (function () {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunWatch); } catch (e) { return false; }
+})();
+let WATCH_SYNC_T = null;
 // ⚠️ Roughly the range shoe manufacturers themselves quote. It is a REMINDER, NOT A RULE, and the
 // copy must never claim that replacing a shoe on schedule prevents injury — the evidence does not
 // support it, and this app sits beside a RED-S screen where an unsupportable claim costs the
@@ -10726,9 +10771,8 @@ function markFired(slot) { const o = firedToday(); o[slot] = true; try { localSt
 // which is why the calendar export exists. WKWebView has no Notification API at all, so in the app
 // this feature was entirely inert. When the native bridge is there the page hands over a SCHEDULE
 // and iOS fires it whether or not Inte-Run is running.
-const NATIVE_NOTIFY = (function () {
-  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunNotify); } catch (e) { return false; }
-})();
+// NATIVE_NOTIFY (whether that bridge is there) is declared with the store keys, near the top, above the first
+// recompute(): adoptPlan calls syncNativeReminders at launch, and it reads NATIVE_NOTIFY on its first line.
 let NATIVE_PERM = "default";
 let NOTIFY_ASKED = false;
 let NOTIFY_RERENDER = null; // set while the reminders sheet is open, so an async grant redraws it
@@ -10887,7 +10931,7 @@ function buildReminderSchedule() {
   }
   return out;
 }
-let NOTIFY_SYNC_T = null;
+// NOTIFY_SYNC_T (the debounce timer below) is declared beside NATIVE_NOTIFY, near the top: adoptPlan calls this at launch.
 // Debounced, so the plan rebuild and the settings change that follow one another collapse into one.
 // When each deferred sync's body LAST RAN, so planMoment can report a stage as done only when it
 // genuinely happened rather than after a guessed delay.
@@ -10962,9 +11006,8 @@ function coachLinesForWatch(coach) {
 // to run the engine either. So the page extracts just today's session and the native shell relays
 // it over WatchConnectivity. Absent "session" means a rest day, which the watch shows differently
 // from "not synced yet".
-const NATIVE_WATCH = (function () {
-  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunWatch); } catch (e) { return false; }
-})();
+// NATIVE_WATCH (whether that bridge is there) is declared with the store keys, near the top, above the first
+// recompute(): adoptPlan calls syncWatch at launch, and it reads NATIVE_WATCH on its first line.
 // Haptics: WKWebView has no navigator.vibrate, so the app's shell plays the real generators.
 const NATIVE_HAPTIC = (function () {
   try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.interunHaptic); } catch (e) { return false; }
@@ -12031,7 +12074,7 @@ window.__interunWatchRun = function (json) {
   try { return ingestWatchRun(typeof json === "string" ? JSON.parse(json) : json); }
   catch (e) { return String(e); }
 };
-let WATCH_SYNC_T = null;
+// WATCH_SYNC_T (syncWatch's debounce timer) is declared beside NATIVE_WATCH, near the top: adoptPlan calls syncWatch at launch.
 // THE app's one max-heart-rate ceiling: a measured profile.maxHr when present (sanity-ranged),
 // else Tanaka's 208 - 0.7*age. Everything that judges effort against a max - the coach's
 // safety-effort cue AND the watch's zone colours - MUST come through here. This function exists
@@ -13869,15 +13912,8 @@ function stretchFinish() {
  * only copy of anything the migration could not resolve, and a store nobody writes costs nothing.
  */
 function loadSlogV1() { try { return JSON.parse(localStorage.getItem("interun_slog") || "{}"); } catch (e) { return {}; } }
-/**
- * ⚠️ THE STORE IS HELD IN MEMORY AND THE DISK WRITE IS DEBOUNCED, because the weight box writes on
- * every KEYSTROKE. Re-parsing and re-stringifying the whole log per character costs most for exactly
- * the runner who has used the app longest — the same reasoning state.hist records for the run
- * history, and the same split the run-note field uses: keep the value synchronously, debounce only
- * the disk. Every path that can lose the page flushes first.
- */
-let SLOG = null;
-let SLOG_T = null;
+// The set log in memory (SLOG) and its debounced disk write (SLOG_T) are declared with the store keys, near
+// the top, above the first recompute(): adoptPlan runs migrateSlog at launch. Why it is held in memory: there.
 function slogAll() {
   if (SLOG) return SLOG;
   try {
@@ -27973,13 +28009,11 @@ function seg(name, opts, val) { return '<div class="seg" data-set="' + name + '"
  * halved a wizard runner's strength week because the same draft key changed meaning from a flag to a
  * count. strengthSessionsFor's phase rules are written so that an answer of two reproduces the old
  * counts in every phase.
+ *
+ * ⚠️ THE DEFAULTS (STR_DEFAULT_MIN, STR_DEFAULT_LEVEL, STR_DEFAULT_GOAL) ARE DECLARED WITH THE STORE KEYS,
+ * near the top, above the first recompute(): applyProfile reads them through strengthPrefsOf at launch, and
+ * here they reset a stored profile to the default one (2026-11-18). Never move them back down.
  */
-const STR_DEFAULT_MIN = 45;
-// ⚠️ INTERMEDIATE IS THE NEUTRAL DEFAULT BECAUSE IT REPRODUCES TODAY'S SET COUNTS (2 technique,
-// 3 heavy, 2 maintenance). Beginner would quietly take a set off every session of a runner who never
-// saw the question; advanced would add one.
-const STR_DEFAULT_LEVEL = "intermediate";
-const STR_DEFAULT_GOAL = "running";
 function strengthDaysOf(p) {
   if (p && p.strengthDays != null) return Math.max(0, Math.min(RC.STRENGTH_MAX_PER_WEEK, Number(p.strengthDays) || 0));
   return (p && p.strength) ? 2 : 0;

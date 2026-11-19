@@ -75,7 +75,8 @@ The runtime JS sits inside the outer template literal, so:
   in place**, so every check after it passes against the previous build. Read the build's own exit code, not
   `tail`'s. `npm run verify` runs `node --check` on every emitted `<script>` block.
 - Silent runtime traps that keep recurring: a `const` read before its declaration throws inside a `try/catch`
-  and nothing happens (store keys are declared together near the top for this reason); two top-level
+  and nothing happens (store keys are declared together near the top for this reason, and
+  `test/launch-order.test.ts` follows the whole launch for it); two top-level
   functions with one name — the later one wins silently; `el()` takes an HTML string, not a tag name;
   `isoAdd()` returns a Date, not a string.
 

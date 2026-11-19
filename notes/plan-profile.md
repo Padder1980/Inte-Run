@@ -1013,3 +1013,63 @@ Each is as large as pieces 1 and 2 together, so each is its own session (CLAUDE.
 app must tolerate none — `profile.raceDate`/`goalDist`/`targetS`, feasibility, the race-day handover (B9), Alfie's race facts, the
 calendar export, the plan journal, the wizard's goal step. Inventory first. Engine: rolling 4-week blocks, each planned from the
 last block's test (today `generateRoadPlan` falls back to the plain plan when a road has no race stage).
+
+---
+
+## ✅ THE LAUNCH READS NOTHING DECLARED BELOW IT — the strength defaults and six more (2026-11-19)
+
+The defect recorded under Stages ("Found while testing, not caused by this stage") is fixed, and the whole class is now
+guarded by a derived check instead of hand-written lists of names.
+
+**What it was.** `strengthPrefsOf` (called by `applyProfile`, so by the launch's first `recompute()`) read `STR_DEFAULT_MIN`,
+`STR_DEFAULT_LEVEL` and `STR_DEFAULT_GOAL`, declared ~21,000 lines below that call. Each is read only when the stored answer is
+missing or no longer on offer (`RC.STRENGTH_MINUTES` / `STRENGTH_LEVELS` / `STRENGTH_GOALS`), so a profile with `strengthDays`
+but no `strengthMin` threw in the dead zone, and `try { recompute(); } catch (e) { profile = Object.assign({}, DEFAULT_PROFILE); … }`
+swapped the runner's whole profile for the default one. ⚠️ An engine change that dropped one of those options would have done
+the same to every profile that had chosen it. ⚠️ After the swap, the first profile save (Training zones, say) writes the default
+answers over the stored ones — `saveProfileStore` writes the whole in-memory `profile`. Reproduced in node before the fix: the
+real page in a sandbox opened with `status: "regular"` and `name: ""`.
+
+**The sweep found nine, all at that one statement:**
+- Uncaught (a profile reset): the three strength defaults, via `recompute > applyProfile > strengthPrefsOf`.
+- Caught inside `adoptPlan`'s own `try` blocks (a step skipped at EVERY launch, silently): `NATIVE_NOTIFY` + `NOTIFY_SYNC_T`
+  (`syncNativeReminders`), `NATIVE_WATCH` + `WATCH_SYNC_T` (`syncWatch`) — invisible only because the launch's closing
+  `initReminders(); syncWatch();` syncs both anyway; `SLOG` + `SLOG_T` (`migrateSlog` → `slogAll` / `slogFlush`) — the v1 → v2
+  migration ran only on the first later rebuild (notes/manage-plan.md recorded that as "not changed here").
+- All nine now sit in the store-key block, right after `SLOG_MAX_ROWS`, each with its reason; a pointer is left at each old home.
+- Behaviour: the launch's own reminder and watch syncs now schedule, and the closing calls cancel and replace them (both
+  debounce through `NOTIFY_SYNC_T` / `WATCH_SYNC_T`), so iOS still gets ONE schedule and the watch ONE sync per launch.
+  `migrateSlog` now runs at launch, as its comment in `adoptPlan` always said; for anyone already migrated it returns at once
+  (`meta.migratedAt`). Nothing else read at launch changed.
+
+**The guard — `test/launch-order.test.ts` (5 tests).**
+- The built page's app script is parsed with the TypeScript compiler (its checker does the scope resolution), and EVERY top-level
+  statement is walked in order: its own code plus, transitively, every top-level function it names. A `const`, `let` or
+  `class` declared at or below the statement is a finding; a declaration list is taken one declarator at a time.
+- Rules (each pinned by a fixture script that breaks it): naming a function counts as calling it; naming a constant declared
+  above that HOLDS functions walks them too; a callback runs now unless it is handed to a timer, a listener or a promise, or is
+  visibly stored (assigned, a property's value, a variable's value, returned, a method); `if (!FLAG) return;` as a function's
+  first line, with FLAG a top-level `let … = false` set only by top-level statements, keeps the function out until the first of
+  them (`EXTRA_READY` → `refreshProgExtras`); a read inside a try still counts and is reported as "silently does nothing".
+- ⚠️ WHY THIS STATIC SWEEP WORKS WHEN club-trim's DID NOT: that one flagged "a function defined above a const it captures" (57
+  candidates, one real). This one follows what the launch EXECUTES, from each top-level statement — measured over the whole
+  launch: the nine above and nothing else, and zero after the fix. Self-checks keep it from going blind: it must find the boot
+  statement, see `applyProfile` … `normalizeWeekStarts` uncaught and `journalSync`, `migrateSlog` and the two syncs caught,
+  honour the EXTRA_READY gate, and see the launch read the very constants these traps were about.
+- Not seen: a function reached only through an object property it was put on inside another function; screens opened later
+  (the story viewer's dead zone was in a handler — club-trim.test.ts still runs that one).
+- The case itself, executed: the page's own engine and app script run in `node:vm` up to the end of the launch's first
+  `recompute()` (a probe and a stop are spliced in after it, so every function below is still hoisted), with `rc_profile_v1`
+  seeded: strengthDays only, and answers no longer on offer, both keep the runner's name, status and goal, and the defaults
+  fill the gaps (45 / intermediate / running); a complete profile keeps its own.
+- Re-broken, 4 of 4 caught (file copied aside and back each time, never git checkout): `STR_DEFAULT_MIN` back beside
+  `strengthDaysOf` → both sweep tests and the sandbox ("the launch replaced the runner's profile with the default one");
+  `NATIVE_WATCH` back beside the watch handover → both sweep tests, marked "inside a try"; `let CURRENT_WEEK …` moved after
+  the top-level `computeToday()` → the whole-launch test only; the gate written as `if (EXTRA_READY === false)` → the self-check
+  ("the EXTRA_READY gate was not recognised") plus a caught `EXTRA` finding.
+- ⚠️ THE FIX FOR A FINDING is to declare the binding in the store-key block, never another try around the read.
+
+**Not changed — the owner's call (Road Map `pc-launchfallback`).** The launch's fallback itself is still silent: any profile
+the engine cannot plan opens as the default one, and the first profile save then writes the default answers over the stored
+ones. Suggested: a line in Support › Your data saying it happened and why, and a copy of the stored answers kept before anything
+can overwrite them. It changes what the runner sees, so it waits for him.

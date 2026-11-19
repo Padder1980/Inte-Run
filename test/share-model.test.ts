@@ -751,6 +751,12 @@ test("BLOCKER: The Execution is hidden for a repetition session, and says why", 
   const st2 = E.shareTemplateStates(noBand, E.runAnalysis(noBand), E.runRoutePresentation(noBand, E.sharePrivacyFor(noBand)), { photo: PHOTO });
   assert.equal(st2.execution.ok, false);
   assert.match(st2.execution.why, /no prescribed pace/i);
+  // And a run–walk, whose running HAD a pace, is refused for that reason — never "no prescribed pace" (pc-repverdict).
+  const walk = refRun({ pband: null, pwin: null, pmix: "walk" });
+  const st3 = E.shareTemplateStates(walk, E.runAnalysis(walk), E.runRoutePresentation(walk, E.sharePrivacyFor(walk)), { photo: PHOTO });
+  assert.equal(st3.execution.ok, false, "a run–walk is offered a target-band chart");
+  assert.match(st3.execution.why, /running and walking/i, "the reason does not name what makes a run–walk ineligible");
+  assert.doesNotMatch(st3.execution.why, /no prescribed pace/i, "a run–walk is told it had no prescribed pace");
 });
 
 test("The Progression needs three MEASURED splits, not three splits", () => {

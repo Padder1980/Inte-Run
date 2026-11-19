@@ -533,3 +533,28 @@ a month; a run is ~8). If abuse ever shows, the next step is the Worker proxying
 ✅ **Done the same evening:** he made the key, it turned out URL-restricted (200 as his website, 403 as the app —
 see notes/ios-native.md, "Build 583"), he removed the restriction, and **build 583 is the first build with a
 working Mapbox token embedded.** The web-layer fix above reaches every copy over the air regardless.
+
+## Repeats and run-walk were told they were "by feel" (pc-repverdict, fixed 2026-11-19)
+
+`paceStampFor` answers `pband: null` with `pmix: "reps"` (or `"walk"`) for a session whose efforts are scattered through it,
+because a kilometre split averages them with the recoveries and nothing per-rep is stored on either device. `debriefParagraphs`
+already said the true thing ("Efforts and recoveries land in the same kilometre…", tested in `test/post-run-card.test.ts`), but
+three readers on the same page still treated "no band" as "no prescription":
+
+- **`runVerdict`** fell through to `!band` → **"A run by feel" / "This one had no prescribed pace"**, the largest type on the run's
+  page, and B10's briefing quotes the headline next time ("your debrief said: A run by feel."). New branch above it, on
+  `a.mixed` (= `!!run.pmix`): **"Repeats, not one pace"** / **"Run–walk, not one pace"**, a body that says why there is no
+  single pace to judge, state `insufficientData`, no in-range chip. Measured on a real "2 × 10′ true tempo / 4′ jog" run.
+- **`rdWell`** praised "Pace was even throughout" and "You finished quicker than you started" from those same mixed
+  kilometres, right under a verdict saying they cannot be judged: both now need `!a.mixed`. On the repeats run the "What went
+  well" section now has nothing true to say, so it is not drawn.
+- **`rdInterpretation`** (under the pace chart) called even mixed kilometres "what a controlled run looks like" and wandering
+  ones "terrain and wind": it now says each kilometre mixes efforts with recoveries (or running with walking), so the splits
+  show the session's rhythm, not how the repetitions went.
+- **The share studio's Execution template** already explained repeats; a run-walk got "This run had no prescribed pace". It now
+  names the running and walking (`shareTemplateStates`, `mixKind === "walk"`).
+- Guarded in `test/post-run-card.test.ts`: EVERY session the plans hand out (beginner run-walk, intermediate 10K, advanced half)
+  whose stamp says `pmix` — derived, not listed, and asserted to include both kinds — gets an honest verdict, no kilometre-pace
+  praise and an honest chart sentence; a free run is still "A run by feel"; an even continuous run is still praised. The
+  share case is in `test/share-model.test.ts`. Re-broken four ways (verdict, share, praise, chart), each caught; the verdict's
+  first failure named "Run–walk ladder — build up, then back down".

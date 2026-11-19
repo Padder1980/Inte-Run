@@ -34724,6 +34724,20 @@ function runVerdict(run, a) {
              "The time and distance are recorded and still count towards your week."],
       chips: chips.slice(0, 3), well: [], watch: [] };
   }
+  // 2b — ⚠️ PRESCRIBED, BUT NOT PER KILOMETRE (pc-repverdict, 2026-11-19). A session of repeats, or a run-walk, HAS a
+  // pace for every effort; paceStampFor answers pband null with pmix "reps" or "walk" only because a kilometre split
+  // averages the efforts with the recoveries, and nothing per-rep is stored on either device. Falling through to "A run
+  // by feel ... no prescribed pace" told the runner something false, B10's briefing quoted it next time ("your debrief
+  // said: A run by feel."), and debriefParagraphs on the same page already said the true thing. Judge nothing; say why.
+  if (!band && a.mixed) {
+    const walk = a.mixKind === "walk";
+    return { confidence: conf, state: "insufficientData", headline: walk ? "Run–walk, not one pace" : "Repeats, not one pace",
+      body: [walk
+          ? "The running had a target pace, but every kilometre split mixes it with the walking, so there is no single pace to judge it by."
+          : "Each repetition had its own target pace, but every kilometre split mixes the efforts with the recoveries, so there is no single pace to judge it by.",
+        "It still counts towards your week."],
+      chips: chips.slice(0, 3), well: rdWell(run, a), watch: [] };
+  }
   if (!band) {
     return { confidence: conf, state: "insufficientData", headline: "A run by feel",
       body: ["This one had no prescribed pace, so there is no target to measure it against.",
@@ -34802,9 +34816,12 @@ function runVerdict(run, a) {
 /** Up to three things that genuinely went well, each tied to a real measurement. */
 function rdWell(run, a) {
   const out = [];
-  if (a.n >= 3 && a.slowest - a.fastest <= 25) out.push("Pace was even throughout");
+  // ⚠️ NOT ON A SESSION A KILOMETRE CANNOT JUDGE (a.mixed: repeats, run-walk; pc-repverdict). Every split there averages
+  // the efforts with the recoveries, so "even" or "quicker at the end" says nothing about how it was run, and it sat
+  // under a verdict saying there is no single pace to judge it by.
+  if (!a.mixed && a.n >= 3 && a.slowest - a.fastest <= 25) out.push("Pace was even throughout");
   if (a.band && a.inBand >= Math.ceil(a.n * 0.7)) out.push("Most kilometres sat inside the target band");
-  if (a.shiftSec > 8) out.push("You finished quicker than you started");
+  if (!a.mixed && a.shiftSec > 8) out.push("You finished quicker than you started");
   const ceil = maxHrEstimate();
   if (run.avgHr && ceil && run.avgHr < ceil * 0.75 && (run.type === "easy" || run.type === "long" || run.type === "recovery")) {
     out.push("Heart rate stayed comfortably low");
@@ -35277,6 +35294,11 @@ function rdInterpretHtml(run, a) {
 }
 function rdInterpretation(run, a) {
   if (!a.n) return "";
+  // ⚠️ A KILOMETRE OF REPEATS OR RUN-WALK IS PART EFFORT, PART RECOVERY (pc-repverdict): "what a controlled run looks
+  // like" or "terrain and wind move it around" says nothing true about one. Say what its splits do show.
+  if (a.mixed) return a.mixKind === "walk"
+    ? "Each kilometre here mixes running with walking, so the splits show the rhythm of the session, not your running pace."
+    : "Each kilometre here mixes efforts with recoveries, so the splits show the rhythm of the session, not how the repetitions went.";
   if (a.n >= 3 && a.slowest - a.fastest <= 25) return "Your kilometres were within a few seconds of each other, which is what a controlled run looks like.";
   if (a.shiftSec > 12) return "You ran the back half quicker than the front half.";
   if (a.shiftSec < -20) return "The pace drifted as the run went on, which is normal on a long or hot one.";
@@ -40390,6 +40412,8 @@ function shareTemplateStates(run, a, pres, opt) {
     : { ok: false, why: "This run recorded neither a distance nor a time, so there is no headline to build a card from." };
   out.execution = a.mixKind === "reps"
       ? { ok: false, why: "This session is repetitions. Inte-Run records whole-kilometre splits, and a kilometre of reps and jog recoveries has no target to be judged against — so there is nothing true to draw." }
+    : a.mixKind === "walk"
+      ? { ok: false, why: "This session alternates running and walking. Inte-Run records whole-kilometre splits, and a kilometre of both has no target to be judged against — so there is nothing true to draw." }
     : !a.band ? { ok: false, why: "This run had no prescribed pace, so there is no target to show against it." }
     : a.judgedN < 2 ? { ok: false, why: "Too few kilometres could be measured against the target for a chart to mean anything." }
     : { ok: true, why: "" };

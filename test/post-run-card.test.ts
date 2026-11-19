@@ -103,6 +103,70 @@ test("⚠️ it never claims 'pace and feel agreeing' when no pace was judged", 
   }
 });
 
+// The verdict at the top of the run's page (and quoted by the next briefing), lifted as built with the real "what went
+// well" list under it (maxHrEstimate only matters for heart rate, which these runs do not carry), and the sentence under
+// the pace chart.
+const WELL: any = new Function("maxHrEstimate", lift("rdWell") + "; return rdWell;")(() => 0);
+const V: any = new Function("rdWell", lift("runVerdict") + "; return runVerdict;")(WELL);
+const INTERPRET: any = new Function(lift("rdInterpretation") + "; return rdInterpretation;")();
+
+/** Every session the plans hand out whose paces a kilometre cannot judge, found by the app's own stamp, not listed. */
+function unjudgeableSessions(): any[] {
+  const found = new Map<string, any>();
+  const runners = [
+    { daysPerWeek: 3, experience: "beginner", runWalk: true, recent: { distanceMeters: 5000, timeSeconds: 2400 }, distance: "10k", target: 5400 },
+    { daysPerWeek: 4, experience: "intermediate", runWalk: false, recent: { distanceMeters: 5000, timeSeconds: 1500 }, distance: "10k", target: 3000 },
+    { daysPerWeek: 5, experience: "advanced", runWalk: false, recent: { distanceMeters: 5000, timeSeconds: 1200 }, distance: "half", target: 5400 },
+  ];
+  for (const r of runners) {
+    const plan = generatePlan(
+      { daysPerWeek: r.daysPerWeek, experience: r.experience, includeStrength: false, runWalk: r.runWalk, recent: r.recent } as never,
+      { distance: r.distance, targetTimeSeconds: r.target, raceDateIso: "2027-03-14", startDateIso: "2026-11-16" } as never,
+    );
+    for (const w of plan.weeks) for (const s of w.sessions) {
+      if (M.paceStampFor(M.withGeneratedWarmup(s)).pmix && !found.has(s.title)) found.set(s.title, s);
+    }
+  }
+  return [...found.values()];
+}
+
+test("⚠️ the verdict never calls a session of repeats or run–walk 'by feel' (pc-repverdict)", () => {
+  // The debrief's paragraphs said the true thing; the verdict above them still said "A run by feel — this one had no
+  // prescribed pace", and the next briefing quoted it ("your debrief said: A run by feel.").
+  const sessions = unjudgeableSessions();
+  const kinds = new Set(sessions.map((s) => M.paceStampFor(M.withGeneratedWarmup(s)).pmix));
+  assert.ok(kinds.has("reps") && kinds.has("walk"), "the plans no longer hand out both repeats and run–walk, so this covers less than it says: " + [...kinds].join(", "));
+  for (const sess of sessions) {
+    const run = recordFor(sess);
+    const v = V(run, M.runAnalysis(run));
+    const said = v.headline + " — " + v.body.join(" ");
+    assert.ok(!/by feel|no prescribed pace|no set pace/i.test(said), `"${sess.title}": the verdict calls a prescribed session unpaced: ${said}`);
+    assert.match(v.headline, run.pmix === "walk" ? /run–walk/i : /repeats/i, `"${sess.title}": the verdict does not say what kind of session it was: ${said}`);
+    assert.equal(v.state, "insufficientData", `"${sess.title}": the verdict judged kilometres that cannot judge it`);
+    assert.ok(!v.chips.some((c: any) => c.k === "In range"), `"${sess.title}": an in-range chip with no range to be in`);
+    // And nothing under it praises the kilometres' pace it has just said it cannot judge (the fixture's splits are even,
+    // and quicker at the end, so both would fire).
+    assert.ok(!v.well.some((w: string) => /even|quicker than you started/i.test(w)), `"${sess.title}": praised for kilometre pace it cannot judge: ${v.well.join("; ")}`);
+    const chart = INTERPRET(run, M.runAnalysis(run));
+    assert.ok(!/controlled run|terrain and wind|drifted|quicker than the front/i.test(chart), `"${sess.title}": the chart reads its mixed kilometres as one pace: ${chart}`);
+    assert.match(chart, /mixes/, `"${sess.title}": the chart does not say why its splits wander: ${chart}`);
+  }
+});
+
+test("an evenly run continuous session is still praised for it", () => {
+  const even: any = { id: "e", type: "easy", dist: 3, time: 930, pace: 310, pband: { minSecPerKm: 300, maxSecPerKm: 320 },
+    pwin: null, pmix: null, rband: { min: 2, max: 4 }, splits: [{ km: 1, sec: 310 }, { km: 2, sec: 308 }, { km: 3, sec: 312 }], route: [] };
+  const a = M.runAnalysis(even);
+  assert.ok(WELL(even, a).includes("Pace was even throughout"), "an even run lost its praise");
+  assert.match(INTERPRET(even, a), /controlled run/, "an even run lost its chart sentence");
+});
+
+test("a run with genuinely no prescribed pace is still 'A run by feel' in the verdict", () => {
+  const free: any = { id: "f", t: "Free run", type: "easy", dist: 5, time: 1800, pace: 360, pband: null, pwin: null, pmix: null,
+    splits: [{ km: 1, sec: 360 }, { km: 2, sec: 355 }], route: [] };
+  assert.equal(V(free, M.runAnalysis(free)).headline, "A run by feel", "an unprescribed run lost its honest verdict");
+});
+
 test("a genuinely by-feel run still says so", () => {
   // ⚠️ The fix must not silence the honest case. A free run really has no prescription.
   const free: any = { id: "f", t: "Free run", type: "easy", dist: 5, time: 1800, pace: 360,

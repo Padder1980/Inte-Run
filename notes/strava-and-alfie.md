@@ -233,3 +233,18 @@ tester tries it, and confirm the paid Strava subscription. The Road Map step `p2
 authorize request whose `redirect_uri` is on `example.com` gets **400 `redirect_uri invalid`**; the same
 request with ours gets **302 to Strava's login**. Athlete capacity and the subscription cannot be seen
 from outside Strava's own settings page and are still the owner's to check.
+
+## Deployed 2026-11-19 (version fa07893f-a21d-48d0-946e-22138d66f339)
+
+The Worker on main went live: B11's Expand with Alfie and B1's Strava switch for a run added by hand are on. Read from the live
+server straight after, neither spending a question: `GET /` → `"expand":["briefing","insight"]`,
+`"expandDaily":{"device":3,"global":40,"usedToday":0}` (before: no `expand` key, so the app hid the button); `GET /strava/status`
+with no device key → `"configured":true`, `"origins":["recorded","added"]` (`stravaCanAddedRuns`). Bindings at deploy: `STRAVA`
+(KV), `AI`, `BURST` (ratelimit, wrangler warns that "unsafe" fields are experimental).
+
+- ⚠️ **The wrangler login had expired again** (the 2026-09-23 one): `whoami` → "Your auth token has expired and could not be
+  refreshed". The first `wrangler login` in his Terminal panel timed out after two minutes unseen (the browser page opens behind
+  the app), the second worked once he was told to switch to the browser first.
+- ⚠️ **`run_in_terminal` only starts in this session's folders**, so from a worktree: symlink the main checkout's
+  `alfie-proxy/node_modules` into the worktree's `alfie-proxy/` and log in there (the login itself is stored per user, not per
+  folder). Deploy from a checkout whose `alfie-proxy/` matches main: `git diff <its HEAD> main -- alfie-proxy/` was empty.

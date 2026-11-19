@@ -6381,7 +6381,11 @@ function isoAdd(iso, days) { const p = String(iso).split("-").map(Number); const
 function dmon(dt) { return dt.getUTCDate() + " " + MONTHS[dt.getUTCMonth()]; }
 
 // ---- Your profile drives everything ---------------------------------------
-const watch = { sleepHours: 7.5, restingHrDelta: 0, hrvStatus: "normal" };
+// ⚠️ NO "watch" CONSTANT (pc-fakewatch, removed 2026-11-19). A demo one stood here, { sleepHours: 7.5,
+// restingHrDelta: 0, hrvStatus: "normal" }, and the Ready? check printed it to everybody, watch or not, as
+// "From your watch: Slept 7.5 h · Resting HR normal": invented health data, on the screen an App Store reviewer
+// opens. Nothing reads sleep or resting heart rate from a watch or from Health. The engine still takes them
+// (RC.assessReadiness, all optional): give it a real reading behind a capability flag, or nothing.
 function todayIso() { return new Date().toISOString().slice(0, 10); }
 const MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 // A date that stays true. Used for watch runs, which have a date but no clock time.
@@ -9035,7 +9039,7 @@ function planDefaultWeek() {
   return PLAN.defaultWeekIndex;
 }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", motivation: "high", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, heatAdapt: loadHeatAdapt(), heatHour: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, heatAdapt: loadHeatAdapt(), heatHour: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() {
@@ -9430,10 +9434,12 @@ function fmtPace(s) { s = Math.round(s); return Math.floor(s/60) + ":" + String(
 function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
 
 // ============ TODAY ========================================================
+// ⚠️ ONLY WHAT THE RUNNER TOLD US: the four answers the How you feel sheet asks (feelSheetHtml). Sleep,
+// resting heart rate and HRV came from the made-up watch constant (see where it stood, by todayIso), and
+// motivation from a default "high" no screen ever asked about. Absent is absent: the engine skips a missing
+// one, and at those values (7.5 h, no change, high) none ever added anything, so every answer reads as before.
 function readinessInput() {
-  const i = { sleepHours: watch.sleepHours, restingHrDelta: watch.restingHrDelta, soreness: state.subj.soreness, energy: state.subj.energy, stress: state.subj.stress, motivation: state.subj.motivation, illness: state.subj.illness };
-  if (watch.hrvStatus !== "normal") i.hrvStatus = watch.hrvStatus;
-  return i;
+  return { soreness: state.subj.soreness, energy: state.subj.energy, stress: state.subj.stress, illness: state.subj.illness };
 }
 function renderReadiness() {
   const r = RC.assessReadiness(readinessInput());
@@ -9446,8 +9452,7 @@ function renderReadiness() {
   const c = BAND[r.band];
   const reasons = r.band !== "ready" ? '<div class="chips">' + r.reasons.map((x) => '<span class="c">' + x + '</span>').join("") + '</div>' : "";
   return '<div class="status"><div class="band" style="--bc:' + c + '"><div class="h">' + r.headline + '</div><div class="rec">' + r.recommendation + '</div><div class="meter"><i style="width:' + r.score + '%"></i></div></div>' +
-    '<div class="body">' + reasons + '<div class="reassure">' + r.reassurance + '</div></div></div>' +
-    '<div class="watch"><span class="wl">From your watch</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Slept ' + watch.sleepHours + ' h</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Resting HR normal</span></div>';
+    '<div class="body">' + reasons + '<div class="reassure">' + r.reassurance + '</div></div></div>';
 }
 /**
  * THE ONE SESSION-TO-EFFORT-COLOUR MAPPING, AND EVERY SURFACE THAT PAINTS AN --eff-* COLOUR READS IT.
@@ -11090,7 +11095,6 @@ function feelSheetHtml() {
     '<div class="sd-desc">' + esc(r.recommendation) + '</div>' +
     '<div class="meter" style="--bc:' + c + '"><i style="width:' + r.score + '%"></i></div>' + reasons +
     '<div class="sd-desc" style="margin-top:12px">' + esc(r.reassurance) + '</div>' +
-    '<div class="watch" style="margin-top:12px"><span class="wl">From your watch</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Slept ' + watch.sleepHours + ' h</span><span class="c" style="font-size:12px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px">Resting HR normal</span></div>' +
     '<div class="sd-move"><div class="sd-move-h">Tell us how you\\'re feeling</div>' + body + '</div>';
 }
 function openFeelSheet() { ensureSheet(); SHEET_CTX = null; $("sheetBody").innerHTML = feelSheetHtml(); wireFeelSheet(); $("sheetOv").classList.add("on"); }

@@ -222,12 +222,14 @@ test("every box on the checklist page is the text in APPSTORE.md, word for word"
 });
 
 test("the page's step 0 is there exactly while the made-up watch numbers are", () => {
-  // Raised in B10: the Ready? sheet prints "From your watch" from a hard-coded constant. The page tells the
-  // owner to fix it before the build; once it is fixed, this fails until the step is taken off the page.
-  const fake = /const watch = \{ sleepHours: 7\.5/.test(APP_SRC);
+  // Raised in B10 (pc-fakewatch): the Ready? sheet printed "From your watch" from a hard-coded constant; fixed
+  // 2026-11-19 and step 0 taken off the page. ANY hard-coded reading brings the step back, not just the old line
+  // (test/ready-no-made-up-watch.test.ts holds the app itself to it). Comments quote the old line, so they go first.
+  const code = APP_SRC.replace(/^\s*\/\*[\s\S]*?\*\//gm, " ").replace(/(^|[^:'"\\])\/\/[^\n]*/g, "$1 ");
+  const fake = /\bsleepHours\s*:\s*[\d.]|\brestingHrDelta\s*:\s*-?[\d.]|\bhrvStatus\s*:\s*["']|From your watch/.test(code);
   assert.equal(PAGE.includes('data-id="fix-watch"'), fake,
-    fake ? "the made-up watch numbers are still in the app, and the page no longer says to fix them"
-      : "the made-up watch numbers are gone: take step 0 off docs/submit/ (and its line in APPSTORE.md)");
+    fake ? "made-up watch numbers are in the app again, and the page no longer says to fix them"
+      : "the made-up watch numbers are gone: take step 0 off docs/submit/");
 });
 
 test("the screenshot tool makes the sizes Apple takes, with no alpha channel", async () => {

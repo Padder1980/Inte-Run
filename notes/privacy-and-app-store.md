@@ -490,3 +490,26 @@ under 15 px.
 the Worker deploy; the policy read; the build and upload (Claude, TESTFLIGHT.md step 2 — the archive now checks the
 token); App Information and the version page in App Store Connect; the dry run; the DPIA signature. Re-run
 `node tools/store-shots.mjs` (with `docs/` served) whenever the look changes; the watch shots come from the simulator.
+
+## Step 0 done: the Ready? check's made-up watch numbers (pc-fakewatch, 2026-11-19)
+
+`const watch = { sleepHours: 7.5, restingHrDelta: 0, hrvStatus: "normal" }` (a demo constant by `todayIso`) is gone. It was
+printed to everybody as "From your watch: Slept 7.5 h · Resting HR normal" in the How you feel sheet (`feelSheetHtml`) and in
+`renderReadiness` (whose `#readySlot` no screen draws any more), and `readinessInput()` fed it to `RC.assessReadiness`, which the
+sheet, Ask Alfie (`alfieIntents`) and B10's briefing (`briefingFacts`) read. Nothing reads sleep or resting heart rate from a watch
+or from Health (no HealthKit query for either in `ios/`), so there was nothing real to show instead.
+
+- **`readinessInput()` now carries only the four answers the sheet asks** (soreness, energy, stress, illness). It also passed
+  `motivation`, a default "high" that no screen ever asked about; that went with it, from `state.subj` too.
+- ⚠️ **NOBODY'S ADVICE CHANGED, AND THAT IS MEASURED, NOT ASSUMED.** The engine skips an absent reading, and at 7.5 h, a delta of
+  0 and "high" none of the three ever added strain: for every combination of the sheet's own answers, the advice with and without
+  them is identical (`test/ready-no-made-up-watch.test.ts`). The engine still takes all three (`ReadinessInput`, optional):
+  wire a REAL reading in behind a capability flag, never a stand-in.
+- **The checklist page:** step 0 (`data-id="fix-watch"`) moved to "Already done". `test/submit-checklist.test.ts` used to detect
+  the fake by its exact line; it now brings the step back for ANY hard-coded reading (comments stripped first, since the removal
+  note quotes the old line). There was no line about it in APPSTORE.md, whatever that test's old message said.
+- Guards re-broken three ways (a hard-coded sleep figure back; the "From your watch" line back; motivation back), each caught.
+  Seen in a browser in light and dark at phone size.
+- ⚠️ **Found, not fixed:** the sheet's readiness bar (`.meter` / `.meter > i`, white on a 30%-white track, made for the coloured
+  `.band` card) is invisible on the light sheet (measured: fill rgb(255,255,255) on a white sheet); dark mode shows it. Roadmap
+  `pc-feel-meter-light`.

@@ -128,3 +128,6 @@ the sender's own gate; the pages and the wiring). `test/alfie-proxy.test.ts` res
 `test/briefings.test.ts` allows `briefingReadyLine`. **29 of 29 re-breaks caught**, PLAN.md's own ("remove the number
 filter") among them. Driven in the browser with the network stood in (light and dark, 375×812): the sent body was
 `{ mode, context, device }` with no readiness or pain in the context, and the reply replaced the text with its label.
+
+**Fixed 2026-11-19 (pc-fakewatch):** the hard-coded demo `watch` constant above is gone; readiness reads only the runner's four
+answers, and the advice is unchanged for every answer (measured). Details at the end of notes/privacy-and-app-store.md.

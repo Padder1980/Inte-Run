@@ -457,3 +457,21 @@ flag already made a second dismissal harmless, this stops the work happening at 
 `tools/story-shots.mjs`, `tools/debrief-shots.mjs` and this file's own Playwright recipe all clicked that
 button to get past the welcome. All three now click `#welcomeback`, the overlay itself. **Grep for an id
 before deleting it** — the app was clean, the tooling was not.
+
+## The readiness bar on the How you feel sheet (pc-feel-meter-light, 2026-11-19)
+
+`.meter` / `.meter > i` (white on a 30%-white track) were made for the coloured readiness card (`.band`, painted `--bc`). The
+How you feel sheet (`feelSheetHtml`) draws the same bar on the plain sheet (`--surface`), so in light mode it was white on
+white: measured fill rgb(255,255,255) on a white sheet, 1.00:1. Dark mode showed it only because its sheet is dark.
+
+- **Fix: two sheet-scoped rules beside `.meter`**: `.sheet .meter { background: var(--surface-2) }` and `.sheet .meter > i {
+  background: var(--bc, var(--accent)); border-radius: var(--r-pill) }` (a ladder radius: the
+  design-system ratchet refuses a new raw `5px`) — the band colour the sheet already set inline (`--bc`) on the
+  design system's own bar track, as `.ui-bar` does (same 7 px, same radius). The card keeps its white bar (`.meter > i`).
+- ⚠️ **Measured on the rendered sheet:** light — ready 3.37:1, ease 2.76:1 against the white sheet (steady 3.16, rest 5.11 from
+  the tokens); dark — ready 7.37, ease 7.27. Ease under 3:1 in light is the same orange `.ui-bar.watch > i` already uses on light
+  ground; the band's headline and advice say the same thing in words.
+- Guarded by `test/feel-meter-light.test.ts`, read like `test/contrast.test.ts`: the generated CSS and the
+  `:root[data-theme]` token blocks, every band reached by answering the sheet, the bar's colour resolved as the browser would
+  (most specific `.meter > i` rule that can match inside `.sheet`, then the last); at least 2.5:1 in both themes. Re-broken
+  (the two rules removed): "light, ready: the bar is 1.00:1 against the sheet — it cannot be seen at all".

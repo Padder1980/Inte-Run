@@ -659,6 +659,11 @@ h2.sec:first-child { margin-top: 4px; }
 .status .band .rec { font-size: 13px; margin-top: 2px; opacity: .96; }
 .meter { height: 7px; background: rgba(255,255,255,.3); border-radius: 5px; overflow: hidden; margin-top: 10px; }
 .meter > i { display: block; height: 100%; background: #fff; }
+/* ⚠️ WHITE IS FOR THE COLOURED CARD (.band) THE METER WAS MADE FOR. In the How you feel sheet it sits on the plain sheet,
+   and white on a white sheet was no bar at all in light mode (pc-feel-meter-light, 2026-11-19). There it takes the band's
+   own colour, --bc, which feelSheetHtml already sets on it, on the design system's bar track, as .ui-bar does. */
+.sheet .meter { background: var(--surface-2); }
+.sheet .meter > i { background: var(--bc, var(--accent)); border-radius: var(--r-pill); }
 .status .body { padding: 12px 16px; background: var(--surface); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips .c { font-size: 12px; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }

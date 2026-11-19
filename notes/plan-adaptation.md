@@ -519,3 +519,101 @@ changes when it shortens a run ("Kept your long run the longest run of the week�
 band EXCEPT a week the long-run hold shortened, and only that week; such weeks must stay under 1%, and nothing may
 pass 35% (re-broken with the hold at 60%: the deepest went to 48.8% and the guard failed). A new test asks the ruling
 itself on every week of the grid, for all three reasons, on both rulers. 2 of 2 re-breaks caught.
+
+## ✅ AN EASIER WEEK IS EASIER ON THE ROAD — THE TRIM IS REAL (2026-11-18/19)
+
+Found while building STAGES.md §10 piece 2 (recorded, not fixed, in `notes/plan-profile.md`). `easeWeek` "trimmed" easy and
+long runs with `scaleSessionDistance` plus a scaled estimate — **the figures only**. The steps (what the live run, the voice
+coach and the watch follow) and the titles were untouched. Measured: a main-track week's eased **"58′ long run" still said 58′
+and ran 58 minutes** while the week summary said 46; a walk-run week's runs and a Rebuild week's runs were **prescribed exactly
+as before** (they have no hard session to swap, so nothing real changed at all). It reached every caller: Make a week easier,
+B5's "how quickly", B6's "ease back in", B14's and §10's checkpoint "Ease back", and the week before a B-race (B7).
+
+**The owner's rulings, 2026-11-18**, put to him as options with worked examples from his own plan types:
+- run–walk sessions in an easier week — **"Shorter runs, same walks"** (over "go back a week" and "fewer repeats"):
+  `2 × (8′ run / 2′ walk)` → `2 × (7′ run / 2′ walk)`, `8 × (1′ run / 1′30″ walk)` → `8 × (50″ run / 1′30″ walk)`;
+- a walk-run KEY RUN in an easier week — **"Stays as it is"** (over "waits a week"): the checkpoint can still be passed that
+  week; the rest of the week is easier.
+
+**The mechanism: `shortenSession(s, factor, rounding)` in `src/plan/session-templates.ts`**, beside the builders, so a shortened
+run is built by their rules. `factor` is what is left of the session's RUNNING (steady + rep steps); the cut comes out of its
+easy running only. A continuous run (any steady step) loses it from the steady running — strides, pickups, hill sprints,
+race-effort reps and walk-backs are kept; a run–walk session (no steady step) loses it from every running block, walks never;
+warm-ups and cool-downs never. The figures are then DERIVED from the steps by `figuresOf` — the one derivation `assemble` now
+shares — and the title's own number follows (a leading minutes or km, a run–walk title's block, "19′ without stopping" and its
+description, each block's "Run 50″ —" label).
+- ⚠️ **Units are the owner's.** A timed total that was on five minutes stays on five (2026-08-26, "always be in multiples of
+  5's"), otherwise whole minutes; a distance-set run on the builder's 100 m; a run–walk block on 10 s under 3′, 30 s under 10′,
+  then whole minutes; a run without stopping on whole minutes.
+- ⚠️⚠️ **NEAREST, NOT UP — a deliberate exception to the builders' "rounding gives the runner the work".** That rule stops
+  rounding noise trimming a week the plan meant; here the trim is the point, and up to five minutes would erase a 15% cut from
+  every timed run under 35 minutes (25′ × 0.85 = 21.25 → 25′). A shortened run is at least one unit shorter, and never under
+  ten minutes on the clock, 1 km by distance or 30 s a block; where those floors leave nothing, the session comes back unchanged.
+- ⚠️ **The key run is skipped in `easeWeek` itself** (the ruling lives there, quoted), and `keepLongRunLongest` skips it too.
+
+### ⚠️⚠️ FLOORS MET THE LONG-RUN RULE, AND THE LONG RUN GIVES WAY
+
+Shortened for real, a run stops at its floor — so a tiny beginner week (5k/3d/beginner/1249 s, week 4) kept a
+**"10′ easy + gentle pickups" that no hold could bring under a long run trimmed from 13′ to 10′**: on the road the easy run was
+the longer one. The paper trim had passed on paper. Both of the owner's rules hold this way: where an easy run cannot get
+shorter, **the long run gives up some of its trim** (0.85, 0.90, 0.95, then untrimmed) until it is the longest again — 13′ → 11′
+there — and the changes say so ("…so it is trimmed a little less"). Measured over 10,080 eased weeks (all three reasons):
+**0 weeks** with an easy run longer than the long run; the long run gave trim back in 12. `keepLongRunLongest` now shortens for
+real, rounding DOWN, and tightens until the hold is true of the run as prescribed.
+
+### The B-race race week had the same paper-only cut
+
+A survey of **30,068 sessions** an easier week touches (10,178 weeks; main track, beginners, run-walk, roads, B-races, dials):
+every session's figures equal its steps' to the second and the metre — **except the B-race race week's**, scaled by the
+race-week multiplier on paper (`applySecondaryRace`). It shortens through `shortenSession` now. Measured over b-race.test's
+grid: steps agree in all 80 sessions; within **153 s** of the exact product (the walk-backs after strides are kept).
+
+### Measured after (the 3,360 weeks of ease-week.test's grid, "chosen")
+
+| | before (paper) | now (real) |
+|---|---|---|
+| time cut, 1st percentile | — | **13.9%** |
+| mean | 18.9% | **19.5%** |
+| deepest | 32.2% | **32.3%** |
+| under 10% | 0 | **4** (shallowest 5.9%) — every one the same beginner week 4 of ten-minute runs at their floor |
+
+### Guards updated deliberately rather than around
+
+| guard | what changed |
+|---|---|
+| ease-week: "the cut is inside the band" | the 10% minimum now allows a week under it ONLY where one of its runs sits at the ten-minute floor, such weeks ≤ 0.5%, nothing under 5% (re-broken with both scales at 0.97: caught, "no run in it is at its ten-minute floor") |
+| b-race: "the fortnight's shape" | held the ESTIMATE to the exact product — what a paper cut looks like. Now: the run's minutes are its steps' minutes, and within one five-minute step (300 s) of the product |
+
+### The app
+
+Nothing in the app had to change for the runs themselves (`easeWeekIn` adopts `RC.easeWeek`'s week and re-projects through
+`RC.weekView`). Three words changed with them: the Make a week easier sheet ("This makes that week's runs shorter and swaps its
+hardest session, if it has one, for an easy run… On most plans it takes roughly a fifth out of the week"), the menu row
+("Shorter runs, and the hardest session made easy" — a walk-run or Rebuild week has no hard session), and the sheet's rows now
+quote ONE DECIMAL through `reentryKm` (B5's lesson): in whole kilometres a walk-run week read **"2 km → 2 km"** while it really
+goes 2.2 → 1.8.
+
+### Verification
+
+`test/ease-week-real.test.ts` (9): the runs themselves are shorter and add up to their own figures, on every track; walk-run
+and Rebuild weeks prescribe less running; the owner's examples exactly; shorter runs, same walks; the key run stays; titles
+follow the steps; the owner's units and nearest-not-up (asked of `shortenSession` at the easier week's own factors, 3,881
+runs); the long run giving way, by name; and **no session the engine builds is cut on paper only** (every session of every plan,
+B-races at both ends of their window). **12 of 12 re-breaks caught**: trims on paper (R1), run–walk not shortened, blocks on
+15 s, walks shortened too, the key run eased, titles not rewritten, always whole minutes, rounded up, no long-run give-back, the
+B-race on paper, the B-race at the wrong multiplier, and the band guard's floor exception.
+Driven in a browser at 430×932, light and dark: a walk-run plan's Make a week easier sheet (2.2 → 1.8 km … week 5 4.8 →
+4.4), the real button on week 5 → one stored row, "Easier week", both run–walk sessions "2 × (7′ run / 2′ walk)" at 24 min, the
+key run "20′ without stopping" at 28 min unchanged, the session sheet's main set "2 × 7′ run", 16 min. Overflow 0, rows ≥ 70 px,
+no console errors. Screenshots in the session notes folder.
+
+### Found, NOT fixed (follow-ups)
+
+- **The swapped easy run has no pace** (`easeWeek`'s single steady step carries only RPE 2–3), so its distance — worked out at
+  the week's easy pace — cannot be derived from its steps (ease-week-real's figures guard skips it, by type), and for a
+  beginner it can be **"6′ easy (easier week)"** — 70% of a short session, off the five-minute steps. Changing either changes
+  what the runner is told: Road Map step `pc-ease-swappace`, for the owner.
+- **A sentence shows twice** on an eased week's session sheet: `xwBlockText` answers both directions (earlier, later) with "You
+  made this week easier, so nothing moves out of it." (B4). Road Map step `pc-ease-dupline`.
+- `applyInjuryAdjustment` (src/adapt/injury.ts, still no caller) cuts with `scaleSessionDistance` on paper too. Whoever wires it
+  must shorten through `shortenSession` and teach `retitled` any title shape it meets (the title guard fails on an unknown one).

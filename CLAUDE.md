@@ -141,6 +141,8 @@ node --test            # the suite (about 1,800 tests)
   history treats it as the same plan (B9: pauses and date edits are the same plan; only a new goal is new by itself).
 - **`PLAN.weeks` is a display summary with no steps, exercises or pace bands; the prescription is
   `RAW.weeks`** (`rawSessionsForIso()`). Reading the wrong one fails silently.
+- **To shorten a run, use `shortenSession`** (steps, minutes, km and title together). `scaleSessionDistance` changes the
+  figures only: an "easier week" built on it ran in full for months (`notes/plan-adaptation.md`, last chapter).
 - **The block starts at `profile.startDateIso`, as it is** (`planStartIso` — never clamped to today, or the runner
   is in week 1 for ever). Never write a blank start for a real plan; a profile edit keeps it (`formStartIso`).
   After a pause that picks up, the block is laid out from the earlier `profile.blockFromIso` (`blockStartIso`) and

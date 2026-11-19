@@ -31,7 +31,7 @@ import {
 } from "../science/intensity-distribution.ts";
 import { computeMas, masVo2Range } from "../science/mas.ts";
 import { deriveTrainingPaces, reconcileVo2, withHrZones } from "../science/paces.ts";
-import { scaleSessionDistance, sessionVolumeMeters } from "../domain/steps.ts";
+import { sessionVolumeMeters } from "../domain/steps.ts";
 import { RACE_DISTANCES_M } from "../domain/units.ts";
 import { easeWeek } from "../adapt/missed-sessions.ts";
 import { runningDaysFor, runningDayChoices } from "../domain/running-days.ts";
@@ -62,6 +62,7 @@ import {
   rwLong,
   rwSteady,
   walkRunSession,
+  shortenSession,
   type SessionContent,
   strengthSession,
   taperSession,
@@ -2421,9 +2422,9 @@ function applySecondaryRace(weeks: PlannedWeek[], goal: Goal, paces: TrainingPac
       continue;
     }
     if (s.dayOfWeek === raceDow - 1 && HARD_BEFORE_RACE.has(s.type)) { clearedEve = true; continue; }
-    kept.push(s.type === "long" || AEROBIC_RUN_TYPES.has(s.type)
-      ? { ...scaleSessionDistance(s, mult), estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * mult) }
-      : s);
+    // ⚠️ SHORTENED FOR REAL (2026-11-18): this scaled only the figures, so race week's runs were cut on the card and run
+    // in full — the one paper-only trim the survey found among sessions the engine builds (see shortenSession).
+    kept.push(s.type === "long" || AEROBIC_RUN_TYPES.has(s.type) ? shortenSession(s, mult) : s);
   }
   if (clearedEve && !kept.some((s) => s.dayOfWeek === raceDow - 1)) {
     kept.push(shakeoutSession(paces, rw.startDateIso, raceDow - 1));

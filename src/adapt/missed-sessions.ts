@@ -16,9 +16,17 @@
 // could already offer is a FILTER (`adjDrops`), so the shallowest easing a runner could reach took
 // 57% off their week when a scheduled recovery week takes 25%. Measured, this takes 20-21% — inside
 // the book's own "20-to 30-percent reduction in mileage" — and leaves the session COUNT unchanged.
+//
+// ⚠️⚠️ AND THE TRIM IS REAL (2026-11-18). It used to scale only the FIGURES (scaleSessionDistance plus the estimate), so
+// the runs the runner actually runs — the steps the live run, the voice coach and the watch follow — and their titles
+// stayed exactly as they were: an eased "58′ long run" still ran 58 minutes under a week summary saying 46, and a
+// walk-run or Rebuild week, which has no hard session to swap, was not easier at all. `shortenSession` now shortens the
+// steps and derives the minutes, kilometres and title from them. The owner chose what easier means for a run–walk
+// session — "Shorter runs, same walks" — and that a walk-run KEY RUN in an easier week "Stays as it is".
 
 import type { PlannedWeek, Session, SessionOutcome } from "../domain/types.ts";
-import { scaleSessionDistance, weekVolumeMeters } from "../domain/steps.ts";
+import { weekVolumeMeters } from "../domain/steps.ts";
+import { shortenSession } from "../plan/session-templates.ts";
 
 export type MissedSessionResult = {
   triggered: boolean;
@@ -125,36 +133,59 @@ export function easeWeek(week: PlannedWeek, reason: EaseReason = "chosen"): Miss
         targetRpe: { min: 2, max: 3 },
       };
     }
-    if (s.type === "long") {
-      return {
-        ...scaleSessionDistance(s, LONG_SCALE),
-        estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * LONG_SCALE),
-      };
-    }
-    if (s.intensity === "easy") {
-      return {
-        ...scaleSessionDistance(s, EASY_SCALE),
-        estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * EASY_SCALE),
-      };
-    }
+    // ⚠️ A WALK-RUN KEY RUN STAYS AS IT IS — the owner's ruling of 2026-11-18, asked whether an easier week should hold
+    // the test back a week or keep it: "Stays as it is". It is the run the block's checkpoint looks for (20, then 30
+    // minutes without stopping), so the rest of the week gets easier and the checkpoint can still be passed in it.
+    if (s.keyRun) return s;
+    if (s.type === "long") return shortenSession(s, LONG_SCALE);
+    if (s.intensity === "easy") return shortenSession(s, EASY_SCALE);
     return s;
   });
 
   // ⚠️⚠️ THE LONG RUN STAYS THE LONGEST RUN OF THE WEEK — the owner's ruling of 2026-10-05 ("Easier weeks: keep the
   // long run the longest run"), chosen over the book's 30% band where the two disagree. keepLongRunLongest records
   // where they do; test/ease-week.test.ts holds the band everywhere else.
-  const sessions = keepLongRunLongest(trimmed);
-  if (sessions.some((s, i) => s !== trimmed[i])) {
-    changes.push("Kept your long run the longest run of the week, so an easy run is a little shorter too.");
+  // ⚠️ AND WHERE AN EASY RUN CANNOT GET ANY SHORTER, THE LONG RUN GIVES UP SOME OF ITS TRIM. Shortened for real, a run
+  // stops at its floor (ten minutes, in the owner's five-minute steps; shortenSession), so a tiny beginner week can hold a
+  // "10′ easy + gentle pickups" that no hold can bring under a long run trimmed from 13′ to 10′ — measured 2026-11-18,
+  // 5k/3d/beginner week 4. On paper the old trim passed; on the road the easy run was the longer one. Both of the owner's
+  // rules hold this way: the long run stays the longest run, and the run stays on a multiple of five minutes.
+  const longAt = trimmed.findIndex((s) => s.type === "long");
+  const longWas = week.sessions[longAt];
+  let sessions = keepLongRunLongest(trimmed);
+  let longGave = false;
+  for (let f = LONG_SCALE + 0.05; longWas && longestBroken(sessions) && f < 1.001; f += 0.05) {
+    const t2 = trimmed.slice();
+    t2[longAt] = f > 0.999 ? longWas : shortenSession(longWas, f);
+    sessions = keepLongRunLongest(t2);
+    longGave = true;
+  }
+  const heldEasy = sessions.some((s, i) => s !== trimmed[i] && s.type !== "long");
+  if (heldEasy || longGave) {
+    changes.push(heldEasy && longGave
+      ? "Kept your long run the longest run of the week: it is trimmed a little less, and an easy run is a little shorter too."
+      : heldEasy
+        ? "Kept your long run the longest run of the week, so an easy run is a little shorter too."
+        : "Kept your long run the longest run of the week, so it is trimmed a little less.");
   }
 
-  changes.push(
-    reason === "missed"
-      ? "Trimmed the long run ~20% and easy volume ~15% this week; missed sessions are not added back."
-      : reason === "race"
-        ? "Trimmed the long run ~20% and easy volume ~15% this week, so you arrive at your race fresh."
-        : "Trimmed the long run ~20% and easy volume ~15% this week. Next week picks up where it left off.",
-  );
+  // ⚠️ SAY ONLY WHAT WAS TRIMMED. A walk-run week has no long run, and a run already at its floor is left as it was —
+  // "trimmed the long run" over a week without one is the stale-derived-fact trap in the engine's own words.
+  const cutLong = sessions.some((s, i) => s !== week.sessions[i] && s.id !== hardestId && s.type === "long");
+  const cutEasy = sessions.some((s, i) => s !== week.sessions[i] && s.id !== hardestId && s.type !== "long");
+  const what = cutLong && cutEasy ? "the long run ~20% and easy volume ~15%"
+    : cutLong ? "the long run ~20%" : cutEasy ? "easy running ~15%" : "";
+  if (what) {
+    changes.push(
+      reason === "missed"
+        ? `Trimmed ${what} this week; missed sessions are not added back.`
+        : reason === "race"
+          ? `Trimmed ${what} this week, so you arrive at your race fresh.`
+          : `Trimmed ${what} this week. Next week picks up where it left off.`,
+    );
+  }
+  const key = week.sessions.find((s) => s.keyRun);
+  if (key?.keyRun) changes.push(`Kept your key run as it is: ${key.keyRun.minutes} minutes without stopping.`);
 
   const plannedDistanceMeters = weekVolumeMeters(sessions);
   const qualitySessionCount = sessions.filter(
@@ -202,15 +233,35 @@ export function keepLongRunLongest(sessions: Session[]): Session[] {
   const long = sessions.find((s) => s.type === "long");
   if (!long) return sessions;
   return sessions.map((s) => {
-    if (s === long || s.intensity !== "easy" || !EASY_RUN_TYPES.has(s.type)) return s;
+    if (!heldUnder(s, long)) return s;
     let f = 1;
     const cap = (mine: number | undefined, theirs: number | undefined) => {
       if (mine && theirs && mine > theirs * LONGEST_MARGIN) f = Math.min(f, (theirs * LONGEST_MARGIN) / mine);
     };
     cap(s.estimatedDistanceMeters, long.estimatedDistanceMeters);
     cap(s.trainingDistanceMeters, long.trainingDistanceMeters);
-    return f < 1 ? { ...scaleSessionDistance(s, f), estimatedDurationSeconds: Math.round(s.estimatedDurationSeconds * f) } : s;
+    if (f >= 1) return s;
+    // ⚠️ SHORTENED FOR REAL AND ROUNDED DOWN, so the hold is true of the run as prescribed, not of a figure beside it
+    // (shortenSession). Its strides or hill sprints are kept, so one pass can land a unit over: tighten until it holds.
+    let out = shortenSession(s, f, "down");
+    for (let k = 1; k <= 10 && pastLong(out, long); k++) out = shortenSession(s, f - 0.02 * k, "down");
+    return out;
   });
+}
+
+/** An easy run the hold keeps under the long run (never the long run itself, nor a walk-run key run). */
+function heldUnder(s: Session, long: Session): boolean {
+  return s !== long && !s.keyRun && s.intensity === "easy" && EASY_RUN_TYPES.has(s.type);
+}
+/** Is this run longer than the long run allows (LONGEST_MARGIN), on either ruler? */
+function pastLong(s: Session, long: Session): boolean {
+  const over = (mine: number | undefined, theirs: number | undefined) => !!(mine && theirs && mine > theirs * LONGEST_MARGIN);
+  return over(s.estimatedDistanceMeters, long.estimatedDistanceMeters) || over(s.trainingDistanceMeters, long.trainingDistanceMeters);
+}
+/** Is an easy run still past the long run — one keepLongRunLongest could not shorten enough (it sits at its floor)? */
+function longestBroken(sessions: Session[]): boolean {
+  const long = sessions.find((s) => s.type === "long");
+  return !!long && sessions.some((s) => heldUnder(s, long) && pastLong(s, long));
 }
 
 function hardestSessionId(week: PlannedWeek): string | undefined {

@@ -8147,10 +8147,12 @@ function easeWeekSheetHtml() {
     // session carries almost no counted distance for its length, so an easy run of 70% of its
     // duration covers more ground. Printing a rise as though it were a cut would be a false promise,
     // so where that happens the row says the distance is about the same.
+    // \u26a0\ufe0f ONE DECIMAL, AS THE PLAN SCREEN AND B5's CARD (reentryKm) QUOTE IT (2026-11-18). In whole kilometres a walk-run
+    // week read "2 km \u2192 2 km" while it really goes 2.2 \u2192 1.8 km: the row looked like an easier week that changes nothing.
     const up = o.km1 > o.km0 + 0.05;
     const dist = up
       ? "about the same distance, a lot less hard"
-      : Math.round(o.km0) + " km \u2192 " + Math.round(o.km1) + " km";
+      : reentryKm(o.km0) + " km \u2192 " + reentryKm(o.km1) + " km";
     const sub = (o.title ? esc(o.title) + " becomes an easy run \u00b7 " : "") + dist;
     return '<button class="ew-row" data-ewk="' + o.i + '"><span class="ew-mid">' +
       '<span class="ew-t">' + head + '</span><span class="ew-s">' + sub + '</span></span>' +
@@ -8159,9 +8161,12 @@ function easeWeekSheetHtml() {
   const live = opts.filter((o) => !o.why).length;
   return '<div class="eyebrow">Manage plan</div>' +
     '<h3 class="sheet-h">Make a week easier</h3>' +
-    '<p class="mp-note">This swaps that week\u2019s hardest session for an easy run and trims the long ' +
-    'run a little. Nothing is deleted and nothing moves to another week, so your target date does not ' +
-    'change. It takes roughly a fifth out of the week \u2014 about what a built-in easier week does.</p>' +
+    // \u26a0\ufe0f SAID FOR EVERY TRACK (2026-11-18). It read "swaps that week's hardest session ... and trims the long run a
+    // little", which a walk-run or Rebuild week has neither of \u2014 and those weeks now really are easier: every run is
+    // shorter, as the voice coach and the watch will run it (shortenSession). A walk-run key run stays as it is.
+    '<p class="mp-note">This makes that week\u2019s runs shorter and swaps its hardest session, if it has one, for an ' +
+    'easy run. Nothing is deleted and nothing moves to another week, so your target date does not ' +
+    'change. On most plans it takes roughly a fifth out of the week \u2014 about what a built-in easier week does.</p>' +
     (live
       ? '<div class="ew-list">' + opts.map(row).join("") + '</div>'
       : '<p class="mp-note">There is no week left to ease \u2014 the weeks still ahead of you are ' +
@@ -16668,7 +16673,8 @@ function managePlanHtml() {
       row("pause", "Pause my plan", "Stop completely for a while and pick up later", "timer", "var(--rest)") +
       row("holiday", "Going away", "Keep training your own way while you are there", "wxSun", "var(--base)") +
       row("ease", "Not feeling 100%", "Take the hard edges off the next few sessions", "heart", "var(--ease)") +
-      row("easier", "Make a week easier", "Swap one hard session for an easy run", "timer", "var(--taper)") +
+      // 2026-11-18: every run is shorter now, and a walk-run or Rebuild week has no hard session to swap (shortenSession).
+      row("easier", "Make a week easier", "Shorter runs, and the hardest session made easy", "timer", "var(--taper)") +
       // B7: --brass, the medal colour, which no other row uses (and declared in all four theme blocks).
       row("race", bRaceAhead() ? "Your race" : "Add a race", bRaceAhead()
         ? esc(B_RACE_NAME[bRaceAhead().distance] || "Race") + " on " + esc(runDateLabelIso(bRaceAhead().dateIso)) + " \u2014 change it here"

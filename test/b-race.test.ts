@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generatePlan, secondaryRaceWindow } from "../src/plan/generate-plan.ts";
 import { taperFor } from "../src/science/taper.ts";
+import { figuresOf } from "../src/plan/session-templates.ts";
 import { RACE_DISTANCES_M } from "../src/domain/units.ts";
 import type { Athlete, Goal, PlannedWeek, RaceDistanceKey, Session } from "../src/domain/types.ts";
 
@@ -202,10 +203,20 @@ test("BLOCKER: the fortnight's shape — an easier week, one sharpener, the race
     assert.ok(jog.length === 1 && jog[0]!.type === "recovery" && Math.round(jog[0]!.estimatedDurationSeconds / 60) === 25,
       who + ": two days after the B-race is not a 25-minute recovery jog");
     // Easy and long running in race week are cut by the B distance's own race-week multiplier.
+    // ⚠️ RESTATED 2026-11-18, DELIBERATELY: this held the ESTIMATE to the exact product, which is what a cut made on paper
+    // looks like — the steps (what the runner runs) were never cut at all. The run is shortened in its steps now
+    // (shortenSession), so its figures must be its steps' figures, and it lands on the builder's units — a minute, five
+    // minutes, 100 m — with the walk-backs after strides left alone: measured over this grid, within 153 s of the exact
+    // product. One five-minute step is the bound.
     const m = taperFor(sr.distance).volumeMultiplierByWeek.at(-1)!;
     for (const s of rw.sessions.filter((x) => (x.type === "easy" || x.type === "long") && x.dayOfWeek < dow(sr.dateIso))) {
       const was = base.weeks[ri]!.sessions.find((b) => b.id === s.id);
-      if (was) assert.equal(s.estimatedDurationSeconds, Math.round(was.estimatedDurationSeconds * m), who + ": " + s.title + " was not cut by the race-week multiplier");
+      if (!was) continue;
+      assert.equal(s.estimatedDurationSeconds, figuresOf(s.steps).estimatedDurationSeconds,
+        who + ": " + s.title + " was cut on paper only — its steps do not add up to its minutes");
+      assert.ok(Math.abs(s.estimatedDurationSeconds - was.estimatedDurationSeconds * m) <= 300,
+        who + ": " + s.title + " (" + s.estimatedDurationSeconds + " s) was not cut by the race-week multiplier (" +
+        Math.round(was.estimatedDurationSeconds * m) + " s)");
     }
     // Seven days a week, in order, and the week's figures its own.
     for (const w of [before, rw, p.weeks[ri + 1]].filter(Boolean) as PlannedWeek[]) {

@@ -232,20 +232,181 @@ function assemble(
   const band = targetRpe && hardestStepRpe > targetRpe.max
     ? { min: targetRpe.min, max: hardestStepRpe }
     : targetRpe;
-  const estimatedDurationSeconds = Math.round(steps.reduce((s, st) => s + stepDuration(st), 0));
-  const estimatedDistanceMeters = Math.round(steps.reduce((s, st) => s + stepDistance(st), 0));
-  const trainingDistanceMeters = Math.round(steps.reduce((s, st) => s + trainingStepDistance(st), 0));
   return {
     type,
     title,
     description,
     intensity,
-    estimatedDurationSeconds,
-    estimatedDistanceMeters: estimatedDistanceMeters > 0 ? estimatedDistanceMeters : undefined,
-    trainingDistanceMeters: trainingDistanceMeters > 0 ? trainingDistanceMeters : undefined,
+    ...figuresOf(steps),
     steps,
     targetRpe: band,
   };
+}
+
+/**
+ * A session's minutes and kilometres, DERIVED FROM ITS STEPS — the one derivation `assemble` and `shortenSession` share,
+ * so a shortened run's figures are worked out exactly as a built run's are. Measured 2026-11-18 over 30,068 sessions an
+ * easier week touches: every one built by the engine carries exactly these figures (to the second and the metre) — except
+ * the B-race race week's, which were scaled on paper (see `shortenSession`).
+ */
+export function figuresOf(steps: WorkoutStep[]): Pick<SessionContent, "estimatedDurationSeconds" | "estimatedDistanceMeters" | "trainingDistanceMeters"> {
+  const estimatedDurationSeconds = Math.round(steps.reduce((s, st) => s + stepDuration(st), 0));
+  const estimatedDistanceMeters = Math.round(steps.reduce((s, st) => s + stepDistance(st), 0));
+  const trainingDistanceMeters = Math.round(steps.reduce((s, st) => s + trainingStepDistance(st), 0));
+  return {
+    estimatedDurationSeconds,
+    estimatedDistanceMeters: estimatedDistanceMeters > 0 ? estimatedDistanceMeters : undefined,
+    trainingDistanceMeters: trainingDistanceMeters > 0 ? trainingDistanceMeters : undefined,
+  };
+}
+
+// ---- Shortening a built run, for real --------------------------------------------------------------------------
+
+/** How a shortened run is rounded: to the nearest unit (an easier week), or down (a run that must end under a cap). */
+export type ShortenRounding = "nearest" | "down";
+/** The shortest a shortened run on the clock may be, and a run–walk block. */
+const SHORTEN_MIN_RUN_SEC = 10 * 60;
+const SHORTEN_MIN_BLOCK_SEC = 30;
+/** The shortest a shortened distance-set run may be. */
+const SHORTEN_MIN_DIST_M = 1000;
+
+/**
+ * ⚠️⚠️ SHORTEN A RUN FOR REAL: ITS STEPS, AND THE MINUTES, KILOMETRES AND TITLE DERIVED FROM THEM.
+ *
+ * Until 2026-11-18 an easier week (easeWeek), its long-run hold and the B-race race week "trimmed" runs with
+ * `scaleSessionDistance` plus a scaled estimate — the FIGURES only. The steps, which the live run, the voice coach and the
+ * watch follow, were untouched, and so was the title: an eased "58′ long run" still said 58′ and still ran 58 minutes
+ * while the week's summary said 46. A walk-run or Rebuild week has no hard session to swap, so its easier week changed
+ * nothing at all that the runner would run. This rewrites the prescription and derives everything else from it.
+ *
+ * WHAT COMES OFF, AND FROM WHERE. `factor` is what is left of the session's RUNNING (its steady and rep steps); the cut
+ * comes out of its EASY RUNNING only:
+ *   - a continuous run (any `steady` step): from the steady running. Strides, pickups, hill sprints, race-effort reps and
+ *     their walk-backs stay as they are — they are short and they are the point of the session. Its total lands on a whole
+ *     minute, on five where the builder put it on five (the owner, 2026-08-26: timed easy runs "always be in multiples of
+ *     5's"), or on 100 m for a distance-set run (KM_UNIT_M).
+ *   - a run–walk session (no steady step): every RUNNING block is shortened and every walk is left alone — the owner's
+ *     choice on 2026-11-18, "Shorter runs, same walks": 2 × (8′ run / 2′ walk) → 2 × (7′ run / 2′ walk). A block rounds
+ *     to 10 s under three minutes, 30 s under ten, then whole minutes; a run without stopping to whole minutes.
+ *   - warm-ups and cool-downs never: preparation is not training (isPreparationStep).
+ *
+ * ⚠️ NEAREST, NOT UP, AND THAT IS A DELIBERATE EXCEPTION TO THE BUILDER'S "ROUNDING GIVES THE RUNNER THE WORK". That rule
+ * stops rounding noise trimming a week the plan meant; here the trim IS the point, and rounding up to five minutes would
+ * erase a 15% cut from every timed run under 35 minutes (25′ × 0.85 = 21.25 → 25′). A shortened run is at least one unit
+ * shorter, never under ten minutes on the clock, a kilometre by distance or 30 s for a block; where those floors leave
+ * nothing to take off, the session comes back unchanged (the caller's `triggered` stays honest).
+ *
+ * The title's own number follows the steps (the builders' rule since 2026-08-26: "rebuilt from the steps"): a run's
+ * leading minutes or kilometres, a run–walk title's block ("Run–walk · 8 × (50″ run / 1′30″ walk)"), "19′ without
+ * stopping" with its description, and each block's label ("Run 50″ — easy, conversational").
+ */
+export function shortenSession<T extends SessionContent>(s: T, factor: number, rounding: ShortenRounding = "nearest"): T {
+  const steps = s.steps ?? [];
+  if (!(factor > 0 && factor < 1) || !steps.length) return s;
+  const next = steps.some((st) => st.kind === "steady")
+    ? shortenContinuous(steps, factor, rounding)
+    : shortenBlocks(steps, factor, rounding);
+  if (!next) return s;
+  const fig = figuresOf(next);
+  if (fig.estimatedDurationSeconds >= s.estimatedDurationSeconds) return s;
+  return { ...s, ...fig, steps: next, ...retitled(s, next, fig) };
+}
+
+function roundTo(x: number, unit: number, rounding: ShortenRounding): number {
+  return (rounding === "down" ? Math.floor(x / unit + 1e-9) : Math.round(x / unit)) * unit;
+}
+
+/**
+ * Share `total` over `parts` in proportion, each on `unit`, summing exactly — one rounding per session, the remainder
+ * handed to the largest shares first (byDistanceSet's rule: rounding each segment on its own drags the gear changes about).
+ */
+function apportion(parts: number[], total: number, unit: number): number[] {
+  const sum = parts.reduce((a, b) => a + b, 0);
+  const exact = parts.map((p) => (p * total) / sum);
+  const out = exact.map((e) => Math.max(unit, Math.round(e / unit) * unit));
+  const order = out.map((_, i) => i).sort((a, b) => exact[b]! - exact[a]!);
+  let diff = total - out.reduce((a, b) => a + b, 0);
+  for (let k = 0; diff !== 0 && k < order.length * 64; k++) {
+    const i = order[k % order.length]!;
+    if (diff > 0) { out[i] = out[i]! + unit; diff -= unit; }
+    else if (out[i]! > unit) { out[i] = out[i]! - unit; diff += unit; }
+  }
+  return out;
+}
+
+/** A continuous run: the cut comes out of its steady running; see shortenSession. Null when nothing can come off. */
+function shortenContinuous(steps: WorkoutStep[], factor: number, rounding: ShortenRounding): WorkoutStep[] | null {
+  const timed = steps.map((st, i) => (st.kind === "steady" && st.durationSeconds ? i : -1)).filter((i) => i >= 0);
+  const byDist = steps.map((st, i) => (st.kind === "steady" && !st.durationSeconds && st.distanceMeters && st.targetPaceSecPerKm ? i : -1))
+    .filter((i) => i >= 0);
+  const body = timed.length ? timed : byDist;
+  if (!body.length) return null;
+  const total = steps.reduce((a, st) => a + stepDuration(st), 0);
+  const running = steps.reduce((a, st) => a + (st.kind === "steady" || st.kind === "rep" ? stepDuration(st) : 0), 0);
+  const bodySec = body.reduce((a, i) => a + stepDuration(steps[i]!), 0);
+  const cut = (1 - factor) * running;
+  if (!(bodySec > cut)) return null;
+  const out = steps.slice();
+  if (!timed.length) {
+    // Set by distance: the steady running loses the cut at its own pace, on the builder's 100 m.
+    const dist = body.reduce((a, i) => a + steps[i]!.distanceMeters!, 0);
+    let want = roundTo((dist * (bodySec - cut)) / bodySec, KM_UNIT_M, rounding);
+    if (want >= dist) want = dist - KM_UNIT_M;
+    want = Math.max(want, SHORTEN_MIN_DIST_M);
+    if (want >= dist) return null;
+    const parts = apportion(body.map((i) => steps[i]!.distanceMeters!), want, DIST_UNIT_M);
+    body.forEach((i, n) => { out[i] = { ...steps[i]!, distanceMeters: parts[n]! }; });
+    return out;
+  }
+  // On the clock: the session's total — what its title names — lands on a whole minute, or on five where it was on five.
+  const was = Math.round(total);
+  const unit = was % 300 === 0 ? 300 : 60;
+  const titled = Math.round(was / unit) * unit;
+  let want = roundTo(total - cut, unit, rounding);
+  if (want >= titled) want = titled - unit;
+  want = Math.max(want, SHORTEN_MIN_RUN_SEC);
+  if (want >= titled) return null;
+  const keep = bodySec - (was - want);
+  if (keep < body.length * 60) return null;
+  const whole = keep % 60 === 0 && body.every((i) => steps[i]!.durationSeconds! % 60 === 0);
+  const parts = apportion(body.map((i) => steps[i]!.durationSeconds!), keep, whole ? 60 : 1);
+  body.forEach((i, n) => { out[i] = { ...steps[i]!, durationSeconds: parts[n]! }; });
+  return out;
+}
+
+/** A run–walk session: every running block shorter, every walk as it was (the owner, 2026-11-18). Null: nothing came off. */
+function shortenBlocks(steps: WorkoutStep[], factor: number, rounding: ShortenRounding): WorkoutStep[] | null {
+  const single = steps.filter((st) => st.kind === "rep").length === 1;
+  let moved = false;
+  const out = steps.map((st) => {
+    if (st.kind !== "rep" || !st.durationSeconds) return st;
+    const exact = st.durationSeconds * factor;
+    const unit = single || exact >= 600 ? 60 : exact >= 180 ? 30 : 10;
+    const sec = Math.max(SHORTEN_MIN_BLOCK_SEC, roundTo(exact, unit, rounding));
+    if (sec >= st.durationSeconds) return st;
+    moved = true;
+    return { ...st, durationSeconds: sec, label: st.label.replace(/^Run \S+ —/, `Run ${clock(sec)} —`) };
+  });
+  return moved ? out : null;
+}
+
+/** The title (and, for a run without stopping, the description) a shortened session's own numbers now give it. */
+function retitled(s: SessionContent, next: WorkoutStep[], fig: ReturnType<typeof figuresOf>): { title: string; description: string } {
+  let title = s.title;
+  let description = s.description;
+  const reps = next.filter((st) => st.kind === "rep" && st.durationSeconds);
+  if (/^\d+′ without stopping/.test(title) && reps.length === 1) {
+    const min = Math.round(reps[0]!.durationSeconds! / 60);
+    title = title.replace(/^\d+′/, `${min}′`);
+    description = description.replace(/^\d+ minutes/, `${min} minutes`);
+  } else if (/^(Long run|Run)–walk · \d+ × \(\S+ run \//.test(title) && reps.length) {
+    title = title.replace(/× \(\S+ run \//, `× (${clock(reps[0]!.durationSeconds!)} run /`);
+  } else if (/^\d+′/.test(title)) {
+    title = title.replace(/^\d+′/, `${Math.round(fig.estimatedDurationSeconds / 60)}′`);
+  } else if (/^\d+(\.\d+)? km |^\d+ m /.test(title) && fig.estimatedDistanceMeters) {
+    title = title.replace(/^\d+(\.\d+)? km|^\d+ m/, kmLabel(fig.estimatedDistanceMeters));
+  }
+  return { title, description };
 }
 
 function warmup(paces: TrainingPaces, minutes: number, withStrides: boolean): WorkoutStep {

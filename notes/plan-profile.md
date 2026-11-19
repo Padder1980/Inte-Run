@@ -984,6 +984,8 @@ distance and duration but not the steps — and these runs are prescribed by dur
 ease week from B14, a walk-run ease week, "make a week easier" on any beginner week) is prescribed exactly as before: measured on
 Walk-run 1's eased week, the key run still asks for 20′ without stopping while its estimate says 24′ instead of 28′. Fixing it
 changes a shared function and what "easier" means (clinical) — for the owner to decide.
+**✅ Fixed 2026-11-18/19** — the owner chose "Shorter runs, same walks" and that the key run "Stays as it is";
+`shortenSession` shortens the steps for real. See `notes/plan-adaptation.md`, "AN EASIER WEEK IS EASIER ON THE ROAD".
 
 ### For the clinical reviewer
 

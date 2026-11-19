@@ -1330,7 +1330,7 @@ after `#view` (`ensureSheet` appends it to `.app`), so the hidden copy's OLD val
   wizFieldVal("s_target") || ""`), so EVERY habit-builder who starts a plan, first run included, has to type a target to get
   past the goal step. Measured 2026-11-19 on a clean start (no old sheet involved). `draftFromForm` already treats blank as a
   real answer (`targetSet: false`), so the likely fix is `cfg.time === true` in that one check. Roadmap
-  `pc-wizard-optional-target`.
+  `pc-wizard-optional-target` — fixed with §10 piece 4 the same day (its list below, item 1).
 
 ## ✅ §10 — PIECE 4: GOALS WITHOUT A RACE — ROLLING BLOCKS (2026-11-19)
 
@@ -1470,3 +1470,19 @@ the profile form, a full reload. Screenshots: `side-session-notes/…/p4-norace-
 ### For the clinical reviewer (added)
 An open-ended Base held at a race block's opening week, with one quality session a week and a test at the end of every block
 (the rule a race road applies to a few weeks, applied with no end); no plan without a race for 12–17s.
+
+## Two more readers of the target time's three meanings (2026-11-19)
+
+§10 piece 4 fixed the wizard's goal step (`cfg.time === true`, item 1 of its list above). Two readers were still wrong, found while
+fixing the same step on another branch:
+
+- **`draftFromForm`'s typo sentence ended "— or leave it blank." for EVERY status with a time**, so a regular or competitive runner
+  who cleared the box was told to leave it blank, and doing so brought the same sentence back. It now offers blank only to
+  `"optional"` (measured after, in the edit sheet: "Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00.").
+- **`wizStepError` asked a habit-builder to "Pick your race date."** under a card that says "Target date"; `=== true` now, as
+  `draftFromForm` and `goalCardInner` already were.
+- Guarded by `test/wizard-optional-target.test.ts`, whose invariant would have caught the original bug: for EVERY status (derived
+  from `GOAL_BY_STATUS`) and a blank, a mistyped and a real target, the wizard's goal step and `draftFromForm` must agree on
+  whether the answer is allowed (undoing piece 4's `=== true` is caught by it). Re-broken three ways, each caught.
+- ⚠️ The wizard's typo sentence (piece 4's: "…, or leave it blank.") and the save's ("…, e.g. 1:45:00 — or leave it blank.") differ
+  in wording; both offer blank only to `"optional"`, so they were left as written.

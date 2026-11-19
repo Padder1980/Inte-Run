@@ -29342,7 +29342,9 @@ function draftFromForm() {
   } else if (goalCfg.time) {
     // ⚠️ A TYPO IS STILL REFUSED RATHER THAN GUESSED AT, optional or not — a target nobody can read is
     // worse than none, and silently keeping the old one would be a goal they did not set.
-    if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00 \u2014 or leave it blank.");
+    // \u26a0\ufe0f "Or leave it blank" only where blank is an answer: a regular or competitive runner who cleared the
+    // box was told to leave it blank, and leaving it blank brought the same sentence back (2026-11-19).
+    if (!mmss(targetRaw)) throw new Error("Enter your target time as h:mm:ss or m:ss, e.g. 1:45:00" + (goalCfg.time === "optional" ? " \u2014 or leave it blank." : "."));
     targetS = RC.parseDuration(targetRaw);
     targetSet = true;
   } else {
@@ -30462,7 +30464,8 @@ function wizStepError(id) {
     if (cfg.time === true && !mmss(tt)) return "Enter your target time, e.g. 1:45:00.";
     if (cfg.time === "optional" && tt && !mmss(tt)) return "Enter your target time as h:mm:ss or m:ss, or leave it blank.";
     const d = wizFieldVal("s_date");
-    if (!d) return "Pick your " + (cfg.time ? "race" : "target") + " date.";
+    // A habit-builder's card says "Target date" (goalCardInner) and draftFromForm says "target date": === true here too.
+    if (!d) return "Pick your " + (cfg.time === true ? "race" : "target") + " date.";
     if (d <= todayIso()) return "That date needs to be in the future.";
     return null;
   }

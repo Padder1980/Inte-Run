@@ -1287,7 +1287,7 @@ nothing said.** "Add it now" closed the sheet and focused an `s_easypace` that n
   After any one-answer edit from the profile page, the sheet still holds that form; type on the full Edit page, tap another tab,
   and the sheet's older values overwrite what was typed in `draft.__f` (later in document order wins). Measured 2026-11-19: a
   date typed as 14 Mar 2027 came back as 1 Nov 2026. Reads are unaffected (`$` finds `#view`'s field first). Roadmap
-  `pc-setup-stale-sheet`.
+  `pc-setup-stale-sheet` — fixed later the same day (below), and the wizard turned out to be exposed too.
 
 ### And a landmine removed the same day (2026-11-19)
 
@@ -1298,3 +1298,36 @@ this Mac ran them against whatever that one worktree last built. They fail again
 sessions' `npm run verify` passed, so that worktree evidently held an older build until it was refreshed for this fix; from then
 on they failed every verify on this Mac, and once the worktree is deleted they would fail to load at all. Removed. A test reads
 the build through `new URL("../web/app.html", import.meta.url)`, never an absolute path.
+
+## A closed sheet kept its copy of the setup form (pc-setup-stale-sheet, fixed 2026-11-19)
+
+The sheet hides with `display:none` (`.sheet-ov` / `.sheet-ov.on`) and keeps `#sheetBody`, so after a one-answer edit from the
+profile page its copy of the WHOLE form stayed in the page, every `s_` id with it, until another sheet happened to replace it.
+`captureSetupFields` sweeps the whole document (it must: the form IS in the sheet during a one-answer edit) and the sheet comes
+after `#view` (`ensureSheet` appends it to `.app`), so the hidden copy's OLD values won.
+
+- ⚠️ **Measured, both before the fix:** (1) the full Edit page — a date typed, then a tab tapped (the nav buttons capture), came
+  back as the old one (14 Mar → 1 Nov). (2) **The wizard** — reached from a card on Today ("Start a new plan" on B6's get back
+  on track, or B9's after race day: `answerRealign` / `answerHandover` → `startWizard`), with no sheet opened in between: a goal
+  picked as a half came back as the old 10K on the next step. `wizNext`'s capture took the hidden copy's value, and
+  `wizFieldVal` finds the hidden copy before it ever looks in `draft.__f`, so the new plan would have been built from the old
+  goal. The Manage plan menu's "Start a new plan" escaped by luck: that menu is a sheet, so it replaced the old form first.
+- **Fix: `closeSheet()` ends with `dropSheetForm()`**, which empties `#sheetBody` when (and only when) it holds `s_` fields. No
+  animation is lost (the sheet has none on the way out). Every other sheet keeps its content, because code that closes a sheet
+  may still read it (the session sheet's time field, for one). After the fix the wizard built the half's plan.
+- **"Show every question" lost what was typed in the sheet** (measured: 5K came back as 10K): nothing captured the sheet before
+  `closeProfileEdit`, and the full page is drawn from the profile and `draft.__f`. It now captures first. ⚠️ A box CLEARED in the
+  sheet still comes back filled on the full page (render's setup branch restores without `exact`, and `exact` there would blank
+  a newer stored answer after an ordinary trip between tabs); on the full page that is visible and fixable, unlike the preview.
+- Guarded by `test/setup-stale-sheet.test.ts` (the "Show every question" handler lifted from inside the real `applySetupFocus`;
+  re-broken twice, each caught). `test/pace-prompt-edit.test.ts` lifts `closeSheet` too, so it lifts `dropSheetForm` with it.
+
+### ⚠️ Found, NOT fixed (its own piece of work)
+
+- **The wizard's goal step refuses a blank OPTIONAL target time.** `wizStepError`'s goal branch tests `cfg.time` for truth, and
+  "Building the habit" carries `time: "optional"`, so a blank box is refused with "Enter your target time, e.g. 1:45:00." while
+  the card above it says OPTIONAL, "leave it blank". The wizard never pre-fills the box (`wizBody`: `target:
+  wizFieldVal("s_target") || ""`), so EVERY habit-builder who starts a plan, first run included, has to type a target to get
+  past the goal step. Measured 2026-11-19 on a clean start (no old sheet involved). `draftFromForm` already treats blank as a
+  real answer (`targetSet: false`), so the likely fix is `cfg.time === true` in that one check. Roadmap
+  `pc-wizard-optional-target`.

@@ -15534,7 +15534,23 @@ function openSessionSheet(sess, week) {
 /** ⚠️ EVERY SHEET-SCOPED FLAG IS CLEARED HERE, AND LIVE_TARGET IS THE ONE THAT WOULD BITE. Dismissed
  *  without committing, a flag left set turns the NEXT "add a session to Tuesday" into a target for a
  *  run that is no longer live — a state nobody could see and nobody could explain. */
-function closeSheet() { slogFlush(); PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); strengthStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; }
+function closeSheet() { slogFlush(); PROFILE_EDIT_OPEN = false; state.setupFocus = null; stretchStop(); strengthStop(); LIVE_TARGET = false; const o = $("sheetOv"); if (o) o.classList.remove("on"); WX_SHEET_OPEN = false; dropSheetForm(); }
+/**
+ * ⚠️ A CLOSED SHEET MUST NOT KEEP THE SETUP FORM (pc-setup-stale-sheet, 2026-11-19). The sheet hides
+ * with display:none and keeps its body, so after a one-answer edit from the profile page its copy of
+ * the form stayed in the page, every s_ id with it, until another sheet happened to replace it.
+ * captureSetupFields sweeps the whole document (it must: that form IS in the sheet while one answer is
+ * edited), and the sheet comes after #view, so the hidden copy's OLD values overwrote what was typed.
+ * Measured: on the full Edit page a date typed and then left by a tab came back as the old one; in
+ * the wizard, opened from a card on Today with no sheet in between, a goal picked as a half came back
+ * as the old 10K, because wizFieldVal also finds the hidden copy before it looks in draft.__f.
+ * Only the setup form is dropped: another sheet's content may still be read by the code that closed it.
+ * No animation is lost: the sheet has none on the way out.
+ */
+function dropSheetForm() {
+  const b = $("sheetBody");
+  if (b && b.querySelector('[id^="s_"]')) b.innerHTML = "";
+}
 // Wire every element carrying data-open to open its session detail (keyed by stable session id).
 function wireSessionTaps() {
   document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => {
@@ -28634,6 +28650,11 @@ function applySetupFocus() {
     const all = $("setupAll");
     if (all) all.onclick = () => {
       const wasSheet = PROFILE_EDIT_OPEN;
+      // ⚠️ KEEP WHAT WAS TYPED IN THE SHEET. The full page is drawn from the stored profile and then
+      // from draft.__f, and nothing had captured the sheet: a goal changed to 5K came back as the old
+      // 10K on "Show every question" (measured 2026-11-19). Captured before closeProfileEdit, which
+      // drops the sheet's form (dropSheetForm).
+      if (wasSheet) captureSetupFields();
       closeProfileEdit();
       if (wasSheet) { state.screen = "setup"; }
       render();

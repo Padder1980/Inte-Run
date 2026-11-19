@@ -56,7 +56,7 @@ const SAVE_HANDLER = braced(inWire('const save = $("saveProfile");'), "the save 
 const DO_SAVE = braced(inWire("function doSaveProfile() {"), "doSaveProfile");
 
 const FNS = ["needsPacePrompt", "openPacePrompt", "openProfileEdit", "closeProfileEdit", "openProfilePreview", "closeSheet",
-  "captureSetupFields", "restoreSetupFields", "wizFieldVal", "seedSetupDraft", "draftFromForm",
+  "dropSheetForm", "captureSetupFields", "restoreSetupFields", "wizFieldVal", "seedSetupDraft", "draftFromForm",
   "isBeginnerStatus", "goalsForAge", "currentAgeAnswer", "derivedGoalS", "formStartIso",
   "strMinVal", "strLevelVal", "strGoalVal", "kitFromField", "kitToField", "strengthKitOf", "strengthDaysOf", "returnKind"];
 const CONSTS = ["GOAL_BY_STATUS", "STR_DEFAULT_MIN", "STR_DEFAULT_LEVEL", "STR_DEFAULT_GOAL"];
@@ -90,6 +90,10 @@ function page() {
   const kids: Record<string, any[]> = { view: [], sheetBody: [] };
   const box = (name: string) => {
     const el = make(name, "div");
+    el.querySelector = (sel: string) => {
+      assert.equal(sel, '[id^="s_"]', "the page was asked for something this fake does not draw: " + sel);
+      return (kids[name] ?? []).find((e) => e.id.startsWith("s_")) || null;
+    };
     Object.defineProperty(el, "innerHTML", {
       set(h: string) {
         if (name === "sheetBody") dom.sheetWrites.push(h);

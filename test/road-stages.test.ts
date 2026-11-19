@@ -58,8 +58,11 @@ test("BLOCKER: the owner's own case builds as Rebuild → Base → race block, w
   assert.ok(prop, "a returning habit-builder is placed on a road");
   assert.equal(prop.startStage, "rebuild");
   assert.equal(prop.shortWeeks, 0, "his runway fits the whole road");
-  assert.deepEqual(prop.stages.map((s) => s.kind), ["rebuild", "base", "race"]);
-  assert.equal(prop.stages[2]!.weeks, RACE_BLOCK_WEEKS.half, "the race block is the book's 16 weeks");
+  // §10 piece 3 (2026-11-18): the race block is laid out as blocks of four, each ending in a checkpoint — one block to
+  // the engine (test/road-regular.test.ts holds the byte-for-byte half).
+  assert.deepEqual(prop.stages.map((s) => s.kind), ["rebuild", "base", "race", "race", "race", "race"]);
+  assert.equal(prop.stages.filter((s) => s.kind === "race").reduce((n, s) => n + s.weeks, 0), RACE_BLOCK_WEEKS.half,
+    "the race block is the book's 16 weeks");
   const p = roadPlan(athlete, goal, prop.stages, prop.rampWeeks);
   assert.equal(p.weeks.length, 25, "his 25 weeks to race day are all planned — none left as a lead-in");
   assert.ok(p.weeks.every((w) => w.stage), "every week carries its stage");
@@ -210,11 +213,13 @@ test("roadFor places the runners it is built for, and says honestly when the run
   // Placed: the beginner track's continuous runner, coming back or not.
   assert.equal(roadStartFor(athlete), "rebuild");
   assert.equal(roadStartFor({ ...athlete, returningFromInjury: false }), "rebuild");
-  // §10 decision 2 (2026-11-18): a run-walk runner starts at Walk-run 1 now (test/road-walkrun.test.ts). Not yet placed
-  // (each recorded in notes/plan-profile.md): a 12-17 runner, a regular runner.
+  // §10 decision 2 (2026-11-18): a run-walk runner starts at Walk-run 1 now (test/road-walkrun.test.ts); §10 decision 3
+  // (piece 3, the same day): a regular runner coming back starts at Rebuild, otherwise at Base (test/road-regular.test.ts).
+  // Not yet placed (recorded in notes/plan-profile.md): a 12-17 runner.
   assert.equal(roadStartFor({ ...athlete, runWalk: true }), "walkrun1");
   assert.equal(roadStartFor({ ...athlete, age: 15 }), null);
-  assert.equal(roadStartFor({ ...athlete, experience: "recreational" }), null);
+  assert.equal(roadStartFor({ ...athlete, experience: "recreational" }), "rebuild");
+  assert.equal(roadStartFor({ ...athlete, experience: "competitive", returningFromInjury: false }), "base");
   // Short: ten weeks to the same race. The foundation he needs is kept; the race block is the part shortened, and
   // the proposal says by how much and when a race would fit the whole road — one choice among the others.
   const soon = { ...goal, raceDateIso: add(START, 18 * 7 - 1) };

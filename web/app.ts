@@ -6614,6 +6614,14 @@ const ROAD_STAGE_JOB = {
   base: "More running and a first taste of speed: one gentle fartlek a week, and hill sprints.",
   race: "The structured plan for your race: threshold and race-pace work, the longest long runs, then the taper.",
 };
+/**
+ * §10 piece 3 — the same two stages for a regular or competitive runner, whose Rebuild and Base are the main track's own weeks
+ * built from the mileage they state (the beginner words — "one gentle fartlek", "strength twice a week" — are not their week).
+ */
+const ROAD_STAGE_JOB_MAIN = {
+  rebuild: "Easy running only, building back from the running you do now. No hard sessions until you choose to move up.",
+  base: "Your running built up from where it is now: one quality session a week, and the long run growing towards your race block’s.",
+};
 /** The shortest race block a road keeps (the engine's own shortest block). */
 const ROAD_MIN_RACE_WEEKS = 4;
 /** The checkpoint pop-up's last showing: "<the checkpoint's Monday>|<the day shown>" — once a day while unanswered. */
@@ -9684,9 +9692,13 @@ function todayNextUp() {
  *   checkpoints  each answer: the Monday the stage ended on (dueIso), the stage it ended, "up" | "more" | "ease"
  * The current stage is DERIVED from those (roadNow) rather than stored a second time: one source, so the store
  * and the plan can never disagree about where the runner is.
- * ⚠️ PLACED TODAY ONLY WHERE THE ENGINE PLACES (RC.roadStartFor): the beginner track's continuous runner, coming back
- * or not. A runner whose answers no longer place them (now a regular runner, now run-walk) has no road, and their
- * plan is exactly the plan it was.
+ *   destWeeks    §10 piece 3, a regular runner's road only: the race block's length as laid, which their foundation is
+ *                aimed at — stored for the reason rampWeeks is
+ * ⚠️ PLACED ONLY WHERE THE ENGINE PLACES (RC.roadStartFor): since §10 every adult — run-walk, the habit-builder, and (piece 3)
+ * the regular or competitive runner. A runner whose answers no longer place them (now 12–17) has no road, and their plan
+ * is exactly the plan it was.
+ * ⚠️ §10 PIECE 3: THE RACE BLOCK HAS CHECKPOINTS TOO, every four weeks (RC.raceBlockSplit) — stored as consecutive "race"
+ * stages, built by the engine as one block. They HOLD NOBODY: unanswered, the race block carries on as laid.
  */
 function roadOf(pf) {
   const r = pf && pf.road;
@@ -9718,8 +9730,12 @@ function wizRoadFor(pf, prop) {
 /** The stored road for a proposal: its first Monday counted back from race week, so the stages fill it exactly. */
 function roadFromProposal(prop, pf) {
   const weeks = prop.stages.reduce((n, s) => n + s.weeks, 0);
-  return { v: 1, fromIso: roadMondayAfter(weekMondayOf(pf.raceDate), -(weeks - 1)),
+  const road = { v: 1, fromIso: roadMondayAfter(weekMondayOf(pf.raceDate), -(weeks - 1)),
     stages: prop.stages.map((s) => ({ kind: s.kind, weeks: s.weeks })), rampWeeks: prop.rampWeeks, checkpoints: [] };
+  // §10 piece 3: a regular runner's foundation is aimed at the race block as laid — stored, as rampWeeks is, so that no
+  // later answer moves the destination of a week already run (absent on a beginner's road: the book's length).
+  if (prop.destWeeks > 0) road.destWeeks = prop.destWeeks;
+  return road;
 }
 /** The last answer given at the checkpoint due on this Monday, or null. */
 function roadAnswerAt(r, dueIso) {
@@ -9736,7 +9752,11 @@ function effectiveRoad(pf, ath, goal) {
   const r = roadOf(pf);
   if (!r) return null;
   try { if (!RC.roadStartFor(ath)) return null; } catch (e) { return null; }
-  const stages = r.stages.map((s) => ({ kind: s.kind, weeks: Math.max(1, Math.round(Number(s.weeks))) }));
+  // ⚠️ §10 PIECE 3 — THE RACE BLOCK IS ONE STAGE HERE, however it is stored: its blocks of four (each with a checkpoint) are
+  // merged, the road fitted and held exactly as before, and the block cut into its blocks again at the end (roadSplitRace),
+  // so its checkpoints always follow the race block as it now stands. A road stored before the race block had checkpoints
+  // (one race stage) is cut the same way: its sessions do not change — the engine builds the entries as one block.
+  const stages = roadMergeRace(r.stages.map((s) => ({ kind: s.kind, weeks: Math.max(1, Math.round(Number(s.weeks))) })));
   const race = stages[stages.length - 1];
   const diff = roadWeeksBetween(r.fromIso, weekMondayOf(goal.raceDateIso)) + 1 - stages.reduce((n, s) => n + s.weeks, 0);
   const lastF = stages.length > 1 ? stages[stages.length - 2] : race;
@@ -9792,7 +9812,29 @@ function effectiveRoad(pf, ath, goal) {
     }
     break;
   }
-  return { stages: stages.filter((s) => s.weeks > 0), rampWeeks: r.rampWeeks };
+  // ⚠️⚠️ NO HOLD INSIDE THE RACE BLOCK: the loop above stops at its first Monday (it is one stage here). A race-block checkpoint
+  // left unanswered lets the plan carry on as laid — holding there would shorten the race block, which decision 4 says the
+  // app never does by itself; there is no stage to move up to, only the same block going on.
+  return { stages: roadSplitRace(stages.filter((s) => s.weeks > 0), pf.goalDist), rampWeeks: r.rampWeeks, destWeeks: r.destWeeks };
+}
+/** §10 piece 3: the stages with the race block's entries merged into one race stage (the last). */
+function roadMergeRace(stages) {
+  const at = stages.findIndex((s) => s.kind === "race");
+  if (at < 0) return stages.map((s) => ({ kind: s.kind, weeks: s.weeks }));
+  const weeks = stages.slice(at).filter((s) => s.kind === "race").reduce((n, s) => n + s.weeks, 0);
+  return stages.slice(0, at).map((s) => ({ kind: s.kind, weeks: s.weeks })).concat([{ kind: "race", weeks: weeks }]);
+}
+/**
+ * §10 piece 3: the race block (the last stage) cut into its blocks — a checkpoint every four weeks, never in the taper
+ * (RC.raceBlockSplit, the one definition). Anything before it is left as it is.
+ */
+function roadSplitRace(stages, goalDist) {
+  const merged = roadMergeRace(stages);
+  const last = merged[merged.length - 1];
+  if (!last || last.kind !== "race") return merged;
+  let cut = [last.weeks];
+  try { cut = RC.raceBlockSplit(last.weeks, goalDist || "half"); } catch (e) {}
+  return merged.slice(0, -1).concat(cut.map((w) => ({ kind: "race", weeks: w })));
 }
 /** The minimum the road needs about the runner to know whether it still places them: their track and age. */
 function roadAthleteOf(pf) {
@@ -9826,7 +9868,9 @@ function roadCheckpoint() {
   if (!r || !legs) return null;
   const thisMonday = weekMondayOf(todayIso());
   for (const leg of legs) {
-    if (leg.kind === "race") return null;
+    // ⚠️ §10 PIECE 3: every leg ends in a checkpoint — the race block's blocks of four too — except the last, which ends on
+    // race day (B9's after-race handover asks that question).
+    if (leg.i === legs.length - 1) return null;
     if (thisMonday >= leg.endIso) continue;
     if (thisMonday < roadMondayAfter(leg.endIso, -1)) return null;
     if (roadAnswerAt(r, leg.endIso)) return null;
@@ -9996,12 +10040,27 @@ function roadLegName(legs, i) {
   const l = legs[i];
   if (!l) return "";
   const all = legs.filter((x) => x.kind === l.kind);
-  // Walk-run 1 and 2 carry their number already; an eased week of one is still that block.
-  const numbered = l.kind === "rebuild" || l.kind === "base";
+  // Walk-run 1 and 2 carry their number already; an eased week of one is still that block. §10 piece 3: the race block's
+  // blocks are "Race block 1", "Race block 2"… — each ends in its own checkpoint.
+  const numbered = l.kind === "rebuild" || l.kind === "base" || l.kind === "race";
   return ROAD_STAGE_LABEL[l.kind] + (numbered && all.length > 1 ? " " + (all.indexOf(l) + 1) : "");
 }
 /** §10 decision 2: is this one of the two walk-run blocks? */
 function roadWalkRun(kind) { return kind === "walkrun1" || kind === "walkrun2"; }
+/**
+ * §10 piece 3 — is the runner on a road, whose checkpoints ask for the end-of-block test? Then nothing else asks for one (the
+ * weekly review's 28-day retest stands aside).
+ */
+function roadOwnsTests() {
+  try { return !!roadLegsNow(profile); } catch (e) { return false; }
+}
+/** What a stage is for, in the runner's words — §10 piece 3: a regular or competitive runner's Rebuild and Base are their own. */
+function roadStageJob(kind, pf) {
+  const p = pf || profile;
+  let main = false;
+  try { main = p.status !== "new" && experienceFor(p) !== "beginner"; } catch (e) {}
+  return (main && ROAD_STAGE_JOB_MAIN[kind]) || ROAD_STAGE_JOB[kind] || "";
+}
 /** The road in one line, as the wizard and the Plan screen say it: "4 weeks Rebuild → 5 weeks Base → 16 weeks race block". */
 function roadLine(stages) {
   const legs = [];
@@ -10018,7 +10077,14 @@ function roadLine(stages) {
 function roadAnswered(cp, choice) {
   const r = roadOf(profile);
   if (!r || !cp) return null;
-  const stages = cp.legs.map((l) => ({ kind: l.kind, weeks: l.weeks }));
+  // ⚠️ §10 PIECE 3: AT A RACE-BLOCK CHECKPOINT NOTHING MOVES. "Carry on" is the plan as laid, and "ease back" is the easier-week
+  // row alone (answerRoad) — no Rebuild week inserted, no week taken: the race block is laid back from race day and only the
+  // runner may shorten it (decision 4).
+  const inRace = cp.kind === "race";
+  if (inRace && choice !== "up" && choice !== "ease") return null;
+  // A foundation answer takes its week from the race block AS ONE BLOCK (its floor is the block's, not each four-week
+  // piece's), then the block is cut into its blocks again.
+  const stages = (inRace ? cp.legs : roadMergeRace(cp.legs)).map((l) => ({ kind: l.kind, weeks: l.weeks }));
   // ⚠️ §10: THE WEEK COMES FROM BASE FIRST, then the race block (never under its shortest), then Rebuild — and NEVER
   // FROM A WALK-RUN BLOCK, whose key run is in its last week (a "more" in Walk-run 1 taking a week from Walk-run 2 would
   // have dropped its 30-minute run from the plan).
@@ -10037,12 +10103,17 @@ function roadAnswered(cp, choice) {
   if (choice === "more") { if (!take(cp.i + 1, 1)) return null; stages[cp.i].weeks += 1; }
   // Easing back: a lighter week of easy running (Rebuild) — or, in a walk-run block, a lighter week of that run–walk
   // (continuous running would be the harder week for somebody not yet running 20 minutes).
-  if (choice === "ease") { if (!take(cp.i + 1, 1)) return null; stages.splice(cp.i + 1, 0, { kind: roadWalkRun(cp.kind) ? cp.kind : "rebuild", weeks: 1 }); }
+  if (choice === "ease" && !inRace) { if (!take(cp.i + 1, 1)) return null; stages.splice(cp.i + 1, 0, { kind: roadWalkRun(cp.kind) ? cp.kind : "rebuild", weeks: 1 }); }
   const rec = { dueIso: cp.endIso, kind: cp.kind, answer: choice, answeredIso: todayIso() };
-  return Object.assign({}, r, { stages: stages.filter((s) => s.weeks > 0), checkpoints: (r.checkpoints || []).concat([rec]) });
+  return Object.assign({}, r, { stages: roadSplitRace(stages.filter((s) => s.weeks > 0), profile.goalDist),
+    checkpoints: (r.checkpoints || []).concat([rec]) });
 }
-/** The race block's length on a road, and the book's own for this race. */
-function roadRaceWeeks(stages) { const s = stages[stages.length - 1]; return s && s.kind === "race" ? s.weeks : 0; }
+/** The race block's length on a road (all its blocks — §10 piece 3), and the book's own for this race. */
+function roadRaceWeeks(stages) {
+  const m = roadMergeRace(stages || []);
+  const s = m[m.length - 1];
+  return s && s.kind === "race" ? s.weeks : 0;
+}
 function roadBookRaceWeeks() { return ({ "1mile": 10, "5k": 12, "10k": 14, half: 16, marathon: 20 })[profile.goalDist] || 16; }
 /**
  * B14 — THE CHECKPOINT, AS A POP-UP (STAGES.md §5): what the app saw, Ready / Nearly / Not yet with the reasons, and three
@@ -10059,12 +10130,19 @@ function roadCheckpointHtml() {
   const next = cp.next;
   // §10 decision 1: Base can run as several blocks, each with this checkpoint — the next one is "the next block", not a move up.
   const same = !!next && next.kind === cp.kind;
+  // §10 piece 3: a checkpoint inside the race block — the block carries on; there is no stage to move up to.
+  const inRace = cp.kind === "race";
   const head = { ready: same ? "Ready for your next block" : "Ready to move up", nearly: "Nearly there", notyet: "Not yet" }[v.verdict];
-  const nextName = next ? (next.kind === "race" ? "your race block" : roadLegName(cp.legs, next.i)) : "";
+  const nextName = next ? (next.kind === "race" && !same ? "your race block" : roadLegName(cp.legs, next.i)) : "";
   const held = weekMondayOf(todayIso()) >= cp.endIso;
-  const opts = [
+  const opts = inRace ? [
+    // ⚠️ NOTHING MOVES IN THE RACE BLOCK UNLESS THE RUNNER ASKS: "start" is the plan as laid; easing back is one lighter week
+    // (the "make a week easier" row), with no week taken from the race block.
+    { id: "up", t: next ? "Start " + nextName : "Carry on", s: "Your race block carries on as planned from Monday." },
+    { id: "ease", t: "Ease back", s: "A lighter week next week, its hardest session swapped for easy running. Then your plan carries on." },
+  ] : [
     { id: "up", t: next ? (same ? "Start " + nextName : "Move up to " + nextName) : "Move up",
-      s: next ? ROAD_STAGE_JOB[next.kind] + " It starts " + (held ? "next Monday" : "on Monday") + "." : "" },
+      s: next ? roadStageJob(next.kind) + " It starts " + (held ? "next Monday" : "on Monday") + "." : "" },
     { id: "more", t: "One more week of " + ROAD_STAGE_LABEL[cp.kind],
       s: roadWalkRun(cp.kind) ? "Another week like this one — repeating a week is completely normal — and this checkpoint again at the end of it."
         : "Another week like this one, and this checkpoint again at the end of it." },
@@ -10120,7 +10198,8 @@ function roadCheckpointHtml() {
   // turned the controlled 2 km into a maximal one and started it behind the sheet.
   let trial = "";
   const kr = facts.keyRun;
-  if (cp.kind === "base" && !v.met.keyRun && kr.kind === "test") {
+  // §10 piece 3: and at every race-block checkpoint — the test that keeps the race block's paces honest (decision 3).
+  if ((cp.kind === "base" || cp.kind === "race") && !v.met.keyRun && kr.kind === "test") {
     const offer = kr.offer || [];
     if (offer.indexOf("controlled-2k") >= 0) trial += '<button class="perf-a" data-roadtrial="controlled">Do the 2 km — strong but controlled ›</button>';
     if (offer.indexOf("trial-2k") >= 0) trial += '<button class="perf-a" data-roadtrial="max">Do the 2 km test run ›</button>';
@@ -10138,8 +10217,11 @@ function roadCheckpointHtml() {
     '<p><b>What would you like to do?</b></p></div>' +
     '<div class="re-opts">' + opts.map(opt).join("") + '</div>' +
     '<button class="primary road-later" id="roadLater" type="button">Not now</button>' +
-    '<p class="mp-note">You choose — the app never moves you up on its own. Nothing changes until you pick, and you can undo straight after. ' +
-    'Until you choose, you stay in ' + esc(ROAD_STAGE_LABEL[cp.kind]) + '.</p></div>';
+    (inRace
+      // ⚠️ NO HOLD IN THE RACE BLOCK (effectiveRoad): unanswered, the plan carries on as laid — say so, not "you stay".
+      ? '<p class="mp-note">You choose — nothing changes until you pick, and you can undo straight after. If you don’t choose, your plan carries on as it is.</p></div>'
+      : '<p class="mp-note">You choose — the app never moves you up on its own. Nothing changes until you pick, and you can undo straight after. ' +
+        'Until you choose, you stay in ' + esc(ROAD_STAGE_LABEL[cp.kind]) + '.</p></div>');
 }
 /**
  * Open the checkpoint as the app's bottom sheet, its buttons wired here (wire() runs on a render, not when a sheet opens).
@@ -10230,7 +10312,9 @@ function answerRoad(choice) {
   seedDone(); restoreTicks(ticks);
   const said = choice === "up" ? (cp.next && cp.next.kind === cp.kind ? "On to " + roadLegName(cp.legs, cp.next.i) + "." : "Moving up to " + (cp.next && cp.next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[(cp.next || {}).kind] || "the next stage") + ".")
     : choice === "more" ? "One more week of " + ROAD_STAGE_LABEL[cp.kind] + "."
-    : roadWalkRun(cp.kind) ? "Easing back: next week is a lighter week of run–walk." : "Easing back: next week is lighter and easy running only.";
+    : roadWalkRun(cp.kind) ? "Easing back: next week is a lighter week of run–walk."
+      : cp.kind === "race" ? "Easing back: next week is lighter, its hardest session swapped for easy running."
+        : "Easing back: next week is lighter and easy running only.";
   toastUndo(said, () => {
     const t2 = todayTicks();
     restore();
@@ -10249,8 +10333,10 @@ function roadDayLabel(iso) {
  * dates and where the runner is — text, never colour alone. Used by the Plan screen (with "you are here") and by the
  * wizard before saving (no position yet). The legs are [{ kind, weeks, fromIso, endIso }].
  */
-function roadTimelineHtml(legs, here) {
+function roadTimelineHtml(legs, here, pf) {
   if (!legs || !legs.length) return "";
+  // Before saving (no position yet) each stage's job is said once — on its first block, not on all four race blocks.
+  const firstOfKind = (i) => legs.findIndex((x) => x.kind === legs[i].kind) === i;
   const bar = '<div class="road-tl" aria-hidden="true">' + legs.map((l, i) =>
     '<span class="road-seg' + (i === here ? " on" : "") + '" style="flex:' + l.weeks + ';--rc:' + ROAD_COLOUR[l.kind] + '"></span>').join("") + '</div>';
   const rows = legs.map((l, i) => {
@@ -10260,7 +10346,7 @@ function roadTimelineHtml(legs, here) {
     return '<div class="road-row' + (i === here ? " on" : "") + '" style="--rc:' + ROAD_COLOUR[l.kind] + '">' +
       '<i aria-hidden="true"></i><div class="road-rt"><b>' + esc(roadLegName(legs, i)) + '</b> · ' + roadWeeksLabel(l.weeks) +
       '<span class="road-when">' + esc(when) + '</span>' +
-      (i === here || here == null ? '<span class="road-job">' + esc(ROAD_STAGE_JOB[l.kind]) + '</span>' : "") + '</div>' +
+      (i === here || (here == null && firstOfKind(i)) ? '<span class="road-job">' + esc(roadStageJob(l.kind, pf)) + '</span>' : "") + '</div>' +
       (state ? '<span class="road-st">' + state + '</span>' : "") + '</div>';
   }).join("");
   return bar + '<div class="road-list">' + rows + '</div>';
@@ -10276,15 +10362,24 @@ function roadPlanCard() {
   const r = roadOf(profile);
   const ans = cur && r ? roadAnswerAt(r, cur.endIso) : null;
   const next = legs[here + 1];
-  const nextName = next ? (next.kind === "race" ? "your race block" : roadLegName(legs, here + 1)) : "";
-  const cpLine = !cur || cur.kind === "race" ? ""
+  const nextName = next ? (next.kind === "race" && (!cur || cur.kind !== "race") ? "your race block" : roadLegName(legs, here + 1)) : "";
+  // §10 piece 3: a race-block checkpoint is a look at the block and a test run, not a move up — and nothing waits on it.
+  const inRace = !!cur && cur.kind === "race";
+  const cpLine = !cur || here === legs.length - 1 ? ""
     : ans && ans.answer === "up" && next
       ? '<p class="mp-note">You chose to ' + (next.kind === cur.kind ? "go on" : "move up") + ': ' + nextName + ' starts on Monday ' + roadDayLabel(cur.endIso) + '.</p>'
+      // §10 piece 3: easing back inside the race block moves no week, so the answer stands against this block (found in the
+      // browser: the card went on saying "your checkpoint is this week" after the runner had answered it).
+      : ans && ans.answer === "ease" && inRace && next
+        ? '<p class="mp-note">You chose to ease back: the week of ' + roadDayLabel(cur.endIso) + ' is lighter, then ' + nextName + ' carries on as planned.</p>'
       : thisMonday >= roadMondayAfter(cur.endIso, -1)
-        ? '<p class="mp-note">Your checkpoint is this week. You choose whether to move up — nothing harder arrives until you do.</p>' +
+        ? (inRace
+          ? '<p class="mp-note">Your checkpoint is this week: a test run, and a look at how this block went.</p>'
+          : '<p class="mp-note">Your checkpoint is this week. You choose whether to move up — nothing harder arrives until you do.</p>') +
           (currentRoadCheckpoint() ? '<button class="perf-a" id="roadOpen">Open your checkpoint ›</button>' : "")
         : '<p class="mp-note">Your next checkpoint is the week of ' + roadDayLabel(roadMondayAfter(cur.endIso, -1)) +
-          '. You choose then whether to move up — nothing harder arrives until you do.</p>';
+          (inRace ? ': a test run that keeps your paces honest, and a look at how the block went.</p>'
+            : '. You choose then whether to move up — nothing harder arrives until you do.</p>');
   return '<h2 class="sec">Your road</h2><div class="card road-card">' + roadTimelineHtml(legs, here) + cpLine + '</div>';
 }
 /**
@@ -10307,8 +10402,13 @@ function wizRoadHtml(prop, pf) {
       '<label class="road-ok"><input type="checkbox" id="s_roadshort"' + (draft.roadShort === "1" ? " checked" : "") + '> Use this road, with the shorter race block</label></div>'
     : "";
   return '<div class="road-wiz"><div class="road-wiz-h">Here’s your road</div><p class="road-wiz-l">' + esc(roadLine(road.stages)) + '</p>' +
-    roadTimelineHtml(legs, null) +
-    '<p class="mp-note">Each stage before your race block ends with a checkpoint, never more than six weeks apart. You choose then whether to move up, take one more week, or ease back — the app never moves you up on its own.</p>' +
+    roadTimelineHtml(legs, null, pf) +
+    (legs[0].kind === "race" ? ""
+      : '<p class="mp-note">Each stage before your race block ends with a checkpoint, never more than six weeks apart. You choose then whether to move up, take one more week, or ease back — the app never moves you up on its own.</p>') +
+    // §10 piece 3: the race block has its own checkpoints, every four weeks.
+    (legs.filter((l) => l.kind === "race").length > 1
+      ? '<p class="mp-note">Your race block has a checkpoint every four weeks too: a test run that keeps your paces honest, and a look at how the block went.</p>'
+      : "") +
     short + '</div>';
 }
 
@@ -43707,7 +43807,10 @@ function currentWeeklyReview() {
       // Anything the runner has told us that makes a maximal effort the wrong idea.
       unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
       // ⚠️ §10 DECISION 5: and who they are — no maximal test for somebody just getting started or back from injury.
-      noMaximalTest: !RC.maximalTestAllowed({ level: resolvedStatus(profile), injured: returnKind(profile) === "injury" }),
+      // ⚠️ §10 PIECE 3: AND NOT ON A ROAD, where the checkpoint at the end of every block asks for the test this runner may
+      // do (blockTestsFor) — the review asking for its all-out 2 km in other weeks would be the same question twice, and for
+      // a habit-builder the wrong test (their checkpoint's 2 km is the controlled one).
+      noMaximalTest: !RC.maximalTestAllowed({ level: resolvedStatus(profile), injured: returnKind(profile) === "injury" }) || roadOwnsTests(),
       addDay: addDayEvidence(phase),
       easeWeek: ev,
     });

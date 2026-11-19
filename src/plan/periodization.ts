@@ -120,13 +120,22 @@ export function structuredWeekCount(
 
 export type WeekPlan = { phase: Phase; isDeload: boolean };
 
+/**
+ * How many of a block's last weeks are its taper — the distance's taper, never more than leaves three weeks before it.
+ * ONE DEFINITION: phaseSchedule lays the taper with it, and a road's race block (§10, piece 3) keeps its checkpoints
+ * out of the taper with it (raceBlockSplit, src/plan/road.ts).
+ */
+export function taperWeeksFor(structuredWeeks: number, distance: RaceDistanceKey): number {
+  return Math.min(taperFor(distance).weeks, Math.max(1, structuredWeeks - 3));
+}
+
 export function phaseSchedule(
   structuredWeeks: number,
   distance: RaceDistanceKey,
   returningFromInjury: boolean,
   scheduleDeloads = true,
 ): WeekPlan[] {
-  const taperWeeks = Math.min(taperFor(distance).weeks, Math.max(1, structuredWeeks - 3));
+  const taperWeeks = taperWeeksFor(structuredWeeks, distance);
   const remaining = structuredWeeks - taperWeeks;
 
   let peakWeeks: number;

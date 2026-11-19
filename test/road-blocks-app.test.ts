@@ -58,8 +58,10 @@ function harness(o: { status?: string; returning?: string | false; runs?: Run[];
   };
   const fns = ["roadFacts", "roadClock", "roadLongestKm", "roadTestOffer", "roadTestIn", "roadParkrunCandidates", "countRoadTest",
     "resolvedStatus", "returnKind", "fmtTimeFull", "weekMondayOf", "roadMondayAfter", "roadLegName", "roadCheckpointHtml",
-    "roadAnswered", "roadRaceWeeks", "roadWeeksLabel", "roadBookRaceWeeks", "roadWalkRun", "roadTargetRun"];
-  const src = [constDecl("ROAD_STAGE_LABEL"), constDecl("ROAD_STAGE_JOB"), constDecl("ROAD_MIN_RACE_WEEKS"), ...fns.map(fnBody)].join("\n");
+    "roadAnswered", "roadRaceWeeks", "roadWeeksLabel", "roadBookRaceWeeks", "roadWalkRun", "roadTargetRun", "roadMergeRace", "roadSplitRace",
+    "roadStageJob", "experienceFor"];
+  const src = [constDecl("ROAD_STAGE_LABEL"), constDecl("ROAD_STAGE_JOB"), constDecl("ROAD_STAGE_JOB_MAIN"), constDecl("ROAD_MIN_RACE_WEEKS"),
+    ...fns.map(fnBody)].join("\n");
   const names = Object.keys(env);
   const api = new Function(...names, src + "\nreturn { " + fns.join(", ") + " };")(...names.map((n) => env[n]));
   return { api, cp, state, profile, saved };

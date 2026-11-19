@@ -996,7 +996,8 @@ run only when rated easy, and easing back as a repeat of the block's last week m
 
 Each is as large as pieces 1 and 2 together, so each is its own session (CLAUDE.md: one stage per session).
 
-**Piece 3 — decision 3, regular and competitive runners.**
+**Piece 3 — decision 3, regular and competitive runners.** ✅ **Built 2026-11-19** — see the chapter below (the open
+question about "one more week" inside the race block was put to the owner; Start / Ease back only until he answers).
 - *Placement* (`roadStartFor`): an adult on the main track coming back (injury or break) → Rebuild; otherwise Base when the runway is
   longer than the race block (`RACE_BLOCK_WEEKS`), else a race-only road. Today every main-track runner gets null (no road).
 - *Base from the mileage they state* (`pf.volKm` → `weeklyVolumeKmCurrent`; blank = the plan's own defaults): the beginner builder
@@ -1075,3 +1076,175 @@ real page in a sandbox opened with `status: "regular"` and `name: ""`.
 the engine cannot plan opens as the default one, and the first profile save then writes the default answers over the stored
 ones. Suggested: a line in Support › Your data saying it happened and why, and a copy of the stored answers kept before anything
 can overwrite them. It changes what the runner sees, so it waits for him.
+## ✅ §10 — PIECE 3: REGULAR AND COMPETITIVE RUNNERS' ROADS, AND A CHECKPOINT EVERY FOUR WEEKS IN THE RACE BLOCK (2026-11-19)
+
+Decision 3 of `STAGES.md` §10 (*"yes to all five, build it"*, 2026-11-18): regular and competitive runners get roads too (Base
+built from the mileage they state, a returner's Rebuild), and race blocks get a checkpoint every four weeks. Before this every
+main-track runner had no road. ⚠️ **"One more week" inside the race block was put to the owner first** (the brief said so) —
+its answer and what was built for it are the last section of this chapter.
+
+### Placement and the budget — `roadStartFor`, `mainRoadFor` (src/plan/road.ts)
+
+- `roadStartFor`: a main-track adult coming back (injury OR a break) → `"rebuild"`; otherwise → `"base"`. 12–17 still null.
+- `mainRoadFor` (the beginner budget is untouched): the race block is the book's length; before it the foundation the runner
+  NEEDS — Rebuild (4) when coming back, and the CLIMB from the stated mileage to the race block's first week
+  (`mainFoundationNeed`, at least `BASE_MIN_WEEKS` when there is one). Spare weeks join a Base the runner already needs;
+  without one they become Base blocks once there are ≥ 4, and fewer go to the race block — today's own longer block
+  (`MAX_STRUCTURED_WEEKS` is the book's length + 4), so **a race-only road is today's plan byte for byte**, with checkpoints.
+- ⚠️ **The climb is measured against the race block the road will lay**, not the book's: the volume fit opens a block of another
+  length on another week. Short of the runway the race block shortens, and a shorter block can open higher, so the need is
+  asked again (twice at most). The length the road lays its race block at is returned and stored (`destWeeks`, below).
+- ⚠️ **Within one step (the race block opens ≤ 1.10× the first week's own shape at the stated mileage) there is no climb.**
+  Measured without it: a 5 km runner at 15 km a week against a 17 km opening (0.88) got four weeks of Base and, fourteen
+  weeks out, a shortened race block to tick — where today's 14-week block opens at 15.2 km.
+- ⚠️ **A runner not coming back, with no more than today's plan's runway, gets the whole runway as ONE race block** when that
+  block needs no climb (it opens lower on its ramp) — a race-only road, not a Base squeezed in front of a shortened block.
+- ⚠️ **No road where even the shortest race block (4 weeks) leaves too little room for the climb**: a foundation cut short of
+  its need joins its race block in a jump (measured: a marathon 14 weeks out on 15 km a week, 55 → 83 minutes into a 4-week
+  block). Such a runner keeps today's plan. Short of a full race block otherwise: the race block is the part shortened, the
+  proposal says by how much, and the wizard's existing short-road choices apply (decision 4).
+
+### Base from the stated mileage — `mainFoundation`, `mainFoundationEnds`, `mainFoundationNeed` (src/plan/generate-plan.ts)
+
+- **The main track's own week builder** (`buildWeek`) in its base phase — not the beginner builder, which cannot read a stated
+  mileage. **Aimed at the race block's own first week**, as the beginner foundation is: the long run climbs on
+  `LONG_LIFT_STEP_MAX` from `open` (the stated mileage's share × the race block's opening long run, never under
+  `MAIN_FOUNDATION_OPEN_MIN` = 30) to that opening long run; the easy runs climb on the same ramp, **geometrically**
+  (`geomLerp(f0, 1, frac)` — a straight ramp front-loads its growth), built AT THE RACE BLOCK'S OWN VOLUME FIT.
+- ⚠️⚠️ **`FIT_OF`** — a WeakMap keyed on a plan's `weeks` array (every wrapper hands the array back untouched): the scale the
+  weeks were built at (`weeksScale`, tracked beside every assignment — the bisection assigns `weeks` without moving `scale`,
+  so `volScale` could not be read), the lazy quality reference and `easyStartFrac`. **It changes no plan** (nothing reads it
+  but `mainFoundation`/`mainFoundationEnds`, and it is not part of any plan object). The last Base week at full ramp IS the
+  race block's first week, so the step into it is the next step of one ladder.
+- `f0` = the stated mileage over **the foundation's first week's own shape at full size** (1 when blank or already there:
+  Base aims UP to the race block, never down to it; blank holds the race block's opening week — "the plan's own defaults").
+  ⚠️ Against the race block's week instead, a returner at their race block's volume opened Rebuild at 1.13× what they run.
+- **One quality session a week in Base** whatever the hard-days dial says (the dial reaches the race block). Base is annotated
+  as a base phase of `MAIN_BASE_PHASE_WEEKS` = 6 — a CONSTANT, so nothing a Base week reads depends on how long Base becomes,
+  and under 8 there is no quality-free opening: decision 1, harder sessions from Base's first week.
+- **A returner keeps the main track's own returner rules in Base** (no strides, no hill sprints, gentler formats) — the race
+  block after it keeps the comeback flags, so Base is no harder than the block it leads to. (The beginner road differs: its
+  Base gives a returner hill sprints that its race block then withholds — recorded at B14, still the owner's to rule on.)
+- **A returning regular runner's Rebuild** = the same builder with `noQuality` (no hard session) and `easyOnly` (plain easy,
+  explore and recovery runs — not the moderate gear, "a gear up from easy"). ⚠️⚠️ **The hard session's day becomes an easy run
+  of the ground that session would have covered** (`standInMin`: its counted volume at easy pace, never longer than a usual
+  easy run), **on the hard session's own day**. Three versions failed first, each measured: a full-length easy run in its
+  place made Rebuild bigger than the race block's opening (a returner at 40 km a week: 41.1 km against today's 34.6); a fixed
+  shorter slot cannot shrink once easy runs reach their 95-minute ceiling (3 days, 40 km: 47.4 km of Rebuild before a 39.9 km
+  race week); and drawing the stand-in from the easy-day list (four slots) left a six-day runner's Rebuild a run short.
+  `standInFull`: where the race block OPENS without a hard session (a long block's own quality-free weeks), Rebuild mirrors that
+  week — its hard day is a full easy run, as that week's is (otherwise the race block opened 1.14× bigger, measured).
+- **The easy floor is held by construction**: a Base week too small to carry its quality session inside the intensity model
+  carries none (`noQuality`), then the long run is held again.
+- **A week already run never changes**: every input is counted from the road's first foundation week (weeks before the plan
+  began included); `rampWeeks` and now `destWeeks` are stored on the road.
+
+### The race block in blocks of four — `raceBlockSplit` (src/plan/road.ts)
+
+- A checkpoint every `BLOCK_WEEKS` (4) from the race block's first week — **which is where its own lighter weeks fall** (its
+  weeks 4, 8, 12…, phaseSchedule), so the test lands on a lighter week — **never inside the taper** (`taperWeeksFor`, now ONE
+  definition exported from periodization.ts and used by phaseSchedule), the last entry (to race day, B9's question) ≤ 6.
+  Half 16 → 4·4·4·4; 10 km 14 → 4·4·4·2; 5 km 12 → 4·4·4; marathon 20 → 4·4·4·4·4.
+- **Consecutive race entries are ONE race block to the engine** (`generateRoadPlan` sums them), byte for byte. Every road gets
+  them — the beginner roads of pieces 1–2 too (`roadFor` splits its race stage) — and a road STORED with one race stage (made
+  before this) is cut on read by `effectiveRoad`: its sessions cannot change; its checkpoints appear.
+
+### In the app (web/app.ts, "The road to a race")
+
+- `effectiveRoad` merges the race entries (`roadMergeRace`), fits and holds exactly as before, then cuts the race block again
+  (`roadSplitRace` → `RC.raceBlockSplit`), and passes `destWeeks` through. `roadFromProposal` stores `destWeeks` (main-track
+  roads only; a beginner's road stores none and is aimed at the book's block as before).
+- ⚠️⚠️ **NO HOLD INSIDE THE RACE BLOCK.** The hold stops at the race block's first Monday (it is one stage there). Unanswered, a
+  race-block checkpoint lets the plan carry on as laid — holding would shorten the race block, which decision 4 says the app
+  never does by itself, and there is no stage to move up to. The sheet says so: "If you don't choose, your plan carries on as it
+  is." (Foundation checkpoints hold exactly as before.)
+- `roadCheckpoint`: every leg ends in a checkpoint except the last (race day). `roadAnswered`: **an answer at a race-block
+  checkpoint moves no week** — "Start Race block 2" is the plan as laid; "Ease back" is the existing easier-week row alone (no
+  Rebuild week inserted, no week taken). ⚠️ A FOUNDATION answer takes its week from the race block AS ONE BLOCK — its floor
+  is the block's (`ROAD_MIN_RACE_WEEKS`), not each four-week piece's, or no week could ever be taken.
+- The race-block sheet: the level's test (`blockTestsFor` — a regular runner's parkrun once the longest run of 30 days is
+  ~4.5 km, or the 2 km trial; back from injury the controlled 2 km or time on feet), the test buttons (Base's code, now for
+  race legs too), and the honest target as at every checkpoint. **Re-baselining only as the runner chooses**: a counted
+  parkrun goes through the existing pace offer; the 2 km trial is the runner's own act (its screen says its time sets paces).
+- Names: "Race block 1", "Race block 2"…; `roadStageJob` — a regular runner's Rebuild and Base in their own words
+  (`ROAD_STAGE_JOB_MAIN`; the beginner words say "one gentle fartlek" and "strength twice a week"); the timeline says each
+  stage's job once in the wizard (not four times for the race block); the Plan screen's line for a race-block checkpoint ("a
+  test run that keeps your paces honest, and a look at how the block went"); the wizard: "Your race block has a checkpoint
+  every four weeks too…".
+- ⚠️ **The weekly review's all-out 2 km retest stands aside on a road** (`roadOwnsTests`): the checkpoints ask for the test, and
+  the review asking in other weeks would be the same question twice — and for a habit-builder the WRONG test (piece 1 left the
+  review offering them the all-out 2 km while their checkpoint asks for the controlled one).
+- Wording fix found on the way: the time-on-feet test read "a 80-minute run" — now "an 80-minute run" (8, 11, 18, 80–89).
+
+### Measured (real engine, sweeps over 4 distances × abilities × 3/4/5/6 days × 0/15/25/40/60 km × comeback × runways)
+
+- **The race block is today's main-track plan byte for byte in every road** (7,651 roads), race-only roads included.
+- **The long run never steps more than 10% into the next stage** on any road, short ones included (worst 1.100 on whole
+  minutes); like for like (the easy running where both weeks carry the same hard sessions, the whole week where the race block
+  opens with fewer) worst **1.110** where the road fits, 1.066 where it is short. A foundation aimed at the book's block
+  instead of the one it joins measured 1.338; one too short for the climb 1.405 (both re-broken below).
+- **No foundation week breaks the easy floor.** Rebuild weeks at most 1.094× the race block's first week with a hard session.
+- **Week one**: within 1.10× the stated mileage for 2,360 of 2,830 runners, against 2,186 on today's plan; worst 2.10× against
+  today's 2.64×; never more than 1.12× the bigger of the stated mileage and today's own first week (the two points over 1.10 are
+  the quality rotation: one profile opens on the library's 65-minute threshold session where today's opens on its 56-minute
+  one — and today's own second week is that same 65-minute session). The per-run floors (a 20-minute run cannot shrink, a hard
+  session has its library length) keep many low-mileage first weeks above what they state — shared with today's plan — but
+  every one of 161 runners stating well under the race block's opening starts nearer their own mileage than the race block would.
+
+**Tests:** `test/road-regular.test.ts` (9, engine, one shared sweep of ~960 roads) and `test/road-regular-app.test.ts` (8, lifted
+from the built page); restated on purpose: road-stages' placement line (a regular runner IS placed) and the race block's kinds
+(now four entries), road-app's "a regular runner has no road" (now 12–17), the harnesses read the race block's entries as one
+(`raceAsOne`) and lift the new helpers, and road-app's test-button regex (Base OR race). **Re-breaks: 30 of 30 caught** —
+placement; the race entries built as one; no checkpoint in the taper; Base from the stated mileage; Rebuild's no quality, easy
+runs only, the stand-in's size, the stand-ins existing and sitting on the hard days; aimed at the block it joins; the climb;
+the easy-floor fallback; past weeks; no road when the climb cannot fit; the one-step threshold; the race-only shortcut; and in
+the app: race blocks' checkpoints, the cut, no hold, a foundation week taken from the block as one, race ease moving no week,
+no "more" offered there, `destWeeks` stored, a regular runner's words, the review's retest, the footer, the test buttons, the
+wizard's line, the race weeks read across blocks, the Plan screen after an ease. ⚠️ Three re-breaks first went UNCAUGHT and each
+taught something: the easy-floor fallback fires only at very low mileage on three days (40 of 28,123 weeks — added to the
+guard); the race-only shortcut matters for 8 of 1,152 runners and the first fixture was not one of them (replaced); and "no
+'more' in the race block" was re-broken at a line that was not load-bearing (the per-block floor refused it anyway) — re-broken
+where it IS: the sheet offering it.
+
+**Driven in a browser at phone size, light and dark:** a regular runner's race-only half (16 weeks from 26 Oct): Race block 1's
+checkpoint in its lighter week — "Nearly there" with the parkrun and 2 km buttons, the parkrun counted to "Ready for your next
+block" with "Start Race block 2" suggested, the pop-up opening by itself after the welcome (dark), "On to Race block 2." with
+Undo, Ease back (the answer recorded, the road unchanged, next week the easier week at 28.8 km with no hard session) and its Undo
+(answer and row both gone, the checkpoint back); the wizard for a regular runner back from injury at 18 km a week ("4 weeks
+Rebuild → 6 weeks Base → 16 weeks race block in 4 blocks", their own stage words, the race-block line) and the plan it saved
+(Rebuild 18.2–18.7 km all easy, Base ~21 km with one threshold session, race week 1 21.5 km); the Plan screen's road in both.
+**Found there and fixed:** after Ease back the Plan screen still said "your checkpoint is this week" (now "You chose to ease
+back: the week of 23 Nov is lighter, then Race block 2 carries on as planned." — guarded and re-broken). ⚠️ **Not a defect,
+recorded so nobody chases it:** with the browser pane hidden, screenshots can be stale frames — a "Week 1 · 26 Oct" header that
+the live page did not have. Read the page's text when the pane is hidden. ⚠️ Seeding a profile by hand also needs
+`interun_anchor_v1` set (or the one-time October migration moves its start to today) and the history rows (`syncHist`), or B6's
+"get back on track" (which reads history rows) stands in front of every checkpoint.
+
+### ⚠️ "One more week" inside the race block — put to the owner, 2026-11-19, not answered yet
+
+The brief said to ask before building it. Asked (through the session that started this one), with the measured trade-off:
+- **A (recommended — §10's "eats into the block"):** next week repeats the last full week; the weeks after are re-spaced over one
+  week less (each later step a little bigger, never past `LONG_LIFT_STEP_MAX`; the longest runs may arrive a few minutes short);
+  the sheet says so and offers decision 4's choices. Needs a HELD week inside a block laid back from race day — two-piece ramps
+  (the weeks before it as laid, the rest re-laid from its level) and the volume fit pinned to the block as laid, so no week run
+  changes. Point in its favour, measured: "Ease back" carries on as laid, so the next full week is two rungs up from the last.
+- **B:** no "one more week" inside the race block — "Carry on" and "Ease back" only; behind → a later race or a revised target.
+
+**Until he answers, the race block offers Start / Ease back only** (B's behaviour — `roadAnswered` refuses "more" there and the sheet
+does not offer it; both guarded). If he picks A, that is the next piece of work; "Nearly" there then recommends it where runs
+were missed (a missing TEST should keep recommending the test, not a repeat).
+
+### ⚠️ Found, NOT fixed (each its own piece of work)
+
+- **The wizard's plan cards ignore the road** ("20 weeks · peak 43 km" for a road of 26 weeks) — they describe the plan without
+  it. Pre-existing since B14 (the cards never learned about roads).
+- **The main track's easy-day list has four slots**, so a quality-free main-track week gives a six-day runner five runs (a
+  marathon race block's own opening weeks, today's plan too). Pre-existing; Rebuild's stand-ins avoid it by using the hard days.
+- **An injured returner's race block** keeps "no time trial until running is back to normal" for its whole length (their checkpoint
+  test is the controlled 2 km or time on feet throughout) — nothing yet says when running IS back to normal. Clinical.
+
+### For the clinical reviewer (added)
+
+A regular runner's Rebuild (easy only, the hard day an easy run of the session's ground), Base for a returner keeping the main
+track's returner rules, the race-block test for somebody back from injury (controlled 2 km or time on feet, all block long), and
+the weekly review's all-out retest no longer offered to anyone on a road.

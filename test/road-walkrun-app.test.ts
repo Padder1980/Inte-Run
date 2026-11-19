@@ -56,14 +56,21 @@ function harness(today: string, o: { runs?: Run[]; links?: Record<string, string
   const fns = ["roadOf", "roadWeeksBetween", "roadMondayAfter", "roadAnswerAt", "effectiveRoad", "roadAthleteOf", "roadLegsNow",
     "roadCheckpoint", "roadAnswered", "roadRaceWeeks", "weekMondayOf", "roadWalkRun", "roadTargetRun", "roadFacts", "roadClock",
     "roadLongestKm", "roadTestOffer", "roadTestIn", "resolvedStatus", "returnKind", "fmtTimeFull", "roadLegName", "roadWeeksLabel",
-    "roadBookRaceWeeks", "roadCheckpointHtml", "roadParkrunCandidates"];
-  const src = [constDecl("ROAD_STAGE_LABEL"), constDecl("ROAD_STAGE_JOB"), constDecl("ROAD_MIN_RACE_WEEKS"), ...fns.map(fnBody)].join("\n");
+    "roadBookRaceWeeks", "roadCheckpointHtml", "roadParkrunCandidates", "roadMergeRace", "roadSplitRace", "roadStageJob", "experienceFor"];
+  const src = [constDecl("ROAD_STAGE_LABEL"), constDecl("ROAD_STAGE_JOB"), constDecl("ROAD_STAGE_JOB_MAIN"), constDecl("ROAD_MIN_RACE_WEEKS"),
+    ...fns.map(fnBody)].join("\n");
   const names = Object.keys(env);
   const api = new Function(...names, src + "\nreturn { " + fns.join(", ") + " };")(...names.map((n) => env[n]));
   holder.api = api;
   return { api, profile, state };
 }
-const kinds = (r: any) => r.stages.map((s: any) => s.kind.replace("walkrun", "w") + ":" + s.weeks).join(" ");
+// §10 piece 3: the race block's blocks of four read as ONE block here (test/road-regular-app.test.ts guards the cut).
+const raceAsOne = (stages: any[]) => stages.reduce((out: any[], s: any) => {
+  const l = out[out.length - 1];
+  if (l && l.kind === "race" && s.kind === "race") l.weeks += s.weeks; else out.push({ ...s });
+  return out;
+}, []);
+const kinds = (r: any) => raceAsOne(r.stages).map((s: any) => s.kind.replace("walkrun", "w") + ":" + s.weeks).join(" ");
 
 test("BLOCKER: Walk-run's key run counts only the plan's own key session, done and rated easy", () => {
   const cp = harness("2026-12-26").api.roadCheckpoint();

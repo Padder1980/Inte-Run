@@ -100,7 +100,16 @@ export type RoadStage = { kind: StageKind; weeks: number };
  * road was made (absent: the foundation as it stands). It is stored rather than re-derived so that a checkpoint
  * answer — a week more here, or easing back — can never re-pace the weeks already run (see `generateRoadPlan`).
  */
-export type Road = { stages: RoadStage[]; rampWeeks?: number };
+export type Road = {
+  stages: RoadStage[];
+  rampWeeks?: number;
+  /**
+   * §10 piece 3 — the race block's length when the road was made: the block a main-track foundation is aimed at (absent:
+   * the book's length, RACE_BLOCK_WEEKS, as every beginner road). Stored, never re-derived, for the reason rampWeeks is:
+   * a later answer that takes a week from the race block must not move the destination of weeks already run.
+   */
+  destWeeks?: number;
+};
 
 const PEAK_LONG_MIN: Record<Goal["distance"], number> = {
   "1mile": 55,
@@ -887,6 +896,25 @@ export function longRunRangeFor(
  *  and a short one stays gentle. Counted from Base's first week, so a later week added to it never changes an
  *  earlier week's dose. */
 const BASE_DOSE_WEEKS = 8;
+/**
+ * §10 PIECE 3 — THE VOLUME FIT A MAIN-TRACK PLAN'S WEEKS WERE BUILT AT, keyed on the weeks array itself (which every
+ * wrapper hands back untouched — `{ ...p, athlete, notes }` copies the plan, never its weeks). A regular runner's Base is
+ * built by the main track's own week builder and aimed at the race block's first week, so it must build its easy runs
+ * at the scale that week was built at — the fit's own answer, never a guess at it. `qRefMin` is lazy: only a road asks.
+ * ⚠️ IT CHANGES NO PLAN: nothing is read from it except by `mainFoundation`, and a WeakMap entry is not part of any
+ * plan object (the byte-for-byte guards compare the plans, and they cannot see it).
+ */
+type PlanFit = { vScale: number; qRefMin: () => number | undefined; easyStartFrac: number };
+const FIT_OF = new WeakMap<PlannedWeek[], PlanFit>();
+/**
+ * §10 piece 3 — a main-track Base's weeks are annotated as a base phase of this many weeks, a constant so that nothing a
+ * Base week reads depends on how long Base turns out to be (a later race, a week more): the quality rotation and the
+ * second half's VO2 weeks follow the main track's own base, and under eight there is no quality-free opening (the
+ * foundation the main track gives a LONG base) — decision 1: harder sessions are back from Base's first week.
+ */
+const MAIN_BASE_PHASE_WEEKS = 6;
+/** A main-track foundation's long run never opens under this (a regular runner's card says they can finish a 10 km). */
+const MAIN_FOUNDATION_OPEN_MIN = 30;
 /** The shortest race block a road builds: the engine's own shortest block (periodization.ts MIN_STRUCTURED_WEEKS). */
 const MIN_RACE_BLOCK_WEEKS = 4;
 /** What each stage's ordinary week is for, in the runner's words (a lighter week keeps its own wording). */
@@ -895,6 +923,11 @@ const STAGE_FOCUS = {
   walkrun2: "Walk-run 2 — from 20 to 30 minutes of running without stopping",
   rebuild: "Rebuild — easy running only, so running feels normal again",
   base: "Base — more running and a first taste of speed",
+} as const;
+/** §10 piece 3 — the same, for a regular or competitive runner's foundation (the main track's own weeks). */
+const MAIN_STAGE_FOCUS = {
+  rebuild: "Rebuild — easy running only, building back from the running you do now",
+  base: "Base — your running built up from where it is now, with one quality session a week",
 } as const;
 /** How a stage is named in the plan's own note. */
 export const STAGE_LABEL: Record<StageKind, string> = {
@@ -1019,6 +1052,154 @@ export function roadFoundationNeed(athlete: Athlete, goal: Goal, options: Genera
   return { weeks: 52, openMin: open, destMin: dest };
 }
 
+/**
+ * ⚠️⚠️ §10 PIECE 3 — A REGULAR OR COMPETITIVE RUNNER'S FOUNDATION (owner, 2026-11-18, decision 3: "yes to all five, build
+ * it"): Base blocks built FROM THE MILEAGE THEY STATE, and — coming back — a Rebuild before them. NOT the beginner
+ * builder, which cannot read a stated mileage: the main track's own week builder (`buildWeek`), in its base phase.
+ *
+ * ⚠️ AIMED AT THE RACE BLOCK'S OWN FIRST WEEK, exactly as the beginner foundation is: the long run climbs from where the
+ * runner is now to the long run the race block opens with (on LONG_LIFT_STEP_MAX), and the easy runs climb on the same
+ * ramp to that week's own length — built at the race block's own volume fit (FIT_OF), so the last weeks of Base ARE the
+ * race block's first week and the step into it is the next step of one ladder. "Where the runner is now" is the stated
+ * mileage as a share of that week (never above it: Base aims UP to the race block, never down to it); blank, or already
+ * there, and Base holds the race block's opening week — "blank = the plan's own defaults" (notes/plan-profile.md).
+ *
+ * ⚠️ NOTHING ALREADY RUN CAN CHANGE WHEN A LATER CHECKPOINT IS ANSWERED. Everything a week reads is counted from the
+ * road's first foundation week: its lighter week (every fourth week of the road), its ramp position (`rampWeeks`,
+ * stored), its place in Base (Base weeks so far; the phase length a constant, MAIN_BASE_PHASE_WEEKS), and the
+ * destination (a race block of the book's length).
+ *
+ * Rebuild here is the main track's own easy week with NO quality session and easy runs only (`noQuality`, `easyOnly`) —
+ * "no fast running" (STAGES.md §3). Base is the main track's base week: one quality session, and the runner's own
+ * comeback rules (a returner gets no strides or hill sprints — as their race block, which keeps the comeback flags).
+ * ⚠️ THE EASY FLOOR IS HELD BY CONSTRUCTION: a week too small to carry its quality session inside the intensity model
+ * carries none (the main track's own small-week rule, one step on).
+ */
+/**
+ * §10 piece 3 — THE TWO ENDS OF A MAIN-TRACK FOUNDATION, one definition (mainFoundation builds on it, mainFoundationNeed
+ * measures with it): where it is going (the race block's first full week, its long run `dest`) and where the runner is
+ * now — `f0`, their stated mileage as a share of the foundation's own first week at full size (1 when blank or already
+ * there: never above it), and `open`, the long run scaled to it (never under MAIN_FOUNDATION_OPEN_MIN).
+ * ⚠️ AGAINST THE FIRST WEEK'S OWN SHAPE: a road that opens with Rebuild opens without the hard session, and an easy run in
+ * its place counts more ground than the session did (its warm-up and cool-down are not counted volume) — measured
+ * against the race block's week instead, a returner already at their race block's volume opened at 1.13x what they
+ * said they run (a 5 km runner on three days at 40 km a week), where today's plan opens at 0.97x.
+ */
+function mainFoundationEnds(athlete: Athlete, goal: Goal, ref: { weeks: PlannedWeek[]; paces: TrainingPaces }, rebuildFirst: boolean):
+  { open: number; dest: number; f0: number; destQuiet: boolean } {
+  const w1 = ref.weeks.find((w) => !w.isDeload && !w.sessions.some((s) => s.type === "race")) ?? ref.weeks[0]!;
+  const dest = Math.max(MAIN_FOUNDATION_OPEN_MIN, Math.round(longRunMinutesOf(w1)));
+  // The race block opens without a hard session (a long block's own quality-free weeks): Rebuild mirrors that week.
+  const destQuiet = w1.qualitySessionCount === 0;
+  const stated = athlete.weeklyVolumeKmCurrent;
+  if (!(stated && Number.isFinite(stated) && stated > 0)) return { open: dest, dest, f0: 1, destQuiet };
+  let shapeKm = w1.plannedDistanceMeters / 1000;
+  if (rebuildFirst) {
+    const fit = FIT_OF.get(ref.weeks);
+    const wp: AnnotatedWeek = { phase: "base", isDeload: false, ordinalInPhase: 1, phaseTotal: MAIN_BASE_PHASE_WEEKS };
+    shapeKm = buildWeek(1, w1.startDateIso, wp, {
+      athlete: { ...athlete, hardDays: undefined }, goal, paces: ref.paces,
+      returning: !!(athlete.returningFromInjury || athlete.returningFromBreak), longMin: dest,
+      vScale: fit?.vScale ?? 1, taperMult: 1, easyRamp: fit?.easyStartFrac ?? easyStartFracFor(athlete),
+      qRefMin: fit?.qRefMin(), noQuality: true, easyOnly: true, standInFull: destQuiet,
+    }).plannedDistanceMeters / 1000;
+  }
+  const f0 = shapeKm > 0 ? Math.min(1, stated / shapeKm) : 1;
+  return { open: Math.min(dest, Math.max(MAIN_FOUNDATION_OPEN_MIN, Math.round(dest * f0))), dest, f0, destQuiet };
+}
+
+/**
+ * ⚠️⚠️ §10 PIECE 3 — HOW MANY FOUNDATION WEEKS A REGULAR OR COMPETITIVE RUNNER NEEDS to climb from the mileage they state
+ * to the race block's first week inside the step limit (LONG_LIFT_STEP_MAX), measured on the engine's own ladder as
+ * roadFoundationNeed is for a beginner — 0 when they are already within one step of it. ⚠️ A RUNNER STATING LITTLE FOR A
+ * LONG RACE NEEDS WEEKS: the race block opens its long run near 70 minutes for a half whatever they state (its floor is
+ * the race's own), and measured before this, a 15 km-a-week half-marathoner's road joined it at up to 1.61x on the long
+ * run. Both halves of the week are asked: the long run's ladder must arrive within a step, and the easy runs' ramp
+ * (geometric, from f0 to 1) must take no step over the limit either.
+ */
+export function mainFoundationNeed(athlete: Athlete, goal: Goal, options: GenerateOptions = {}, raceWeeks?: number): number {
+  const { road: _road, ...rest } = options;
+  const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
+  // The race block the foundation will join: the book's length, or the length the road lays it at (Road.destWeeks).
+  const refWeeks = Math.max(MIN_RACE_BLOCK_WEEKS, Math.round(raceWeeks ?? RACE_BLOCK_WEEKS[goal.distance]));
+  const ref = generatePlan(athlete, goal, { ...rest, secondaryRace: undefined, startDateIso: addDays(raceMonday, -(refWeeks - 1) * 7) });
+  // A runner coming back opens with Rebuild (roadStartFor) — the first week's own shape is that one.
+  const { open, dest, f0 } = mainFoundationEnds(athlete, goal, ref, !!(athlete.returningFromInjury || athlete.returningFromBreak));
+  // ⚠️ WITHIN ONE STEP OF THE RACE BLOCK'S OPENING, IT CAN BE ENTERED STRAIGHT AWAY — the main track's own week-one rule
+  // (1.10x what they run). Measured without this, a 5 km runner at 15 km a week against a 17 km opening (0.88) was handed
+  // four weeks of Base and, fourteen weeks out, a shortened race block to tick — where today's plan opens at 15.2 km.
+  if (f0 >= 1 / LONG_LIFT_STEP_MAX - 1e-9) return 0;
+  const easySteps = Math.ceil(Math.log(1 / f0) / Math.log(LONG_LIFT_STEP_MAX) - 1e-9);
+  for (let F = 1; F <= 52; F++) {
+    const schedule = foundationSchedule(athlete, goal, F);
+    const ladder = quantisedLadder(open, dest, rampFractions(schedule, F), schedule, LONG_LIFT_STEP_MAX);
+    const last = Math.max(0, ...ladder);
+    // Progressing weeks after the first — the steps the easy ramp is spread over.
+    const steps = schedule.filter((w) => !w.isDeload).length - 1;
+    // ⚠️ One minute under the limit, as roadFoundationNeed: a rung is not quite what is delivered.
+    if (dest <= Math.floor(last * LONG_LIFT_STEP_MAX) - 1 && steps >= easySteps) return F;
+  }
+  return 52;
+}
+
+function mainFoundation(
+  athlete: Athlete, goal: Goal, paces: TrainingPaces, ref: { weeks: PlannedWeek[] }, model: IntensityModel,
+  kinds: StageKind[], offset: number, rampWeeksAll: number, raceStartMonday: string,
+): PlannedWeek[] {
+  const fKinds = kinds.slice(offset);
+  const F = fKinds.length;
+  const fit = FIT_OF.get(ref.weeks);
+  // ⚠️ The ROAD's first foundation week, not this plan's (the weeks before the plan began count): stored, so it holds.
+  const { open, dest, f0, destQuiet } = mainFoundationEnds(athlete, goal, { weeks: ref.weeks, paces }, kinds[0] === "rebuild");
+  const schedule = foundationSchedule(athlete, goal, F, offset);
+  const frac = rampFractions(schedule, Math.max(1, Math.round(rampWeeksAll) - offset));
+  const ladder = quantisedLadder(open, dest, frac, schedule, LONG_LIFT_STEP_MAX);
+  const e1 = fit?.easyStartFrac ?? easyStartFracFor(athlete);
+  const vScale = fit?.vScale ?? 1;
+  const qRefMin = fit?.qRefMin();
+  const returning = !!(athlete.returningFromInjury || athlete.returningFromBreak);
+  // ⚠️ ONE QUALITY SESSION A WEEK IN BASE, whatever the hard-days dial says: the dial reaches the race block (where it is
+  // held to the balanced plan), and a foundation that reaches for two would be the first place the easy floor broke.
+  const a: Athlete = { ...athlete, hardDays: undefined };
+  // Counted from the road's FIRST foundation week, the weeks before the plan began included.
+  let baseOrd = kinds.slice(0, offset).filter((k) => k === "base").length;
+  let rebOrd = kinds.slice(0, offset).filter((k) => k === "rebuild").length;
+  const specs = fKinds.map((kind, i) => {
+    const sp = schedule[i]!;
+    const base = kind === "base";
+    const wp: AnnotatedWeek = { phase: "base", isDeload: sp.isDeload, ordinalInPhase: base ? ++baseOrd : ++rebOrd,
+      phaseTotal: MAIN_BASE_PHASE_WEEKS };
+    const f = frac[i + 1] ?? 1;
+    // A lighter week that opens the plan (only where the road was trimmed) has no rung yet; it eases the opening.
+    const rung = ladder[i + 1] || open;
+    const ctx: WeekContext = {
+      athlete: a, goal, paces, returning,
+      longMin: longRunMinutes(wp, rung, dest, 1),
+      vScale, taperMult: 1,
+      // GEOMETRIC, as the long run's ladder: a straight ramp front-loads its growth (geomLerp's own warning).
+      easyRamp: e1 * geomLerp(f0, 1, f),
+      qRefMin,
+      ...(base ? {} : { noQuality: true, easyOnly: true, standInFull: destQuiet }),
+    };
+    return { weekIndex: offset + i + 1, startDateIso: addDays(raceStartMonday, -(F - i) * 7), wp, ceilMin: dest, ctx, kind };
+  });
+  const buildOne = (i: number, over?: Partial<WeekContext>): PlannedWeek => {
+    const s = specs[i]!;
+    return buildWeek(s.weekIndex, s.startDateIso, s.wp, over ? { ...s.ctx, ...over } : s.ctx);
+  };
+  let weeks = enforceLongRunIsLongest(specs.map((_, i) => buildOne(i)), specs, buildOne);
+  let again = false;
+  weeks.forEach((w, i) => {
+    const d = computeDistribution(w.sessions);
+    if (d.totalSeconds > 0 && !honoursModel(d, model) && !specs[i]!.ctx.noQuality) {
+      specs[i]!.ctx = { ...specs[i]!.ctx, noQuality: true };
+      again = true;
+    }
+  });
+  if (again) weeks = enforceLongRunIsLongest(specs.map((_, i) => buildOne(i)), specs, buildOne);
+  return weeks;
+}
+
 function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions): ReturnType<typeof generatePlanCore> {
   const { road, ...rest } = options;
   const stages = (road?.stages ?? [])
@@ -1032,8 +1213,12 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
   const startWeekMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
   const totalWeeks = Math.max(0, weeksBetween(startWeekMonday, raceMonday) + 1);
   const raceTrack = raceTrackAthlete(athlete);
+  // ⚠️⚠️ §10 PIECE 3 — CONSECUTIVE RACE ENTRIES ARE ONE RACE BLOCK. The app cuts the race block into blocks of four weeks,
+  // each ending in a checkpoint (raceBlockSplit, src/plan/road.ts), exactly as Base is cut; to this engine they are one
+  // block laid back from race day, so the plan is byte for byte the block it was uncut.
+  const raceStored = stages.slice(raceAt).filter((st) => st.kind === "race").reduce((n, st) => n + st.weeks, 0);
   // The race block: never longer than the runway, never shorter than the engine's own shortest block.
-  const raceWeeks = Math.max(1, Math.min(totalWeeks, Math.max(MIN_RACE_BLOCK_WEEKS, stages[raceAt]!.weeks)));
+  const raceWeeks = Math.max(1, Math.min(totalWeeks, Math.max(MIN_RACE_BLOCK_WEEKS, raceStored)));
   // The foundation, one stage kind per calendar week in road order. Where the road reaches back before the plan's
   // first week, what does not fit is its EARLIEST weeks (they would be before the runner began).
   // ⚠️ §10: WALK-RUN WEEKS LEAD THE ROAD (W of them) and are built from their own levels below; the Rebuild/Base weeks
@@ -1062,10 +1247,28 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
     // ⚠️ THE DESTINATION IS A RACE BLOCK OF THE BOOK'S LENGTH, NOT THIS ONE. A race block shortened later (a week more
     // in Base, carried into it) opens on the same week as the full one for a runner with no stated mileage, but its
     // quality reference can move a minute — and the destination must not, or the weeks already run would.
-    const refWeeks = RACE_BLOCK_WEEKS[goal.distance];
+    // §10 piece 3: or of the length a main-track road laid its race block at (Road.destWeeks, stored) — for a runner who
+    // states a mileage, the volume fit opens a race block of another length on another week (measured: a returning
+    // half-marathoner's 18-week block opened its long run 61 → 86 minutes against the book's 16-week one).
+    const refWeeks = Math.max(MIN_RACE_BLOCK_WEEKS, Math.round(road?.destWeeks ?? RACE_BLOCK_WEEKS[goal.distance]));
     const ref = raceWeeks === refWeeks && raceStartIso === raceStartMonday && !rest.secondaryRace
       ? raceBlock
       : generatePlan(raceTrack, goal, { ...rest, secondaryRace: undefined, startDateIso: addDays(raceMonday, -(refWeeks - 1) * 7) });
+    // §10 piece 3: a regular or competitive runner's foundation is the main track's own weeks, from their stated mileage.
+    const mainTrack = athlete.experience !== "beginner" && !athlete.runWalk;
+    const foundation = mainTrack
+      ? mainFoundation(athlete, goal, paces, ref, raceBlock.intensityModel, kinds, offset, road?.rampWeeks ?? kinds.length, raceStartMonday)
+      : beginnerFoundation(paces, ref);
+    foundation.forEach((w, i) => {
+      const kind = fKinds[i] as "rebuild" | "base";
+      w.stage = kind;
+      if (!w.isDeload) w.focus = (mainTrack ? MAIN_STAGE_FOCUS : STAGE_FOCUS)[kind];
+    });
+    if (Wk === 0) applyPartialFirstWeek(foundation, startIso);
+    weeksOut.push(...foundation);
+  }
+  /** The beginner track's foundation (B14, pieces 1–2): the habit-builder's Rebuild and Base, from the beginner builder. */
+  function beginnerFoundation(paces: TrainingPaces, ref: { weeks: PlannedWeek[] }): PlannedWeek[] {
     const { open, dest, destEasy } = foundationEnds(athlete, goal, paces, ref);
     // Deloads every fourth week OF THE ROAD, counted from its first week (the beginner track's own cadence, and a
     // beginner or a returner always keeps them — schedulesRecoveryWeeks).
@@ -1109,14 +1312,7 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
       const sp = specs[i]!;
       return buildBeginnerWeek(sp.weekIndex, sp.startDateIso, sp.wp, over ? { ...sp.ctx, ...over } : sp.ctx, F + 1, false);
     };
-    const foundation = enforceLongRunIsLongest(specs.map((_, i) => buildOne(i)), specs, buildOne);
-    foundation.forEach((w, i) => {
-      const kind = specs[i]!.kind as "rebuild" | "base";
-      w.stage = kind;
-      if (!w.isDeload) w.focus = STAGE_FOCUS[kind];
-    });
-    if (Wk === 0) applyPartialFirstWeek(foundation, startIso);
-    weeksOut.push(...foundation);
+    return enforceLongRunIsLongest(specs.map((_, i) => buildOne(i)), specs, buildOne);
   }
   if (Wk > 0) {
     // ⚠️ THE LEVEL IS COUNTED FROM THE ROAD'S FIRST WEEK OF EACH KIND, weeks before the plan began included, and a week
@@ -1510,6 +1706,9 @@ function generatePlanCore(
   const natural = buildFull(1);
   let weeks = natural;
   let volScale = 1;
+  // §10 piece 3 — the scale `weeks` was actually built at, kept beside every assignment to it (the bisection below
+  // assigns weeks without moving `scale`, which is why `volScale` cannot be read for this). See FIT_OF.
+  let weeksScale = 1;
   if (targetPeakKm && !beginner) {
     let scale = 1;
     for (let pass = 0; pass < 5; pass++) {
@@ -1525,6 +1724,7 @@ function generatePlanCore(
       if (Math.abs(next - scale) < 0.01) break;   // the caps are binding; further passes are futile
       scale = next;
       weeks = buildFull(scale);
+      weeksScale = scale;
     }
     // ⚠️ THE INTENSITY FLOOR IS A POST-CONDITION, NOT AN ASSUMPTION — but only for scaling DOWN.
     // Scaling UP adds easy running and nothing else, so it cannot reduce an easy fraction and needs
@@ -1571,12 +1771,14 @@ function generatePlanCore(
         let lo = scale;            // known bad (or at least unproven)
         let hi = 1;                // known good: the plan they would otherwise have received
         let best: PlannedWeek[] | null = null;
+        let bestScale = 1;
         for (let i = 0; i < 6 && hi - lo > 0.01; i++) {
           const mid = (lo + hi) / 2;
           const cand = buildFull(mid);
-          if (ok(cand)) { hi = mid; best = cand; } else { lo = mid; }
+          if (ok(cand)) { hi = mid; best = cand; bestScale = mid; } else { lo = mid; }
         }
         weeks = best ?? natural;
+        weeksScale = best ? bestScale : 1;
       }
     }
     volScale = scale;
@@ -1619,8 +1821,13 @@ function generatePlanCore(
       if (Math.abs(next - scale) < 0.004) break;   // the per-session floors are binding
       scale = next;
       weeks = buildFull(scale);
+      weeksScale = scale;
     }
   }
+  // §10 piece 3: what these weeks were built at, for a road's Base to aim at (FIT_OF). Changes no plan.
+  const fitScale = weeksScale;
+  let qMemo: { v: number | undefined } | null = null;
+  FIT_OF.set(weeks, { vScale: fitScale, qRefMin: () => (qMemo ??= { v: qualityRefFor(fitScale) }).v, easyStartFrac: easyStartFracFor(athlete) });
 
   // ⚠️ B7: A B-RACE IS SHAPED ONTO THE FINISHED PLAN, AFTER THE VOLUME FIT AND THE YOUTH CEILING — NOT INSIDE
   // buildFull, WHERE PLAN.md SKETCHED IT. Inside, every fitting pass would see the easier week before the race,
@@ -1718,6 +1925,18 @@ type WeekContext = {
   easyCapKm?: number;
   /** §10: a walk-run block's week — its level's sessions (WALKRUN_LEVELS). Absent everywhere else. */
   walkRun?: WalkRunLevel;
+  /**
+   * §10 piece 3 — a regular runner's REBUILD week on the main track: no quality session at all (STAGES.md §3, "no fast
+   * running"), and only plain easy, explore and recovery runs — not the moderate gear, which is "a gear up from easy".
+   * Absent everywhere else, so no other week this engine builds can change.
+   */
+  noQuality?: boolean;
+  easyOnly?: boolean;
+  /**
+   * §10 piece 3 — a Rebuild week whose race block OPENS without a hard session (a long block's own quality-free weeks): its
+   * hard-session day is a full easy run, as that week's is, rather than the ground a hard session would have covered.
+   */
+  standInFull?: boolean;
 };
 
 /**
@@ -1953,8 +2172,24 @@ function buildWeek(
   );
   const baseQuality = qualitySessionsThisWeek(wp, runningDays, ctx.returning, ctx.vScale ?? 1, youthLimitsFor(ctx.athlete.age) != null,
     ctx.athlete.hardDays);
-  const qualityCount = runningDays <= 4 && longCarriesWork ? Math.min(baseQuality, 1) : baseQuality;
-  const easyCount = Math.max(0, runningDays - qualityCount - 1); // minus the long run
+  // §10 piece 3: a regular runner's Rebuild week (and a Base week too small to carry one safely) has none.
+  const usualQuality = runningDays <= 4 && longCarriesWork ? Math.min(baseQuality, 1) : baseQuality;
+  const qualityCount = ctx.noQuality ? 0 : usualQuality;
+  // ⚠️ AND THE HARD SESSION'S DAY BECOMES AN EASY RUN OF THE GROUND THAT SESSION WOULD HAVE COVERED — not a full-length easy
+  // run, and not a fixed shorter one. An easy run counts every minute as ground covered where a hard session's warm-up
+  // and cool-down are not counted, so a full-length run in its place made a Rebuild week BIGGER than the race block's first
+  // week (measured: a returner at 40 km a week opened Rebuild at 41.1 km where today's plan opens at 34.6); and a fixed
+  // shorter slot is no answer once the easy runs reach their 95-minute ceiling (a fast runner on three days at 40 km a
+  // week: 47.4 km of Rebuild before a 39.9 km race week). Never reached by any week that has its hard session.
+  const replacedByEasy = ctx.noQuality ? usualQuality : 0;
+  const standInMin = replacedByEasy > 0 && ctx.standInFull ? Infinity : replacedByEasy > 0 ? (() => {
+    const would = qualityContentsFor(wp, index, usualQuality, ctx);
+    // Counted volume, as sessionVolumeMeters reads it (that takes a placed Session; these are not placed yet).
+    const km = would.reduce((m, s) => m + (s.trainingDistanceMeters ?? s.estimatedDistanceMeters ?? 0), 0) / 1000 / Math.max(1, would.length);
+    return (km * (ctx.paces.easy.minSecPerKm + ctx.paces.easy.maxSecPerKm) / 2) / 60;
+  })() : 0;
+  // §10 piece 3: a Rebuild week's usual easy runs are the week's own; its stand-ins go on the hard sessions' days (below).
+  const easyCount = Math.max(0, runningDays - qualityCount - replacedByEasy - 1); // minus the long run
 
   const sessions: SessionContent[] = [];
   const dayOf: number[] = [];
@@ -2058,7 +2293,7 @@ function buildWeek(
     runningDays >= 7 ? easyDays.length - 1 : -1,
     // ⚠️ Asked of the ROTATION, exactly as the stand-aside below asks it, so the two cannot disagree
     // about which day is the strides day.
-    (ei) => easyVariantIsStrides(ctx.paces, index + ei, canStride),
+    (ei) => easyVariantIsStrides(ctx.paces, index + ei, canStride, ctx.easyOnly),
   );
   easyDays.forEach((d, ei) => {
     // Easy running is where weekly volume actually lives, so it scales with the runner too —
@@ -2111,7 +2346,7 @@ function buildWeek(
     // 5 km block: 24 strides-typed sessions and not one of them relaxed strides. Standing aside
     // wherever the rotation would have chosen strides removes the aliasing as a class rather than
     // patching the arithmetic of one case.
-    const rotWouldStride = easyVariantIsStrides(ctx.paces, index + ei, canStride);
+    const rotWouldStride = easyVariantIsStrides(ctx.paces, index + ei, canStride, ctx.easyOnly);
     const hillReps = ei === sprintSlot && !seventh && !weekAlreadyClimbs && !rotWouldStride
       ? hillSprintDose(wp, index, ctx.returning)
       : 0;
@@ -2119,7 +2354,7 @@ function buildWeek(
       ? recoveryRun(ctx.paces, m)
       : hillReps > 0
         ? easyHillStrides(ctx.paces, m, hillReps)
-        : easyVariant(ctx.paces, m, index + ei, canStride));
+        : easyVariant(ctx.paces, m, index + ei, canStride, ctx.easyOnly));
     let built = make(minutes);
     // ⚠️ MEASURE THE SESSION THAT WAS BUILT, NOT THE MINUTES ASKED FOR. "37′ easy + strides" and
     // "37′ easy + hill sprints" are LONGER than 37 minutes — the strides and the walk-backs are added
@@ -2143,6 +2378,25 @@ function buildWeek(
     sessions.push(built);
     dayOf.push(d);
   });
+
+  // ⚠️ §10 PIECE 3 — A REBUILD WEEK'S STAND-INS, ON THE HARD SESSIONS' OWN DAYS: "the hard session's day becomes an easy run".
+  // ⚠️ THEIR OWN DAYS, NOT THE EASY DAYS: the easy-day list has four slots (the week's hard days are a separate list), so a
+  // stand-in drawn from it left a six-day runner's Rebuild week one run short — five runs, measured. Each is the ground the
+  // session would have covered, at easy pace (standInMin), never longer than a usual easy run, and held to the long run like
+  // any easy run (the belt). No other week has any: replacedByEasy is 0.
+  for (let qi = 0; qi < replacedByEasy; qi++) {
+    // A lighter week's stand-in is a lighter week's easy run at most (the deload's own 32, as its other easy runs).
+    const usualMax = Math.min(95, (wp.isDeload ? 32 : 45) * (ctx.vScale ?? 1)) * (ctx.easyRamp ?? 1);
+    let m = Math.max(20, Math.min(95, Math.round(Math.min(standInMin, usualMax))));
+    let built = easyRun(ctx.paces, m, false);
+    if (ctx.easyCapMin != null || ctx.easyCapKm != null) {
+      const over = () => (ctx.easyCapMin != null && sessionMinutes(built) > ctx.easyCapMin + 1e-9)
+        || (ctx.easyCapKm != null && sessionKm(built) > ctx.easyCapKm + 1e-9);
+      while (over() && m > 20) built = easyRun(ctx.paces, --m, false);
+    }
+    sessions.push(built);
+    dayOf.push(qualityDays[qi]!);
+  }
 
   // Strength (shares days with runs, per the research brief's weekly structure).
   addStrength(wp, ctx, sessions, dayOf);
@@ -3312,8 +3566,8 @@ function hillSprintDose(wp: AnnotatedWeek, weekIndex: number, returning: boolean
  *
  * The minute count is arbitrary: which flavour the rotation lands on does not depend on it.
  */
-function easyVariantIsStrides(paces: TrainingPaces, idx: number, canStride: boolean): boolean {
-  const probe = easyVariant(paces, 40, idx, canStride);
+function easyVariantIsStrides(paces: TrainingPaces, idx: number, canStride: boolean, easyOnly?: boolean): boolean {
+  const probe = easyVariant(paces, 40, idx, canStride, easyOnly);
   return (probe.steps ?? []).some((st) => st.kind === "rep" && st.targetPaceSecPerKm != null);
 }
 
@@ -3330,7 +3584,13 @@ function easyVariantIsStrides(paces: TrainingPaces, idx: number, canStride: bool
 // ⚠️ The pool going from eight entries to seven changes which flavour each easy slot draws. That is a
 // real difference to every plan and it is the point: the slot the sprints used to occupy is now spent
 // on the other flavours, while the sprints themselves happen far more often than before.
-function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStride: boolean): SessionContent {
+function easyVariant(paces: TrainingPaces, minutes: number, idx: number, canStride: boolean, easyOnly?: boolean): SessionContent {
+  // §10 piece 3 — a regular runner's Rebuild week: easy running only, so not the moderate gear or the progression.
+  if (easyOnly) {
+    const calm: ((p: TrainingPaces, m: number) => SessionContent)[] =
+      [(p, m) => easyRun(p, m, false), (p, m) => contExplore(p, m), (p, m) => recoveryRun(p, m)];
+    return calm[idx % calm.length]!(paces, minutes);
+  }
   const pool: ((p: TrainingPaces, m: number) => SessionContent)[] = canStride
     ? [
         (p, m) => easyRun(p, m, false),

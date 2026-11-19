@@ -46,7 +46,7 @@ function harness(today: string, road: unknown) {
     experienceFor: (p: any) => (p.status === "building" || p.status === "new" ? "beginner" : "recreational"),
   };
   const fns = ["roadOf", "roadWeeksBetween", "roadMondayAfter", "roadAnswerAt", "effectiveRoad", "roadAthleteOf", "roadLegsNow",
-    "roadCheckpoint", "roadAnswered", "roadRaceWeeks", "weekMondayOf", "roadWalkRun"];
+    "roadCheckpoint", "roadAnswered", "roadRaceWeeks", "weekMondayOf", "roadWalkRun", "roadMergeRace", "roadSplitRace"];
   const src = [constDecl("ROAD_STAGE_LABEL"), constDecl("ROAD_MIN_RACE_WEEKS"), ...fns.map(fnBody)].join("\n");
   const names = Object.keys(env);
   const api = new Function(...names, src + "\nreturn { " + fns.join(", ") + " };")(...names.map((n) => env[n]));
@@ -54,7 +54,14 @@ function harness(today: string, road: unknown) {
 }
 const ROAD = (checkpoints: unknown[] = [], stages = [{ kind: "rebuild", weeks: 4 }, { kind: "base", weeks: 5 }, { kind: "race", weeks: 16 }]) =>
   ({ v: 1, fromIso: FROM, stages, rampWeeks: 9, checkpoints });
-const kinds = (r: any) => r.stages.map((s: any) => s.kind[0] + s.weeks).join(" ");
+// §10 piece 3: the race block's blocks of four (each ending in a checkpoint) read as ONE block here — these guards are about
+// the race block's length; test/road-regular-app.test.ts guards where it is cut.
+const raceAsOne = (stages: any[]) => stages.reduce((out: any[], s: any) => {
+  const l = out[out.length - 1];
+  if (l && l.kind === "race" && s.kind === "race") l.weeks += s.weeks; else out.push({ ...s });
+  return out;
+}, []);
+const kinds = (r: any) => raceAsOne(r.stages).map((s: any) => s.kind[0] + s.weeks).join(" ");
 const ATH = { experience: "beginner", runWalk: false };
 const GOAL = { raceDateIso: "2027-05-16" };
 
@@ -92,8 +99,10 @@ test("BLOCKER: the road fits a moved race date from its own first week, never re
   const blocks = harness("2026-11-25", ROAD([], [{ kind: "rebuild", weeks: 4 }, { kind: "base", weeks: 4 }, { kind: "base", weeks: 5 }, { kind: "race", weeks: 16 }]));
   assert.equal(kinds(blocks.api.effectiveRoad(blocks.profile, ATH, { raceDateIso: "2027-06-13" })), "r4 b4 b5 r16", "as laid");
   assert.equal(kinds(blocks.api.effectiveRoad(blocks.profile, ATH, { raceDateIso: addDays("2027-06-13", -42) })), "r4 b3 r16");
-  // A runner the road no longer places (now a regular runner) has no road at all: the plan it would have been.
-  assert.equal(h.api.effectiveRoad(h.profile, { experience: "recreational" }, GOAL), null);
+  // A runner the road no longer places (now 12–17) has no road at all: the plan it would have been. §10 piece 3 (2026-11-18):
+  // a regular runner IS placed now, so their road carries on.
+  assert.equal(h.api.effectiveRoad(h.profile, { experience: "recreational", age: 15 }, GOAL), null);
+  assert.ok(h.api.effectiveRoad(h.profile, { experience: "recreational" }, GOAL), "a regular runner's road was dropped");
 });
 
 test("BLOCKER: the card shows in a stage's last week, once — never daily, never after an answer", () => {
@@ -110,7 +119,8 @@ test("BLOCKER: the card shows in a stage's last week, once — never daily, neve
   assert.equal(seen("2026-12-22"), "rebuild→2026-12-28");
   // Base's checkpoint comes in Base's last week.
   assert.equal(seen("2027-01-20", [{ dueIso: "2026-12-21", kind: "rebuild", answer: "up" }]), "base→2027-01-25");
-  // The race block has no checkpoint (race day is B9's handover).
+  // The race block's LAST block has no checkpoint (race day is B9's handover). §10 piece 3: its earlier blocks of four do —
+  // test/road-regular-app.test.ts.
   assert.equal(seen("2027-05-12", [{ dueIso: "2026-12-21", kind: "rebuild", answer: "up" }, { dueIso: "2027-01-25", kind: "base", answer: "up" }]), null);
 });
 
@@ -179,7 +189,8 @@ test("BLOCKER: one question at a time — the checkpoint waits behind the others
 
 test("Base's test run can be started from the checkpoint itself — the plan schedules none", () => {
   const html = decomment(fnBody("roadCheckpointHtml"));
-  assert.match(html, /cp\.kind === "base" && !v\.met\.keyRun/);
+  // §10 piece 3: and at every race-block checkpoint (the test that keeps the race block's paces honest).
+  assert.match(html, /\(cp\.kind === "base" \|\| cp\.kind === "race"\) && !v\.met\.keyRun/);
   // §10 decision 5: the controlled 2 km and the all-out trial, each only when this runner is offered it.
   assert.match(html, /offer\.indexOf\("controlled-2k"\) >= 0\) trial \+= '<button class="perf-a" data-roadtrial="controlled">/);
   assert.match(html, /offer\.indexOf\("trial-2k"\) >= 0\) trial \+= '<button class="perf-a" data-roadtrial="max">/);

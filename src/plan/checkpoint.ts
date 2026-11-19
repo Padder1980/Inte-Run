@@ -66,8 +66,8 @@ export function blockTestsFor(o: { level: RunnerLevel; injured: boolean; longest
 export type EasyRunKey = { needMin: number; bestMin: number | null; bestIso?: string | null };
 
 export type CheckpointFacts = {
-  /** The stage whose checkpoint this is. */
-  stage: "walkrun1" | "walkrun2" | "rebuild" | "base";
+  /** The stage whose checkpoint this is — §10 piece 3: a block of the race block too (its key run is the level's test). */
+  stage: "walkrun1" | "walkrun2" | "rebuild" | "base" | "race";
   /** Runs the plan asked for in the stage's last two weeks, up to today. */
   planned: number;
   /** Of those, how many were run (logged on their day, or linked to the session). */
@@ -90,13 +90,20 @@ export type CheckpointFacts = {
     | { kind: "target-run"; needMin: number; doneIso: string | null; plannedIso?: string | null };
 };
 
+/** "an 80-minute run", "a 46-minute run" — the article for a number of minutes as it is said aloud (8, 11, 18, 80–89). */
+function minutesArticle(n: number): string {
+  const s = String(Math.round(n));
+  return s.startsWith("8") || s === "11" || s === "18" ? "an" : "a";
+}
+
 /** "a strong-but-controlled 2 km, or a parkrun or 5 km" — the offered tests in the runner's words. */
 function offerWords(offer: BlockTest[] | undefined, tof: EasyRunKey | null | undefined): string {
+  const need = tof ? tof.needMin : REBUILD_KEY_RUN_MIN;
   const words = (offer && offer.length ? offer : ["trial-2k" as BlockTest]).map((t) =>
     t === "trial-2k" ? "the 2 km test run"
       : t === "controlled-2k" ? "a strong-but-controlled 2 km"
         : t === "parkrun" ? "a parkrun or 5 km"
-          : `a ${tof ? tof.needMin : REBUILD_KEY_RUN_MIN}-minute run without stopping that feels easy`);
+          : `${minutesArticle(need)} ${need}-minute run without stopping that feels easy`);
   return words.length < 2 ? words.join("") : words.slice(0, -1).join(", ") + " or " + words[words.length - 1];
 }
 

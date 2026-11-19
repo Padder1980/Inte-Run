@@ -1251,3 +1251,40 @@ race, both in the profile, none chosen for him.
 A regular runner's Rebuild (easy only, the hard day an easy run of the session's ground), Base for a returner keeping the main
 track's returner rules, the race-block test for somebody back from injury (controlled 2 km or time on feet, all block long), and
 the weekly review's all-out retest no longer offered to anyone on a road.
+
+## The easy-pace question lost the answer being edited (pc-pace-prompt-edit, fixed 2026-11-19)
+
+Found while building STAGES.md §10 piece 4, older than that work. A runner on "Building the habit" with no easy pace changed one
+answer from the profile page (their goal, 10 km → 5 km) and tapped "Update my plan". `needsPacePrompt()` was true, and
+`openPacePrompt` drew "Add your easy pace?" into the SAME bottom sheet as the edit form (`openProfileEdit`) without
+`captureSetupFields()`, so the form left the page. "No — work it out from my first run" then ran `doSaveProfile` with no form:
+`draftFromForm` reads through `wizFieldVal`, whose `draft.__f` fallback held the STORED answers after a visit to the full Edit
+page, so the preview said "Your plan comes out the same either way" and the plan stayed 10 km. **Measured on a fresh launch,
+`__f` was empty: `draftFromForm` threw "Pick your target date" and the catch died on the missing `#setupErr` — nothing saved,
+nothing said.** "Add it now" closed the sheet and focused an `s_easypace` that no longer existed.
+
+- ⚠️ **The cure is `openProfilePreview`'s: capture, remember the topic, PUT THE FORM BACK before acting.** "No" re-opens the edit
+  (`openProfileEdit(topic, true)`) and then calls the save it was handed. `doSaveProfile` is a closure inside `wire()`, but it
+  reads nothing local to `wire()` (checked by scanning wire's top-level names), so the earlier copy saves the re-opened form, and a
+  complaint lands in that form's `#setupErr`. "Add it now" re-opens at the `fitness` topic (where `s_easypace` is asked), every
+  other answer kept, and focuses the box. On the full Edit page the form is in `#view` and the sheet never touched it, so only
+  the sheet path re-opens (`editing !== false`, the preview's own test).
+- ⚠️ **It was asked TWICE.** The preview's "Rebuild my plan" clicks `#saveProfile` again and `needsPacePrompt()` was still true, so
+  the runner was asked again after confirming — on both paths (measured on the full Edit page). The save handler now skips the
+  question while `PROFILE_CONFIRMED` is set: with the pace blank, the only way to that preview was answering it.
+- ⚠️ **`restoreSetupFields` skips blanks, so a CLEARED box came back filled whenever the form was put back.** Measured on the
+  preview path alone: an optional target time cleared → the preview built without it → "Rebuild my plan" saved the old 1:05:00.
+  A cleared easy pace + "No" would have kept the old pace. A re-open straight after a capture (the preview's and both of the
+  question's) passes `exact`, which restores blanks too; every other caller keeps the old rule, because there a blank can be a
+  question the runner never reached.
+- Guarded by `test/pace-prompt-edit.test.ts`: the real save handler and `doSaveProfile` lifted from INSIDE `wire()`, the real
+  `draftFromForm` and its helpers over RC, and a fake page that drops a container's fields when its HTML is replaced. Re-broken
+  four ways (no capture; asked twice; blanks skipped; the old "No"), each caught. Driven in a browser at phone size.
+
+### ⚠️ Found, NOT fixed (its own piece of work)
+
+- **A closed sheet keeps its copy of the form, and `captureSetupFields` sweeps it too** (it is deliberately not scoped to `#view`).
+  After any one-answer edit from the profile page, the sheet still holds that form; type on the full Edit page, tap another tab,
+  and the sheet's older values overwrite what was typed in `draft.__f` (later in document order wins). Measured 2026-11-19: a
+  date typed as 14 Mar 2027 came back as 1 Nov 2026. Reads are unaffected (`$` finds `#view`'s field first). Roadmap
+  `pc-setup-stale-sheet`.

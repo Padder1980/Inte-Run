@@ -7307,7 +7307,8 @@ function openProfilePreview(pf, imp) {
   $("piBack").onclick = () => closeSheet();
   $("piGo").onclick = () => {
     PROFILE_CONFIRMED = true;
-    if (editing !== false) { openProfileEdit(editing); }
+    // exact: a box the runner cleared stays cleared — the preview above was built without it.
+    if (editing !== false) { openProfileEdit(editing, true); }
     else closeSheet();
     // ⚠️ #saveProfile, and doSaveProfile is a CLOSURE inside wire() so it cannot be called
     // from here. The first version clicked "#saveSetup", which does not exist anywhere in the app --
@@ -24853,15 +24854,18 @@ let PROFILE_EDIT_OPEN = false;
  * ⚠️ wire() BINDS THE SETUP HANDLERS ON ELEMENT PRESENCE, NOT ON state.screen -- every one is
  * guarded with "if (el)". That is the only reason the form works here at all, and it is worth knowing
  * before anybody "tidies" those guards into a screen check.
+ *
+ * exact: the form is being PUT BACK just after another sheet replaced it (the preview, the easy-pace
+ * question), so a blank captured then is a box the runner cleared — restoreSetupFields keeps it blank.
  */
-function openProfileEdit(topic) {
+function openProfileEdit(topic, exact) {
   state.setupFocus = topic;
   seedSetupDraft();
   ensureSheet();
   $("sheetBody").innerHTML = viewSetup();
   linkFormLabels();
   applySetupFocus();
-  restoreSetupFields();
+  restoreSetupFields(exact);
   $("sheetOv").classList.add("on");
   PROFILE_EDIT_OPEN = true;
   wire();
@@ -28997,13 +29001,18 @@ function captureSetupFields() {
     if (el.id && typeof el.value === "string") draft.__f[el.id] = el.value;
   });
 }
-function restoreSetupFields() {
+function restoreSetupFields(exact) {
   const f = draft.__f; if (!f) return;
   Object.keys(f).forEach((id) => {
     const el = $(id);
     // Only restore a field the runner actually reached — an empty string would blank a sensible
     // default on a question they never scrolled to.
-    if (el && typeof el.value === "string" && f[id] !== "") el.value = f[id];
+    // ⚠️ EXCEPT WHEN THE FORM IS PUT BACK A MOMENT AFTER IT WAS CAPTURED (exact: the preview's
+    // "Rebuild my plan", and both answers to "Add your easy pace?"). Every field was on screen then, so
+    // a blank is an answer the runner gave, a box they cleared, and skipping it put the STORED answer
+    // back: measured 2026-11-19, a cleared target time was saved as the old one after a preview built
+    // without it, and a cleared easy pace would have come back after "No — work it out from my first run".
+    if (el && typeof el.value === "string" && (exact || f[id] !== "")) el.value = f[id];
   });
 }
 let draft = {};
@@ -43227,7 +43236,23 @@ function needsPacePrompt() {
   const el = $("s_easypace");
   return draft.status === "building" && !!el && !el.value.trim();
 }
+/**
+ * ⚠️ THE QUESTION SHARES ONE SHEET WITH THE EDIT FORM, so asking it destroyed the form: the trap
+ * openProfilePreview already documents, here with no cure until pc-pace-prompt-edit (2026-11-19). A
+ * runner on "Building the habit" changed one answer from the profile page (their goal, say), tapped
+ * "Update my plan" and was asked this. "No" then saved with the form gone, so draftFromForm read the
+ * STORED answers through wizFieldVal's draft fallback: 10 km changed to 5 km came back as 10 km, with
+ * "Your plan comes out the same either way". Measured on a fresh launch, with nothing stored to fall
+ * back on, it threw at the missing error line and saved nothing, in silence. "Add it now" closed the
+ * sheet and focused a field that no longer existed.
+ * So, as the preview does: capture what was typed and PUT THE FORM BACK before either answer acts.
+ * "No" saves from the live form, where a complaint has somewhere to show; "Add it now" opens it at the
+ * easy-pace question (one of Current fitness's), every other answer kept. On the full Edit page the
+ * form is in #view and the sheet never touched it.
+ */
 function openPacePrompt(onSkip) {
+  const editing = PROFILE_EDIT_OPEN ? (state.setupFocus || null) : false;
+  if (PROFILE_EDIT_OPEN) captureSetupFields();
   ensureSheet(); SHEET_CTX = null;
   $("sheetBody").innerHTML =
     '<div class="sd-type" style="--sc:var(--accent)">Easy pace</div>' +
@@ -43236,8 +43261,14 @@ function openPacePrompt(onSkip) {
     '<div class="sd-desc" style="margin-top:8px">Happy to leave it? That\\u2019s fine \— we\\u2019ll start you gently and set your paces automatically from your first run.</div>' +
     '<button class="primary" id="paceAdd" style="width:100%;margin-top:14px">Add it now</button>' +
     '<button class="rm-nothanks" id="paceSkip">No \— work it out from my first run</button>';
-  $("paceAdd").onclick = () => { closeSheet(); const el = $("s_easypace"); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } };
-  $("paceSkip").onclick = () => { closeSheet(); onSkip(); };
+  $("paceAdd").onclick = () => {
+    if (editing !== false) openProfileEdit(editing ? "fitness" : null, true); else closeSheet();
+    const el = $("s_easypace"); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); }
+  };
+  $("paceSkip").onclick = () => {
+    if (editing !== false) openProfileEdit(editing, true); else closeSheet();
+    onSkip();
+  };
   $("sheetOv").classList.add("on");
 }
 function loadPaceNotice() { try { return JSON.parse(localStorage.getItem("interun_pacenotice") || "null"); } catch (e) { return null; } }
@@ -45481,7 +45512,10 @@ function wire() {
   const wxSeg = document.querySelector("[data-weatherseg]"); if (wxSeg) wxSeg.querySelectorAll("button").forEach((b) => b.onclick = () => { state.weather = b.dataset.weather; render(); });
   const save = $("saveProfile"); if (save) save.onclick = () => {
     // Blank easy pace on a "building" profile: ask once before saving.
-    if (needsPacePrompt()) { openPacePrompt(doSaveProfile); return; }
+    // ⚠️ ONCE PER SAVE. The preview's "Rebuild my plan" clicks this button again (openProfilePreview),
+    // and the only way to that preview with the pace blank was answering this question, so it was
+    // asked a second time after the runner had confirmed (measured 2026-11-19, on the full Edit page).
+    if (!PROFILE_CONFIRMED && needsPacePrompt()) { openPacePrompt(doSaveProfile); return; }
     doSaveProfile();
   };
   function doSaveProfile() {

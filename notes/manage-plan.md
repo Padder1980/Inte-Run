@@ -1187,3 +1187,29 @@ history across pauses and goals, the five lists, Up next, the race-day question 
 race offer and the finished plan). Restated for the new home of the start path: `test/manage-plan.test.ts`,
 `plan-anchor`, `pause-pickup`, `b-race-app`; `realign` and `reentry` lift the new question beside theirs. **28 of 28
 re-breaks caught.** Driven in the browser at 375×812, light and dark.
+
+## ✅ AN EASIER WEEK SAYS ONCE WHY ITS RUNS STAY PUT (B4's wording, fixed 2026-11-19)
+
+**The defect** (found while building the real easier week, `notes/plan-adaptation.md`, last chapter; Road Map
+`pc-ease-dupline`): open any run in a week the runner made easier, and under "Move to another week" the sheet read
+"You made this week easier, so nothing moves out of it. You made this week easier, so nothing moves out of it." —
+`xwRefusal` shuts both directions with "eased", and `xwRowHtml` joined `xwBlockText`'s answer for each direction.
+
+**The fix, two parts:**
+- `xwRowHtml` says a reason both directions share ONCE (the notes are de-duplicated before they are joined).
+- `xwBlockText` asks about the session's OWN week first (`t.home`, the week `xwRefusal` reads). An easier week stops
+  everything leaving it, whichever way, so that is the one reason. Asked target-first, as it was, a run in an easier
+  week next to another easier week gave two reasons for one fact ("…nothing moves out of it. You made week 3 easier,
+  so nothing moves into it."). A run in a week that is NOT easier still names the easier week next door ("You made
+  week 2 easier, so nothing moves into it.").
+- `t.home` is the current week whenever it is easier: a moved session whose home or new week is made easier is sent
+  home by the rebuild (`applyCrossWeekMoves` asks `xwRefusal`), so "this week" is always the week on the sheet.
+
+**Tests** (`test/move-week.test.ts`, 2 new): the named case (week 2 made easier: each of its runs has both buttons
+shut and the one sentence, once; weeks 2 and 3 both easier: still the one sentence; week 1 names week 2), and a sweep
+(11 layouts of easier weeks, one session moved a week, every offerable run — 209 rows, 72 in an easier week of their
+own, 55 beside one, 3 moved — no sentence said twice). **2 of 2 re-breaks caught:** no de-duplication (both fail), and
+the target asked first again (the named case fails; the sweep's reach bound falls to 48 own-week rows).
+Driven in a browser at 430×932, light and dark: a regular half plan, week 2 made easier through the real menu row,
+the real Plan screen, the 67′ long run's sheet → both buttons greyed, the sentence once, no sentence repeated anywhere
+on the sheet, no console errors. Weeks 1 and 3 name week 2.

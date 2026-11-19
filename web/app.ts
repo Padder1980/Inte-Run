@@ -7824,12 +7824,18 @@ const XW_WHY = {
   eve: "The day before your race can’t take a hard session.",
   "break": "Days in a break you’ve booked are greyed out, because the break would take it straight back out.",
 };
-/** A whole week that cannot take it, in one sentence for the sheet. */
+/**
+ * A whole week that cannot take it, in one sentence for the sheet.
+ * ⚠️ THE SESSION'S OWN EASIER WEEK IS ASKED FIRST. xwRefusal says "eased" when either week was made easier.
+ * When it is the session's own week (home, as xwRefusal reads it), nothing moves out of it either way, so
+ * both directions give that one reason and xwRowHtml says it once. Asked the other way round, an easier week
+ * next door to an easier week gave two reasons for one fact.
+ */
 function xwBlockText(t, dir) {
   if (t.block === "race") return t.ti === PLAN.weeks.length - 1 ? "Race week keeps its own sessions, so nothing moves into it." : "Race week’s sessions stay in race week.";
-  if (t.block === "eased") return eased(PLAN.weeks[t.ti], loadAdjust())
-    ? "You made week " + (t.ti + 1) + " easier, so nothing moves into it."
-    : "You made this week easier, so nothing moves out of it.";
+  if (t.block === "eased") return eased(PLAN.weeks[t.home], loadAdjust())
+    ? "You made this week easier, so nothing moves out of it."
+    : "You made week " + (t.ti + 1) + " easier, so nothing moves into it.";
   if (t.block === "far") return "A session can move one week from where your plan put it.";
   if (!t.any) return "Every day in week " + (t.ti + 1) + " already has a run, or has gone.";
   return "";
@@ -7894,8 +7900,11 @@ function xwRowHtml(sess, week) {
     : (dir < 0 ? "‹ A week earlier" : "A week later ›");
   const btn = (t, dir, id) => t.block === "edge" ? "" :
     '<button class="sd-wkbtn" id="' + id + '"' + (t.any ? "" : " disabled") + '>' + label(t, dir) + '</button>';
+  // ⚠️ A REASON BOTH DIRECTIONS SHARE IS SAID ONCE. In a week the runner made easier, both buttons are shut
+  // for the same reason, and the sheet read "You made this week easier, so nothing moves out of it." twice
+  // in a row (found 2026-11-19).
   const notes = [h ? "Moved here from week " + (h.home + 1) + "." : "", back.block === "edge" ? "" : xwBlockText(back, -1),
-    fwd.block === "edge" ? "" : xwBlockText(fwd, 1)].filter(Boolean);
+    fwd.block === "edge" ? "" : xwBlockText(fwd, 1)].filter((n, i, all) => n && all.indexOf(n) === i);
   return '<div class="sd-xw"><div class="sd-move-h">Move to another week</div>' +
     '<div class="sd-xw-btns">' + btn(back, -1, "sdWeekBack") + btn(fwd, 1, "sdWeekNext") + '</div>' +
     (notes.length ? '<div class="sd-move-n">' + esc(notes.join(" ")) + '</div>' : "") + '</div>';

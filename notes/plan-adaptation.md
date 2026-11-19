@@ -617,3 +617,6 @@ no console errors. Screenshots in the session notes folder.
   made this week easier, so nothing moves out of it." (B4). Road Map step `pc-ease-dupline`.
 - `applyInjuryAdjustment` (src/adapt/injury.ts, still no caller) cuts with `scaleSessionDistance` on paper too. Whoever wires it
   must shorten through `shortenSession` and teach `retitled` any title shape it meets (the title guard fails on an unknown one).
+
+**Fixed 2026-11-19:** the sentence shown twice on an easier week's session sheet (`pc-ease-dupline`) — said once now;
+the fix and its tests are in `notes/manage-plan.md`, last chapter.

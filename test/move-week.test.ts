@@ -460,6 +460,65 @@ test("BLOCKER: Move to another week is offered only where it can work — a run,
   assert.match(api.xwRowHtml(w(1, "threshold"), 2), /You made week 3 easier, so nothing moves into it\./);
 });
 
+/* An easier week's runs, and the one reason they cannot move (found 2026-11-19). */
+const OWN_EASED = "You made this week easier, so nothing moves out of it.";
+const xwNote = (html: string) => { const m = /<div class="sd-move-n">([^<]*)<\/div>/.exec(html); return m ? m[1]! : ""; };
+const easeWeeks = (box: any, weeks: number[]) => {
+  box.api.saveAdjust(weeks.map((wi) => ({ id: "e" + wi, kind: "recovery", mode: "recovery", from: MON(wi), to: addDays(MON(wi), 6) })));
+  relaunch(box);
+};
+const offeredRuns = (box: any, wi: number) => box.RAW.weeks[wi].sessions.filter((s: any) => box.api.xwOfferable(s, wi + 1));
+
+test("a week the runner made easier says once why its runs cannot move to another week", () => {
+  // The defect: in an easier week both buttons are shut for the same reason, and the session sheet said it
+  // twice in a row — "You made this week easier, so nothing moves out of it. You made this week easier, so
+  // nothing moves out of it."
+  const one = sandbox();
+  easeWeeks(one, [1]);
+  assert.ok(one.api.eased(one.PLAN.weeks[1], one.api.loadAdjust()), "the fixture did not make week 2 easier");
+  const runs = offeredRuns(one, 1);
+  assert.ok(runs.length >= 3, "week 2 offered " + runs.length + " runs a move — too few to prove anything");
+  for (const s of runs) {
+    const row = one.api.xwRowHtml(s, 2);
+    assert.match(row, /id="sdWeekBack"[^>]*disabled/, s.title + " could be moved out of an easier week");
+    assert.match(row, /id="sdWeekNext"[^>]*disabled/, s.title + " could be moved out of an easier week");
+    assert.equal(xwNote(row), OWN_EASED, s.title + "'s row did not give the one reason once");
+  }
+  // Weeks 2 and 3 both easier: a week-2 run is held by its OWN week, in either direction. That is the reason,
+  // said once — not that and "You made week 3 easier" as well.
+  const two = sandbox();
+  easeWeeks(two, [1, 2]);
+  for (const s of offeredRuns(two, 1)) assert.equal(xwNote(two.api.xwRowHtml(s, 2)), OWN_EASED, s.title + " gave more than the one reason");
+  // A run in a week that is NOT easier still names the easier week next door.
+  assert.equal(xwNote(two.api.xwRowHtml(offeredRuns(two, 0).find((s: any) => s.type === "threshold"), 1)),
+    "You made week 2 easier, so nothing moves into it.");
+});
+
+test("no reason is said twice in the Move to another week row, whichever weeks are easier", () => {
+  const layouts = [[], [0], [1], [2], [3], [0, 1], [1, 2], [2, 3], [1, 3], [0, 2], [0, 1, 2, 3]];
+  let rows = 0, own = 0, nextDoor = 0, moved = 0;
+  for (const weeks of layouts) {
+    const box = sandbox();
+    // One run already moved a week, so "Moved here from week 2." is in the mix too (an easier week 2 or 3
+    // sends it home on the rebuild, as the rule says).
+    box.api.moveSessionToWeek(box.RAW.weeks[1].sessions.find((x: any) => x.type === "threshold"), 2, 1, 4);
+    easeWeeks(box, weeks);
+    box.RAW.weeks.forEach((w: any, wi: number) => offeredRuns(box, wi).forEach((s: any) => {
+      const said = xwNote(box.api.xwRowHtml(s, wi + 1)).split(/(?<=\.)\s+/).filter(Boolean);
+      assert.equal(new Set(said).size, said.length, "week " + (wi + 1) + ", " + s.title + " with weeks " + weeks.map((x) => x + 1) +
+        " easier said a reason twice: " + said.join(" "));
+      rows++;
+      if (said.includes(OWN_EASED)) own++;
+      if (said.some((x) => /^You made week \d+ easier/.test(x))) nextDoor++;
+      if (said.some((x) => /^Moved here from week/.test(x))) moved++;
+    }));
+  }
+  // Measured 2026-11-19: 209 rows, 72 in a week of their own made easier, 55 beside one, 3 moved. The sweep must
+  // keep reaching every kind of row it is about.
+  assert.ok(rows > 180 && own > 60 && nextDoor > 45 && moved > 0,
+    "the sweep reached " + rows + " rows, " + own + " own, " + nextDoor + " next door, " + moved + " moved");
+});
+
 test("BLOCKER: the picker offers only days the rebuild will honour, says why the others are grey, and quotes the engine's distance", () => {
   const box = sandbox();
   const { api } = box;

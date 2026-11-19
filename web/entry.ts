@@ -15,7 +15,9 @@ export { generatePlan, HARD_BEFORE_RACE, sessionIdFor, secondaryRaceWindow, long
 // B14 — the road to a race: where a runner starts and how the weeks are budgeted (STAGES.md). The app asks it when a
 // plan is made and stores what the runner accepted; the engine builds exactly that road.
 // §10 piece 3: raceBlockSplit — where the race block's checkpoints fall (every four weeks, never in the taper).
-export { roadFor, roadStartFor, blockSplit, raceBlockSplit, BLOCK_WEEKS, BLOCK_MAX_WEEKS, WALKRUN_WEEKS, WALKRUN_KEY_MIN } from "../src/plan/road.ts";
+// §10 piece 4: a goal without a race — rolling blocks (roadNoRaceFor, and the block after a block).
+export { roadFor, roadStartFor, blockSplit, raceBlockSplit, BLOCK_WEEKS, BLOCK_MAX_WEEKS, WALKRUN_WEEKS, WALKRUN_KEY_MIN,
+  roadNoRaceFor, noRaceNextKind, noRaceBlockWeeks } from "../src/plan/road.ts";
 // B14 — the checkpoint's judgement (Ready / Nearly / Not yet), pure over the facts the app gathers.
 // §10 (decision 5): the end-of-block test chosen by level — one definition the checkpoint and the app both read.
 export { evaluateCheckpoint, REBUILD_KEY_RUN_MIN, EASY_RPE_MAX, blockTestsFor, maximalTestAllowed, PARKRUN_MIN_LONGEST_KM,

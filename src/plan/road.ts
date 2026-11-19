@@ -250,3 +250,61 @@ export function roadFor(athlete: Athlete, goal: Goal, startIso: string, options:
     fullFitsRaceMondayIso: addDays(startMonday, (wr + need + fullRaceWeeks - 1) * 7),
   };
 }
+
+// ---- §10 piece 4: a goal without a race — rolling blocks (STAGES.md §10 decision 4) --------------------------------
+
+/**
+ * §10 piece 4 — THE BLOCK AFTER A BLOCK ON A ROAD WITH NO RACE: Walk-run 1 → Walk-run 2 → Rebuild → Base → Base → …, each
+ * at its standard length (noRaceBlockWeeks). The road has no end: the app lays out the block the runner is in and the
+ * next, and adds another as each checkpoint is passed. One definition, read by the app (effectiveRoad) and the tests.
+ */
+export function noRaceNextKind(kind: StageKind): StageKind {
+  return kind === "walkrun1" ? "walkrun2" : kind === "walkrun2" ? "rebuild" : "base";
+}
+/** A block's standard length on a road with no race: the walk-run blocks their levels, Rebuild and Base four weeks. */
+export function noRaceBlockWeeks(kind: StageKind): number {
+  return kind === "walkrun1" ? WALKRUN_WEEKS.walkrun1 : kind === "walkrun2" ? WALKRUN_WEEKS.walkrun2
+    : kind === "rebuild" ? REBUILD_WEEKS : BLOCK_WEEKS;
+}
+export type NoRaceRoadProposal = {
+  /** The first two blocks: the block the runner starts in and the next (decision 3 — "the block you're in plus the next"). */
+  stages: RoadStage[];
+  /** The foundation's ramp, in Rebuild/Base weeks: how long the climb to race-ready takes before the plan holds there. */
+  rampWeeks: number;
+  startStage: StageKind;
+  /** Every week of the climb, the walk-run blocks included — what the wizard says ("it builds for about 12 weeks"). */
+  climbWeeks: number;
+};
+/**
+ * ⚠️⚠️ §10 PIECE 4 — A NEW ROAD WITH NO RACE (owner, 2026-11-19: "yes, all your picks"). Placed exactly as a race road is
+ * (roadStartFor: the walk-run blocks for a runner just getting started, Rebuild for a habit-builder or anybody coming
+ * back, Base for a regular runner), and never for a 12–17 runner (null — their plan is built for a race).
+ *
+ * THE CLIMB IS THE ROAD'S OWN NEED, measured as a race road measures it (roadFoundationNeed, mainFoundationNeed): the
+ * fewest weeks whose long run arrives within one step of the first week of a race block of the book's length for the
+ * runner's distance — anchored, as the engine anchors it (generateNoRaceRoadPlan), on the road's first Monday. Over those
+ * weeks the plan climbs; past them it holds (decision 4, the owner's A). A regular runner already there climbs nothing.
+ */
+export function roadNoRaceFor(athlete: Athlete, goal: Goal, startIso: string, options: GenerateOptions = {}): NoRaceRoadProposal | null {
+  const startStage = roadStartFor(athlete);
+  if (!startStage) return null;
+  const startMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
+  const book = RACE_BLOCK_WEEKS[goal.distance];
+  const refGoal: Goal = { ...goal, raceDateIso: addDays(startMonday, (book - 1) * 7 + 6), startDateIso: startMonday };
+  const { road: _road, secondaryRace: _sr, ...rest } = options;
+  let ramp: number;
+  if (athlete.experience !== "beginner" && !athlete.runWalk) {
+    const climb = mainFoundationNeed(athlete, refGoal, rest, book);
+    const rebuild = startStage === "rebuild" ? REBUILD_WEEKS : 0;
+    ramp = rebuild > 0 ? Math.max(rebuild, climb) : climb > 0 ? Math.max(BASE_MIN_WEEKS, climb) : 0;
+  } else {
+    ramp = Math.max(REBUILD_WEEKS + BASE_MIN_WEEKS, roadFoundationNeed(athlete, refGoal, rest).weeks);
+  }
+  const second = noRaceNextKind(startStage);
+  const stages: RoadStage[] = [
+    { kind: startStage, weeks: noRaceBlockWeeks(startStage) },
+    { kind: second, weeks: noRaceBlockWeeks(second) },
+  ];
+  const walk = startStage === "walkrun1" ? WALKRUN_WEEKS.walkrun1 + WALKRUN_WEEKS.walkrun2 : 0;
+  return { stages, rampWeeks: ramp, startStage, climbWeeks: walk + ramp };
+}

@@ -181,7 +181,7 @@ test("the weekly review's 2 km retest stands aside on a road — the checkpoints
 
 type Run = { id: string; dateIso: string; distKm: number; sec: number; rpe?: number; test?: string; pain?: boolean };
 const SHEET_TODAY = "2027-02-17";
-function sheet(o: { status?: string; returning?: string | false; runs?: Run[] } = {}) {
+function sheet(o: { status?: string; returning?: string | false; runs?: Run[]; feas?: unknown } = {}) {
   const profile: any = { personalized: true, status: o.status ?? "regular", returning: o.returning ?? false, goalDist: "half",
     raceDate: "2027-05-16", recentTimeS: 1350, noRecent: false };
   const state: any = { logged: o.runs ?? [], hist: [] };
@@ -197,7 +197,7 @@ function sheet(o: { status?: string; returning?: string | false; runs?: Run[] } 
   const env: Record<string, unknown> = {
     RC, profile, state, isoAdd, todayIso: () => SHEET_TODAY,
     // The block's longest planned run: 80 minutes (time on feet's bar, where it counts).
-    PLAN: { weeks: [{ index: 12, startIso: "2027-02-08" }], feasibility: null, goal: { target: "1:35:00" } },
+    PLAN: { weeks: [{ index: 12, startIso: "2027-02-08" }], feasibility: o.feas ?? null, goal: { target: "1:35:00" } },
     RAW: { weeks: [{ sessions: [{ id: "w12-long", type: "long", dayOfWeek: 6, estimatedDurationSeconds: 80 * 60 }] }] },
     PRIMARY_TYPES: { long: 1, easy: 1 }, effDay: (s: any) => s.dayOfWeek, linkedRunFor: () => null,
     loadHist: () => [], loadTwoKm: () => [], runDateLabelIso: (iso: string) => "D" + iso,
@@ -239,4 +239,25 @@ test("BLOCKER: the race-block checkpoint asks for the level's test, and says the
   const ih = inj.api.roadCheckpointHtml();
   assert.match(ih, /data-roadtrial="controlled"/);
   assert.doesNotMatch(ih, /data-roadtrial="max"|parkrun/);
+});
+
+test("BLOCKER: the owner's B inside the race block — the suggestion is Start or Ease back, and behind names both ways out", () => {
+  // His answer, 2026-11-19: "B: No "One more week" there". Where the judgement would suggest a week more (a run missed, the
+  // test not yet done), the race block suggests carrying on — the reasons and the test buttons say what is missing.
+  const sug = (html: string) => (/data-road="(\w+)"[^>]*><span class="po-rec">Suggested/.exec(html) || [])[1] ?? null;
+  const nearly = sheet({ runs: [run("a", "2027-02-07", 10, 55)] });
+  assert.notEqual(RC.evaluateCheckpoint(nearly.api.roadFacts(nearly.cp)).verdict, "ready");
+  assert.equal(RC.evaluateCheckpoint(nearly.api.roadFacts(nearly.cp)).recommend, "more", "the judgement itself is unchanged");
+  assert.equal(sug(nearly.api.roadCheckpointHtml()), "up", "inside the race block nothing was suggested, or a week more");
+  // Something hurt: easing back, with the injury door — as at every checkpoint.
+  const hurt = sheet({ runs: [{ ...run("a", "2027-02-14", 10, 55), pain: true }] });
+  const hh = hurt.api.roadCheckpointHtml();
+  assert.equal(sug(hh), "ease");
+  assert.match(hh, /id="roadInjury"/);
+  // Behind: a new target near the suggested one, or a later race — both named, neither picked.
+  const behind = sheet({ runs: [], feas: { verdict: "unrealistic", currentPredicted: "1:48:00", suggestedTarget: "1:45:00" } });
+  const bh = behind.api.roadCheckpointHtml().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  assert.match(bh, /behind — your current fitness predicts 1:48:00\. Your choices, none picked for you: a target near 1:45:00, which fits the time left, or a later race — both in your profile — or carry on as you are\./);
+  const noSuggestion = sheet({ runs: [], feas: { verdict: "unrealistic", currentPredicted: "1:48:00", suggestedTarget: null } });
+  assert.match(noSuggestion.api.roadCheckpointHtml(), /Your choices, none picked for you: a new target, or a later race/);
 });

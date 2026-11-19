@@ -983,8 +983,10 @@ function raceTrackAthlete(a: Athlete): Athlete {
  * the runner reaches (`raceTrackAthlete`) for the race stage's weeks — dials, volume fit, B-race and all — so it is
  * exactly the block today's engine builds for those weeks, and every guard on that engine still holds over it.
  *
- * THE FOUNDATION FILLS THE WEEKS BEFORE IT, which until now were left un-planned (the "lead-in" note). It is built
- * by the beginner track's own week builder, one stage per week:
+ * THE FOUNDATION FILLS THE WEEKS BEFORE IT, which until now were left un-planned (the "lead-in" note). For a beginner
+ * (and a run-walk runner after their walk-run blocks) it is built by the beginner track's own week builder, one stage per
+ * week, as below; for a regular or competitive runner by the main track's own week builder, from the mileage they state
+ * (§10 piece 3 — `mainFoundation`):
  *   * a REBUILD week carries no fast running for anyone — `returning` set, so no quality and no hill sprints;
  *   * a BASE week carries the beginner track's gentle quality (fartlek, hill reps every fourth week) and its hill
  *     sprints — decision 1: harder sessions return once the runner has passed the Rebuild checkpoint.

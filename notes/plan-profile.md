@@ -996,8 +996,8 @@ run only when rated easy, and easing back as a repeat of the block's last week m
 
 Each is as large as pieces 1 and 2 together, so each is its own session (CLAUDE.md: one stage per session).
 
-**Piece 3 — decision 3, regular and competitive runners.** ✅ **Built 2026-11-19** — see the chapter below (the open
-question about "one more week" inside the race block was put to the owner; Start / Ease back only until he answers).
+**Piece 3 — decision 3, regular and competitive runners.** ✅ **Built 2026-11-19** — see the chapter below (the owner
+chose no "one more week" inside the race block, 2026-11-19: "B: No "One more week" there").
 - *Placement* (`roadStartFor`): an adult on the main track coming back (injury or break) → Rebuild; otherwise Base when the runway is
   longer than the race block (`RACE_BLOCK_WEEKS`), else a race-only road. Today every main-track runner gets null (no road).
 - *Base from the mileage they state* (`pf.volKm` → `weeklyVolumeKmCurrent`; blank = the plan's own defaults): the beginner builder
@@ -1191,16 +1191,17 @@ its answer and what was built for it are the last section of this chapter.
   session has its library length) keep many low-mileage first weeks above what they state — shared with today's plan — but
   every one of 161 runners stating well under the race block's opening starts nearer their own mileage than the race block would.
 
-**Tests:** `test/road-regular.test.ts` (9, engine, one shared sweep of ~960 roads) and `test/road-regular-app.test.ts` (8, lifted
+**Tests:** `test/road-regular.test.ts` (9, engine, one shared sweep of ~960 roads) and `test/road-regular-app.test.ts` (9, lifted
 from the built page); restated on purpose: road-stages' placement line (a regular runner IS placed) and the race block's kinds
 (now four entries), road-app's "a regular runner has no road" (now 12–17), the harnesses read the race block's entries as one
-(`raceAsOne`) and lift the new helpers, and road-app's test-button regex (Base OR race). **Re-breaks: 30 of 30 caught** —
+(`raceAsOne`) and lift the new helpers, and road-app's test-button regex (Base OR race). **Re-breaks: 32 of 32 caught** —
 placement; the race entries built as one; no checkpoint in the taper; Base from the stated mileage; Rebuild's no quality, easy
 runs only, the stand-in's size, the stand-ins existing and sitting on the hard days; aimed at the block it joins; the climb;
 the easy-floor fallback; past weeks; no road when the climb cannot fit; the one-step threshold; the race-only shortcut; and in
 the app: race blocks' checkpoints, the cut, no hold, a foundation week taken from the block as one, race ease moving no week,
 no "more" offered there, `destWeeks` stored, a regular runner's words, the review's retest, the footer, the test buttons, the
-wizard's line, the race weeks read across blocks, the Plan screen after an ease. ⚠️ Three re-breaks first went UNCAUGHT and each
+wizard's line, the race weeks read across blocks, the Plan screen after an ease; and after the owner's B, the race block's
+suggestion (Start where a week more would have been suggested) and "behind" naming a later race as well as a new target. ⚠️ Three re-breaks first went UNCAUGHT and each
 taught something: the easy-floor fallback fires only at very low mileage on three days (40 of 28,123 weeks — added to the
 guard); the race-only shortcut matters for 8 of 1,152 runners and the first fixture was not one of them (replaced); and "no
 'more' in the race block" was re-broken at a line that was not load-bearing (the per-block floor refused it anyway) — re-broken
@@ -1220,19 +1221,21 @@ the live page did not have. Read the page's text when the pane is hidden. ⚠️
 `interun_anchor_v1` set (or the one-time October migration moves its start to today) and the history rows (`syncHist`), or B6's
 "get back on track" (which reads history rows) stands in front of every checkpoint.
 
-### ⚠️ "One more week" inside the race block — put to the owner, 2026-11-19, not answered yet
+### ✅ "One more week" inside the race block — the owner's answer, 2026-11-19: B, none
 
 The brief said to ask before building it. Asked (through the session that started this one), with the measured trade-off:
 - **A (recommended — §10's "eats into the block"):** next week repeats the last full week; the weeks after are re-spaced over one
-  week less (each later step a little bigger, never past `LONG_LIFT_STEP_MAX`; the longest runs may arrive a few minutes short);
-  the sheet says so and offers decision 4's choices. Needs a HELD week inside a block laid back from race day — two-piece ramps
-  (the weeks before it as laid, the rest re-laid from its level) and the volume fit pinned to the block as laid, so no week run
-  changes. Point in its favour, measured: "Ease back" carries on as laid, so the next full week is two rungs up from the last.
-- **B:** no "one more week" inside the race block — "Carry on" and "Ease back" only; behind → a later race or a revised target.
+  week less (each later step a little bigger, never past `LONG_LIFT_STEP_MAX`; the longest runs may arrive a few minutes short).
+  It would have needed a HELD week inside a block laid back from race day — two-piece ramps and the volume fit pinned.
+- **B:** no "One more week" inside the race block — "Carry on" and "Ease back" (a lighter week) only; behind → a later race or a
+  new target. He was told that after an "Ease back" the next full week is two steps up from the last full one.
 
-**Until he answers, the race block offers Start / Ease back only** (B's behaviour — `roadAnswered` refuses "more" there and the sheet
-does not offer it; both guarded). If he picks A, that is the next piece of work; "Nearly" there then recommends it where runs
-were missed (a missing TEST should keep recommending the test, not a repeat).
+**→ Owner, 2026-11-19, word for word: "B: No "One more week" there".** Recorded against decision 3 in `STAGES.md`. Built that
+way: `roadAnswered` refuses "more" at a race-block checkpoint and the sheet does not offer it (both guarded). Two things B's
+description promised, done with it: the "Suggested" mark inside the race block falls on "Carry on" wherever the judgement would
+have suggested a week more (pain still suggests easing back) — a missing test is answered by the test buttons, not a repeat —
+and when the honest target says **behind**, the checkpoint names both ways out: a new target near the suggested one, or a later
+race, both in the profile, none chosen for him.
 
 ### ⚠️ Found, NOT fixed (each its own piece of work)
 

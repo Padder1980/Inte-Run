@@ -10173,13 +10173,20 @@ function roadCheckpointHtml() {
     comfortable: "on track — your current fitness already predicts " + pred + ".",
     achievable: "on track — your current fitness predicts " + pred + ", and the weeks you have left can close the gap.",
     ambitious: "within reach, with little margin — your current fitness predicts " + pred + ".",
-    unrealistic: "behind — your current fitness predicts " + pred + "." +
-      (f.suggestedTarget ? " A target near " + esc(f.suggestedTarget) + " fits the time left: you can change it in your profile, or keep yours." : ""),
+    // ⚠️ BEHIND NAMES BOTH WAYS OUT, AND PICKS NEITHER (decision 4, "all options available"; the owner's B for the race block
+    // promised it: "if you're behind, the checkpoint offers a later race or a new target"). It said only the target before.
+    unrealistic: "behind — your current fitness predicts " + pred + ". Your choices, none picked for you: " +
+      (f.suggestedTarget ? "a target near " + esc(f.suggestedTarget) + ", which fits the time left, or " : "a new target, or ") +
+      "a later race — both in your profile — or carry on as you are.",
   })[f.verdict] : "";
   const target = f && fLine && profile.targetSet !== false
     ? '<p class="road-target"><b>Your target, ' + esc(PLAN.goal.target) + ':</b> ' + fLine + '</p>'
     : "";
-  opts.forEach((o) => { o.rec = o.id === v.recommend; });
+  // ⚠️ §10 PIECE 3 — THE OWNER'S B (2026-11-19, "B: No "One more week" there"): inside the race block there is no week more to
+  // suggest, so where the judgement would suggest one it suggests carrying on — the reasons and the test buttons say what is
+  // missing (a missing TEST is answered by doing the test, never by repeating a week). Pain still suggests easing back.
+  const rec = inRace && v.recommend === "more" ? "up" : v.recommend;
+  opts.forEach((o) => { o.rec = o.id === rec; });
   const opt = (o) => '<button class="po-opt' + (o.rec ? " rec" : "") + '" data-road="' + o.id + '"' + (o.off ? " disabled" : "") + '>' +
     (o.rec ? '<span class="po-rec">Suggested</span>' : "") +
     '<span class="po-t">' + esc(o.t) + '</span><span class="po-b">' + esc(o.s) + '</span></button>';

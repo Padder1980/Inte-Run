@@ -230,6 +230,13 @@ from a 2 km trial, and already offers one every 28 days — `RETEST_DUE_DAYS`). 
 3. Regular and competitive runners get roads too (Base blocks from their stated mileage), and race blocks get a
    checkpoint every 4 weeks. *Recommended: yes.*
    **→ Owner, 2026-11-18: "yes to all five, build it".**
+   *Asked while building it — what "One more week" means at a checkpoint inside the race block, where race day cannot move:
+   A, next week repeats the last full week and the weeks after are re-spaced over one week less (each later step a little
+   bigger, never past the 10% limit); or B, no "One more week" there — the only choices are "Carry on" and "Ease back" (a
+   lighter week), and if the runner is behind, the checkpoint offers a later race or a new target. He was told that after an
+   "Ease back" the next full week is two steps up from the last full one. Recommended: A.*
+   **→ Owner, 2026-11-19: "B: No "One more week" there".** Built that way: inside the race block the checkpoint offers
+   carrying on or easing back, and nothing that repeats a week.
 4. No-race goals now, as rolling test-ended blocks (overturns decision 5's "later"). *Recommended: yes, built after 3.*
    **→ Owner, 2026-11-18: "yes to all five, build it".**
 5. The end-of-block test by level, as in the table — including **no maximal test for beginners or injury returners**,
@@ -247,5 +254,5 @@ the end-of-block test by level (`blockTestsFor`), no maximal test for "Just gett
 decision 2: Walk-run 1 (to 20 minutes non-stop) and Walk-run 2 (to 30) before Rebuild for a run-walk runner. ✅ Piece 3 —
 decision 3 (built 2026-11-19): regular and competitive runners' roads (Rebuild when coming back, Base built from the mileage
 they state, a race-only road where none is needed) and a checkpoint every 4 weeks in the race block, never in the taper, with
-the level's test; it holds nobody, and an answer there moves no week. "One more week" inside the race block was put to the
-owner and waits for his answer (until then: start the next block, or ease back). ☐ Piece 4 — decision 4 (no-race goals). Build history and the hand-over for 3 and 4: `notes/plan-profile.md`.
+the level's test; it holds nobody, and an answer there moves no week. "One more week" inside the race block: the owner chose
+none (decision 3 above, 2026-11-19) — there the checkpoint offers carrying on or easing back. ☐ Piece 4 — decision 4 (no-race goals). Build history and the hand-over for 3 and 4: `notes/plan-profile.md`.

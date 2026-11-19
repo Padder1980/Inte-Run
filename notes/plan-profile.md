@@ -1402,6 +1402,42 @@ B-race on a plan with no race; a pause picks up where you left off; an existing 
   is the runner's test) its longest easy-rated run — on the checkpoint sheet and the Plan screen's road. The road card shows
   the block before this one onwards, and counts the earlier ones in a line.
 
+### ✅ The independent review (ultracode, 2026-11-19): 37 findings, 31 confirmed by sceptics, all fixed but two
+Six reviewers (engine, road model, every reader of the race, the flows, race-plan regressions, the tests), each finding then
+put to two sceptics — one tracing the code, one running a probe against the built page or a headless Chrome. What it found
+that the first pass had not, and what was done:
+- ⚠️⚠️ **A start moved on laid out no week, and the app could not draw Today at any launch** (a no-race plan that had begun,
+  its start moved to 1 March: `noRaceRoadNow` laid the road out from THIS week only; the engine dropped every road week as
+  before the start and returned an empty plan; `adoptPlan` took it; `viewToday` read week 0's sessions; the top-level
+  `render()` has no catch). Fixed three ways: **a new start date on the profile form is a new road** from that week (the
+  preview says what changes); `noRaceRoadNow(r, startIso)` lays the road out a block past the LATER of this week and the
+  plan's start; and `generateNoRaceRoadPlan` refuses a road that lays out no week (throws) rather than return nothing.
+  Driven in the browser: start moved to 1 March → 8 weeks from 1 March, Today shows the paused card, a reload is clean.
+- **Coming back early from a pick-up pause** ("I am back — start now", `resumeFromPause`) moved the block back but not the
+  road: the runner lost their place. Now the road comes back with it (`noRaceShifted` takes a negative shift), and a road not
+  begun (a pause that started again, a recovery week cut short — `endRecovery`) starts this week (`noRaceRoadFrom`). Undo
+  restores the road in both. Driven: pick up 2 weeks → back at once → week 8, the answer's Monday back where it was.
+- **Any profile save during a pick-up pause re-anchored the road** (my first rule moved a road "not begun" to the new
+  start): gone — only a changed start makes a new road.
+- **A short break offered only "Leave my plan alone"** (3 or 7 days): "Carry on where your plan has got to" is offered with
+  no race (the existing keep, without the target date).
+- **The hard-days dial was offered and never honoured** (Base is one quality session a week, `mainFoundation`): not offered
+  with no race, and the profile form says why; the long-run limit (measured against a race peak) not offered either.
+- **Alfie's new "my road" keyword took "How long until my road race?" from the race answer on a RACE plan** — a race-plan
+  regression: the keywords are "checkpoint" and "next block" only. Also: no "Goal race pace" in Alfie's paces with no race;
+  a road not begun yet gets "Your first block, X, starts on …".
+- Words: a briefing said "week 3 of 8" (and sent `of: 8` online — now no `of`); the club's journal said "3 / 8 Weeks" and
+  an end date; the easing sheets promised a target date; the rename sheet's default name; the road card counted one block
+  short; the wizard said "you already run what a race block starts with" to a runner who gave no mileage (the wording now
+  rests on whether the running really grows — `noRaceOutlook().climbs`); "4 weeks a block" for walk-run (4–5).
+- The tests it called weak: "climb, then hold" now checks the hold IS race-ready (the engine's own race block's first week,
+  ±3 minutes, all 8 runners) and that a runner below it climbs (the engine's own `mainFoundationNeed`); the Undo check checks
+  the restore too; the profile-form check can now see a moved road; the 12–17 case checks the goal step itself; Alfie and the
+  plan's name are driven, not grepped. **22 of 22 re-breaks caught** in all.
+- Found and NOT fixed (both affect race plans the same way; Road Map `pc-pickup-dates`): a pick-up moves the road but not an
+  "Ease back" row already written for a later week, and re-dates the blocks under tests already logged, so one near a
+  block's end can count for the block before.
+
 ### Found on the way and fixed (both in the message the owner answered)
 1. The wizard refused a blank OPTIONAL time for "Building the habit" (`cfg.time` was tested truthy; "optional" is truthy).
 2. The Plan screen showed a worked-out time as the goal (`g.target` with `targetSet: false`), with a verdict on it and its
@@ -1412,7 +1448,7 @@ B-race on a plan with no race; a pause picks up where you left off; an existing 
 no race or taper; adding blocks never changes a week laid out; the horizon never read; climb then hold; each stage's job;
 weeks before the start; placement; never 12–17; held/extended/answered; the weeks through checkpoint answers and a hold, a
 year on; never a race road for a plan with no race; builds without a stored road; plan setup; both fixes; every reader asks.
-**14 of 14 re-breaks caught** (the padding, the horizon, 12–17; the hold taking Base's weeks, promoting, an answer taking a
+**14 of 14 re-breaks caught** before the review, 22 of 22 after it (the padding, the horizon, 12–17; the hold taking Base's weeks, promoting, an answer taking a
 week, throwing without a road, a saved race date, the optional time, the worked-out goal, laying out too far ahead; the
 race-week refusal by position, the pause Undo without the road, the weekly review's end).
 
@@ -1426,9 +1462,8 @@ the profile form, a full reload. Screenshots: `side-session-notes/…/p4-norace-
 - **A runner already above a race block's first week is held below what they run** (decision 4's hold is that week): a
   competitive runner at 55 km a week holds at ~36 km for a marathon focus (~55 for 10 km). A race road's Base does the same,
   briefly. The owner's call — Road Map `pc-norace-holdcut`.
-- **"Add your easy pace?" loses an answer edited from the Profile page** (a habit-builder with no easy pace): the prompt
-  replaces the edit sheet without `captureSetupFields`, so the save reads the stored answer. Older than this piece; race
-  plans too. Road Map `pc-pace-prompt-edit`.
+- ✅ **"Add your easy pace?" lost an answer edited from the Profile page** — fixed by another session the same day (6c63956,
+  `pc-pace-prompt-edit`, its own chapter above), while this piece was under review.
 - The Plan screen's week list says "Base" for a Rebuild week (it prints the PHASE, and a foundation's phase is "base") —
   on race roads too.
 

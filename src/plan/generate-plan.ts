@@ -1473,6 +1473,10 @@ function generateNoRaceRoadPlan(
       ramp, raceStartMonday, Wk === 0 ? startIso : null).slice(0, F));
   }
   if (Wk > 0) weeksOut.unshift(...roadWalkRunWeeks(athlete, refGoal, ref.paces, all.slice(0, W), wDrop, FB, raceStartMonday, startIso));
+  // ⚠️ NEVER A PLAN WITH NO WEEKS (the independent review, 2026-11-19): a road that ends before the plan starts used to come
+  // back as an empty plan, which the app adopted and then could not draw (Today read week 0's sessions at every launch).
+  // The app lays the road out past the plan's start (noRaceRoadNow); this refuses the case rather than return nothing.
+  if (!weeksOut.length) throw new Error("A road with no race laid out no week from the plan's start: it must reach past it.");
   weeksOut.forEach((w, i) => { w.index = i + 1; });
   const legs: Array<{ kind: StageKind; weeks: number }> = [];
   for (const w of weeksOut) {

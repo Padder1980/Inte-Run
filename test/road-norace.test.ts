@@ -6,8 +6,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Athlete, Goal, StageKind } from "../src/domain/types.ts";
-import { generatePlan, type Road, type RoadStage } from "../src/plan/generate-plan.ts";
+import { generatePlan, mainFoundationNeed, type Road, type RoadStage } from "../src/plan/generate-plan.ts";
 import { BLOCK_WEEKS, noRaceBlockWeeks, noRaceNextKind, REBUILD_WEEKS, roadNoRaceFor, WALKRUN_WEEKS } from "../src/plan/road.ts";
+import { RACE_BLOCK_WEEKS } from "../src/plan/periodization.ts";
 
 const M = "2026-11-23"; // a Monday
 const add = (iso: string, d: number) => {
@@ -106,12 +107,41 @@ test("BLOCKER: the horizon is only where the weeks end — the plan never reads 
   }
 });
 
+/**
+ * Where the climb is going — the first week of a race block of the book's length for the distance, on the track the runner
+ * reaches (a beginner on the main track there), laid from the road's first Monday: the engine's own destination, measured
+ * here from the engine's own race plan rather than restated.
+ */
+function destinationLongMin(athlete: Athlete, dist: Goal["distance"]): number {
+  const beginner = athlete.experience === "beginner" || !!athlete.runWalk;
+  const track = beginner ? ({ ...athlete, experience: "recreational", runWalk: false } as Athlete) : athlete;
+  const book = RACE_BLOCK_WEEKS[dist];
+  const ref = generatePlan(track, { distance: dist, targetTimeSeconds: 3000, raceDateIso: add(M, (book - 1) * 7 + 6), startDateIso: M } as Goal,
+    { startDateIso: M });
+  const w1 = beginner ? ref.weeks[0]! : ref.weeks.find((w) => !w.isDeload && !w.sessions.some((s) => s.type === "race")) ?? ref.weeks[0]!;
+  return longMin(w1);
+}
+
 test("climb, then hold: the long run reaches race-ready over the road's own climb and stays there", () => {
   for (const { who, athlete, dist } of RUNNERS) {
     const prop = roadNoRaceFor(athlete, goalFor(dist, add(M, 400)), M)!;
     const p = plan(athlete, dist, { noRace: true, fromIso: M, stages: stagesTo(prop.stages, 56), rampWeeks: prop.rampWeeks });
     const running = p.weeks.filter((w) => w.stage !== "walkrun1" && w.stage !== "walkrun2");
     const peak = Math.max(...running.map(longMin));
+    // ⚠️ THE LEVEL IT HOLDS AT IS RACE-READY — a race block's first week for the distance (the independent review: without
+    // this, a plan that never climbed, holding at its opening week, passed). Within a few minutes: the rung is rounded.
+    const dest = destinationLongMin(athlete, dist);
+    assert.ok(Math.abs(peak - dest) <= 3, `${who}: it holds at a ${peak}-minute long run, race-ready is ${dest}`);
+    // And a runner below race-ready climbs to it: the beginner track opens at its own opening (30 minutes at most), and a
+    // runner stating little opens at what they run — well under the hold. (A Rebuild for somebody already there is four
+    // weeks of easy running at the level they run, with nothing to climb.)
+    const first = running.find((w) => !w.isDeload)!;
+    // "Below" is the engine's own measure: the beginner track always climbs; a main-track runner climbs where the race block's
+    // first week is more than one step above what they run (mainFoundationNeed > 0).
+    const book = RACE_BLOCK_WEEKS[dist];
+    const refGoal = { distance: dist, targetTimeSeconds: 3000, raceDateIso: add(M, (book - 1) * 7 + 6), startDateIso: M } as Goal;
+    const below = athlete.experience === "beginner" || !!athlete.runWalk || mainFoundationNeed(athlete, refGoal, {}, book) > 0;
+    if (below) assert.ok(longMin(first) <= peak - 5, `${who}: it opens at ${longMin(first)} minutes and holds at ${peak} — no climb`);
     // Two weeks of slack past the climb: a lighter week can sit where the climb ends.
     const held = p.weeks.slice(prop.climbWeeks + 2).filter((w) => !w.isDeload);
     assert.ok(held.length >= 20, `${who}: only ${held.length} weeks past the climb`);
@@ -176,6 +206,15 @@ test("a road with no race is placed as a race road is: walk-run, Rebuild or Base
   assert.equal(roadNoRaceFor(reg!.athlete, goal("10k"), M)!.rampWeeks, 0);
   const w = roadNoRaceFor(walk!.athlete, goal("5k"), M)!;
   assert.equal(w.climbWeeks, WALKRUN_WEEKS.walkrun1 + WALKRUN_WEEKS.walkrun2 + w.rampWeeks);
+});
+
+test("BLOCKER: never a plan with no weeks — a road that ends before the plan starts is refused", () => {
+  // The independent review: a start moved on past the road's end came back as an empty plan, which the app adopted and then
+  // could not draw. The app lays the road out past the start; the engine refuses the case rather than return nothing.
+  const { athlete, dist } = RUNNERS[5]!;
+  const road: Road = { noRace: true, fromIso: M, stages: [{ kind: "base", weeks: 4 }, { kind: "base", weeks: 4 }], rampWeeks: 0 };
+  assert.throws(() => plan(athlete, dist, road, add(M, 8 * 7 - 1), add(M, 8 * 7)), /laid out no week/);
+  assert.equal(plan(athlete, dist, road, add(M, 8 * 7 - 1), add(M, 7 * 7)).weeks.length, 1, "the road's last week is still laid out");
 });
 
 test("BLOCKER: never for a 12–17 runner — no road, and the engine refuses one", () => {

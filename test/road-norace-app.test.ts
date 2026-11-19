@@ -46,12 +46,14 @@ const ATH = { daysPerWeek: 4, recent: { distanceMeters: 5000, timeSeconds: 2250 
   includeStrength: true, longRunDay: 6 } as any;
 
 // ---- 1. The road model: held, laid out a block ahead, answered ------------------------------------------------------
-const ROAD_FNS = ["roadOf", "roadWeeksBetween", "roadMondayAfter", "roadAnswerAt", "effectiveRoad", "noRaceRoadNow",
+const ROAD_FNS = ["roadOf", "roadWeeksBetween", "roadMondayAfter", "roadAnswerAt", "effectiveRoad", "noRaceRoadNow", "planStartIso",
+  "noRaceShifted", "noRaceRoadFrom",
   "roadAthleteOf", "roadLegsNow", "roadCheckpoint", "roadAnswered", "roadRaceWeeks", "weekMondayOf", "roadWalkRun",
   "roadMergeRace", "roadSplitRace"];
-function harness(today: string, road: unknown, noRace = true) {
+function harness(today: string, road: unknown, noRace = true, startIso = "") {
   const clock = { today };
   const profile: any = { personalized: true, status: "building", goalDist: "10k", raceDate: noRace ? "" : "2027-05-16", road };
+  if (startIso) profile.startDateIso = startIso;
   if (noRace) profile.noRace = true;
   const env: Record<string, unknown> = {
     RC, profile, todayIso: () => clock.today, isoAdd,
@@ -66,7 +68,7 @@ const RAMP = RC.roadNoRaceFor(ATH, { distance: "10k", targetTimeSeconds: 4000, r
 const ROAD = (checkpoints: unknown[] = [], stages = [{ kind: "rebuild", weeks: 4 }, { kind: "base", weeks: 4 }]) =>
   ({ v: 1, noRace: true, fromIso: FROM, stages, rampWeeks: RAMP, checkpoints });
 const kinds = (r: any) => r.stages.map((s: any) => s.kind[0] + s.weeks).join(" ");
-const eff = (today: string, road: unknown) => { const h = harness(today, road); return h.api.effectiveRoad(h.profile, ATH, {}); };
+const eff = (today: string, road: unknown, startIso = "") => { const h = harness(today, road, true, startIso); return h.api.effectiveRoad(h.profile, ATH, {}); };
 const UP_REBUILD = { dueIso: addDays(FROM, 28), kind: "rebuild", answer: "up" };
 
 test("BLOCKER: a road with no race is the block in hand plus the next — held at a checkpoint nobody answered, never promoted", () => {
@@ -131,6 +133,38 @@ test("BLOCKER: a road with no race is only ever the road of a plan with no race,
   assert.equal(ok.api.effectiveRoad(ok.profile, { ...ATH, age: 15 }, {}), null);
 });
 
+test("BLOCKER: the road always reaches a block past the plan's own start — a start moved on, a pause", () => {
+  // The independent review: counted from this week alone, a plan starting eight weeks on laid out no week from its start,
+  // and the app could not draw Today at launch.
+  const total = (r: any) => r.stages.reduce((n: number, s: any) => n + s.weeks, 0);
+  for (const start of [addDays(FROM, 10), addDays(FROM, 8 * 7), addDays(FROM, 20 * 7 + 3)]) {
+    const r = eff(addDays(FROM, 2), ROAD(), start);
+    const end = addDays(FROM, total(r) * 7);
+    const startMon = addDays(start, -((new Date(start + "T00:00:00Z").getUTCDay() + 6) % 7));
+    assert.ok(end >= addDays(startMon, 4 * 7 + 7), `a start on ${start}: the road ends ${end}, not a full block past it`);
+    // And through the real engine there are weeks from the start on, the first of them the start's own week.
+    const goal = { distance: "10k", targetTimeSeconds: 4000, startDateIso: start, raceDateIso: addDays(FROM, total(r) * 7 - 1) } as any;
+    const p = RC.generatePlan(ATH, goal, { road: r });
+    assert.ok(p.weeks.length >= 4, `a start on ${start}: ${p.weeks.length} weeks laid out`);
+    assert.equal(p.weeks[0]!.startDateIso, start, `a start on ${start}: the plan opens on ${p.weeks[0]!.startDateIso}`);
+  }
+});
+
+test("a pick-up moves the road and its answers together, and back again; a road not begun starts on the day it is started", () => {
+  const h = harness(addDays(FROM, 2), ROAD([UP_REBUILD]));
+  const r = ROAD([UP_REBUILD]);
+  const on = h.api.noRaceShifted(r, 3);
+  assert.equal(on.fromIso, addDays(FROM, 21));
+  assert.deepEqual(on.checkpoints.map((c: any) => c.dueIso), [addDays(UP_REBUILD.dueIso, 21)]);
+  assert.deepEqual(h.api.noRaceShifted(on, -3), r, "coming back early did not move the road back");
+  assert.equal(h.api.noRaceShifted(r, 0), r);
+  // Not begun and unanswered: started today, it starts this week. Begun, or answered: it keeps its weeks.
+  const later = { ...ROAD(), fromIso: addDays(FROM, 28) };
+  assert.equal(h.api.noRaceRoadFrom(later, addDays(FROM, 2)).fromIso, FROM);
+  assert.equal(h.api.noRaceRoadFrom(ROAD([UP_REBUILD]), addDays(FROM, 2)).fromIso, FROM);
+  assert.equal(h.api.noRaceRoadFrom({ ...later, checkpoints: [UP_REBUILD] }, addDays(FROM, 2)).fromIso, addDays(FROM, 28));
+});
+
 test("BLOCKER: through the real engine, the weeks already laid out never change — the road growing, a checkpoint answered, a hold", () => {
   const goalFor = (road: any) => ({ distance: "10k", targetTimeSeconds: 4000, startDateIso: FROM,
     raceDateIso: addDays(road.fromIso, road.stages.reduce((n: number, s: any) => n + s.weeks, 0) * 7 - 1) }) as any;
@@ -161,7 +195,8 @@ test("BLOCKER: through the real engine, the weeks already laid out never change 
 const APP_FNS = ["applyProfile", "planStartIso", "blockStartIso", "holdBeforeStart", "firstShownWeek", "returnKind",
   "experienceFor", "resolvedStatus", "trainingYearsFor", "typeCeilingFor", "isNoRace", "noRaceGoalRoad", ...ROAD_FNS,
   "wizFieldVal", "draftFromForm", "formStartIso", "isBeginnerStatus", "goalsForAge", "currentAgeAnswer", "derivedGoalS",
-  "goalNoRaceNow", "goalKindAsked", "wizStepError", "goalCardInner", "seg", "planHeadHtml", "targetChosen", "esc"];
+  "goalNoRaceNow", "goalKindAsked", "wizStepError", "goalCardInner", "seg", "planHeadHtml", "targetChosen", "esc",
+  "roadProposalFor", "roadFromProposal", "noRaceShifted", "noRaceRoadFrom", "alfieRaceFacts", "planName"];
 const APP_CONSTS = ["ROAD_STAGE_LABEL", "ROAD_MIN_RACE_WEEKS", "ADJ_QUALITY", "GOAL_BY_STATUS", "RACE_LABEL", "FINISH_LABEL"];
 const TODAY = "2026-11-25";
 function app(pf: Record<string, any>, screen = "setup", draftIn: Record<string, any> = {}) {
@@ -180,7 +215,6 @@ function app(pf: Record<string, any>, screen = "setup", draftIn: Record<string, 
     strengthPrefsOf: () => null, progActive: () => false, strMinVal: () => 30, strLevelVal: () => "beginner",
     strGoalVal: () => "general", kitFromField: () => [], kitToField: () => "-", strengthKitOf: () => [],
     planActionsHtml: () => "", feasibilityWhy: () => '<div class="feas-why">why</div>', wizSafetyAnswered: () => true,
-    roadProposalFor: () => null,
   };
   const src = APP_CONSTS.map(constStmt).join("\n") + "\n" + APP_FNS.map(fnBody).join("\n");
   const names = Object.keys(env);
@@ -239,19 +273,32 @@ test("BLOCKER: plan setup — no race asks no date and no time, saves no target 
   const yw = app({ personalized: true }, "wizard", { goalkind: "norace" });
   yw.put("s_dist", "5k"); yw.put("s_age", "15");
   assert.equal(yw.api.goalKindAsked(), false, "a 15-year-old was asked");
+  assert.equal(yw.api.goalNoRaceNow(), false, "a 15-year-old's goal step drew the card with no date");
   assert.throws(() => yw.api.draftFromForm(), /date/, "a 15-year-old was given a plan with no race");
-  // The profile form of a plan with no race keeps it, its road and no date…
-  const e = app({ noRace: true, road: NO_RACE_ROAD() }, "setup");
-  e.put("s_dist", "5k"); e.put("s_longday", "5"); e.put("s_startdate", FROM); e.put("s_age", "40");
+  // The profile form of a plan with no race keeps it, and — the start left as it is — its road exactly, answers and all…
+  const begun = { ...NO_RACE_ROAD(), fromIso: "2026-11-02", checkpoints: [{ dueIso: "2026-11-30", kind: "rebuild", answer: "up" }] };
+  const e = app({ noRace: true, road: begun, startDateIso: "2026-11-02" }, "setup");
+  e.put("s_dist", "5k"); e.put("s_longday", "5"); e.put("s_startdate", "2026-11-02"); e.put("s_age", "40");
   const ed = e.api.draftFromForm();
   assert.equal(ed.noRace, true);
-  assert.deepEqual(ed.road, NO_RACE_ROAD(), "an edit dropped or moved a road that has begun");
+  assert.deepEqual(ed.road, begun, "an edit that left the start as it is dropped or moved the road");
   assert.equal(ed.goalDist, "5k");
+  // …and a NEW START is a new road from the new start's week (the review: the old road was kept and, eight weeks on, laid out
+  // no week at all) — the first two blocks, no answers, and a plan with weeks in it.
+  for (const start of ["2026-12-02", "2027-03-01"]) {
+    const m = app({ noRace: true, road: begun, startDateIso: "2026-11-02" }, "setup");
+    m.put("s_dist", "10k"); m.put("s_startdate", start); m.put("s_age", "40");
+    const md = m.api.draftFromForm();
+    const mon = addDays(start, -((new Date(start + "T00:00:00Z").getUTCDay() + 6) % 7));
+    assert.equal(md.road.fromIso, mon, `a start moved to ${start} kept the old road`);
+    assert.deepEqual(md.road.checkpoints, []);
+    assert.ok(m.api.applyProfile(md).raw.weeks.length >= 4, `a start moved to ${start} built a plan with no weeks`);
+  }
   // …refuses an age that makes them 12–17, before anything is saved…
   const ey = app({ noRace: true, road: NO_RACE_ROAD() }, "setup");
   ey.put("s_dist", "5k"); ey.put("s_age", "15");
   assert.throws(() => ey.api.draftFromForm(), /18 and over/);
-  // …and a road that has not begun starts on the plan's new first Monday.
+  // (A plan that has not begun, its start brought forward, is the same: a new road from the new start's week.)
   const later = { ...NO_RACE_ROAD(), fromIso: "2027-01-04" };
   const f = app({ noRace: true, road: later, startDateIso: "2027-01-06" }, "setup");
   f.put("s_dist", "10k"); f.put("s_startdate", "2026-12-02"); f.put("s_age", "40");
@@ -290,17 +337,41 @@ test("BLOCKER: the Plan screen's header — no race, date, target or verdict on 
   for (const want of [/10 km · 1:06:40/, /achievable/, /feas-why/, /Goal pace/]) assert.match(rh, want);
 });
 
+test("Alfie and the plan's name say what a plan with no race is", () => {
+  const n = app({ noRace: true, goalDist: "half" });
+  const f = n.api.alfieRaceFacts();
+  assert.equal(f.noRace, true);
+  assert.equal(f.race, "No race: getting fitter for Half marathon");
+  for (const k of ["target", "date", "daysAway", "weeksAway"]) assert.equal(f[k], null, `Alfie was given a ${k}`);
+  assert.equal(n.api.planName({ goal: "half", prof: { noRace: true } }), "Half marathon fitness plan");
+  const r = app({ raceDate: "2027-05-16", targetSet: true, goalDist: "half" });
+  assert.notEqual(r.api.alfieRaceFacts().noRace, true);
+  assert.equal(r.api.planName({ goal: "half", prof: {} }), "Half marathon plan");
+  // The checkpoint answer is asked for by "checkpoint" — never by "road", which took "my road race" from a race plan.
+  assert.match(SRC, /\{ k: \["checkpoint", "next block"\], a: \(\) => alfieCheckpointAnswer\(\) \}/);
+});
+
 test("every screen that reads the race asks first whether there is one", () => {
   // The inventory's readers (notes/plan-profile.md, §10 piece 4): each one handles a plan with no race. A reader that stops
   // asking is the "says something untrue" class this piece exists to close.
   const readers = ["viewPlan", "planHeadHtml", "weekList", "managePlanHtml", "alfieRaceFacts", "alfiePlanContext",
     "pauseChanges", "pausePlanHtml", "applyPause", "realignPickup", "realignOptions", "adoptProf",
     "planStartSheet", "profPlanStatus", "commProfile", "planName", "planFinished", "queueCard", "roadPlanCard", "roadCheckpointHtml", "wizRoadHtml",
-    "draftFromForm", "applyProfile", "roadOf", "effectiveRoad", "roadLegsNow", "roadAnswered", "answerRoad", "roadStageJob"];
+    "draftFromForm", "applyProfile", "roadOf", "effectiveRoad", "roadLegsNow", "roadAnswered", "answerRoad", "roadStageJob",
+    // found by the independent review, 2026-11-19
+    "resumeFromPause", "endRecovery", "briefingFacts", "commJournals", "commJournalSheetHtml", "hardQHtml", "syncHardQ",
+    "longMaxQHtml", "easeWeekSheetHtml", "renderAdjustSheet", "alfieIntents", "wizBody"];
+  // The rename sheet's "leave it blank to go back to…" names the plan's own default (planName knows a plan with no race).
+  assert.match(decomment(fnBody("openRenameSheet")), /planName\(\{ goal: goal, prof: j\.prof \}\)/);
   for (const r of readers) assert.match(decomment(fnBody(r)), /noRace|isNoRace|NoRace/, `${r} never asks whether there is a race`);
-  // A pause, a lapse picked up and a stored plan started now move or replace a plan's road, so each Undo puts it back.
-  for (const f of ["applyPause", "answerRealign", "adoptSnapshot"])
-    assert.match(decomment(fnBody(f)), /road: JSON\.stringify\(profile\.road \|\| null\)/, `${f}'s Undo does not keep the road`);
+  // A pause, a lapse picked up, a stored plan started, coming back early and a recovery week cut short move or replace a
+  // plan's road, so each keeps it before the change AND puts it back on Undo (the review: only the first half was checked).
+  for (const f of ["applyPause", "answerRealign", "adoptSnapshot", "resumeFromPause", "endRecovery"])
+    assert.match(decomment(fnBody(f)), /road: JSON\.stringify\(profile\.road \|\| null\)/, `${f} does not keep the road before changing it`);
+  for (const f of ["applyPause", "answerRealign", "adoptRestore", "resumeFromPause", "endRecovery"])
+    assert.match(decomment(fnBody(f)), /profile\.road = JSON\.parse\((before|beforeProf|snap)\.road\)/, `${f}'s Undo does not put the road back`);
+  // A briefing never says "week 3 of 8" of a plan with no race.
+  assert.match(decomment(fnBody("briefingFacts")), /\(profile\.noRace === true\) \? \{\} : \{ of: PLAN\.weeks\.length \}/);
   // A week-move into the last week is refused only where that week holds the race (xwRaceIso), never by position.
   assert.match(decomment(fnBody("xwRefusal")), /\(ti === last \|\| home === last\) && xwRaceIso\(\)\) return "race";/,
     "the last week refuses week-moves by position again — a plan with no race ends on an ordinary week");
@@ -308,5 +379,5 @@ test("every screen that reads the race asks first whether there is one", () => {
   assert.match(decomment(SRC), /weeksRemaining: \(profile\.noRace === true\) \? 52 :/);
   // And Alfie's chip for a plan with no race has an answer behind it.
   const chip = /"When is my next checkpoint\?"/.test(SRC);
-  assert.ok(chip && /k: \["checkpoint", "next block", "my road"\]/.test(SRC), "the checkpoint chip has no answer behind it");
+  assert.ok(chip && /k: \["checkpoint", "next block"\]/.test(SRC), "the checkpoint chip has no answer behind it");
 });

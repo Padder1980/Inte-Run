@@ -258,8 +258,8 @@ test("\"check now\" always answers, in the sheet: still waiting puts the button 
   assert.equal(waiting.sheet, 1, "still waiting left the button on \"Checking…\" for ever — nothing redrew the sheet");
   assert.equal(waiting.notes.length, 1, "still waiting was not explained in the sheet");
   assert.match(waiting.notes[0]!, /^afterend .*role="status".*Not connected yet\./, "the answer is not a status line under the button");
-  // ⚠️ NOT A TOAST: a toast can be drawn behind the open sheet it is about (both z-index 70, page order decides).
-  assert.equal(waiting.toasts.length, 0, "the answer went to a toast, which can sit hidden behind the sheet");
+  // ⚠️ NOT A TOAST: the answer belongs beside the button it answers, and must not vanish after four seconds.
+  assert.equal(waiting.toasts.length, 0, "the answer went to a toast, which is gone before the runner looks back");
   // Connected: the answer's own redraw shows it, so nothing more here.
   const connected = await checkNow({ connectedAfter: true, open: true });
   assert.deepEqual([connected.sheet, connected.notes.length], [0, 0], "a connected answer was redrawn twice, or annotated");

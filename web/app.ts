@@ -2120,7 +2120,14 @@ button.sw-row:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--
 @media (prefers-reduced-motion: reduce) { .lp-dot { animation: none; } .live-pill { animation: none; } }
 
 /* ---- Toast ----------------------------------------------------------------------------------- */
-.app-toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); z-index: 70;
+/* ⚠️ ABOVE EVERYTHING THE RUNNER CAN BE LOOKING AT (2026-11-20). It was 70, the sheet's own number, and both are
+   added to the page the first time they are used, so page order decided: after any toast that came before the
+   session's first sheet, every later toast sat hidden behind an open sheet. And the full-screen overlays (share
+   studio 92, club editor 96, photo library 97, club question 98) covered it outright, though they raise toasts of
+   their own ("Those could not be read from your library."). 99 is above all of them and below only the launch
+   splash (100), the run's count-in (120) and the calendar's drag ghost (300). test/toast-layer.test.ts holds
+   every other z-index in this stylesheet to that. */
+.app-toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(12px); bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); z-index: 99;
   max-width: min(88vw, 380px); padding: 11px 16px; border-radius: 13px; font-size: 13px; line-height: 1.4; text-align: center;
   color: var(--surface); background: color-mix(in srgb, var(--ink) 92%, transparent); box-shadow: 0 12px 30px -12px rgba(0, 0, 0, .55);
   opacity: 0; pointer-events: none; transition: opacity .22s ease, transform .22s ease; }
@@ -26824,9 +26831,9 @@ function wireStravaSheet() {
   // what is shown, and "still waiting" changes nothing -- so this button said "Checking…" for ever, and an
   // unreachable server left it the same (2026-11-20). Connected redraws the sheet on its own; any other answer
   // puts the button back here and says so, unless the sheet was closed while it checked.
-  // ⚠️ SAID IN THE SHEET, NOT IN A TOAST. The toast and the sheet are both z-index 70 and both added to the page
-  // the first time they are used, so whichever came later is drawn on top: after any toast that came before the
-  // session's first sheet, every later toast sits hidden behind an open sheet (measured, 2026-11-20).
+  // ⚠️ SAID IN THE SHEET, NOT IN A TOAST: the answer belongs beside the button it answers, and it must still be
+  // there when the runner looks back, not gone after four seconds. (A toast could also sit hidden behind an open
+  // sheet until the same day -- both were z-index 70 and page order decided; .app-toast is above sheets now.)
   const chk = $("stvCheckLink");
   if (chk) chk.onclick = () => {
     chk.textContent = "Checking\\u2026"; chk.disabled = true;

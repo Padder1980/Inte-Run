@@ -515,3 +515,29 @@ the Connected apps loop (end of `notes/strava-and-alfie.md`): it is what made 24
   updates from the watch"; a shared top-level flag fails 2, "an arrival with a redraw inside it did not fade in".
 - `test/silent-defects.test.ts`'s static guard "a render of the same screen keeps its scroll position" now reads the
   `sameScreen` form; the behaviour is also run for real in the new test.
+
+## Toasts were drawn behind sheets and full-screen overlays (2026-11-20, his yes)
+
+Found while fixing the Strava sheet (notes/strava-and-alfie.md, the same day). `.app-toast` was **z-index 70, the bottom
+sheet's own number**, and `toast()` and `ensureSheet()` both append to `.app` the first time they run, so page order
+settled the tie: after any toast that came before the session's first sheet, every later toast sat hidden behind an open
+sheet. Proved in a browser with the toast's `pointer-events` switched on for the probe (it is `none`, so
+`elementFromPoint` otherwise sees straight through it — a probe that cannot see the thing it measures): the hit at the
+toast's centre was the sheet's own text. The full-screen overlays covered it outright — share studio 92, club editor 96,
+photo library 97, club question 98 — though they raise toasts of their own ("Those could not be read from your
+library.", "That video could not be read.").
+
+- **Fix: `.app-toast` is z-index 99** — above every layer the runner can act in, below only the launch splash (100), the
+  run's count-in (120) and the calendar's drag ghost (300). `.app` sets `position: relative` and no z-index, so it forms
+  no stacking context and every fixed overlay's number compares directly, whether it was appended to `.app` or `body`.
+- The z-index ladder as of this change: topbar/bottom nav 20 · debrief nav 30 · live pill, trial overlay 60 · sheet 70 ·
+  session guide 80 · recap story, welcome, club story 90 · share studio 92 · photo lightbox, plan moment 95 · club
+  editor/viewer 96 · club photo library 97 · club question 98 · **toast 99** · splash 100 · count-in 120 · drag ghost 300.
+- **Guard: `test/toast-layer.test.ts`**, derived from the built stylesheet (comments stripped first — they quote numbers):
+  the toast is above the sheet, and every other z-index is below the toast unless it is in `ABOVE_ON_PURPOSE`
+  (`.splash`, `.countin`, `.cal-ghost`), so a new overlay above toasts fails until somebody decides. A sanity test checks
+  the known layers were all found (a parser that ate the stylesheet would otherwise pass). Re-broken (back to 70): "the
+  toast (z 70) is not above the sheet (z 70)" and ".welcome (z 90) is drawn over toasts".
+- Checked in the in-app browser at phone size, light and dark, in the order that hid it (a toast before the first sheet):
+  "That must be an https:// address." shows over the open Strava sheet. Toasts now also show over the welcome-back
+  screen; none fires during a normal launch (no `#appToast` existed at boot in any run).

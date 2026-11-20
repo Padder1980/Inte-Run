@@ -365,3 +365,6 @@ Both were found while fixing the Connected apps loop (above), and both were seen
 - ⚠️ **While a connection is waiting, `stravaResume` asks on every return to view.** In the in-app browser the pane hid
   and reappeared dozens of times in a few minutes and each return asked `/strava/status` (31 calls by the end). That
   is the designed path — once per coming back to the app on a phone — not a loop; don't mistake it for one.
+- **`pc-toast-behind-sheet` was fixed the same day, on his yes:** `.app-toast` is z-index 99 now (notes/redesign-design-system.md,
+  "Toasts were drawn behind sheets"). The "check now" answer stays in the sheet anyway — it belongs beside the button it
+  answers, and must not vanish after four seconds.

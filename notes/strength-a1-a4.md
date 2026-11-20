@@ -491,3 +491,23 @@ all) opening cleanly with zero Swap buttons.
 
 **Still to come in this track:** A6 e1RM and progression, A7 standalone programmes, A8 Strava as
 Weight Training, A9 the watch. (A5's session player landed — see the chapter at the foot of this file.)
+
+## Demonstration videos: the brief is `VIDEOS.md` (2026-11-20)
+
+The owner asked for a prompt to give ChatGPT so it makes real demonstration videos for every warm-up drill,
+after-run stretch and strength exercise. `VIDEOS.md` (repo root, beside `DESIGN.md`) is that prompt — 77
+clips, one test clip first and then a stop for his approval — plus Appendix A (each clip → its `EXERCISES`,
+`STRETCHES` or `WARMUP_MOVEMENTS` id) and Appendix B (what wiring the clips in will involve).
+`test/videos-brief.test.ts` holds it to the code: an exercise, stretch or drill with no clip fails it, and
+so does a cue the brief quotes as the app's words that no longer is (six re-breaks, all caught).
+Found while writing it:
+- ⚠️ **Two warm-up drills never reach a runner.** `pickMovements()` pushes `ankling` for hard and maximal
+  sessions and then `slice(0, 5)` drops it (it is always sixth); `high_knees` is never picked. Swept 184
+  real sessions × 4 abilities × 7 conditions: both 0. The brief has clips for both anyway; whether to change
+  the engine is the owner's call.
+- ⚠️ **`DESIGN.md`'s accent is stale:** it says `#0e8c7f` light / `#2bb3a3` dark; the app's `--accent` is
+  `#0c7b70` / `#32c8b2`. The video brief uses the app's values.
+- ⚠️ **OpenAI shut Sora down in 2026** (app 26 April, API 24 September, per Wikipedia) and we found no video
+  generator inside ChatGPT since. The prompt makes ChatGPT say so rather than stitch stills together.
+- The demo frame is square, white in both themes, `object-fit: contain`. An MP4 needs a `<video>`, not the
+  `<img>` that plays today's WebPs, and the page cannot inline 77 clips (Appendix B).

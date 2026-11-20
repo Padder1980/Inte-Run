@@ -58,7 +58,8 @@ app. The owner (Adam, UK) runs it on an iPhone 16 Pro Max on the iOS 27 beta and
   `window.__interunCoachNativePlay`) — never whether a message handler exists.
 - Plans and specs: `PLAN.md` (the plan to beat Runna: strength, launch hygiene, parity), `STAGES.md` (BUILT
   2026-11-18: a road of stages with checkpoints to a long-term goal — PLAN.md B14, `profile.road`, notes/plan-profile.md), `YOUTH.md` (the 12–17
-  programme), `DPIA.md`, `APPSTORE.md`, `DESIGN.md` (the design brief), `WATCH-REDESIGN.md`.
+  programme), `DPIA.md`, `APPSTORE.md`, `DESIGN.md` (the design brief), `WATCH-REDESIGN.md`, `VIDEOS.md` (the
+  ChatGPT brief for the demonstration videos; its appendix maps each clip to an exercise id).
 
 ## CRITICAL — runtime JS inside `web/app.ts`
 

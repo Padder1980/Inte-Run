@@ -23190,24 +23190,45 @@ const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "Ju
  * ⚠️ AND IT DEMANDS A CLEARLY HORIZONTAL, CLEARLY RIGHTWARD TRAVEL — more than 64px across and more than
  * twice as far across as down. A loose test fires on the diagonal drift of an ordinary scroll and the
  * runner is thrown off the screen they were reading.
+ *
+ * ⚠️⚠️ WIRED ONCE, AND IT ACTS ONLY WHILE ITS OWN SCREEN IS SHOWING (fixed 2026-11-20, Road Map
+ * pc-club-swipe). #view is the app's one permanent scroller: render() replaces what is inside it, never
+ * the element. This used to add its three listeners on every render of the post screen, never removed
+ * and never asking which screen was up. Measured in the browser before the fix: a post screen drawn three
+ * times (the tap that opened it, then two redraws) answered ONE swipe with three trips back, three redraws
+ * and three haptic taps; and afterwards a right swipe on the Training calendar threw the runner out of
+ * it to the Inte-Club grid, three times over. The setup form, the plan wizard and the live run screen
+ * are drawn into the same #view. So the listeners now go on once per node and screen (the flag), the
+ * gesture arms only on its own screen, and it fires only if that screen is still up when the finger
+ * lifts: a wrist run can change the screen under a finger. The flag holds the way back, and the latest
+ * wiring's is the one used, so a way back that one day reads its own render cannot go stale.
+ * ⚠️ IT STAYS ON #view RATHER THAN A NODE OF THE FEED'S OWN. One inside the feed would die with each
+ * render and could never pile up, but it would shrink the gesture to the content box: #view's 16px
+ * gutter is where a back swipe starts, and below a short feed there is no content at all.
  */
 const CLUB_BACK_SWIPE_PX = 64;
-function clubWireBackSwipe(node, back) {
+function clubWireBackSwipe(node, screen, back) {
   if (!node) return;
+  const key = "__backSwipe_" + screen;
+  const wired = !!node[key];
+  node[key] = back;
+  if (wired) return;
   let st = null;
   node.addEventListener("pointerdown", (ev) => {
-    if (ev.pointerType === "mouse" && ev.button !== 0) { st = null; return; }
+    st = null;
+    if (state.screen !== screen) return;
+    if (ev.pointerType === "mouse" && ev.button !== 0) return;
     const rail = ev.target && ev.target.closest ? ev.target.closest("[data-cprail]") : null;
-    if (rail && rail.scrollWidth > rail.clientWidth + 1) { st = null; return; }
+    if (rail && rail.scrollWidth > rail.clientWidth + 1) return;
     st = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
   }, { passive: true });
   const end = (ev) => {
     const s0 = st; st = null;
-    if (!s0 || ev.pointerId !== s0.id) return;
+    if (!s0 || ev.pointerId !== s0.id || state.screen !== screen) return;
     const dx = ev.clientX - s0.x, dy = ev.clientY - s0.y;
     if (dx < CLUB_BACK_SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 2) return;
     haptic("light");
-    back();
+    node[key]();
   };
   node.addEventListener("pointerup", end, { passive: true });
   node.addEventListener("pointercancel", () => { st = null; }, { passive: true });
@@ -23245,7 +23266,9 @@ function wireClubPostView() {
     if (acts) acts.classList.toggle("on");
   });
   // ⚠️ THE SAME PLACE THE BACK CHEVRON GOES, so a swipe and a tap cannot disagree about where back is.
-  clubWireBackSwipe($("view"), () => { state.screen = null; state.clubPostId = null; render(); });
+  // Called on every render of this screen, but it wires #view once and acts only while this screen is up
+  // (clubWireBackSwipe says why: it used to pile up and fire on every later screen).
+  clubWireBackSwipe($("view"), "clubpost", () => { state.screen = null; state.clubPostId = null; render(); });
   clubFillMedia();
   // ⚠️ SCROLLED TO THE TAPPED POST AFTER THE MEDIA HAS ITS BOX, not before. A post whose picture has not
   // arrived is a few pixels tall, so scrolling to it lands on the wrong one — the measure-before-shown

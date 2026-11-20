@@ -866,3 +866,61 @@ A second `.cm-meta` container below would have been two rules owning one line's 
 **Measured after, at 430×932 and 320×568, at text scale 1.0 and 1.3, both themes:** pane overflow **0**,
 nothing sticking out of the pane at any of them, `scrollLeft` **0**, page overflow **0**, capsules in 2
 even rows (3 at the narrowest extreme, by design), zero console errors.
+
+### THE POSTS SCREEN'S BACK SWIPE PILED UP AND FIRED ON EVERY LATER SCREEN (2026-11-20, Road Map `pc-club-swipe`)
+
+Found by reading the code during the Connected apps sweep (`notes/strava-and-alfie.md`, its 2026-11-20 list), then
+**reproduced before anything was changed**, in the in-app browser at 375×812 with real mouse input. `wireClubPostView` runs on
+every render of the Posts screen (from `wire()`), and every run called `clubWireBackSwipe($("view"), …)`, which added
+pointerdown, pointerup and pointercancel listeners to `#view` — the app's one permanent scroller, whose element `render()`
+never replaces (it only rewrites `innerHTML`). They were never removed, and the way back never asked which screen was up.
+Measured on the old build: the Posts screen drawn three times (the tap that opened it, then two `render()`s standing in for a
+watch tick) answered **one** right swipe with **three** trips back — three renders of the grid and three `haptic("light")`;
+then, after a real tap on the top bar's calendar button, a right swipe across the calendar's hint line threw the runner **out
+of the calendar** to the Inte-Club grid, three times over. The setup form, the plan wizard, the live run screen and every
+other screen are drawn into the same `#view`.
+
+⚠️⚠️ **THE FIX IS TWO HALVES, AND EACH IS HELD ON ITS OWN.** `clubWireBackSwipe(node, screen, back)` now (1) wires a node
+once per screen — a flag on the node, `node["__backSwipe_" + screen]`, which also holds the way back, so the LATEST wiring's
+is the one used — and (2) arms on pointerdown only while `state.screen === screen`, and fires on pointerup only if that screen
+is still up: a wrist run can change the screen under a finger that is already down.
+⚠️ **THE SCREEN CHECK ALONE ALREADY STOPS THE TRIPLE TRIP BACK — WHICH IS WHY THE GUARD COUNTS LISTENERS.** With the flag
+removed and the checks kept, the first copy's `back()` sets `state.screen = null` and every later copy's pointerup check then
+refuses: one trip back, by an accident of ordering, while `#view` still gains three listeners per render for ever. Only the
+listener count catches that half.
+⚠️ **IT STAYS ON `#view`, NOT ON A NODE OF THE FEED'S OWN.** A wrapper inside the feed would die with each render and could
+never pile up, but `.view` has `padding: 16px 16px 96px`: the gesture would lose the 16px gutter a back swipe starts in, the
+96px under the last post, and all the empty space below a short feed. He asked for "swiping right on the screen".
+⚠️ **PROPERTY HANDLERS (`node.onpointerdown = …`) WOULD HAVE STOPPED THE PILE-UP TOO, AND WERE NOT USED:** `#view` is the one
+scroller every screen shares, so a second screen claiming the same slot would silently replace this one. (`clubDraftWire`'s
+property handlers sit on a node of their own.)
+
+**Guard:** `test/club-back-swipe.test.ts` runs the real `openClubPost`, `wireClubPostView` and `clubWireBackSwipe` (with the
+page's own `CLUB_BACK_SWIPE_PX`) against a `#view` stand-in that keeps its listeners across renders, as the element does, and a
+stand-in `render()` that wires the Posts screen only while it is showing. A reachability test holds both to the page: one
+`id="view"`, `render()` draws the Posts screen into it and calls `wire()`, `wire()` calls `wireClubPostView()` on `clubpost`, a
+grid tile opens it through `openClubPost`, and the chevron goes where the swipe goes. The screens it swipes on are read from
+the page (every `state.screen = "…"` / `=== "…"`, plus the tabs), not listed by hand. Re-broken three ways, copying the file
+aside and back: the original code fails 4 of 6 (*"one swipe went back 5 times"*); the screen checks alone removed fail 2 (a
+swipe on another screen, and one that lifts on another screen); the once-flag alone removed fails 1 (*"#view holds 5
+pointerdown listeners after five draws"*). `test/community.test.ts`'s 2026-08-23 swipe test lifted the old two-argument
+helper and matched the old call; it follows the new signature, its rules unchanged.
+
+**Measured after, the same steps in the same browser:** one swipe on the Posts screen → 1 render, 1 haptic, back on the grid;
+the same swipe on the calendar → 0 renders, 0 haptics, still on the calendar.
+
+⚠️⚠️ **A TOUCH SWIPE IN CHROME NEVER REACHES THIS CODE, AND THAT IS NOT WHAT THE PHONE DOES.** In headless Chrome with real
+touch input (`Input.dispatchTouchEvent`, 375×812, light and dark) a sideways drag over `#view` gives `pointerdown` then
+`pointercancel` and no `pointerup` — Chrome takes the touch for a pan — so on BOTH builds neither the back swipe nor the bug
+fires there. A mouse drag does deliver `pointerup`. **So a Chrome touch test is no test of this gesture either way.** The
+phone's engine was checked instead, in Safari on the iPhone 17 Pro simulator (iOS 26.5, the only iPhone simulator installed),
+with the simulator's own swipes: WebKit DOES deliver `pointerup` for a sideways swipe over `#view`. On the old build the Posts
+swipe went back, and a right swipe on the calendar threw the runner to the Inte-Club grid — **the bug was real on the phone**;
+on the fixed build the Posts swipe still goes back and the calendar swipe does nothing. ⚠️ The first sideways swipe straight
+after a vertical fling did nothing on either build: the touch was spent stopping the scroll's momentum. Not a fault.
+⚠️ **The in-app Browser pane was hidden and this session was in no window,** so its screenshots were stale frames (one showed
+the calendar while the live DOM said "Your profile"); state was read from the page, and the light and dark pictures came from
+headless Chrome.
+
+Seen in passing, NOT changed: `wire()` wires `[data-crun]` (a club run tile → `state.screen = "run"`), but nothing renders
+`data-crun` and `render()` has no `"run"` branch — a handler wired to nothing, harmless.

@@ -156,7 +156,9 @@ node --test            # the suite (about 1,800 tests)
 - Code that measures or scrolls a rendered screen goes in `wire()`, not `buildNav()` (which runs once at boot,
   before any screen exists). Never measure inside a bottom sheet before adding `.on`.
 - `wire()` runs after EVERY render, not once per screen. A request started there whose answer calls `render()`
-  loops for ever unless it asks only on arrival and redraws only on a change (Connected apps, 2026-11-20).
+  loops for ever unless it asks only on arrival and redraws only on a change (Connected apps, 2026-11-20). A
+  listener it adds to a node that survives the render (`#view`, `document`) stacks a copy per render and outlives
+  its screen: wire it once and check the screen (Inte-Club's back swipe, `clubWireBackSwipe`, the same day).
 - Don't re-render on every keystroke (it rebuilds the field under the finger). A DOM kept for a transition has
   duplicate ids, so `$()` finds the wrong node.
 - An undeclared `var(--x)` voids the whole CSS declaration silently. Theme tokens are declared in FOUR places

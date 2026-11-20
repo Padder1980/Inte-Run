@@ -2339,14 +2339,16 @@ test("BLOCKER: swiping right leaves the post feed, and nothing else does", () =>
   // Driven: only a clearly horizontal, clearly rightward travel over the threshold goes back.
   const px = Number(/const CLUB_BACK_SWIPE_PX = (\d+)/.exec(appBlock())?.[1]);
   assert.ok(px >= 40, "a threshold of " + px + "px fires on the drift of an ordinary scroll");
-  const run = new Function("haptic", "CLUB_BACK_SWIPE_PX",
-    nocomment(fn("clubWireBackSwipe")) + "\nreturn clubWireBackSwipe;")(() => {}, px);
+  // On the post feed: since 2026-11-20 the swipe acts only while its own screen is showing (that, and wiring
+  // #view once, is held in test/club-back-swipe.test.ts).
+  const run = new Function("haptic", "CLUB_BACK_SWIPE_PX", "state",
+    nocomment(fn("clubWireBackSwipe")) + "\nreturn clubWireBackSwipe;")(() => {}, px, { screen: "clubpost" });
   const drive = (dx: number, dy: number, onRail: boolean, railScrolls: boolean) => {
     let went = 0;
     const handlers: Record<string, Array<(e: unknown) => void>> = {};
     const node = { addEventListener: (t: string, f: (e: unknown) => void) => {
       (handlers[t] = handlers[t] || []).push(f); } };
-    run(node, () => { went++; });
+    run(node, "clubpost", () => { went++; });
     const rail = { scrollWidth: railScrolls ? 900 : 300, clientWidth: 300 };
     const target = { closest: (s: string) => (onRail && s === "[data-cprail]" ? rail : null) };
     handlers.pointerdown!.forEach((f) => f({ pointerId: 1, pointerType: "touch", button: 0,
@@ -2365,7 +2367,7 @@ test("BLOCKER: swiping right leaves the post feed, and nothing else does", () =>
     "a single-picture post's rail cannot scroll, so a swipe there should still go back");
   // ⚠️ THE SWIPE AND THE CHEVRON GO TO THE SAME PLACE, or two ways back mean two different backs.
   const wire = nocomment(fn("wireClubPostView"));
-  assert.match(wire, /clubWireBackSwipe\(\$\("view"\), \(\) => \{ state\.screen = null; state\.clubPostId = null; render\(\); \}\)/,
+  assert.match(wire, /clubWireBackSwipe\(\$\("view"\), "clubpost", \(\) => \{ state\.screen = null; state\.clubPostId = null; render\(\); \}\)/,
     "the swipe does not go where the back chevron goes");
 });
 

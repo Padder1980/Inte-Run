@@ -2694,6 +2694,12 @@ select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
 .wk-sum.cur { border-color: var(--accent); }
 .wk-n { flex: none; width: 26px; height: 26px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-soft); font-size: var(--t-meta); font-weight: 750; display: grid; place-items: center; }
 .wk-sum.cur .wk-n { background: var(--accent); color: var(--accent-ink); }
+/* A WEEK'S ROAD STAGE, in the road card's own colours (owner, 2026-11-19: "the week numbers on the plan page should
+   match the colours of the Road"): a tint and a ring of the stage's colour under an ink number, solid for this week as the
+   road draws its own stage. Measured: the ink number 10:1 or better on the tint in both themes; near-black on the solid
+   4.6:1 or better (white on the stage colours fails). The stage's name rides on the badge's title. */
+.wk-n.road { background: color-mix(in srgb, var(--rc) 22%, var(--surface)); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--rc); }
+.wk-sum.cur .wk-n.road { background: var(--rc); color: #06110e; box-shadow: none; }
 .wk-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .wk-t { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; font-size: var(--t-body); font-weight: 700; color: var(--ink); }
 /* ⚠️ THE BADGE IS A WORD, NOT A COLOUR. An absorb week is a diagonal hatch on the chart and a
@@ -11913,6 +11919,8 @@ window.__interunWatchLive = function (live) {
   if (live.id !== WATCH_LIVE_ID) {
     WATCH_LIVE_ID = live.id;
     coachResetSession(true);
+    // The wrist's tick names the session; today's planned one is the session it is running when the titles agree.
+    COACH.walkBreaks = (function () { try { const t = rawToday(); return !!(t && (!live.title || t.title === live.title) && coachWalkBreaks(t)); } catch (e) { return false; } })();
     // ⚠️ AND A RUN STARTED ON THE WATCH ITSELF NEVER PASSES THROUGH startOnWatch, so the cue map has
     // to be pushed from here too. This is the case the owner actually ran: the phone handover failed,
     // he started it on his wrist instead, and the coach went quiet after the first line. Pushing only
@@ -18482,7 +18490,7 @@ function planHeadHtml(g, s) {
  * runner most needs to recognise in advance, and both were unreadable without tapping. Deload, taper
  * and race week now carry the word.
  */
-function weekSummaryRow(w, isRace) {
+function weekSummaryRow(w, isRace, legs) {
   const past = isoAdd(w.startIso, 6).toISOString().slice(0, 10) < todayIso();
   const cur = TODAY_IN_PLAN && w.index === curWeekNo();
   // B7: the week holding a B-race says so, and so does the easier week before it.
@@ -18499,9 +18507,12 @@ function weekSummaryRow(w, isRace) {
   // DASHED accent border AND a tag with the word in it -- the dash is what distinguishes it from the
   // current week, which already owns the solid accent border.
   const adj = weekAdjust(w);
+  // The road stage this week sits in (legs from roadLegsNow, Mondays both), coloured as the road card colours it. A week
+  // outside the road — no road, or before it starts — keeps the plain number.
+  const leg = legs ? legs.find((l) => w.startIso >= l.fromIso && w.startIso < l.endIso) : null;
   return '<button class="wk-sum' + (past ? " past" : "") + (cur ? " cur" : "") + (adj ? " adj" : "") +
     '" data-weeksel="' + w.index + '">' +
-    '<span class="wk-n">' + w.index + '</span>' +
+    '<span class="wk-n' + (leg ? ' road" style="--rc:' + ROAD_COLOUR[leg.kind] + '" title="' + esc(roadLegName(legs, legs.indexOf(leg))) : "") + '">' + w.index + '</span>' +
     '<span class="wk-b"><span class="wk-t">Week ' + w.index +
       (cur ? '<span class="wk-tag cur">This week</span>' : "") +
       (adj ? '<span class="wk-tag adj">' + adj.tag + '</span>' : "") +
@@ -18666,12 +18677,14 @@ function pausedWeekRow() {
 function weekList() {
   // §10 piece 4: with no race, no week is race week.
   const raceIdx = PLAN.goal && PLAN.goal.noRace ? -1 : PLAN.weeks.length;
+  // Once for the list, not once a row: each week's number takes its road stage's colour (weekSummaryRow).
+  let legs = null; try { legs = roadLegsNow(profile); } catch (e) { legs = null; }
   // state.planWeek of 0 means nothing is open, which is a legitimate state: the chart still shows the
   // shape of the block and every week reads as a one-line summary.
   return pausedWeekRow() + PLAN.weeks.slice(firstShownWeek()).map((w) =>
     w.index === state.planWeek
       ? '<div class="card wk-open' + (weekAdjust(w) ? " adj" : "") + '">' + weekDetail() + '</div>'
-      : weekSummaryRow(w, w.index === raceIdx)).join("");
+      : weekSummaryRow(w, w.index === raceIdx, legs)).join("");
 }
 /** One place that changes the selected week, so the chart and the list can never disagree. */
 function selectPlanWeek(n) {
@@ -31042,7 +31055,7 @@ function coachTrigger(trigger, sessionType, nowSec) {
   // exists for this moment. Falls straight through to the shared catalogue when it does not.
   const personal = coachPersonalPrompts(trigger).filter((x) => RC.canPlay(x, nowSec, COACH.history));
   let p = personal.length ? personal[Math.floor(Math.random() * personal.length)] : null;
-  if (!p) p = RC.selectPrompt(trigger, sessionType, nowSec, COACH.history);
+  if (!p) p = RC.selectPrompt(trigger, sessionType, nowSec, COACH.history, { walkBreaks: !!COACH.walkBreaks });
   if (!p || !coachFrequencyAllows(p)) return;
   if (COACH.current && !RC.shouldInterrupt(p, COACH.current)) {
     if (COACH.queue.length < 3 && p.priority >= 40) COACH.queue.push(p); // queue only things worth hearing
@@ -31166,7 +31179,19 @@ function coachStop() {
   try { if (COACH.audio) { COACH.audio.pause(); } } catch (e) {}
   stopSpeech();
 }
+/**
+ * ⚠️ ARE THIS SESSION'S BREAKS WALKS? (pc-tempowalk, 2026-11-19) "4 × 10′ tempo / 2′ walk" walks between its blocks, and
+ * one of the two recorded recovery lines says "Good rep. Jog easy…", so on alternate breaks the coach told a walking
+ * runner to jog. Every break a walk (its label says so, and it has no pace to hold) means no line marked jog plays: the
+ * live picker (coachTrigger) and the lists handed to Swift (coachScheduledPrompt) both read COACH.walkBreaks, set where
+ * a session starts — on the phone (beginLive), on the watch from the phone (startOnWatch) or from the wrist (a new run id).
+ */
+function coachWalkBreaks(sess) {
+  const rec = ((sess && sess.steps) || []).filter((st) => st.kind === "recovery");
+  return rec.length > 0 && rec.every((st) => /\\bwalk/i.test(String(st.label || "")) && !st.targetPaceSecPerKm);
+}
 function coachResetSession(keepAudio) {
+  COACH.walkBreaks = false;
   COACH.history = RC.newPromptHistory(); COACH.halfwayDone = false; COACH.finalDone = false;
   COACH.paceSince = 0; COACH.paceWas = ""; COACH.lastPaceCueAt = -999; COACH.paceCorrectionPending = false;
   COACH.whyDone = false; COACH.whyShown = null; COACH.keepSlot = -1;
@@ -31487,7 +31512,7 @@ function coachScheduledPrompt(trigger, idx, type) {
     // fell through to evaluateJavaScript against a suspended page, and the coach went silent the moment
     // the phone went in a pocket. That is the owner's report verbatim, and the fix written for it was
     // inert from the day it shipped.
-    const all = RC.promptsFor(trigger, type || (LIVE && LIVE.session && LIVE.session.type)) || [];
+    const all = RC.promptsFor(trigger, type || (LIVE && LIVE.session && LIVE.session.type), { walkBreaks: !!COACH.walkBreaks }) || [];
     if (!all.length) return null;
     // Rotate, then fall back to any candidate that actually has audio for this coach.
     for (let n = 0; n < all.length; n++) {
@@ -32081,6 +32106,7 @@ function startOnWatch(sess, opts) {
     // ⚠️ Pushed HERE, while the app is certainly in the foreground and the page certainly running.
     // Later is too late: by the time the first cue arrives the phone may already be pocketed and this
     // page suspended, which is the very failure the map exists to survive.
+    COACH.walkBreaks = coachWalkBreaks(s);
     coachLoadManifest().then(() => coachPushWatchCueMap(s && s.type));
     LIVE = null;
     WATCH_LIVE_PENDING = true;
@@ -32443,6 +32469,7 @@ function beginLive() {
   // coach's <audio> element and the speech engine (fallback) here, then greet through the chosen coach.
   if (VOICE_AVAILABLE) loadVoices();
   coachResetSession();
+  COACH.walkBreaks = coachWalkBreaks(LIVE.session);
   if (coachEnabled()) {
     coachUnlock();
     coachLoadManifest().then(() => { coachPreload(); coachTrigger("session-prep", LIVE.session.type, 0); });
@@ -43628,6 +43655,10 @@ function plannedPaceBandOf(sess) {
  * continuous running anywhere. Reading the title would miss "Run–walk ladder" and "Build-up run–walk".
  */
 function isRunWalkShape(sess) {
+  // ⚠️ A RUN-WALK IS EASY RUNNING WITH WALKS. "4 × 10′ tempo / 2′ walk" has the same shape once its breaks are walks
+  // (pc-tempowalk), and calling it a run-walk would tell its debrief "the running stayed easy enough to talk through".
+  // A hard session with walking breaks is repeats ("reps"): efforts and recoveries in the same kilometre.
+  if (sess && sess.type && ["easy", "long", "recovery"].indexOf(sess.type) < 0) return false;
   const steps = (sess && sess.steps) || [];
   const work = steps.filter((s) => s.kind === "rep");
   const rec = steps.filter((s) => s.kind === "recovery");
@@ -43683,7 +43714,10 @@ function paceWindowOf(sess) {
     // perfectly-run session down on its opening split. Preparation is excluded from training
     // volume for the same reason; this is the same rule, applied to judging.
     const prep = st.kind === "warmup" || st.kind === "cooldown";
-    marks.push({ start: m, end: m + d, band: !prep && same(st.targetPaceSecPerKm), paced: !prep && !!st.targetPaceSecPerKm });
+    // ⚠️ A RECOVERY BREAKS THE STRETCH TOO, paced or not (pc-tempowalk, 2026-11-19). A walking break between tempo blocks is
+    // as much the work scattered through the run as a jog is, and with it inside the stretch every kilometre holding a
+    // walk was judged slower than tempo — the false accusation this function exists to prevent.
+    marks.push({ start: m, end: m + d, band: !prep && same(st.targetPaceSecPerKm), paced: !prep && (!!st.targetPaceSecPerKm || st.kind === "recovery") });
     m += d;
   }
   const first = marks.findIndex((x) => x.band);
@@ -44884,6 +44918,10 @@ function parseGuide(title) {
     else merged.push(words[i]);
   }
   const hasReps = merged.some((w) => /^\\d+$/.test(w)) && merged.includes("\\u00D7");
+  // ⚠️ "2′ walk" IS A WALK (pc-tempowalk): the recovery's words follow the slash, and the guide called every recovery
+  // "gentle jogging", the title's own word notwithstanding.
+  const slash = merged.indexOf("/");
+  const recWalk = slash >= 0 && merged.slice(slash + 1).some((w) => /^walk/i.test(w));
   let rec = false, usedEffort = false;
   const tokens = [];
   merged.forEach((w) => {
@@ -44895,7 +44933,7 @@ function parseGuide(title) {
     } else if (/^\\d+[\\u2032]$/.test(w)) { // minutes, e.g. 8'
       const mins = w.replace("\\u2032", "");
       step = rec
-        ? { label: "Recovery", body: "Easy recovery between efforts \— " + mins + " minute" + (mins === "1" ? "" : "s") + " of gentle jogging." }
+        ? { label: "Recovery", body: "Easy recovery between efforts \— " + mins + " minute" + (mins === "1" ? "" : "s") + (recWalk ? " of walking." : " of gentle jogging.") }
         : hasReps
           ? { label: "Each effort", body: "How long each effort lasts \— " + mins + " minute" + (mins === "1" ? "" : "s") + ". (\\u2032 means minutes, \\u2033 means seconds.)" }
           : { label: "Duration", body: "How long to run for \— " + mins + " minutes at the effort shown. (\\u2032 means minutes.)" };
@@ -44906,7 +44944,7 @@ function parseGuide(title) {
         : { label: "Each effort", body: "A short, sharp effort \— " + secs + " seconds. (\\u2033 means seconds.)" };
     } else if (/^\\d+(?:\\.\\d+)?\\s?(?:miles?|km|m)$/i.test(w)) { // distance, e.g. 800m, 1 mile
       step = rec
-        ? { label: "Recovery", body: "Recover over " + w + " of easy jogging." }
+        ? { label: "Recovery", body: "Recover over " + w + (recWalk ? " of walking." : " of easy jogging.") }
         : { label: "Each effort", body: "How far each effort covers \— " + w + "." };
     } else {
       const key = w.toLowerCase().replace(/[^a-z0-9]/g, "");

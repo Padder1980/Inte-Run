@@ -1604,7 +1604,7 @@ const THRESHOLD_FORMATS: QualityFormat[] = [
     build: (p) => reps(2, { durationSeconds: 15 * 60, pace: p.threshold }, { durationSeconds: 3 * 60, pace: p.steady }) },
   { id: "thr-4x10", title: "4 × 10′ tempo / 2′ walk", phases: ["build", "peak"],
     desc: "Four ten-minute tempo blocks with a full walking break. The walk is deliberate — it keeps every block honest rather than letting them blur into one.",
-    build: (p) => reps(4, { durationSeconds: 10 * 60, pace: p.tempo }, { durationSeconds: 2 * 60, pace: p.easy }) },
+    build: (p) => reps(4, { durationSeconds: 10 * 60, pace: p.tempo }, { durationSeconds: 2 * 60, walk: true }) },
 
   // — fartlek and progression —
   { id: "thr-fartlek-6x3", title: "Threshold fartlek: 6 × 3′ brisk / 2′ easy", phases: ["base", "build"],
@@ -2424,7 +2424,8 @@ export function restDay(): SessionContent {
 
 // ---- helpers --------------------------------------------------------------
 
-type RepSpec = { durationSeconds?: number; distanceMeters?: number; pace?: PaceRange };
+/** `walk`: the recovery is a WALKING break, by the clock (no pace, RPE 1–2), said as one — see reps(). */
+type RepSpec = { durationSeconds?: number; distanceMeters?: number; pace?: PaceRange; walk?: boolean };
 
 // ---- structural helpers ----------------------------------------------------
 //
@@ -2626,13 +2627,18 @@ function reps(count: number, work: RepSpec, recovery: RepSpec): WorkoutStep[] {
       repeatCount: count,
     });
     if (i < count) {
-      steps.push({
-        kind: "recovery",
-        label: "Easy jog recovery",
-        durationSeconds: recovery.durationSeconds,
-        distanceMeters: recovery.distanceMeters,
-        targetPaceSecPerKm: recovery.pace,
-      });
+      // ⚠️ A WALKING BREAK IS SAID AS ONE (pc-tempowalk, 2026-11-19). "4 × 10′ tempo / 2′ walk" promised a deliberate walk
+      // and built an easy-paced "Easy jog recovery", so the steps, the watch and the voice coach all ran a jog. A walk is
+      // the run-walk sessions' shape: no pace to hold, RPE 1–2, a label that says walk.
+      steps.push(recovery.walk
+        ? { kind: "recovery", label: `Walk ${clock(recovery.durationSeconds ?? 0)} — recover`, durationSeconds: recovery.durationSeconds, targetRpe: { min: 1, max: 2 } }
+        : {
+          kind: "recovery",
+          label: "Easy jog recovery",
+          durationSeconds: recovery.durationSeconds,
+          distanceMeters: recovery.distanceMeters,
+          targetPaceSecPerKm: recovery.pace,
+        });
     }
   }
   return steps;

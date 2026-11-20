@@ -1486,3 +1486,54 @@ fixing the same step on another branch:
   whether the answer is allowed (undoing piece 4's `=== true` is caught by it). Re-broken three ways, each caught.
 - ⚠️ The wizard's typo sentence (piece 4's: "…, or leave it blank.") and the save's ("…, e.g. 1:45:00 — or leave it blank.") differ
   in wording; both offer blank only to `"optional"`, so they were left as written.
+
+## The Plan screen's week numbers wear their road stage's colour (2026-11-19)
+
+The owner: "the week numbers on the plan page should match the colours of the 'Road'". `weekList` reads the road once
+(`roadLegsNow(profile)`, in a try) and hands the legs to `weekSummaryRow(w, isRace, legs)`, which finds the leg holding the
+week's Monday (`fromIso <= startIso < endIso`; both Mondays) and draws the number as `<span class="wk-n road" style="--rc:
+ROAD_COLOUR[kind]" title="<roadLegName>">` — the SAME constant the Your road card colours its rows and segments with, so the
+two cannot drift. A week the road does not reach (no road, before it begins, after it ends) keeps the plain grey number.
+
+- CSS: `.wk-n.road` is a 22% tint of the stage colour over `--surface` with a 1.5px ring in the stage colour and `--ink` text;
+  the current week (`.wk-sum.cur .wk-n.road`) is solid stage colour with `#06110e` text. Measured on the rendered page: that
+  text is 4.58–6.98:1 in light, 6.01–8.38:1 in dark (lowest: Walk-run's purple in light); white text would have failed at
+  2.29–4.19:1.
+- The open week (`.wk-open`, a heading "Week N") has no number badge and is unchanged.
+- `test/plan-week-road-colour.test.ts` lifts `weekList`, `weekSummaryRow` and the REAL road chain (`roadLegsNow`,
+  `effectiveRoad`, `roadOf`, `roadSplitRace`…) from the built page; the weeks each stage holds are counted from its first Monday
+  and length, not by the row's own comparison. Re-broken three ways, each caught: `<= l.endIso` (the first Base week took
+  Rebuild's green), white text on the solid number (light, Walk-run: 4.19:1), and `weekList` not passing the legs.
+- ⚠️ Not changed, worth knowing: inside the race block the row's phase word is the engine's periodisation phase, so the race
+  block's first weeks read "Base · 30.7 km" beside an orange (Race block) number, while the road's own Base stage is blue.
+
+## Days a week for a habit-builder once the road reaches the race block — research, awaiting the owner (2026-11-19)
+
+His question: "Building the habit" offers only 3 or 4 days (`runningDayChoices`, beginner track: `CHOICE_MAX.beginner` 4), which
+may hold a runner back once the road moves them into a harder block — should a block change raise the days?
+
+**What the code does today.** The race block of a road is built on the MAIN track (`raceTrackAthlete`: beginner → recreational),
+which honours 3–7 days, but the answer carried in is still capped at 4 by the beginner picker, and the weekly review's
+`addDayOffer` refuses `experience === "beginner"` outright — so a habit-builder in the race block can never reach 5 days, and is
+never offered a 4th. Measured with the engine (his road shape: Rebuild 4, Base 5, race block 16, half, 21-min 5K): the long run
+is the same at every answer (peak 122 min); the days change only the rest of the week —
+3 days: race-block weeks 139–220 min, 1 quality, long run up to ~55% of the week;
+4 days: 177–265 min, 1 quality, ~46%; 5 days (main track only): 216–331 min, 1–2 quality, ~37%.
+
+**What the evidence says** (subagent web research, 2026-11-19; sources checked by the agent):
+- 3 runs a week is the norm and the minimum in novice 10K and half programmes (NHS Couch to 5K; Hal Higdon Novice 1 half: 3 runs
+  + an optional 4th or cross-training; ProjectRun21's research half schedules, Damsted et al., Inj Epidemiol 2017; ACSM
+  position stand, Garber et al., MSSE 2011: vigorous exercise on at least 3 days a week).
+- Frequency and injury: the evidence conflicts (Fredette et al., J Athl Train 2022, 36 studies). First-time marathoners running
+  4+ times a week had MORE injuries (Toresdahl et al., Phys Sportsmed 2022, RR 1.36), novices showed no frequency effect
+  (Kluitenberg et al., JSAMS 2016). Nothing makes a 4th day a safety requirement.
+- The clearest signal is per run: a run more than 10% longer than the longest of the previous 30 days raised overuse injury
+  (Frandsen et al., BJSM 2025;59:1203–10, 5,205 runners; HRR 1.64 for 10–30% longer). Weekly jumps of 20–60% raised early
+  injury in half-marathon trainees (Damsted et al., JOSPT 2019). No peer-reviewed limit on the long run's share of the week.
+- No study compares adding a day with lengthening runs.
+
+**Recommendation put to him (not built):** never raise the days by itself (always with the runner). Offer it as a choice at the
+checkpoint into the race block, only when that checkpoint's own evidence is good (most runs done, nothing hurt); the new day
+starts as a short easy run (15–20 min) so the week grows by under ~20%; declining is remembered. Let a habit-builder pick up to 5
+days once in the race block (it already runs on the main track), and let `addDayOffer` treat race-block weeks by the track they
+are built on. Never say a 4th day is needed to be safe — the evidence does not support that.

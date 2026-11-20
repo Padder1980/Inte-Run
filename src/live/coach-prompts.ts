@@ -169,6 +169,8 @@ export type PromptDef = {
   variants?: Partial<Record<CoachId, string>>;
   /** Optional tag for future per-intensity selection. */
   intensity?: PromptIntensity;
+  /** The line tells the runner to JOG, so it is never played at a walking break (selectPrompt's `walkBreaks`). */
+  jog?: true;
 };
 
 // Priority bands (kept as named constants so intent is legible).
@@ -334,7 +336,7 @@ export const PROMPTS: PromptDef[] = [
 
   // — Recovery periods -------------------------------------------------------
   { id: "recovery_1", trigger: "recovery-start", text: "Recover now. Ease right down and catch your breath.", priority: P_INFO, interrupt: false, minRepeatSec: 20, sessionTypes: ["vo2", "threshold", "race-specific"], intensity: "low" },
-  { id: "recovery_2", trigger: "recovery-start", text: "Good rep. Jog easy and let the heart rate come back.", priority: P_INFO, interrupt: false, minRepeatSec: 20, sessionTypes: ["vo2", "threshold", "race-specific"], intensity: "low" },
+  { id: "recovery_2", trigger: "recovery-start", text: "Good rep. Jog easy and let the heart rate come back.", priority: P_INFO, interrupt: false, minRepeatSec: 20, sessionTypes: ["vo2", "threshold", "race-specific"], intensity: "low", jog: true },
 
   // — Hills ------------------------------------------------------------------
   { id: "hill_1", trigger: "hill-start", text: "Up the hill. Shorten your stride, drive your arms, keep the effort steady.", priority: P_KEY, interrupt: false, minRepeatSec: 25, sessionTypes: ["vo2", "threshold"], intensity: "high" },
@@ -551,10 +553,17 @@ export const ALL_PROMPTS: PromptDef[] = PROMPTS.concat(PACE_NUMBER_CLIPS, PACE_M
 
 // ---- Selection (pure, testable) -------------------------------------------
 
+/** What the session's breaks are, where a line depends on it. */
+export type PromptOptions = {
+  /** The session's recoveries are WALKING breaks ("4 × 10′ tempo / 2′ walk"): no line that says jog (pc-tempowalk). */
+  walkBreaks?: boolean;
+};
+
 /** Every prompt for a trigger that applies to the given session type. */
-export function promptsFor(trigger: PromptTrigger, sessionType: SessionType): PromptDef[] {
+export function promptsFor(trigger: PromptTrigger, sessionType: SessionType, opts: PromptOptions = {}): PromptDef[] {
   return PROMPTS.filter(
-    (p) => p.trigger === trigger && (p.sessionTypes === "all" || p.sessionTypes.includes(sessionType)),
+    (p) => p.trigger === trigger && (p.sessionTypes === "all" || p.sessionTypes.includes(sessionType)) &&
+      !(opts.walkBreaks && p.jog),
   );
 }
 
@@ -585,8 +594,9 @@ export function selectPrompt(
   sessionType: SessionType,
   nowSec: number,
   history: PromptHistory,
+  opts: PromptOptions = {},
 ): PromptDef | null {
-  const eligible = promptsFor(trigger, sessionType).filter((p) => canPlay(p, nowSec, history));
+  const eligible = promptsFor(trigger, sessionType, opts).filter((p) => canPlay(p, nowSec, history));
   if (eligible.length === 0) return null;
   const topPriority = Math.max(...eligible.map((p) => p.priority));
   const top = eligible.filter((p) => p.priority === topPriority);

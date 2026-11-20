@@ -619,3 +619,17 @@ which `generatePlan` never reads (`options.startDateIso ?? goal.startDateIso ?? 
 was built from TODAY while the raw plan was built from 2026-09-21. The two agreed by accident until today passed
 the capped block's own start; from mid-November every week index named a different Monday and the migration
 matched nothing. A fixture fault, not an app fault — the app builds PLAN and RAW from one start.
+
+## A walking break never hears "jog" (pc-tempowalk, 2026-11-19)
+
+Of the two `recovery-start` lines, `recovery_2` ("Good rep. Jog easy and let the heart rate come back.") tells the runner to jog.
+"4 × 10′ tempo / 2′ walk" now really walks its breaks (notes/plan-sessions.md, same date), so:
+
+- **`PromptDef.jog`** marks a catalogue line that says jog; `promptsFor(trigger, type, { walkBreaks })` and
+  `selectPrompt(…, { walkBreaks })` leave those lines out. `recovery_1` ("Recover now. Ease right down…") suits both and is what
+  a walking break hears. The guard checks the mark against the TEXT, so a new line saying jog without the mark fails.
+- **`COACH.walkBreaks`** = `coachWalkBreaks(session)`: every recovery step's label says walk and none has a pace. Reset to false
+  in `coachResetSession`; set in `beginLive` (a phone run), `startOnWatch` (a run sent to the watch) and on the wrist tick's
+  new run id (a run started on the watch, matched to today's session by title). Both pickers read it: `coachTrigger` (live)
+  and `coachScheduledPrompt` (the lists handed to Swift for the locked phone and the watch), so it is web-only — no rebuild.
+- The watch's own fallback for `recovery-start` is "Recover.", which was already right for a walk.

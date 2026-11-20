@@ -735,3 +735,22 @@ with its own constant measures the test's value, which this project has watched 
 `test/onboarding-wizard.test.ts` Date overload, **1348 pass / 0 fail**. His week 3 now reads
 `25′ explore run` · `Mobility flow (15′)` · `3.4 km easy run` · **`25′ easy + gentle pickups`** (was 26) ·
 `31′ long run`.
+
+## The tempo session that said walk and ran a jog (pc-tempowalk, fixed 2026-11-19)
+
+`thr-4x10` is titled "4 × 10′ tempo / 2′ walk" and its blurb says the walk is deliberate, but `reps()` built every break as
+an "Easy jog recovery" carrying the easy pace band — so the session card, the watch and the voice coach all ran a 2′ JOG.
+Found 6 October 2026 (Road Map `pc-tempowalk`).
+
+- **`RepSpec.walk`** (src/plan/session-templates.ts): a break marked `walk: true` is built as
+  `{ kind: "recovery", label: "Walk 2:00 — recover", durationSeconds, targetRpe: { min: 1, max: 2 } }` — by the clock, NO pace
+  band (a walk has no pace to hold). `thr-4x10` is the only format using it today. The walk counts as 0 m of running.
+- **The guard derives the formats, never lists them:** `test/tempo-walk.test.ts` builds every session `listWorkouts` returns for
+  three runners (35:00 / 25:00 / 18:20 5K) and holds that a break the TITLE calls a walk is a walk in the steps (label says walk,
+  no pace) and one it calls a jog or a float is not. A new format titled "/ 90″ walk" with jog steps fails it.
+- ⚠️ **The debrief:** with no pace band on the walks, `paceWindowOf`'s judged stretch ran straight through them and the session
+  was judged per km against the tempo band. A recovery step now always breaks the stretch (`paced: … || st.kind === "recovery"`),
+  so it stamps `pmix: "reps"` like every other repeats session. `isRunWalkShape` is false for any session whose type is not
+  easy, long or recovery, so walking breaks in a threshold session never read as a beginner's run-walk.
+- The "Understanding your sessions" guide (`parseGuide`) says "2 minutes of walking" for a "/ 2′ walk" break.
+- The voice coach half is in notes/voice-coach.md (the `jog` mark on a catalogue line, `COACH.walkBreaks`).

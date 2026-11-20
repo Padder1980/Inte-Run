@@ -26476,9 +26476,21 @@ function stravaRefresh() {
     return c;
   }).catch(() => cfg);
 }
+/**
+ * Show a new Strava answer wherever the runner can see it: Connected apps, and the Strava sheet if it is OPEN.
+ *
+ * ⚠️ "IS #stvSheet THERE?" IS NOT "IS THE SHEET OPEN?". closeSheet hides the sheet and keeps its body, so
+ * #stvSheet stays in the page after the runner closes it. Asked on its own, that test reopened a sheet they had
+ * closed the next time Strava's answer changed -- a disconnect made on Strava's website popped it back up --
+ * and returned before Connected apps was redrawn, so the row behind it still said Connected (2026-11-20). Open
+ * means #sheetOv.on as well, the same test refreshStartWhere makes. And the screen behind an open sheet is
+ * redrawn too, or it shows the old answer once the sheet is closed.
+ */
 function stravaRerender() {
-  if ($("stvSheet")) { openStravaSheet(); return; }
+  const ov = $("sheetOv");
+  const sheetOpen = !!$("stvSheet") && !!ov && ov.classList.contains("on");
   if (state.tab === "support" && state.support === "connect") render();
+  if (sheetOpen) openStravaSheet();
 }
 /**
  * Step one: hand the runner to Strava, in a real browser.
@@ -26771,7 +26783,26 @@ function wireStravaSheet() {
     haptic(c.auto ? "success" : "tap");
     openStravaSheet();
   };
-  const chk = $("stvCheckLink"); if (chk) chk.onclick = () => { chk.textContent = "Checking\\u2026"; stravaRefresh(); };
+  // ⚠️ THE RUNNER ASKED, SO THEY GET AN ANSWER EVERY TIME. stravaRefresh redraws only when the answer changes
+  // what is shown, and "still waiting" changes nothing -- so this button said "Checking…" for ever, and an
+  // unreachable server left it the same (2026-11-20). Connected redraws the sheet on its own; any other answer
+  // puts the button back here and says so, unless the sheet was closed while it checked.
+  // ⚠️ SAID IN THE SHEET, NOT IN A TOAST. The toast and the sheet are both z-index 70 and both added to the page
+  // the first time they are used, so whichever came later is drawn on top: after any toast that came before the
+  // session's first sheet, every later toast sits hidden behind an open sheet (measured, 2026-11-20).
+  const chk = $("stvCheckLink");
+  if (chk) chk.onclick = () => {
+    chk.textContent = "Checking\\u2026"; chk.disabled = true;
+    stravaRefresh().then(() => {
+      if (stravaConnected()) return;
+      const ov = $("sheetOv");
+      if (!$("stvSheet") || !ov || !ov.classList.contains("on")) return;
+      openStravaSheet();
+      const again = $("stvCheckLink");
+      if (again) again.insertAdjacentHTML("afterend", '<div class="bk-md" id="stvCheckNote" role="status" style="margin-top:10px">' +
+        'Not connected yet. Finish on Strava in your browser, then check again.</div>');
+    });
+  };
   const save = $("stvUrlSave"), inp = $("stvUrl");
   if (inp) inp.value = String(stravaCfg().proxy || "");
   if (save && inp) save.onclick = () => {

@@ -330,3 +330,38 @@ reminders reply (`NOTIFY_RERENDER` asks nothing back). Found on the way — not 
   `pc-weather-preset`.
 - Also reported, not checked: `wireTrialRun` starts a new animation-frame chain on every render without cancelling
   the last (CPU only).
+
+## The Strava sheet: a closed sheet stays closed, and "check now" answers (2026-11-20, his yes)
+
+Both were found while fixing the Connected apps loop (above), and both were seen in a browser before being fixed.
+- **A closed sheet popped back open.** `closeSheet` removes `.on` and keeps the sheet's body, so `#stvSheet` stays in
+  the page, and `stravaRerender` asked only `$("stvSheet")`: the next answer that changed something reopened the sheet
+  the runner had closed, and returned before redrawing Connected apps, whose row still said Connected. Measured: open
+  the sheet, close it, disconnect on Strava's website, reopen Connected apps → the sheet popped up over it. Now the
+  sheet counts as open only with `#sheetOv.on` as well (the `refreshStartWhere` test), and Connected apps is redrawn
+  whether or not the sheet is open, so the row behind an open sheet is right when it closes (before, Connect inside
+  the sheet left the row saying "Ready" while the sheet said "Waiting for Strava").
+- **"I've done that — check now" stuck on "Checking…".** `stravaRefresh` redraws only when the answer changes what is
+  shown, and "still waiting" changes nothing (an unreachable server, the same), so nothing put the button back. The
+  handler now waits for the answer: connected → the answer's own redraw shows it; anything else → the sheet is
+  redrawn (button back, enabled) with a status line under the button, "Not connected yet. Finish on Strava in your
+  browser, then check again." Nothing happens if the sheet was closed while it checked.
+- ⚠️ **The answer is IN THE SHEET, not a toast, because a toast can sit hidden behind an open sheet.** `.app-toast` and
+  `.sheet-ov` are both z-index 70 and both appended to `.app` the first time they are used, so page order decides:
+  whenever a toast came before the session's first sheet, the sheet is drawn over every later toast. Proved with a
+  probe that turns the toast's `pointer-events` on (it is `none`, so `elementFromPoint` otherwise sees straight
+  through it): the hit at the toast's centre was the sheet's own text (`.sd-desc`). Every toast raised while a sheet
+  is open is exposed (the Strava sheet's "That must be an https:// address." among them). NOT changed — a layering
+  change for every toast in the app; Road Map `pc-toast-behind-sheet`.
+- **Guard:** two more tests in `test/connected-apps-still.test.ts` (8 in all): `stravaRerender` with a closed sheet
+  still in the page, with an open one, and on another screen; the check button still waiting, connected, and closed
+  while checking — and never a toast. Re-broken by copying the file aside and back: the old `stravaRerender` fails "a
+  closed Strava sheet stays closed"; the old one-line handler fails "check now always answers"; the answer sent to a
+  toast fails it as well.
+- Checked in the in-app browser at phone size, light and dark: the closed sheet stays closed and the row reads
+  "Ready"; with the sheet open, coming back connected turns the sheet and the row behind it to Connected together;
+  "check now" while waiting shows "Checking…", then the button and the status line (8.2:1 in dark; the sheet's own
+  `.bk-md` text style).
+- ⚠️ **While a connection is waiting, `stravaResume` asks on every return to view.** In the in-app browser the pane hid
+  and reappeared dozens of times in a few minutes and each return asked `/strava/status` (31 calls by the end). That
+  is the designed path — once per coming back to the app on a phone — not a loop; don't mistake it for one.

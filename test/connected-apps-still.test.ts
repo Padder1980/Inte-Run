@@ -197,3 +197,73 @@ test("the harness is the app's own path: render ends in wire, wire calls wireCon
   assert.match(nocomment(topLevel("wire")), /state\.support = to;\s*\n\s*state\.supportFrom = "profile";\s*\n\s*render\(\);/,
     "the profile rows no longer open their screen through render()");
 });
+
+// ---- The Strava sheet: a closed sheet stays closed, and "check now" always answers (2026-11-20, his yes) --------
+
+/** Run real functions from the built page with only the names given here in scope. */
+function lift<T>(names: string[], ret: string, scope: Record<string, unknown>): T {
+  const keys = Object.keys(scope);
+  // eslint-disable-next-line no-new-func
+  return new Function(...keys, names.map(fnOf).join("\n") + "\nreturn " + ret + ";")(...keys.map((k) => scope[k])) as T;
+}
+/** The sheet's overlay: open or closed. closeSheet only removes .on, and the sheet's body stays in the page. */
+const overlay = (open: boolean) => ({ classList: { contains: (c: string) => c === "on" && open } });
+
+test("a closed Strava sheet stays closed: a new answer redraws Connected apps instead", () => {
+  const rerender = (o: { sheetInPage: boolean; open: boolean; onConnect: boolean }) => {
+    const n = { render: 0, sheet: 0 };
+    lift<() => void>(["stravaRerender"], "stravaRerender", {
+      $: (id: string) => (id === "sheetOv" ? overlay(o.open) : id === "stvSheet" ? (o.sheetInPage ? {} : null) : null),
+      state: o.onConnect ? { tab: "support", support: "connect" } : { tab: "today", support: null },
+      render: () => { n.render++; },
+      openStravaSheet: () => { n.sheet++; },
+    })();
+    return n;
+  };
+  // ⚠️ THE CASE THAT WAS WRONG: opened once, closed, and the answer changed (a disconnect made on Strava's website).
+  // The sheet popped back up, and Connected apps behind it still said Connected.
+  assert.deepEqual(rerender({ sheetInPage: true, open: false, onConnect: true }), { render: 1, sheet: 0 },
+    "a closed Strava sheet was reopened, or Connected apps was not redrawn");
+  assert.deepEqual(rerender({ sheetInPage: true, open: false, onConnect: false }), { render: 0, sheet: 0 },
+    "a closed Strava sheet popped up over another screen");
+  // An open sheet shows the answer, and so does the screen behind it, for when it is closed.
+  assert.deepEqual(rerender({ sheetInPage: true, open: true, onConnect: true }), { render: 1, sheet: 1 },
+    "an open Strava sheet, or the screen behind it, kept the old answer");
+  assert.deepEqual(rerender({ sheetInPage: false, open: false, onConnect: true }), { render: 1, sheet: 0 });
+});
+
+test("\"check now\" always answers, in the sheet: still waiting puts the button back and says so", async () => {
+  const checkNow = async (o: { connectedAfter: boolean; open: boolean }) => {
+    const n = { sheet: 0, notes: [] as string[], toasts: [] as string[], whileChecking: "" };
+    const btn: { textContent: string; disabled: boolean; onclick: null | (() => void); insertAdjacentHTML: (at: string, html: string) => void } =
+      { textContent: "I’ve done that — check now", disabled: false, onclick: null,
+        insertAdjacentHTML: (at: string, html: string) => { n.notes.push(at + " " + html); } };
+    lift<() => void>(["wireStravaSheet"], "wireStravaSheet", {
+      $: (id: string) => (id === "stvCheckLink" ? btn : id === "sheetOv" ? overlay(o.open) : id === "stvSheet" ? {} : null),
+      stravaConnect: () => {}, stravaDisconnect: () => {}, stravaCfg: () => ({}), stravaSaveCfg: () => {}, haptic: () => {},
+      openStravaSheet: () => { n.sheet++; },
+      // The server's answer, on a later turn; stravaRefresh itself redraws only when the answer changed.
+      stravaRefresh: () => new Promise((res) => setTimeout(() => res({}), 0)),
+      stravaConnected: () => o.connectedAfter,
+      toast: (m: string) => { n.toasts.push(m); },
+    })();
+    assert.ok(btn.onclick, "the check button is not wired");
+    btn.onclick!();
+    n.whileChecking = btn.textContent;
+    await settle();
+    return n;
+  };
+  const waiting = await checkNow({ connectedAfter: false, open: true });
+  assert.equal(waiting.whileChecking, "Checking…", "the button does not say it is checking");
+  assert.equal(waiting.sheet, 1, "still waiting left the button on \"Checking…\" for ever — nothing redrew the sheet");
+  assert.equal(waiting.notes.length, 1, "still waiting was not explained in the sheet");
+  assert.match(waiting.notes[0]!, /^afterend .*role="status".*Not connected yet\./, "the answer is not a status line under the button");
+  // ⚠️ NOT A TOAST: a toast can be drawn behind the open sheet it is about (both z-index 70, page order decides).
+  assert.equal(waiting.toasts.length, 0, "the answer went to a toast, which can sit hidden behind the sheet");
+  // Connected: the answer's own redraw shows it, so nothing more here.
+  const connected = await checkNow({ connectedAfter: true, open: true });
+  assert.deepEqual([connected.sheet, connected.notes.length], [0, 0], "a connected answer was redrawn twice, or annotated");
+  // Closed while it checked: nothing reopens it.
+  const closed = await checkNow({ connectedAfter: false, open: false });
+  assert.deepEqual([closed.sheet, closed.notes.length], [0, 0], "a sheet closed while checking was reopened");
+});

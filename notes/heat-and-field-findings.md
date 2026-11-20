@@ -353,3 +353,69 @@ GPS signal indicator, map zoom/recentre/mute controls) and its FINISH screen (wo
 private notes, and a "sync to applications" block with Strava and Apple Health toggles beside Discard and
 Save). Apple Health WRITE does not exist in this app at all — that is an `HKWorkout` save and a new
 entitlement, i.e. native work, not a toggle.
+
+## A PICKED SAMPLE WEATHER STAYS, AND A FAILED FORECAST IS NOT RE-ASKED ON EVERY REDRAW (2026-11-20, `pc-weather-preset`)
+
+Found by reading the code during the Connected apps flicker fix (0cfde14), then reproduced in the in-app browser at
+phone size with `navigator.geolocation` and the Open-Meteo fetch stubbed before the app's own scripts ran:
+- **A picked sample was undone about a second later.** The Conditions sheet's preset buttons did `state.wx = null;
+  state.weather = k; render()`. On Today `render()` calls `fetchWeather()`, whose guard only stopped when `state.wx` was
+  set, so it asked again, and the reply set `state.wx` and redrew the sheet as live. Measured with real taps: "Cold ·
+  1°C · example", a new location request at once, then "live 9°" two seconds later — while the square behind the sheet
+  still said "Cold · example", and still did after the sheet closed (the reply redrew the sheet OR Today, never both).
+- **A failed forecast was asked for again on every redraw.** A failure also leaves `state.wx` empty. Location refused:
+  ten redraws of Today, ten more location requests. No signal: six redraws, six location requests and six forecast
+  requests. During a run recorded on the watch Today redraws on every update from the wrist.
+
+⚠️ **FOUR MECHANISMS A COLD SESSION MUST NOT DELETE.**
+1. **`state.wxSample`, and the live reading kept underneath it.** A preset sets `state.wxSample = true`; `activeWeather()`
+   shows the sample while it is set. `state.wx` is NOT emptied any more, and that half matters as much as the flag:
+   emptying it is what made the next render ask again, and it also took the real weather away from the three readers
+   that must only ever hear it — the hero's heat warning (`todayDecision`), Alfie's heat answer ("right now…") and the
+   warm-up, which reads `state.wx.tempC` directly. **A preview may not raise a warning, or hide one.**
+2. **`currentConditions(session, weather)`.** The hero and Alfie pass `state.wx`, so they price the real reading whatever
+   sample is on show (falling back to `activeWeather()` when there is none, exactly as before). Every other caller passes
+   one argument and gets what is on show. Measured on a live 33° day while previewing "Mild": the square and the sheet
+   say "Mild · example", the hero stays on its heat warning, Alfie still says "very hot", the 2 km test's warm-up still
+   says "Cut short for the heat". On a live 9° day, previewing "Hot & humid" does not turn the hero red.
+3. **`wxUseMyLocation()` is the only way back to live**, and every button that asks for the runner's own forecast goes
+   through it: the sheet's Use my location, and the heat block's "Get my local forecast" and "Try again". With a live
+   reading already held the switch is instant (its handler also redraws Today). Opening Conditions still asks (forced) and
+   the refresh runs underneath without replacing the sample — and the sheet never says "Reading your local forecast…"
+   over a sample, because nothing is coming to replace it.
+4. **`WX_RETRY_AT` / `WX_RETRY_MS` (10 minutes).** After a failed attempt Today waits ten minutes before asking by itself;
+   a refusal (code 1, which only iOS Settings can undo) sets it to `Infinity`, so only a tap asks again. A forced ask
+   (opening Conditions, Use my location, the heat buttons) ignores it, and a success clears it. `wxDiagLine()` says
+   "· asks again in Nm" or "· asks again only when tapped", and "sample cold picked" while a sample is on show.
+Also: the forecast's reply now redraws Today as well as an open sheet (`if`, not `else if` — that `render()` asks for
+nothing, since `state.wx` is set by then).
+
+A sample is a per-launch preview, like `state.weather` itself: neither is persisted, so the next launch is live again.
+
+**Heat guidance:** no wording, threshold or model changed. For any given weather every heat surface says what it said
+before; the one difference is that a preview can no longer switch the real warning off (before, a preview followed by a
+failed refetch left `state.wx` empty, which silenced the hero and the warm-up's temperature until a forecast landed).
+
+**Guard:** `test/weather-sample-stays.test.ts` (9 tests) lifts the real weather functions, the hero card and Alfie's
+answers out of the built page with the top-level lets and consts they read (derived, so the retry clock travels with the
+fix), prices the weather with the real engine, and fakes only render, the sheet's document, the location, the network and
+`Date.now()`. Eight re-breaks, one piece at a time, each caught, with the file copied aside and back: the old preset line
+(4 of 9 fail), the guard without the retry clock (2), the hero reading the preview (1), Alfie reading it (1), the reply
+redrawing the sheet OR Today (1), "Reading…" over a sample (1), Use my location keeping the sample (1), `activeWeather`
+ignoring the flag (5). `test/first-run.test.ts` lifts `fetchWeather` with a hand-listed scope, so it now passes
+`WX_RETRY_AT` too.
+
+⚠️ **A HIDDEN BROWSER PANE THROTTLES TIMERS.** A probe that awaited seventeen short `setTimeout`s timed out at 45 s; the
+counts were taken with synchronous redraws instead, and the light/dark screenshots with headless Chrome and real touch
+taps (`Input.dispatchTouchEvent`), as `notes/` already advises.
+
+**Found on the way, NOT changed:**
+- With no live reading at all (offline, or location refused), the square, the sheet and Alfie fall back to the default
+  "Hot & humid" sample, 30°: in November the square reads "example · Run by effort today", and Alfie's heat answer says
+  "Right now Inte-Run rates conditions as…" from that sample without saying it is one. Changing it changes what the heat
+  guidance tells a runner, so it is the owner's call.
+- The sheet's note under the presets reads "Sample conditions — allow location to read your local forecast." after the
+  runner picks a sample even when location is allowed (copy only).
+- On Today's "This week" card the phase badge (`.cal-badge`, e.g. BUILD) is white on rgb(244, 248, 246) in dark mode —
+  unreadable. Measured on the served page. Road Map `pc-week-badge-dark`.
+- `wire()` still binds `[data-weatherseg]`, a preset control nothing renders any more (does nothing).

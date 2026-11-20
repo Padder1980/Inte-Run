@@ -9050,7 +9050,7 @@ function planDefaultWeek() {
   return PLAN.defaultWeekIndex;
 }
 
-const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxHours: null, heatAdapt: loadHeatAdapt(), heatHour: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
+const state = { tab: "today", screen: null, dayType: "quality", subj: { soreness: "none", energy: "good", stress: "low", illness: "none" }, planWeek: planDefaultWeek(), actTab: "workouts", logFilter: "all", supportQ: "", openGuide: null, setupFocus: null, supportFrom: null, logFilterOpen: false, logAll: false, support: null, logged: loadRuns(), hist: loadHist(), weather: "hot", wx: null, wxSample: false, wxHours: null, heatAdapt: loadHeatAdapt(), heatHour: null, fitSuggest: loadFitSuggest(), paceNotice: loadPaceNotice(), trainFlag: loadTrainFlag(), trialPending: false, trialSaved: null, done: {}, dayOverride: loadDayOverride(), selDay: TODAY_DOW, selWeek: CURRENT_WEEK, addOpen: false };
 // Effective day index for a session, honouring any user reschedule. Works for raw sessions
 // (dayOfWeek) and summary sessions (dayIndex), keyed by the shared session id.
 function loadDayOverride() {
@@ -9704,7 +9704,9 @@ function todayDecision() {
   // so every runner who had not granted location saw a red-bordered "run by effort" hero built from
   // weather that is not theirs. A warning drawn from example data is worse than no warning: it is the
   // app crying wolf on its own placeholder.
-  const cond = (state.wx && state.wx.live) ? currentConditions(sess) : null;
+  // ⚠️ AND FROM THE REAL READING EVEN WHILE A SAMPLE IS ON SHOW (pc-weather-preset): previewing "Hot &
+  // humid" must not turn the hero red, and previewing "Mild" must not hide a real heat warning.
+  const cond = (state.wx && state.wx.live) ? currentConditions(sess, state.wx) : null;
   const risky = !!(cond && (cond.severity === "high" || cond.severity === "severe"));
   // B3 \u2014 the time the runner gave it, beside the day, from the one reader every other screen uses.
   const at = sessionTimeAt(isoAdd(curWeek().startIso, state.selDay).toISOString().slice(0, 10), sess.id);
@@ -10994,13 +10996,21 @@ const SEV_COLOR = { none: "var(--ready)", mild: "var(--steady)", moderate: "var(
 const WX_ICON = { mild: "wxCloud", warm: "wxSun", hot: "wxSun", windy: "wxWind", cold: "wxSnow" };
 // The conditions in force: a live local forecast once we've fetched one, otherwise the selected
 // sample preset. Normalised to a common shape so the square, sheet and assessment share it.
+// ⚠️ A SAMPLE THE RUNNER PICKED IS SHOWN INSTEAD OF THE LIVE FORECAST, AND STAYS UNTIL THEY TAP "Use my
+// location" (state.wxSample — pc-weather-preset, 2026-11-20). It used to be done by emptying state.wx,
+// so the very next render() asked for the forecast again and its reply put the live one back about a
+// second after the tap (measured in the browser: "Cold · example", then "live 9°" two seconds later).
+// The live reading now stays in state.wx underneath, because the things that must only ever hear the
+// REAL weather read it there: the hero's heat warning, Alfie's "right now" and the warm-up's
+// temperature. A preview may not raise a warning, or hide one.
 function activeWeather() {
-  if (state.wx) return state.wx;
+  if (state.wx && !state.wxSample) return state.wx;
   const p = WEATHER_PRESETS[state.weather];
   return { tempC: p.tempC, humidityPct: p.humidityPct, windKph: p.windKph, dewPointC: p.dewPointC, label: p.label, iconKey: WX_ICON[state.weather], live: false };
 }
-function currentConditions(session) {
-  const w = activeWeather();
+// weather: pass state.wx to price the REAL conditions whatever sample is on show (see activeWeather).
+function currentConditions(session, weather) {
+  const w = weather || activeWeather();
   // ⚠️ DEW POINT AND DURATION ARE MODEL INPUTS NOW, and dropping them here would have quietly left
   // the heat factor running on defaults — humidity-derived dew point and a notional hour — while the
   // forecast was sitting in state.wx with the real numbers in it. The engine would not have
@@ -11089,6 +11099,15 @@ let WX_FETCHING = false;
 // all, so roaming, patchy hotel wifi, or a "Don't Allow" tapped once at some point in the past
 // produced no message anywhere in the app and no way to tell them apart. Surfaced by wxDiagLine.
 let WX_LAST = "";
+// ⚠️ WHEN TODAY MAY ASK AGAIN BY ITSELF AFTER A FAILED ATTEMPT (pc-weather-preset, 2026-11-20). A failed
+// attempt leaves state.wx empty, and render() asks whenever it is empty — so with no signal, or with
+// location refused, every redraw of Today asked again, which during a run recorded on the watch is every
+// update from the wrist. Measured in the browser: ten redraws, ten more location requests. Now a failure
+// waits WX_RETRY_MS before Today tries again by itself, and a refusal (which only iOS Settings can undo)
+// is not retried by itself at all until the next launch. Anything the runner taps — opening Conditions,
+// Use my location, Get my local forecast — is forced and still asks at once.
+let WX_RETRY_AT = 0;
+const WX_RETRY_MS = 10 * 60 * 1000;
 /**
  * THE HOURLY FORECAST — the thing that makes adapting for heat honest rather than a guess.
  *
@@ -11160,7 +11179,7 @@ function conditionsAtHour(row, session) {
   };
 }
 function fetchWeather(force) {
-  if (WX_FETCHING || (state.wx && !force)) return;
+  if (WX_FETCHING || (!force && (state.wx || Date.now() < WX_RETRY_AT))) return;
   if (!(typeof navigator !== "undefined" && "geolocation" in navigator)) return;
   // ⚠️ NEVER ASK FOR LOCATION BEFORE THE RUNNER KNOWS WHAT THE APP IS. render() runs synchronously at
   // boot with state.tab === "today", so this fired about 50 ms into the very first launch — while the
@@ -11198,13 +11217,18 @@ function fetchWeather(force) {
         iconKey: wmoIcon(c.weather_code, c.wind_speed_10m), live: true, at: Date.now() };
       state.wxHours = parseHourly(d && d.hourly);
       WX_LAST = "ok · " + (state.wxHours || []).length + " hours";
+      WX_RETRY_AT = 0;
       WX_FETCHING = false;
       if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
-      else if (state.tab === "today" && !state.screen) render();
+      // ⚠️ TODAY AS WELL, NOT "else" (2026-11-20). With the sheet open, the square behind it kept its old
+      // reading: measured, the sheet said "live 9°" while the square still said "Cold · example", and it
+      // still did after the sheet was closed. This render() asks for nothing (state.wx is set now).
+      if (state.tab === "today" && !state.screen) render();
     }).catch((e) => {
       // ⚠️ NOT SILENT ANY MORE. Offline, a captive portal, a rate limit and a bad response all landed
       // here and all left the app looking as though the feature did not exist.
       WX_LAST = "forecast fetch failed (" + (e && e.message ? e.message : String(e)) + ")";
+      WX_RETRY_AT = Date.now() + WX_RETRY_MS;
       WX_FETCHING = false;
       if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
     });
@@ -11214,6 +11238,7 @@ function fetchWeather(force) {
     const code = err && err.code;
     WX_LAST = code === 1 ? "location refused (change it in Settings)"
       : code === 2 ? "location unavailable" : code === 3 ? "location timed out" : "location failed";
+    WX_RETRY_AT = code === 1 ? Infinity : Date.now() + WX_RETRY_MS;
     WX_FETCHING = false;
     if (WX_SHEET_OPEN) { $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); }
   }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
@@ -11306,11 +11331,13 @@ function weatherSheetHtml() {
   const c = SEV_COLOR[imp.severity];
   const penSec = heatSecPerKm(imp);
   const pen = penSec ? '<span class="chip rpe">≈ +' + penSec + 's/km for the same effort</span>' : "";
-  const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (!state.wx && k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
+  const presetBtns = Object.keys(WEATHER_PRESETS).map((k) => '<button data-weather="' + k + '"' + (!w.live && k === state.weather ? ' class="on"' : '') + '>' + WEATHER_PRESETS[k].label + '</button>').join("");
+  // ⚠️ NEVER "Reading your local forecast…" OVER A SAMPLE THE RUNNER PICKED. A refresh running underneath
+  // no longer replaces it (pc-weather-preset), so the line must not promise that it will.
   const source = w.live
     ? '<div class="wx-src live"><span class="dot"></span>Live forecast · ' + w.windKph + ' km/h wind · ' + w.humidityPct + '% humidity</div>' +
       '<p class="wx-credit-row" style="text-align:left;margin-top:0">' + wxCreditHtml() + '</p>'
-    : (WX_FETCHING ? '<div class="wx-src">Reading your local forecast…</div>' : '<div class="wx-src">Sample conditions · <button class="wx-loc" id="wxUseLoc">Use my location</button></div>');
+    : (WX_FETCHING && !state.wxSample ? '<div class="wx-src">Reading your local forecast…</div>' : '<div class="wx-src">Sample conditions · <button class="wx-loc" id="wxUseLoc">Use my location</button></div>');
   return '<div class="sd-type" style="--sc:' + c + '">Conditions' + (w.live ? ' · live' : ' · example') + '</div>' +
     // ⚠️ COMPOSED HERE RATHER THAN USING imp.summary, which fixes a duplicate AND the units in one
     // move. The engine's summary already contains the temperature, so the old line read
@@ -11328,10 +11355,19 @@ let WX_SHEET_OPEN = false;
 // app prompting for location before setup is done; it must not stop someone who has deliberately
 // tapped the weather card from getting an answer — that would be a dead screen with no explanation.
 function openWeatherSheet() { ensureSheet(); SHEET_CTX = null; WX_SHEET_OPEN = true; fetchWeather(true); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); $("sheetOv").classList.add("on"); }
+/**
+ * The runner asked for their own forecast: end any sample preview and ask now. Use my location and the
+ * heat block's "Get my local forecast" and "Try again" all come here, so none of them can leave a picked
+ * sample on screen after being asked for the real weather.
+ */
+function wxUseMyLocation() { state.wxSample = false; fetchWeather(true); }
 function wireWeatherSheet() {
-  // Selecting a preset drops any live forecast and previews that sample instead.
-  document.querySelectorAll('#sheetBody [data-wxseg] button').forEach((b) => b.onclick = () => { state.wx = null; state.weather = b.dataset.weather; $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); render(); });
-  const useLoc = $("wxUseLoc"); if (useLoc) useLoc.onclick = () => { fetchWeather(true); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); };
+  // Selecting a preset previews that sample instead of the live forecast, and it STAYS until Use my
+  // location (pc-weather-preset). ⚠️ It must not empty state.wx: that made the render() below ask for the
+  // forecast again, and the reply undid the sample about a second after the tap.
+  document.querySelectorAll('#sheetBody [data-wxseg] button').forEach((b) => b.onclick = () => { state.wxSample = true; state.weather = b.dataset.weather; $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); render(); });
+  // render() as well: when a live reading is already held, the square behind the sheet switches at once.
+  const useLoc = $("wxUseLoc"); if (useLoc) useLoc.onclick = () => { wxUseMyLocation(); $("sheetBody").innerHTML = weatherSheetHtml(); wireWeatherSheet(); render(); };
 }
 function feelSheetHtml() {
   const r = RC.assessReadiness(readinessInput());
@@ -13117,7 +13153,8 @@ function alfieIntents() {
         "<p class=\\"alf-dim\\">Tap \\u201cHow you feel\\u201d on Today to update your check-in.</p>";
     } },
     { k: ["heat", "hot", "humid", "warm weather"], a: () => {
-      let imp; try { imp = currentConditions(selectedSession()); } catch (e) { imp = null; }
+      // "Right now" is the REAL reading whenever one is held, never a sample being previewed (pc-weather-preset).
+      let imp; try { imp = currentConditions(selectedSession(), state.wx); } catch (e) { imp = null; }
       return "<p>Heat makes the same pace cost more \— that\\u2019s physiology, not weakness. <b>Run by effort</b> and let the pace be whatever it is.</p>" +
         (imp ? "<p>Right now Inte-Run rates conditions as <b>" + esc(imp.headline) + "</b>." + (heatSecPerKm(imp) ? " Expect around <b>+" + heatSecPerKm(imp) + "s/km</b> for the same effort." : "") + "</p>" : "") +
         "<p>Go earlier or later in the day, take fluid with some sodium in it \— without over-drinking, since sodium doesn\\u2019t make excess fluid safe \— and give yourself 10\\u201314 days to acclimatise.</p>";
@@ -27006,11 +27043,13 @@ function wxDiagLine() {
     rows.forEach((r) => { days[r.day] = (days[r.day] || 0) + 1; });
     const dayList = Object.keys(days).sort();
     const ahead = hoursFor(null).length;
-    let s = "forecast: " + (state.wx ? "live" : "preset " + state.weather) +
+    let s = "forecast: " + (state.wxSample ? "sample " + state.weather + " picked" : state.wx ? "live" : "preset " + state.weather) +
       " · " + rows.length + " hours" + (dayList.length ? " over " + dayList.length + " days" : "") +
       " · " + ahead + " left today";
     if (state.wx && state.wx.at) s += " · fetched " + Math.round((Date.now() - state.wx.at) / 60000) + "m ago";
     s += " · last " + (WX_LAST || (WX_FETCHING ? "fetching" : "never asked"));
+    // pc-weather-preset: after a failure Today waits before asking again by itself, so say when it will.
+    if (WX_RETRY_AT > Date.now()) s += WX_RETRY_AT === Infinity ? " · asks again only when tapped" : " · asks again in " + Math.ceil((WX_RETRY_AT - Date.now()) / 60000) + "m";
     return s;
   } catch (e) { return "forecast: unknown"; }
 }
@@ -45887,10 +45926,10 @@ function wireHeatControls() {
     // ⚠️ NO FORECAST, SO GO AND GET ONE RATHER THAN OPENING AN EMPTY SHEET. This is the stale and
     // no-forecast path: a sheet reading "No forecast for the rest of today" is a dead end, and the
     // runner cannot tell it from the feature being broken — which is exactly the report this came from.
-    if (!hoursFor(null).length) { fetchWeather(true); openWeatherSheet(); return; }
+    if (!hoursFor(null).length) { wxUseMyLocation(); openWeatherSheet(); return; }
     heatSheet(heatSessById(b.dataset.heatopen));
   });
-  document.querySelectorAll("[data-heatfetch]").forEach((b) => b.onclick = () => { fetchWeather(true); openWeatherSheet(); });
+  document.querySelectorAll("[data-heatfetch]").forEach((b) => b.onclick = () => { wxUseMyLocation(); openWeatherSheet(); });
   document.querySelectorAll("[data-heateffort]").forEach((b) => b.onclick = () => { openWeatherSheet(); });
   document.querySelectorAll("[data-heatno]").forEach((b) => b.onclick = () => heatDecline(heatSessById(b.dataset.heatno), !!SHEET_CTX));
   document.querySelectorAll("[data-heathr]").forEach((b) => b.onclick = () => {

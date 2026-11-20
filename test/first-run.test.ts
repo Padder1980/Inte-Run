@@ -58,9 +58,10 @@ test("⚠️ the app never asks for location before the runner knows what it is"
   let asked = 0;
   const run = (personalized: boolean, force: boolean) => {
     asked = 0;
-    const fn = new Function("profile", "state", "WX_FETCHING", "navigator", "fetch", "wxRender",
+    // WX_RETRY_AT 0: no failed attempt yet (the retry clock added for pc-weather-preset).
+    const fn = new Function("profile", "state", "WX_FETCHING", "WX_RETRY_AT", "navigator", "fetch", "wxRender",
       body + "; return fetchWeather;")(
-        { personalized }, { wx: null }, false,
+        { personalized }, { wx: null }, false, 0,
         { geolocation: { getCurrentPosition: () => { asked++; } } },
         () => new Promise(() => {}), () => {});
     fn(force);

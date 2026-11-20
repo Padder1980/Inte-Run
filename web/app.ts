@@ -9912,7 +9912,11 @@ function effectiveRoad(pf, ath, goal) {
   // ⚠️⚠️ NO HOLD INSIDE THE RACE BLOCK: the loop above stops at its first Monday (it is one stage here). A race-block checkpoint
   // left unanswered lets the plan carry on as laid — holding there would shorten the race block, which decision 4 says the
   // app never does by itself; there is no stage to move up to, only the same block going on.
-  return { stages: roadSplitRace(stages.filter((s) => s.weeks > 0), pf.goalDist), rampWeeks: r.rampWeeks, destWeeks: r.destWeeks };
+  const out = { stages: roadSplitRace(stages.filter((s) => s.weeks > 0), pf.goalDist), rampWeeks: r.rampWeeks, destWeeks: r.destWeeks };
+  // pc-days-raceblock: the days added in the race block, as recorded — the engine phases each one in from its Monday and
+  // builds everything before it for the days the runner had (a chain that no longer ends at their answer is ignored there).
+  if (Array.isArray(r.daysAdded) && r.daysAdded.length) out.daysAdded = r.daysAdded.map((a) => ({ fromIso: a.fromIso, from: a.from, to: a.to }));
+  return out;
 }
 /** §10 piece 3: the stages with the race block's entries merged into one race stage (the last). */
 function roadMergeRace(stages) {
@@ -10339,6 +10343,8 @@ function roadCheckpointHtml() {
   const head = { ready: same ? "Ready for your next block" : "Ready to move up", nearly: "Nearly there", notyet: "Not yet" }[v.verdict];
   const nextName = next ? (next.kind === "race" && !same ? "your race block" : roadLegName(cp.legs, next.i)) : "";
   const held = weekMondayOf(todayIso()) >= cp.endIso;
+  // pc-days-raceblock: at the checkpoint into a habit-builder's race block, on good evidence, "Move up" asks one more thing.
+  const dayOffer = roadDayOffer(cp, v);
   const opts = inRace ? [
     // ⚠️ NOTHING MOVES IN THE RACE BLOCK UNLESS THE RUNNER ASKS: "start" is the plan as laid; easing back is one lighter week
     // (the "make a week easier" row), with no week taken from the race block.
@@ -10346,7 +10352,9 @@ function roadCheckpointHtml() {
     { id: "ease", t: "Ease back", s: "A lighter week next week, its hardest session swapped for easy running. Then your plan carries on." },
   ] : [
     { id: "up", t: next ? (same ? "Start " + nextName : "Move up to " + nextName) : "Move up",
-      s: next ? roadStageJob(next.kind) + " It starts " + (held ? "next Monday" : "on Monday") + "." : "" },
+      s: next ? roadStageJob(next.kind) + " It starts " + (held ? "next Monday" : "on Monday") + "." +
+        (dayOffer ? " Then you choose: " + dayOffer.from + " days a week, or " + dayOffer.to + "." : "") : "",
+      days: !!dayOffer },
     { id: "more", t: "One more week of " + ROAD_STAGE_LABEL[cp.kind],
       s: roadWalkRun(cp.kind) ? "Another week like this one — repeating a week is completely normal — and this checkpoint again at the end of it."
         : "Another week like this one, and this checkpoint again at the end of it." },
@@ -10394,7 +10402,7 @@ function roadCheckpointHtml() {
   // missing (a missing TEST is answered by doing the test, never by repeating a week). Pain still suggests easing back.
   const rec = inRace && v.recommend === "more" ? "up" : v.recommend;
   opts.forEach((o) => { o.rec = o.id === rec; });
-  const opt = (o) => '<button class="po-opt' + (o.rec ? " rec" : "") + '" data-road="' + o.id + '"' + (o.off ? " disabled" : "") + '>' +
+  const opt = (o) => '<button class="po-opt' + (o.rec ? " rec" : "") + '" data-road="' + o.id + '"' + (o.days ? ' data-days="1"' : "") + (o.off ? " disabled" : "") + '>' +
     (o.rec ? '<span class="po-rec">Suggested</span>' : "") +
     '<span class="po-t">' + esc(o.t) + '</span><span class="po-b">' + esc(o.s) + '</span></button>';
   // ⚠️ PAIN COMES WITH THE INJURY GUIDANCE, NOT A NUDGE TO PUSH ON (decision 3). The wording is for the clinical reviewer.
@@ -10447,7 +10455,12 @@ function openRoadCheckpoint() {
   ensureSheet(); SHEET_CTX = null;
   $("sheetBody").innerHTML = html;
   $("sheetOv").classList.add("on");
-  document.querySelectorAll("#sheetBody [data-road]").forEach((b) => { b.onclick = () => { closeSheet(); answerRoad(b.dataset.road); }; });
+  // pc-days-raceblock: "Move up" into a habit-builder's race block asks the days question first (openRoadDays); with no
+  // offer it moves up at once, exactly as before.
+  document.querySelectorAll("#sheetBody [data-road]").forEach((b) => { b.onclick = () => {
+    if (b.dataset.road === "up" && b.dataset.days === "1" && openRoadDays()) return;
+    closeSheet(); answerRoad(b.dataset.road);
+  }; });
   // Opened at all today — by itself or from the Plan screen — counts as today's showing: it does not pop up again today.
   try { localStorage.setItem(ROADPOP_KEY, html && currentRoadCheckpoint() ? currentRoadCheckpoint().endIso + "|" + todayIso() : ""); } catch (e) {}
   const later = $("roadLater"); if (later) later.onclick = closeSheet;
@@ -10489,17 +10502,32 @@ function maybeRoadPopup() {
  * Act on the answer: ONE commit, ONE Undo (the standing pattern). Undo puts back the road, the "make a week easier"
  * row and the plan — and the question.
  */
-function answerRoad(choice) {
+function answerRoad(choice, days) {
   let cp = null;
   try { cp = currentRoadCheckpoint(); } catch (e) { cp = null; }
   if (!cp) return;
-  const road = roadAnswered(cp, choice);
+  let road = roadAnswered(cp, choice);
   if (!road) { toast("There is no room left before your race for another week here."); return; }
   const beforeRoad = JSON.stringify(profile.road || null);
   const beforeRows = JSON.stringify(loadAdjust());
   const beforeOv = JSON.stringify(state.dayOverride || {});
+  // pc-days-raceblock: the days answer is part of the same commit, and of the same Undo.
+  const beforeDays = profile.daysPerWeek;
+  const beforeDeclined = loadAddDayDeclined();
+  let dayOffer = null;
+  if (choice === "up" && (days === "add" || days === "keep")) {
+    try { dayOffer = roadDayOffer(cp, RC.evaluateCheckpoint(roadFacts(cp))); } catch (e) { dayOffer = null; }
+  }
+  if (dayOffer) {
+    const rec = road.checkpoints[road.checkpoints.length - 1];
+    road.checkpoints[road.checkpoints.length - 1] = Object.assign({}, rec, { days: days });
+    if (days === "add") road = roadWithDayAdded(road, dayOffer.from, dayOffer.to, roadDayAddFrom(road), "checkpoint");
+  }
   const ticks = todayTicks();
   profile.road = road;
+  if (dayOffer && days === "add") profile.daysPerWeek = dayOffer.to;
+  // "Keep" is a no, remembered for two months — the weekly review's own store, so neither door asks again meanwhile.
+  if (dayOffer && days === "keep") saveAddDayDeclined();
   if (choice === "ease") {
     const wk = road.stages.slice(0, cp.i + 1).reduce((n, s) => n + s.weeks, 0);
     // §10 piece 4: with no race the eased week is the one added to this block — the week of the checkpoint's Monday.
@@ -10511,6 +10539,8 @@ function answerRoad(choice) {
   }
   const restore = () => {
     try { profile.road = JSON.parse(beforeRoad); } catch (e) {}
+    profile.daysPerWeek = beforeDays;
+    try { if (beforeDeclined) localStorage.setItem("interun_addday_v1", beforeDeclined); else localStorage.removeItem("interun_addday_v1"); } catch (e) {}
     try { localStorage.setItem(ADJUST_KEY, beforeRows); } catch (e) {}
     try { state.dayOverride = JSON.parse(beforeOv); } catch (e) {}
     // ⚠️ WRITTEN BACK BEFORE THE REBUILD THAT READS IT: applyCrossWeekMoves reads the store, not state (B4's lesson).
@@ -10525,7 +10555,11 @@ function answerRoad(choice) {
   saveProfileStore();
   computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks);
-  const said = choice === "up" ? (cp.next && cp.next.kind === cp.kind ? "On to " + roadLegName(cp.legs, cp.next.i) + "." : "Moving up to " + (cp.next && cp.next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[(cp.next || {}).kind] || "the next stage") + ".")
+  const newDay = dayOffer && days === "add" ? roadNewDayFacts(typeof RAW !== "undefined" ? RAW : null) : null;
+  const said = dayOffer ? "Moving up to your race block" + (days === "add"
+      ? ", with a " + roadNth(dayOffer.to) + " day" + (newDay ? " from the week of " + roadDayLabel(newDay.startIso) : "") + "."
+      : " — " + dayOffer.from + " days a week.")
+    : choice === "up" ? (cp.next && cp.next.kind === cp.kind ? "On to " + roadLegName(cp.legs, cp.next.i) + "." : "Moving up to " + (cp.next && cp.next.kind === "race" ? "your race block" : ROAD_STAGE_LABEL[(cp.next || {}).kind] || "the next stage") + ".")
     : choice === "more" ? "One more week of " + ROAD_STAGE_LABEL[cp.kind] + "."
     : roadWalkRun(cp.kind) ? "Easing back: next week is a lighter week of run–walk."
       : cp.kind === "race" ? "Easing back: next week is lighter, its hardest session swapped for easy running."
@@ -10537,6 +10571,211 @@ function answerRoad(choice) {
     computeToday(); seedDone(); restoreTicks(t2); render();
   });
   render();
+}
+// ---- Days a week once a habit-builder's road reaches the race block (pc-days-raceblock, 2026-11-20) ----------------------
+/**
+ * ⚠️⚠️ THE OWNER'S YES TO THE RECOMMENDATION IN notes/plan-profile.md ("Days a week for a habit-builder once the road reaches
+ * the race block"). A habit-builder's race block is built on the MAIN track (the engine's raceTrackAthlete), which tells 3–7
+ * days apart — but the beginner picker stopped them at four and the weekly review refused them outright. Now:
+ *   * THE CHECKPOINT INTO THE RACE BLOCK offers one more day, only on its own good evidence (most runs done, no pain
+ *     flagged — RC.raceBlockDayOffer), as a second question after "Move up": "Keep 4 days" or "Add a day". Nothing changes
+ *     until the runner picks, and "Keep" is remembered for two months (the weekly review's own store, interun_addday_v1).
+ *   * A DAY ADDED STARTS SHORT: a 20-minute easy run, a little longer each week, then the full plan for the new days — the
+ *     engine phases it in (phaseInAddedDays) from the Monday recorded on the road (profile.road.daysAdded), and builds every
+ *     week before that Monday for the days the runner had, so no week already run changes.
+ *   * ONCE THEIR CURRENT WEEK IS IN THE RACE BLOCK, the picker offers that week's track's answers, up to five
+ *     (RC.RACE_BLOCK_BEGINNER_MAX), and the weekly review judges those weeks as the main track they are built on.
+ * ⚠️ NEVER SAY A FOURTH DAY IS NEEDED TO BE SAFE: no study shows it is (the notes). Three runs a week is the norm and the
+ * minimum in novice race plans; the words offer more running, and say what the plan with it holds.
+ */
+/**
+ * Is the runner's CURRENT week in their road's race block — or have they already moved up into it (the checkpoint answered
+ * "up", the block starting on Monday)? Never in the wizard: a new plan begins at its road's start.
+ * ⚠️ THE "MOVED UP" HALF IS LOAD-BEARING (found in the browser): a day added at the checkpoint is stored as five while the
+ * runner is still in Base's last week, and judged by the week alone the picker folded it back to four — the Plan screen
+ * said "your full 4-day plan", and any profile save that week (a new name) would have written four and dropped the day.
+ */
+function dayRaceBlockNow() {
+  try {
+    if (state.screen === "wizard") return false;
+    const legs = roadLegsNow(profile);
+    if (!legs) return false;
+    const mon = weekMondayOf(todayIso());
+    const i = legs.findIndex((l) => l.fromIso <= mon && mon < l.endIso);
+    if (i < 0) return false;
+    if (legs[i].kind === "race") return true;
+    const next = legs[i + 1], ans = next && next.kind === "race" ? roadAnswerAt(roadOf(profile), legs[i].endIso) : null;
+    return !!ans && ans.answer === "up";
+  } catch (e) { return false; }
+}
+/** A day the runner adds now starts short: a habit-builder whose current week is in their race block. */
+function dayAddPhased(status) {
+  try { return experienceFor({ status: status != null ? status : profile.status }) === "beginner" && dayRaceBlockNow(); } catch (e) { return false; }
+}
+/** When a day was last added on this road (its answer date), or null — the weekly review waits two months after it. */
+function roadDayAddedLast(pf) {
+  const r = pf && pf.road;
+  const list = r && Array.isArray(r.daysAdded) ? r.daysAdded : [];
+  let last = null;
+  list.forEach((a) => { const d = a && (a.answeredIso || a.fromIso); if (d && (!last || d > last)) last = d; });
+  return last;
+}
+/** The road with one day added from a Monday: from days "from" to "to" (one more), kept after the earlier days added. */
+function roadWithDayAdded(road, from, to, fromIso, via) {
+  const keep = (road && Array.isArray(road.daysAdded) ? road.daysAdded : []).filter((a) => a && a.fromIso < fromIso && a.to <= from);
+  return Object.assign({}, road, { daysAdded: keep.concat([{ fromIso: fromIso, from: from, to: to, answeredIso: todayIso(), via: via }]) });
+}
+/**
+ * THE PICKER'S DOOR (draftFromForm): days changed in the profile. More days, for a habit-builder in their race block — each
+ * day starts short, from next Monday (one a week after it for a second), so the week in hand never changes. Fewer days —
+ * the days added above the new answer go, and the weeks from their Mondays are built for the answer, as any change of days.
+ */
+function roadDaysEdited(road, now, status) {
+  if (!road || typeof road !== "object" || !(now > 0) || now === Number(profile.daysPerWeek)) return road;
+  // The answer the runner had, as their picker showed it (a stored 6 on a five-day picker was a 5 to them).
+  const was = dayAnswerOf(profile);
+  if (!(was > 0) || now === was) return road;
+  if (now < was) {
+    const list = Array.isArray(road.daysAdded) ? road.daysAdded : [];
+    const keep = list.filter((a) => a && a.to <= now);
+    if (keep.length === list.length) return road;
+    const out = Object.assign({}, road);
+    if (keep.length) out.daysAdded = keep; else delete out.daysAdded;
+    return out;
+  }
+  if (!dayAddPhased(status)) return road;
+  let r = road;
+  const mon = roadDayAddMonday(road);
+  for (let d = was; d < now; d++) r = roadWithDayAdded(r, d, d + 1, roadMondayAfter(mon, d - was), "profile");
+  return r;
+}
+/** The Monday a day added at the checkpoint starts from: the race block's SECOND week — one change a week (the notes). */
+function roadDayAddFrom(road) {
+  const legs = roadLegsNow(Object.assign({}, profile, { road: road }));
+  const first = legs && legs.find((l) => l.kind === "race");
+  return first ? roadMondayAfter(first.fromIso, 1) : roadMondayAfter(weekMondayOf(todayIso()), 2);
+}
+/**
+ * The Monday a day added from the profile or the weekly review starts from: next Monday — so the week in hand never changes —
+ * and ⚠️ NEVER BEFORE THE RACE BLOCK'S SECOND WEEK: in the days after "Move up" next Monday IS the race block's first week, and a
+ * day there would land on top of the race block's own opening step (the checkpoint's offer waits a week for the same reason).
+ */
+function roadDayAddMonday(road) {
+  const next = roadMondayAfter(weekMondayOf(todayIso()), 1), second = roadDayAddFrom(road);
+  return next > second ? next : second;
+}
+/**
+ * The offer at this checkpoint, or null: only the checkpoint INTO the race block, only a habit-builder (the two beginner
+ * cards — their race block is the main track), and only on the checkpoint's own evidence (RC.raceBlockDayOffer).
+ */
+function roadDayOffer(cp, v) {
+  try {
+    if (!cp || !v || cp.kind === "race" || !cp.next || cp.next.kind !== "race") return null;
+    const r = roadOf(profile);
+    if (!r || r.noRace === true || experienceFor(profile) !== "beginner") return null;
+    return RC.raceBlockDayOffer({
+      met: v.met, daysPerWeek: dayAnswerOf(profile), maxDays: RC.RACE_BLOCK_BEGINNER_MAX,
+      raceWeeks: cp.legs.filter((l) => l.kind === "race").reduce((n, l) => n + l.weeks, 0),
+      unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+      easingSuggested: !!(state.trainFlag && state.trainFlag.suggestion && state.trainFlag.suggestion.direction === "slower"),
+      lastDeclinedIso: loadAddDayDeclined(), lastAddedIso: roadDayAddedLast(profile), todayIso: todayIso(),
+    }) || null;
+  } catch (e) { return null; }
+}
+/**
+ * Where the new day is in a raw plan: the first week it is in (startIso), how long it starts, and the first week of the
+ * full plan after it (fullIso) — read off the sessions the engine marked (newDay), never worked out a second time here.
+ */
+function roadNewDayFacts(raw) {
+  const ws = raw && raw.weeks || [];
+  let first = -1, last = -1, openMin = 0;
+  ws.forEach((w, i) => {
+    const s = (w.sessions || []).find((x) => x && x.newDay);
+    if (!s) return;
+    if (first < 0) { first = i; openMin = Math.round((s.estimatedDurationSeconds || 0) / 60); }
+    last = i;
+  });
+  if (first < 0) return null;
+  const mon = (w) => weekMondayOf(w.startDateIso || w.startIso);
+  return { startIso: mon(ws[first]), openMin: openMin, fullIso: ws[last + 1] ? mon(ws[last + 1]) : null };
+}
+/** What the days question says, read off the plan the answer would build (and the one it would not). */
+function roadDayPreview(cp, offer) {
+  const up = roadAnswered(cp, "up");
+  if (!up) return null;
+  const fromIso = roadDayAddFrom(up);
+  const keep = applyProfile(Object.assign({}, profile, { road: up }));
+  const add = applyProfile(Object.assign({}, profile, { road: roadWithDayAdded(up, offer.from, offer.to, fromIso, "checkpoint"), daysPerWeek: offer.to }));
+  // Weeks of the race block where the plan with the day carries more harder sessions than the plan without it.
+  let harder = 0;
+  (add.raw.weeks || []).forEach((w, i) => {
+    const k = keep.raw.weeks[i];
+    if (w && k && w.stage === "race" && (w.qualitySessionCount || 0) > (k.qualitySessionCount || 0)) harder++;
+  });
+  return { fromIso: fromIso, facts: roadNewDayFacts(add.raw), harder: harder };
+}
+/** "4th", "5th" — the days are 4 to 6 here. */
+function roadNth(n) { return n + (n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"); }
+/**
+ * THE SECOND QUESTION, after "Move up to your race block": Keep N days or Add a day. ⚠️ NO "SUGGESTED" MARK — neither answer
+ * is the safer one, and the words must not say otherwise.
+ */
+function roadDaysStepHtml(cp, offer) {
+  let pv = null;
+  try { pv = roadDayPreview(cp, offer); } catch (e) { pv = null; }
+  if (!pv) return "";
+  let facts = null;
+  try { facts = roadFacts(cp); } catch (e) { return ""; }
+  const f = pv.facts;
+  const start = f ? f.startIso : pv.fromIso;
+  const how = f
+    ? 'Your ' + roadNth(offer.to) + ' day starts as a ' + f.openMin + '-minute easy run in the week of ' + roadDayLabel(f.startIso) +
+      ' and grows a little each week' + (f.fullIso ? '. From ' + roadDayLabel(f.fullIso) + ' it is a full day of your ' + offer.to + '-day plan.' : '.')
+    : 'Your ' + roadNth(offer.to) + ' day starts in the week of ' + roadDayLabel(pv.fromIso) + '.';
+  const harder = pv.harder > 0
+    ? '<p>A ' + offer.to + '-day plan also has a second harder session in ' + (pv.harder === 1 ? "one week" : pv.harder + " weeks") + ' of your race block.</p>'
+    : "";
+  return '<div class="re-card road-sheet" id="roadSheet"><div class="sheet-h">Checkpoint · end of ' + esc(roadLegName(cp.legs, cp.i)) + '</div>' +
+    '<div class="db-body"><p class="road-verdict"><b>Your race block: ' + offer.from + ' days a week, or ' + offer.to + '?</b></p>' +
+    '<p>You ran ' + facts.done + ' of your ' + facts.planned + ' planned runs in the last two weeks and didn’t flag pain, so a ' +
+      roadNth(offer.to) + ' day is yours to choose if you’d like more running. Your race block works on ' + offer.from + ' days a week too.</p>' +
+    '<p>' + esc(how) + '</p>' + harder + '</div>' +
+    '<div class="re-opts">' +
+    '<button class="po-opt" data-roaddays="keep"><span class="po-t">Keep ' + offer.from + ' days</span>' +
+      '<span class="po-b">Your race block as planned, from Monday.</span></button>' +
+    '<button class="po-opt" data-roaddays="add"><span class="po-t">Add a day — ' + offer.to + ' a week</span>' +
+      '<span class="po-b">From the week of ' + esc(roadDayLabel(start)) + ', starting short.</span></button></div>' +
+    '<button class="primary road-later" id="roadDaysBack" type="button">Back</button>' +
+    '<p class="mp-note">Either way you move up to your race block on Monday. You can change your days later in your profile.</p></div>';
+}
+/** Show the second question in the open sheet. False when there is no offer (then "Move up" simply moves up). */
+function openRoadDays() {
+  let cp = null, offer = null, html = "";
+  try {
+    cp = currentRoadCheckpoint();
+    if (!cp) return false;
+    offer = roadDayOffer(cp, RC.evaluateCheckpoint(roadFacts(cp)));
+    if (!offer) return false;
+    html = roadDaysStepHtml(cp, offer);
+  } catch (e) { return false; }
+  if (!html || !$("sheetBody")) return false;
+  $("sheetBody").innerHTML = html;
+  const sh = document.querySelector("#sheetOv .sheet"); if (sh) sh.scrollTop = 0;
+  document.querySelectorAll("#sheetBody [data-roaddays]").forEach((b) => {
+    b.onclick = () => { closeSheet(); answerRoad("up", b.dataset.roaddays === "add" ? "add" : "keep"); };
+  });
+  const back = $("roadDaysBack"); if (back) back.onclick = () => { openRoadCheckpoint(); };
+  return true;
+}
+/** The Plan screen's line while a day added is still growing (or about to start): from the plan's own marked sessions. */
+function roadNewDayLine() {
+  const f = roadNewDayFacts(typeof RAW !== "undefined" ? RAW : null);
+  if (!f) return "";
+  const mon = weekMondayOf(todayIso());
+  if (f.fullIso && f.fullIso <= mon) return "";
+  const days = dayAnswerOf(profile);
+  return '<p class="mp-note">Your new running day: a ' + f.openMin + '-minute easy run from the week of ' + roadDayLabel(f.startIso) +
+    ', a little longer each week' + (f.fullIso ? ' — your full ' + days + '-day plan from ' + roadDayLabel(f.fullIso) : '') + '.</p>';
 }
 /** "23 Nov" for a Monday ISO date (UTC, as every date here). */
 function roadDayLabel(iso) {
@@ -10615,7 +10854,7 @@ function roadPlanCard() {
       roadTimelineHtml(legs, here, null, lo) + cpLine + roadTestTrailHtml(legs, here) +
       '<p class="mp-note">No race: your plan is laid out a block at a time. Want a race? Start a new plan with it in plan setup.</p></div>';
   }
-  return '<h2 class="sec">Your road</h2><div class="card road-card">' + roadTimelineHtml(legs, here) + cpLine + '</div>';
+  return '<h2 class="sec">Your road</h2><div class="card road-card">' + roadTimelineHtml(legs, here) + cpLine + roadNewDayLine() + '</div>';
 }
 /**
  * The wizard's road, before saving (STAGES.md §8 step 5): "Here's your road: …", the timeline, and — where the runway
@@ -28517,7 +28756,12 @@ function dayOpts(sel) { const s = sel != null ? Number(sel) : 6; return DAY_NAME
  * "experience = experienceFor(pf)" as a literal there, and churning that line for no behavioural gain
  * is how a guard gets weakened.
  */
-function dayTrackFor(pf) { return { experience: experienceFor(pf), runWalk: (pf && pf.status) === "new" }; }
+function dayTrackFor(pf) {
+  // ⚠️ pc-days-raceblock: AND WHETHER THE RUNNER'S CURRENT WEEK IS IN THEIR RACE BLOCK, which is built on the main track
+  // whatever the card says (the engine's raceTrackAthlete) — so a habit-builder there may pick up to five
+  // (RC.RACE_BLOCK_BEGINNER_MAX). The plan asked is always the stored one: the wizard (a new plan) is never in a race block.
+  return { experience: experienceFor(pf), runWalk: (pf && pf.status) === "new", raceBlock: dayRaceBlockNow() };
+}
 /** The day answers this runner's plan tells apart — the engine's own set, never a local table. */
 function dayChoiceOpts(pf) { return RC.runningDayChoices(dayTrackFor(pf)).map((d) => [String(d), String(d)]); }
 /** The runner's answer folded onto that set. Used everywhere the number is shown or reasoned about. */
@@ -28548,6 +28792,12 @@ function daySegVal(pf) {
 function dayCapNote(pf) {
   const t = dayTrackFor(pf);
   if (t.experience !== "beginner") return '<div class="day-cap-note"></div>';
+  // pc-days-raceblock: in the race block the ceiling is the race block's, and a day added starts short (roadDaysEdited).
+  if (t.raceBlock) {
+    const most = Math.max.apply(null, RC.runningDayChoices(t));
+    return '<div class="day-cap-note q-hint" style="margin-top:6px">Your race block can use up to ' + most +
+      ' runs a week. A day you add starts as a short easy run and grows a little each week.</div>';
+  }
   const card = (STATUS_OPTS.find((o) => o[0] === "regular") || ["", "Regular runner"])[1];
   const runs = RC.runningDaysFor({ experience: t.experience, runWalk: t.runWalk, daysPerWeek: 99 });
   return '<div class="day-cap-note q-hint" style="margin-top:6px">This level builds up to ' + runs +
@@ -29447,7 +29697,9 @@ function draftFromForm() {
     // ⚠️ B14: AND THE ROAD, for the same reason — this object replaces the profile whole, and an edit of the long-run day
     // must not drop the stages and checkpoint answers. The wizard is a NEW plan: it never inherits the old road
     // (wizardFinish gives it the road its summary showed).
-    road: state.screen === "wizard" ? null : (profile.road || null),
+    // ⚠️ pc-days-raceblock: AND A CHANGE OF DAYS IS RECORDED ON IT — a habit-builder adding a day in their race block gets
+    // the same short start as the checkpoint's offer, from next Monday, and no week before it changes (roadDaysEdited).
+    road: state.screen === "wizard" ? null : profile.road ? roadDaysEdited(profile.road, Number(draft.days), status) : null,
     personalized: true,
   };
   if (noRace) {
@@ -44520,10 +44772,23 @@ function addDayEvidence(phase) {
       weeksRemaining: (profile.noRace === true) ? 52 : Math.max(0, PLAN.weeks.length - 1 - cur),
       weeksOnPlan: cur,
       recentWeeks,
-      experience: experienceFor(profile),
+      // ⚠️ pc-days-raceblock (owner, 2026-11-20): THE TRACK THIS WEEK IS BUILT ON, NOT THE STATUS CARD. A habit-builder's race
+      // block is built on the main track (the engine's raceTrackAthlete), so its weeks are judged as the main track's — up to
+      // the five their picker offers there (maxDays). Every other week of theirs is still the beginner track, and refused.
+      experience: experienceFor(profile) === "beginner" && dayRaceBlockNow() ? "recreational" : experienceFor(profile),
+      maxDays: Math.max.apply(null, RC.runningDayChoices(dayTrackFor(profile))),
       returningFromInjury: !!profile.returning,
       unwell: !!(state.subj && (state.subj.illness !== "none" || state.subj.soreness === "high")),
+      // pc-days-raceblock: not after a run they said hurt — the owner's rule for this offer ("nothing hurt"), for the runner it is
+      // new to: a habit-builder in their race block. ⚠️ NOT A REGULAR RUNNER'S, YET: that would change what their offer does,
+      // and the brief says such a change goes to him first (Road Map pc-days-regular-short).
+      painFlagged: dayAddPhased() && (state.logged || []).some((r) => r && r.pain === true && r.dateIso &&
+        r.dateIso >= ((PLAN.weeks[Math.max(0, cur - 3)] || {}).startIso || todayIso()) && r.dateIso <= todayIso()),
       lastDeclinedIso: loadAddDayDeclined(),
+      // pc-days-raceblock: a day added on the road settles in for as long as a no is remembered.
+      lastAddedIso: roadDayAddedLast(profile),
+      // pc-days-raceblock: the day the runner would add starts short (applyAddDay records it on the road).
+      startsShort: dayAddPhased(),
       todayIso: todayIso(),
       // One voice: never ask for more while the engine is asking them to ease off.
       easingSuggested: !!(state.trainFlag && state.trainFlag.suggestion && state.trainFlag.suggestion.direction === "slower"),
@@ -44651,8 +44916,16 @@ function applyAddDay() {
   const sug = r && r.suggestion;
   if (!sug || sug.kind !== "add-a-day") return;
   const ticks = todayTicks();
+  // ⚠️ pc-days-raceblock: A HABIT-BUILDER'S DAY IN THEIR RACE BLOCK STARTS SHORT, from next Monday — recorded on the road, so
+  // the engine phases it in and keeps every week before it as it was (the week in hand included).
+  const beforeRoad = JSON.stringify(profile.road || null);
+  if (dayAddPhased() && profile.road) profile.road = roadWithDayAdded(profile.road, sug.from, sug.to, roadDayAddMonday(profile.road), "review");
   profile.daysPerWeek = sug.to;
-  try { recompute(); } catch (e) { profile.daysPerWeek = sug.from; return; }
+  try { recompute(); } catch (e) {
+    profile.daysPerWeek = sug.from;
+    try { profile.road = JSON.parse(beforeRoad); } catch (e2) {}
+    return;
+  }
   computeToday(); state.planWeek = planDefaultWeek(); state.selWeek = CURRENT_WEEK; state.selDay = TODAY_DOW;
   seedDone(); restoreTicks(ticks); saveProfileStore();
   dismissWeeklyReview();

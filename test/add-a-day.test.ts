@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import {
-  addDayOffer, buildWeeklyReview,
+  addDayOffer, buildWeeklyReview, raceBlockDayOffer,
   ADD_DAY_MAX, ADD_DAY_COOLDOWN_DAYS, ADD_DAY_MIN_RUNWAY_WEEKS, ADD_DAY_MIN_WEEKS_ON_PLAN,
   type AddDayInput,
 } from "../src/adapt/weekly-review.ts";
@@ -139,4 +139,51 @@ test("accepting goes through the app's own rebuild path, not a hand-assembled pl
   assert.match(body, /saveProfileStore\(\)/, "does not persist the change");
   // And the decline must be remembered as a date, or the cooldown cannot work.
   assert.match(html, /interun_addday_v1/, "a declined offer is not remembered anywhere");
+});
+
+/* ---------------------------------------------------------------- pc-days-raceblock (2026-11-20) */
+
+test("pc-days-raceblock: the offer never names a day the runner's own picker would not offer", () => {
+  // A habit-builder in their race block picks up to five (RACE_BLOCK_BEGINNER_MAX): the review is judged on the race block's
+  // track ("recreational") and capped there.
+  assert.equal((addDayOffer({ ...base, daysPerWeek: 4, maxDays: 5 }) as any)?.to, 5);
+  assert.equal(addDayOffer({ ...base, daysPerWeek: 5, maxDays: 5 }), null, "offered a sixth day the picker cannot show");
+  // No cap given: the six-day ceiling, as before.
+  assert.equal((addDayOffer({ ...base, daysPerWeek: 5 }) as any)?.to, 6);
+});
+
+test("pc-days-raceblock: not after a run they said hurt, and not while a day added is still settling in", () => {
+  assert.equal(addDayOffer({ ...base, painFlagged: true }), null, "asked a runner who said a run hurt to run more");
+  assert.equal(addDayOffer({ ...base, lastAddedIso: "2026-07-20" }), null, "asked for another day weeks after one was added");
+  const longAgo = new Date(Date.parse("2026-08-06T00:00:00Z") - (ADD_DAY_COOLDOWN_DAYS + 1) * 86400000).toISOString().slice(0, 10);
+  assert.ok(addDayOffer({ ...base, lastAddedIso: longAgo }), "never asks again after a day was added");
+});
+
+test("pc-days-raceblock: the words say what a day adds — it was \"not more hard work\", and the engine says otherwise", () => {
+  // Measured (weekly-review.ts): a day more gave half of 120 main-track plans a second harder session in some weeks.
+  const plain = addDayOffer(base)!;
+  assert.doesNotMatch(plain.why, /not more hard work/);
+  assert.match(plain.why, /mostly more easy running/);
+  const short = addDayOffer({ ...base, startsShort: true })!;
+  assert.match(short.why, /starts as a short easy run and grows a little each week/);
+  for (const o of [plain, short]) assert.doesNotMatch(o.why, /safe|need|must|injur/i, "the offer claims a day is needed or safer");
+});
+
+test("BLOCKER pc-days-raceblock: the checkpoint's offer — only on its own good evidence, and every refusal a real one", () => {
+  const ok = { met: { runs: true, noPain: true }, daysPerWeek: 4, maxDays: 5, raceWeeks: 16, todayIso: "2027-01-20" };
+  assert.deepEqual(raceBlockDayOffer(ok), { from: 4, to: 5 });
+  assert.deepEqual(raceBlockDayOffer({ ...ok, daysPerWeek: 3 }), { from: 3, to: 4 });
+  const fresh = new Date(Date.parse("2027-01-20T00:00:00Z") - (ADD_DAY_COOLDOWN_DAYS - 1) * 86400000).toISOString().slice(0, 10);
+  const cases: [string, object][] = [
+    ["most runs not done", { met: { runs: false, noPain: true } }],
+    ["a run hurt", { met: { runs: true, noPain: false } }],
+    ["unwell", { unwell: true }],
+    ["already being told to ease off", { easingSuggested: true }],
+    ["at the race block's ceiling", { daysPerWeek: 5 }],
+    ["a race block too short for a day to be worth it", { raceWeeks: ADD_DAY_MIN_RUNWAY_WEEKS - 1 }],
+    ["a no within two months", { lastDeclinedIso: fresh }],
+    ["a day added within two months", { lastAddedIso: fresh }],
+    ["fewer than three days", { daysPerWeek: 2 }],
+  ];
+  for (const [why, patch] of cases) assert.equal(raceBlockDayOffer({ ...ok, ...patch } as any), null, `offered a day: ${why}`);
 });

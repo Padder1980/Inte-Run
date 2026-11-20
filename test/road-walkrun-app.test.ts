@@ -51,6 +51,8 @@ function harness(today: string, o: { runs?: Run[]; links?: Record<string, string
     // The sheet asks currentRoadCheckpoint: here, the checkpoint itself (nothing else is open). Through a holder, because
     // a value handed to new Function is bound when it is called.
     currentRoadCheckpoint: () => holder.api.roadCheckpoint(),
+    // pc-days-raceblock: the days offer is for the checkpoint into the race block — guarded in road-days-app.
+    roadDayOffer: () => null,
   };
   const holder: { api: any } = { api: null };
   const fns = ["roadOf", "roadWeeksBetween", "roadMondayAfter", "roadAnswerAt", "effectiveRoad", "roadAthleteOf", "roadLegsNow",

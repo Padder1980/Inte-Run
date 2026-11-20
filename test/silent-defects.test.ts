@@ -895,6 +895,9 @@ test("⚠️ a first-time runner cannot build a plan on questions they never ans
   const rd = await import("../src/domain/running-days.ts");
   const segVal = (draftObj: Record<string, unknown>, pf: Record<string, unknown>) => {
     const f = new Function("draft", "RC", "experienceFor", "pf",
+      // pc-days-raceblock: dayTrackFor asks whether the stored plan's week is in a race block — not here (guarded in
+      // test/road-days-app.test.ts).
+      "function dayRaceBlockNow() { return false; }\n" +
       fnOf(html, "dayTrackFor") + "\n" + fnOf(html, "dayAnswerOf") + "\n" + fnOf(html, "daySegVal")
       + "\nreturn daySegVal(pf);");
     return (f as (...a: unknown[]) => unknown)(

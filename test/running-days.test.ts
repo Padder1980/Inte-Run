@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { generatePlan } from "../src/plan/generate-plan.ts";
-import { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "../src/domain/running-days.ts";
+import { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN, RACE_BLOCK_BEGINNER_MAX } from "../src/domain/running-days.ts";
 import type { Athlete, RaceDistanceKey } from "../src/domain/types.ts";
 
 /**
@@ -258,4 +258,37 @@ test("BLOCKER: an unanswered days question is never answered for the runner", ()
   const sync = app.slice(app.indexOf("function syncStatus"), app.indexOf("function syncFitSrc"));
   assert.match(sync, /if \(draft\.days !== "" && draft\.days != null\) draft\.days =/,
     "syncStatus writes a clamped answer over an unanswered question");
+});
+
+/* ------------------------------------------- pc-days-raceblock: THE RACE BLOCK'S OWN DAYS */
+
+test("BLOCKER: a habit-builder whose week is in the race block is offered that block's days — up to five, each its own plan", () => {
+  // pc-days-raceblock (the owner's yes, 2026-11-20). A road's race block is built on the MAIN track whatever the status card
+  // (raceTrackAthlete), so the beginner cap of 4 no longer describes those weeks. ⚠️ FIVE IS A COACHING CEILING, NOT THE
+  // ENGINE'S — 6 and 7 do build different race blocks, and are withheld on purpose: the one place the "nothing withheld"
+  // rule above is waived, by name, with the owner's approval.
+  assert.equal(RACE_BLOCK_BEGINNER_MAX, 5);
+  for (const t of TRACKS) {
+    const inRace = runningDayChoices({ ...t, raceBlock: true });
+    if (t.experience === "beginner") assert.deepEqual(inRace, [3, 4, 5], t.status + " in the race block");
+    else assert.deepEqual(inRace, runningDayChoices(t), t.status + "'s picker changed in the race block");
+    // Outside it, the beginner cap is exactly what it was.
+    if (t.experience === "beginner") assert.deepEqual(runningDayChoices(t), [3, 4], t.status + " outside the race block");
+  }
+  // Every answer offered builds a different RACE BLOCK — the main track's plan, which those weeks are.
+  const main = TRACKS.find((t) => t.status === "regular")!;
+  for (const dist of DISTS) {
+    const seen = new Map<string, number>();
+    for (const d of runningDayChoices({ experience: "beginner", runWalk: false, raceBlock: true })) {
+      const s = shapeOf(main, d, dist);
+      assert.equal(seen.get(s), undefined, `${dist}: ${d} days and ${seen.get(s)} days build the same race block (${s})`);
+      seen.set(s, d);
+    }
+  }
+  // A stored answer folds onto the set the runner is shown.
+  assert.equal(clampDayAnswer({ experience: "beginner", runWalk: false, raceBlock: true }, 6), 5);
+  assert.equal(clampDayAnswer({ experience: "beginner", runWalk: false }, 5), 4);
+  // And the app asks the engine whether the week is in the race block — never a second table of its own.
+  const app = nocomment(APP);
+  assert.match(app, /raceBlock: dayRaceBlockNow\(\) \};/, "dayTrackFor no longer tells the engine about the race block");
 });

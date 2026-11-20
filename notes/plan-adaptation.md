@@ -620,3 +620,13 @@ no console errors. Screenshots in the session notes folder.
 
 **Fixed 2026-11-19:** the sentence shown twice on an easier week's session sheet (`pc-ease-dupline`) — said once now;
 the fix and its tests are in `notes/manage-plan.md`, last chapter.
+
+## The weekly review's add-a-day, judged by the week's track (pc-days-raceblock, 2026-11-20)
+
+The owner's yes to letting a habit-builder run more days once their road reaches the race block. For the review: a race-block
+week is judged by the track it is built on (a habit-builder's is the main track), capped at their picker's five (`maxDays`); the
+offer is refused after a run answered "hurt" in its evidence weeks (`painFlagged`, a habit-builder in their race block — for a
+regular runner his decision, Road Map `pc-days-regular-short`) and for two months after a day was
+added on the road (`lastAddedIso`); a habit-builder's yes is recorded on the road from next Monday and phased in (starts as a
+20-minute easy run). Its old sentence "more easy running, not more hard work" was false for half of 120 measured plans — now
+"mostly more easy running". Existing gates unchanged. Detail: `notes/plan-profile.md`, last chapter.

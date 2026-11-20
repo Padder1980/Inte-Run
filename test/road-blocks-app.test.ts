@@ -55,6 +55,8 @@ function harness(o: { status?: string; returning?: string | false; runs?: Run[];
     esc: (x: unknown) => String(x).replace(/</g, "&lt;"),
     currentRoadCheckpoint: () => cp, roadOf: () => ({ checkpoints: [] }),
     saveRuns: () => { saved.runs++; }, saveFitSuggest: () => { saved.fit = state.fitSuggest; }, RACE_FIT_MIN: 0.02,
+    // pc-days-raceblock: the checkpoint into the race block may ask the days question too — guarded in road-days-app.
+    roadDayOffer: () => null,
   };
   const fns = ["roadFacts", "roadClock", "roadLongestKm", "roadTestOffer", "roadTestIn", "roadParkrunCandidates", "countRoadTest",
     "resolvedStatus", "returnKind", "fmtTimeFull", "weekMondayOf", "roadMondayAfter", "roadLegName", "roadCheckpointHtml",

@@ -26,7 +26,22 @@ import { youthLimitsFor } from "./youth.ts";
  * the raw field are separate rules and must stay raw — the recovery-week gate, the beginner strength
  * count, two rotation seeds and the long-run dose gate. test/running-days.test.ts pins that.
  */
-type Track = Pick<Athlete, "experience" | "runWalk">;
+type Track = Pick<Athlete, "experience" | "runWalk"> & {
+  /**
+   * pc-days-raceblock (owner, 2026-11-20): the runner's current week is in their road's RACE BLOCK, which is built on the
+   * main track whatever their status card (`raceTrackAthlete`). See RACE_BLOCK_BEGINNER_MAX.
+   */
+  raceBlock?: boolean;
+};
+
+/**
+ * ⚠️ pc-days-raceblock — HOW MANY DAYS A HABIT-BUILDER MAY PICK ONCE THEIR CURRENT WEEK IS IN THE RACE BLOCK (the owner's yes
+ * to the recommendation in notes/plan-profile.md, 2026-11-20). Their race block is built on the main track, which tells 3–7
+ * apart, so the beginner cap of 4 no longer describes it. FIVE, NOT SEVEN, AND IT IS A COACHING CEILING, NOT THE ENGINE'S:
+ * five is the day-count that was measured for him (216–331 minutes a week, 1–2 harder sessions) and one step on from the
+ * beginner track's four. 6 and 7 do build different race blocks; they are withheld on purpose.
+ */
+export const RACE_BLOCK_BEGINNER_MAX = 5;
 
 /** The lowest answer the form offers. The engine's own floors are lower — see RUN_DAY_FLOOR. */
 export const RUN_DAY_MIN = 3;
@@ -78,7 +93,8 @@ export function runningDaysFor(a: Pick<Athlete, "daysPerWeek" | "experience" | "
 
 /** Every answer a picker may offer this runner — ascending, never empty. */
 export function runningDayChoices(t: Track): number[] {
-  const max = isBeginner(t) ? CHOICE_MAX.beginner : CHOICE_MAX.main;
+  // pc-days-raceblock: a habit-builder in their race block is on the main track there, up to RACE_BLOCK_BEGINNER_MAX.
+  const max = !isBeginner(t) ? CHOICE_MAX.main : t.raceBlock ? Math.min(CHOICE_MAX.main, RACE_BLOCK_BEGINNER_MAX) : CHOICE_MAX.beginner;
   const out: number[] = [];
   for (let d = RUN_DAY_MIN; d <= max; d++) out.push(d);
   return out;

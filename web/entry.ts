@@ -11,7 +11,8 @@ export { parseDuration } from "../src/domain/units.ts";
 // ⚠️ HARD_BEFORE_RACE and sessionIdFor: the race-eve set and the one definition of a session's id, so the
 // app refuses a week-move onto race eve with the engine's own list (stage B4) and can carry an id written
 // in the old week-number form across to the calendar-week form without a second copy of the format.
-export { generatePlan, HARD_BEFORE_RACE, sessionIdFor, secondaryRaceWindow, longRunRangeFor, STAGE_LABEL } from "../src/plan/generate-plan.ts";
+export { generatePlan, HARD_BEFORE_RACE, sessionIdFor, secondaryRaceWindow, longRunRangeFor, STAGE_LABEL,
+  ADDED_DAY_OPEN_MIN, ADDED_DAY_STEP_MIN } from "../src/plan/generate-plan.ts";
 // B14 — the road to a race: where a runner starts and how the weeks are budgeted (STAGES.md). The app asks it when a
 // plan is made and stores what the runner accepted; the engine builds exactly that road.
 // §10 piece 3: raceBlockSplit — where the race block's checkpoints fall (every four weeks, never in the taper).
@@ -103,6 +104,8 @@ export {
   // Frequency — the one FITT axis the plan never progressed. It OFFERS a day; it never adds one.
   addDayOffer, ADD_DAY_MAX, ADD_DAY_COOLDOWN_DAYS, ADD_DAY_MIN_RUNWAY_WEEKS,
   ADD_DAY_MIN_WEEKS_ON_PLAN, ADD_DAY_MIN_COMPLETION,
+  // pc-days-raceblock: the same offer at the checkpoint into a habit-builder's race block. It OFFERS; it never adds.
+  raceBlockDayOffer,
   // Hudson ch7's on-demand easier week: it OFFERS one; it never eases a week on its own. Exported so a
   // guard reads the thresholds out of the engine rather than retyping them — a test carrying its own
   // copy of a constant measures the test's value, which this repo has watched escape a re-break twice.
@@ -135,7 +138,7 @@ export { sessionVolumeMeters, weekVolumeMeters } from "../src/domain/steps.ts";
 // 2026-09-09). A sixth copy of the cap in the app layer is what this prevents; the reachable set is
 // derived from the engine's own tables and driven through the real generator by
 // test/running-days.test.ts.
-export { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN } from "../src/domain/running-days.ts";
+export { runningDaysFor, runningDayChoices, clampDayAnswer, RUN_DAY_MIN, RACE_BLOCK_BEGINNER_MAX } from "../src/domain/running-days.ts";
 
 // ⚠️ THE 12-17 LIMITS, AND THE APP MUST NOT KEEP A SECOND COPY OF ANY OF THEM. These are UK
 // Athletics' own competition rule (TR3 S4) plus the owner's frequency column, not preferences — the

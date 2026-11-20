@@ -194,7 +194,7 @@ test("BLOCKER: through the real engine, the weeks already laid out never change 
 // ---- 2. The profile: applyProfile, the setup form, the wizard's checks, the Plan screen's header -------------------
 const APP_FNS = ["applyProfile", "planStartIso", "blockStartIso", "holdBeforeStart", "firstShownWeek", "returnKind",
   "experienceFor", "resolvedStatus", "trainingYearsFor", "typeCeilingFor", "isNoRace", "noRaceGoalRoad", ...ROAD_FNS,
-  "wizFieldVal", "draftFromForm", "formStartIso", "isBeginnerStatus", "goalsForAge", "currentAgeAnswer", "derivedGoalS",
+  "wizFieldVal", "draftFromForm", "roadDaysEdited", "formStartIso", "isBeginnerStatus", "goalsForAge", "currentAgeAnswer", "derivedGoalS",
   "goalNoRaceNow", "goalKindAsked", "wizStepError", "goalCardInner", "seg", "planHeadHtml", "targetChosen", "esc",
   "roadProposalFor", "roadFromProposal", "noRaceShifted", "noRaceRoadFrom", "alfieRaceFacts", "planName"];
 const APP_CONSTS = ["ROAD_STAGE_LABEL", "ROAD_MIN_RACE_WEEKS", "ADJ_QUALITY", "GOAL_BY_STATUS", "RACE_LABEL", "FINISH_LABEL"];

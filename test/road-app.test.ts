@@ -169,7 +169,9 @@ test("the wizard saves the road its summary showed, and a short road only once t
   const err = decomment(fnBody("wizStepError"));
   assert.match(err, /prop\.shortWeeks > 0 && draft\.roadShort !== "1"\) return /);
   // A profile edit keeps the road; the wizard never inherits the old one.
-  assert.match(decomment(fnBody("draftFromForm")), /road: state\.screen === "wizard" \? null : \(profile\.road \|\| null\)/);
+  // pc-days-raceblock (restated on purpose): a profile edit keeps the road, now through roadDaysEdited, which records a day
+  // a habit-builder adds in the race block (test/road-days-app.test.ts) and otherwise hands the road back as it was.
+  assert.match(decomment(fnBody("draftFromForm")), /road: state\.screen === "wizard" \? null : profile\.road \? roadDaysEdited\(profile\.road, Number\(draft\.days\), status\) : null/);
 });
 
 test("BLOCKER: one question at a time — the checkpoint waits behind the others, and the weekly review waits for it", () => {
@@ -212,7 +214,9 @@ test("BLOCKER: the checkpoint is a pop-up, never a card wedged onto Today — on
   assert.equal((SRC.match(/maybeAutoGuide\(\); maybeRoadPopup\(\);/g) || []).length, 3);
   // Every button in it does what it says: the answers, Not now, and the injury door — which NAVIGATES to it.
   const open = decomment(fnBody("openRoadCheckpoint"));
-  assert.match(open, /#sheetBody \[data-road\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => \{ closeSheet\(\); answerRoad\(b\.dataset\.road\); \}; \}\)/);
+  // pc-days-raceblock (restated on purpose): "Move up" with a days offer asks that first (openRoadDays); every answer still
+  // closes the sheet and goes through answerRoad.
+  assert.match(open, /#sheetBody \[data-road\]"\)\.forEach\(\(b\) => \{ b\.onclick = \(\) => \{\s*if \(b\.dataset\.road === "up" && b\.dataset\.days === "1" && openRoadDays\(\)\) return;\s*closeSheet\(\); answerRoad\(b\.dataset\.road\);\s*\}; \}\)/);
   assert.match(open, /\$\("roadLater"\); if \(later\) later\.onclick = closeSheet;/);
   assert.match(open, /state\.tab = "support"; state\.support = "redflags"; render\(\);/);
   assert.match(decomment(fnBody("roadCheckpointHtml")), /id="roadInjury"/);

@@ -118,7 +118,15 @@ export type Road = {
   noRace?: boolean;
   /** §10 piece 4: a no-race road's first Monday (absent: the plan's own first week). */
   fromIso?: string;
+  /**
+   * pc-days-raceblock (owner, 2026-11-20) — RUNNING DAYS THE RUNNER ADDED IN THE RACE BLOCK, oldest first: from the Monday
+   * `fromIso` they run `to` days a week where they ran `from` (always one more). The last `to` is the athlete's own answer.
+   * Absent, the plan is exactly what it was. See `phaseInAddedDays`.
+   */
+  daysAdded?: DayAdded[];
 };
+/** pc-days-raceblock: one running day added, from a Monday — see `Road.daysAdded`. */
+export type DayAdded = { fromIso: string; from: number; to: number };
 
 const PEAK_LONG_MIN: Record<Goal["distance"], number> = {
   "1mile": 55,
@@ -1313,6 +1321,116 @@ function roadWalkRunWeeks(
   applyPartialFirstWeek(walk, startIso);
   return walk;
 }
+
+/**
+ * ⚠️⚠️ pc-days-raceblock — A RUNNING DAY ADDED IN THE RACE BLOCK STARTS SHORT (the owner's yes to the recommendation in
+ * notes/plan-profile.md, "Days a week for a habit-builder once the road reaches the race block", 2026-11-20).
+ *
+ * WHY NOT SIMPLY BUILD THE BLOCK FOR THE NEW DAYS. The main track's block for one day more is a different, bigger week from
+ * the first: measured over 672 habit-builders' roads (4 distances × 6 abilities × 3/4 days × comeback × 4 runways × 2 long-run
+ * days), the race block's week for a day more was up to 1.55× the week the runner had — and weekly jumps of 20–60% raised
+ * early injury in half-marathon trainees (Damsted et al., JOSPT 2019).
+ *
+ * SO THE NEW DAY IS A SHORT EASY RUN ADDED TO THE WEEK THE RUNNER ALREADY HAD — every other session exactly as it was:
+ *   * it JOINS in the first week from the Monday chosen in which a 20-minute run keeps the week within 1.2× the week before
+ *     (or a lighter week) — measured, never more than a week's wait — so the day never lands on top of a big step the
+ *     plan is already making; and never in the race block's first week, whose step from the foundation is its own;
+ *   * it starts at ADDED_DAY_OPEN_MIN (20: the shortest run any plan prescribes) and grows ADDED_DAY_STEP_MIN a week, never
+ *     longer than that week's own shortest easy run;
+ *   * it sits on the day the plan for the new days runs on (so nothing moves when it is fully in), and sits out a B-race
+ *     fortnight;
+ *   * from the first week the full plan for the new days is no bigger than the week with the short run — or the week after
+ *     the run has reached its full length — the block IS the full plan for the new days (race week always is).
+ * Measured over the same roads, the day joining the week after the race block began: the day alone adds at most 17% to a
+ * week; no step through the phase-in is bigger than the plan's own biggest step (1.30 both), and there are fewer steps over
+ * 1.2 than the plan makes by itself (94 against 186 of 6,452); fully in within four weeks.
+ *
+ * ⚠️ A WEEK ALREADY RUN NEVER CHANGES: weeks before the Monday chosen are the block as it was (generateRoadPlan builds
+ * everything before it for the days the runner had), and every week's choice reads only the two blocks and the weeks
+ * before it.
+ */
+export const ADDED_DAY_OPEN_MIN = 20;
+export const ADDED_DAY_STEP_MIN = 5;
+/** The most the week the new day joins may be over the week before it (Damsted et al., JOSPT 2019: 20–60% raised injury). */
+export const ADDED_DAY_RISE_MAX = 1.2;
+const RUN_SESSION_TYPES = new Set<SessionType>(["easy", "long", "recovery", "threshold", "vo2", "strides", "race-specific", "race"]);
+const weekRunMin = (w: PlannedWeek) =>
+  w.sessions.filter((s) => RUN_SESSION_TYPES.has(s.type) && s.type !== "race").reduce((m, s) => m + s.estimatedDurationSeconds / 60, 0);
+/** Only a chain the runner could have made counts: one day at a time, in date order, ending at their answer. */
+function daysAddedChain(athlete: Athlete, road: Road | undefined): DayAdded[] {
+  const raw = road?.daysAdded;
+  if (!Array.isArray(raw) || !raw.length || youthLimitsFor(athlete.age)) return [];
+  const list = raw.filter((a) => a && typeof a.fromIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(a.fromIso) &&
+    Number.isInteger(a.from) && a.to === a.from + 1 && a.from >= 1)
+    .map((a) => ({ fromIso: addDays(a.fromIso, -dayOfWeekMondayZero(a.fromIso)), from: a.from, to: a.to }))
+    .sort((a, b) => (a.fromIso < b.fromIso ? -1 : a.fromIso > b.fromIso ? 1 : 0));
+  if (list.length !== raw.length) return [];
+  for (let i = 1; i < list.length; i++) if (list[i]!.from !== list[i - 1]!.to || list[i]!.fromIso === list[i - 1]!.fromIso) return [];
+  return list[list.length - 1]!.to === athlete.daysPerWeek ? list : [];
+}
+/** The old week with the new day's short easy run added, on the day the plan for the new days runs — or null, no such day. */
+function withNewDayRun(o: PlannedWeek, n: PlannedWeek, minutes: number, paces: TrainingPaces): PlannedWeek | null {
+  const ran = new Set(o.sessions.filter((s) => RUN_SESSION_TYPES.has(s.type)).map((s) => s.dayOfWeek));
+  const day = n.sessions.filter((s) => RUN_SESSION_TYPES.has(s.type)).map((s) => s.dayOfWeek).sort((a, b) => a - b).find((d) => !ran.has(d));
+  if (day == null) return null;
+  const c = easyRun(paces, minutes, false);
+  const run: Session = {
+    ...c,
+    description: "Your new running day. It starts as a short easy run and grows a little each week until it is a full run. " +
+      "Keep it conversational the whole way.",
+    newDay: true,
+    id: sessionIdFor(o.startDateIso, day, c.type),
+    dayOfWeek: day,
+    source: "generated",
+  };
+  const sessions = o.sessions.filter((s) => !(s.dayOfWeek === day && s.type === "rest")).concat([run])
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  return {
+    ...o,
+    sessions,
+    plannedDistanceMeters: Math.round(sessions.reduce((m, s) => m + sessionVolumeMeters(s), 0)),
+    qualitySessionCount: countQuality(sessions),
+  };
+}
+/** The race block with each day added phased in from its Monday (see the note above). `weeksAt(d)`: the block for d days. */
+function phaseInAddedDays(first: PlannedWeek[], added: DayAdded[], weeksAt: (days: number) => PlannedWeek[], paces: TrainingPaces): PlannedWeek[] {
+  let cur = first;
+  for (const a of added) {
+    const next = weeksAt(a.to);
+    const out: PlannedWeek[] = [];
+    let started = false, full = false, capped = false, k = 0;
+    cur.forEach((o, i) => {
+      const n = next[i] ?? o;
+      if (addDays(o.startDateIso, -dayOfWeekMondayZero(o.startDateIso)) < a.fromIso) { out.push(o); return; }
+      // Race week, and every week once the day is fully in: the full plan for the new days.
+      if (full || i === cur.length - 1) { full = true; out.push(n); return; }
+      // A B-race fortnight keeps the week it was shaped as; the new day waits.
+      if (o.secondaryRace || o.sessions.some((s) => s.type === "race")) { out.push(o); return; }
+      // ⚠️ NEVER IN THE RACE BLOCK'S FIRST WEEK: its step from the foundation (Base's fartlek becoming a threshold session) is
+      // the race block's own, and one change a week is the rule — so the day joins in the second week at the earliest.
+      if (!started && i === 0) { out.push(o); return; }
+      const om = weekRunMin(o);
+      const prev = weekRunMin(out[out.length - 1]!);
+      if (!started) {
+        if (!o.isDeload && prev > 0 && om + ADDED_DAY_OPEN_MIN > prev * ADDED_DAY_RISE_MAX) { out.push(o); return; }
+        started = true;
+      }
+      const easy = o.sessions.filter((s) => AEROBIC_RUN_TYPES.has(s.type)).map((s) => s.estimatedDurationSeconds / 60);
+      const cap = easy.length ? Math.max(ADDED_DAY_OPEN_MIN, Math.min(...easy)) : ADDED_DAY_OPEN_MIN;
+      const want = Math.min(ADDED_DAY_OPEN_MIN + ADDED_DAY_STEP_MIN * k, cap);
+      if (capped || weekRunMin(n) <= om + want) { full = true; out.push(n); return; }
+      const h = withNewDayRun(o, n, Math.round(want), paces);
+      if (!h) { full = true; out.push(n); return; }
+      out.push(h);
+      // ⚠️ COMPARED BEFORE ROUNDING: rounded, a 27.4-minute cap gave a 27-minute run that never "reached" it, and the
+      // owner's phase-in ran seven weeks instead of handing over after its lighter week.
+      if (want >= cap) capped = true;
+      k++;
+    });
+    cur = out;
+  }
+  return cur;
+}
 function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions): ReturnType<typeof generatePlanCore> {
   const { road, ...rest } = options;
   const stages = (road?.stages ?? [])
@@ -1327,7 +1445,14 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
   const raceMonday = addDays(goal.raceDateIso, -dayOfWeekMondayZero(goal.raceDateIso));
   const startWeekMonday = addDays(startIso, -dayOfWeekMondayZero(startIso));
   const totalWeeks = Math.max(0, weeksBetween(startWeekMonday, raceMonday) + 1);
-  const raceTrack = raceTrackAthlete(athlete);
+  // ⚠️⚠️ pc-days-raceblock — A DAY ADDED IN THE RACE BLOCK CHANGES NOTHING BEFORE ITS MONDAY. Everything before the first day
+  // added — the foundation, its destination and the race block's earlier weeks — is built for the days the runner had then
+  // (`was`), so no week already run changes when they add one. From that Monday the day is phased in (`phaseInAddedDays`).
+  // Measured before this: the owner's road built for 5 days instead of 4 moved a Base week's easy run 5.5 → 5.7 km, because
+  // the foundation is aimed at the race block's first week, which a day more reshapes.
+  const added = daysAddedChain(athlete, road);
+  const was: Athlete = added.length ? { ...athlete, daysPerWeek: added[0]!.from } : athlete;
+  const raceTrack = raceTrackAthlete(was);
   // ⚠️⚠️ §10 PIECE 3 — CONSECUTIVE RACE ENTRIES ARE ONE RACE BLOCK. The app cuts the race block into blocks of four weeks,
   // each ending in a checkpoint (raceBlockSplit, src/plan/road.ts), exactly as Base is cut; to this engine they are one
   // block laid back from race day, so the plan is byte for byte the block it was uncut.
@@ -1369,12 +1494,26 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
     const ref = raceWeeks === refWeeks && raceStartIso === raceStartMonday && !rest.secondaryRace
       ? raceBlock
       : generatePlan(raceTrack, goal, { ...rest, secondaryRace: undefined, startDateIso: addDays(raceMonday, -(refWeeks - 1) * 7) });
-    weeksOut.push(...roadFoundationWeeks(athlete, goal, paces, ref, raceBlock.intensityModel, kinds, offset,
+    weeksOut.push(...roadFoundationWeeks(was, goal, paces, ref, raceBlock.intensityModel, kinds, offset,
       road?.rampWeeks ?? kinds.length, raceStartMonday, Wk === 0 ? startIso : null));
   }
-  if (Wk > 0) weeksOut.unshift(...roadWalkRunWeeks(athlete, goal, raceBlock.paces, all.slice(0, W), wDrop, F, raceStartMonday, startIso));
-  raceBlock.weeks.forEach((w) => { w.stage = "race"; });
-  weeksOut.push(...raceBlock.weeks);
+  if (Wk > 0) weeksOut.unshift(...roadWalkRunWeeks(was, goal, raceBlock.paces, all.slice(0, W), wDrop, F, raceStartMonday, startIso));
+  // pc-days-raceblock: the race block as the runner's days now make it — each day added phased in from its Monday. The
+  // block for each day count is generatePlan itself (the same call as above), so once a day is fully in, the weeks ARE
+  // today's main-track block for that many days.
+  let last = raceBlock;
+  let blockWeeks = raceBlock.weeks;
+  if (added.length) {
+    const blocks = new Map<number, ReturnType<typeof generatePlanCore>>([[was.daysPerWeek, raceBlock]]);
+    const at = (days: number) => {
+      if (!blocks.has(days)) blocks.set(days, generatePlan(raceTrackAthlete({ ...athlete, daysPerWeek: days }), goal, { ...rest, startDateIso: raceStartIso }));
+      return blocks.get(days)!;
+    };
+    blockWeeks = phaseInAddedDays(raceBlock.weeks, added, (d) => at(d).weeks, raceBlock.paces);
+    last = at(athlete.daysPerWeek);
+  }
+  blockWeeks.forEach((w) => { w.stage = "race"; });
+  weeksOut.push(...blockWeeks);
   // Every week numbered in road order (as before when the road starts at Rebuild: the foundation 1…F, the race block on).
   weeksOut.forEach((w, i) => { w.index = i + 1; });
 
@@ -1387,7 +1526,7 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
   }
   const notes = [
     `Your road to race day: ${legs.map((l) => `${l.weeks} week${l.weeks === 1 ? "" : "s"} ${STAGE_LABEL[l.kind]}`).join(" → ")}.`,
-    ...raceBlock.notes,
+    ...last.notes,
   ];
   const gap = totalWeeks - weeksOut.length;
   if (gap > 1) {
@@ -1398,7 +1537,7 @@ function generateRoadPlan(athlete: Athlete, goal: Goal, options: GenerateOptions
     goal,
     athlete,
     createdAtIso: raceBlock.createdAtIso,
-    intensityModel: raceBlock.intensityModel,
+    intensityModel: last.intensityModel,
     paces: raceBlock.paces,
     totalWeeks,
     weeks: weeksOut,

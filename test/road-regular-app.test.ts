@@ -153,7 +153,9 @@ test("the Plan screen's road says what the runner chose at a race-block checkpoi
     const clock = { today };
     const profile: any = { personalized: true, status: "regular", returning: false, raceDate: "2027-05-16", goalDist: "half", road: REGULAR(cps) };
     const env: Record<string, unknown> = { RC, profile, todayIso: () => clock.today, isoAdd, esc: (x: unknown) => String(x),
-      currentHandover: () => null, currentReentry: () => null, currentRealign: () => null };
+      currentHandover: () => null, currentReentry: () => null, currentRealign: () => null,
+      // pc-days-raceblock: a regular runner's road adds no day this way (road-days-app guards the line).
+      roadNewDayLine: () => "" };
     const fns = [...ROAD_FNS, "roadPlanCard", "roadTimelineHtml", "roadDayLabel", "roadLegName", "currentRoadCheckpoint"];
     const src = [...CONSTS, "ROAD_COLOUR"].map(constDecl).concat(fns.map(fnBody)).join("\n");
     const names = Object.keys(env);
@@ -204,6 +206,8 @@ function sheet(o: { status?: string; returning?: string | false; runs?: Run[]; f
     esc: (x: unknown) => String(x).replace(/</g, "&lt;"),
     currentRoadCheckpoint: () => cp, roadOf: () => ({ checkpoints: [] }),
     saveRuns: () => {}, saveFitSuggest: () => {}, RACE_FIT_MIN: 0.02,
+    // pc-days-raceblock: the days offer is a habit-builder's, at the checkpoint into the race block — road-days-app.
+    roadDayOffer: () => null,
   };
   const fns = ["roadFacts", "roadClock", "roadLongestKm", "roadTestOffer", "roadTestIn", "roadParkrunCandidates", "resolvedStatus", "returnKind",
     "fmtTimeFull", "weekMondayOf", "roadMondayAfter", "roadLegName", "roadCheckpointHtml", "roadAnswered", "roadRaceWeeks", "roadWeeksLabel",

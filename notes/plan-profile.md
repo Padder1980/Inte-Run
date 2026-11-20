@@ -1537,3 +1537,111 @@ checkpoint into the race block, only when that checkpoint's own evidence is good
 starts as a short easy run (15–20 min) so the week grows by under ~20%; declining is remembered. Let a habit-builder pick up to 5
 days once in the race block (it already runs on the main track), and let `addDayOffer` treat race-block weeks by the track they
 are built on. Never say a 4th day is needed to be safe — the evidence does not support that.
+
+## ✅ DAYS A WEEK ONCE A HABIT-BUILDER'S ROAD REACHES THE RACE BLOCK — BUILT (pc-days-raceblock, 2026-11-20)
+
+The owner started the card that held the recommendation above: his yes. Built in the brief's three parts, plus the engine half
+that "the new day starts as a short easy run" needs. Road Map: `pc-days-raceblock` ticked (batch "2026-11-20").
+
+### The engine — `Road.daysAdded`, `phaseInAddedDays` (src/plan/generate-plan.ts)
+
+- **Stored on the road**: `profile.road.daysAdded = [{ fromIso, from, to, answeredIso, via }]` (via: checkpoint | review | profile);
+  `effectiveRoad` passes `{ fromIso, from, to }` on. **Only a chain the runner could make counts** (`daysAddedChain`): one day at a
+  time, distinct Mondays in date order, ending at the athlete's answer. Anything else — a day later taken away, a jump of two — is
+  ignored and the plan is exactly the plan for the answer. Never for a 12–17 runner.
+- ⚠️⚠️ **Everything before the first day added is built for the days the runner had** (`was`), the foundation included. Measured
+  before this: the owner's road built for 5 days instead of 4 moved Base week 6's easy run 5.5 → 5.7 km — the foundation is aimed
+  at the race block's first week (`foundationEnds`' `destEasy`), which a day more reshapes. Guarded byte for byte.
+- **Why not simply build the block for the new days:** the main track's week for a day more measured up to 1.55× the week the
+  runner had (672 roads) — the 20–60% weekly jump Damsted et al. (JOSPT 2019) tied to early injury.
+- **The phase-in**: the old week plus ONE easy run on the day the plan for the new days runs (`withNewDayRun`, marked
+  `Session.newDay`), every other session untouched. It joins in the first week from `fromIso` where the old week + 20 minutes is
+  within `ADDED_DAY_RISE_MAX` (1.2) of the week before (or a lighter week); starts at `ADDED_DAY_OPEN_MIN` (20 — the shortest run
+  any plan prescribes), grows `ADDED_DAY_STEP_MIN` (5) a week, never longer than that week's shortest easy run. From the first
+  week the full plan for the new days is no bigger than the old week + the run — or the week after the run reached its cap — the
+  block IS the full plan (race week always; a B-race fortnight keeps its week and the day waits). ⚠️ **Never in the race block's
+  first week**: its step from the foundation (Base's fartlek becoming a threshold session) is the race block's own — one change a
+  week. Found while waiting on verify: a day picked in the profile (or accepted in the review) in the days after "Move up" was
+  recorded from next Monday, which IS the race block's first week. Both doors now use `roadDayAddMonday` (next Monday, never
+  before the race block's second week), and the engine refuses the first week itself. ⚠️ Compared BEFORE rounding: a
+  27.4-minute cap gave a 27-minute run that never "reached" it, and the owner's phase-in ran seven weeks.
+- **The owner's road** (day added at Base's checkpoint, from the race block's second week): 20′ (1 Feb) → 26′ (8 Feb — 25 asked,
+  built from a distance) → 27′ (15 Feb, the lighter week, capped) → the full 5-day plan from 22 Feb, Race block 2's first week.
+- **Measured over 672 habit-builders' roads** (5K/10K/half/marathon × six abilities × 3→4 and 4→5 × comeback none/injury/break ×
+  four runways × two long-run days): no week before the Monday changed on any road; the day alone adds at most 1.171 to its week;
+  the first week that changes is at most 1.198× the week before; the worst step 1.304 with the day and without; 94 steps over 1.2
+  against the plan's own 186 (of 6,452); the short run lasts at most three weeks; none waited more than a week to join; 4 roads
+  went straight to the full plan (it fitted). Two days added a week apart (3→4→5, the picker's door) compose: each its own phase-in.
+
+### In the app (web/app.ts, "Days a week once a habit-builder's road reaches the race block")
+
+- **The offer** — `roadDayOffer` → `RC.raceBlockDayOffer` (src/adapt/weekly-review.ts): only the checkpoint INTO the race block,
+  only the two beginner cards (both reach the race block on the main track), the checkpoint's own evidence (`met.runs &&
+  met.noPain`), not while unwell or being told to ease off, a race block of at least `ADD_DAY_MIN_RUNWAY_WEEKS`, no "no" or day
+  added within `ADD_DAY_COOLDOWN_DAYS`, under `RACE_BLOCK_BEGINNER_MAX`. ⚠️ **Not gated on coming back from injury** — the owner's
+  own case is one; the checkpoint's evidence is the gate (for the clinical reviewer).
+- **The sheet**: "Move up" carries `data-days` and "Then you choose: 4 days a week, or 5."; `openRoadDays` draws the second question
+  in the same sheet (`roadDaysStepHtml`): the evidence, "Your race block works on 4 days a week too", the start and full-plan dates
+  read off the plan the answer builds (`roadDayPreview` — applyProfile twice; `roadNewDayFacts` reads the `newDay` marks), and how
+  many race-block weeks a 5-day plan has a second harder session in (counted from the two plans). No "Suggested" mark; Back returns
+  to the checkpoint; nothing changes until a choice.
+- **`answerRoad(choice, days)`** — one commit, one Undo (road, days and the decline store). Add: `roadWithDayAdded` from the race
+  block's SECOND Monday (`roadDayAddFrom` — one change a week: the race block's opening step is the fartlek becoming a threshold
+  session); the checkpoint record carries `days`. Keep: `saveAddDayDeclined`, the review's own store. Asked for a day after the
+  evidence has turned (a run hurt since the sheet opened): moves up, adds nothing.
+- **The picker**: `dayTrackFor` carries `raceBlock: dayRaceBlockNow()`, and `runningDayChoices` (src/domain/running-days.ts) gives
+  the main track's answers up to `RACE_BLOCK_BEGINNER_MAX` (5) — a coaching ceiling: 6 and 7 build different race blocks and are
+  withheld by name. Never in the wizard (a new plan starts at its road's start). `dayCapNote` says so.
+- ⚠️⚠️ **Found in the browser and fixed: "in the race block" includes "moved up into it".** Judged by the week alone, a day added
+  at the checkpoint (stored 5) folded back to 4 for the rest of Base's last week — the Plan screen said "your full 4-day plan", and
+  any profile save that week (a new name) would have written 4 and dropped the day. `dayRaceBlockNow` now also answers yes when
+  the checkpoint into the race block is answered "up". Guarded and re-broken.
+- **The picker's door** — `roadDaysEdited` (draftFromForm, only when the profile has a road): more days, for a habit-builder in the
+  race block, start short from next Monday (a second one a week later); fewer days drop the days added above the answer.
+- **The weekly review** — `addDayEvidence` passes the TRACK THE WEEK IS BUILT ON ("recreational" in a habit-builder's race block),
+  `maxDays` (their picker's five), `painFlagged` (a run in the evidence weeks answered "hurt" — sent only for a habit-builder in
+  their race block, his "nothing hurt"; for a regular runner it is his decision, `pc-days-regular-short`), `lastAddedIso`
+  (the road's record) and `startsShort`. `applyAddDay` records the day on the road from next Monday for a habit-builder in the race
+  block; a regular runner's yes is exactly as before. Existing gates kept (injury, peak/taper, runway, weeks on plan, completion,
+  cooldown) — so the owner himself, back from injury, is asked at the checkpoint and not by the review.
+- ⚠️ **The review's sentence was false**: "more easy running, not more hard work". Measured over 120 main-track plans (4 distances
+  × 5 abilities × 3/4/5 days × 2 levels), a day more gave 60 of them a second harder session in some weeks (270 of 1,920 weeks).
+  Now "mostly more easy running" — or "It starts as a short easy run and grows a little each week" where the day is phased in.
+- **The Plan screen**: `roadNewDayLine` on the road card while the day is growing ("Your new running day: a 20-minute easy run
+  from the week of 30 Nov, a little longer each week — your full 5-day plan from 14 Dec.").
+
+**Tests:** `test/road-days-added.test.ts` (7, engine, one sweep of 672 roads), `test/road-days-app.test.ts` (9, lifted from the
+built page over the real applyProfile, on the owner's own road), `add-a-day` (+4), `running-days` (+1). Harnesses restated on
+purpose: road-blocks-app, road-walkrun-app and road-regular-app stub `roadDayOffer` / `roadNewDayLine` (guarded here instead),
+road-norace-app lifts `roadDaysEdited`, silent-defects and pause-pickup stub the race-block question, road-app's two source
+regexes (draftFromForm's road, the sheet's Move-up wiring). **Re-breaks: 30 of 30 caught** — one escaped first: the join guard
+looked only at weeks carrying the short run, so removing the wait (where the full plan fitted at once, a 1.232 step) went unseen;
+restated on the first week that changes at all.
+
+**Driven in a browser at phone size, light and dark** (a habit-builder seeded into Base's last week, 6 of 6 runs, no pain): the
+pop-up opened by itself with "Then you choose: 4 days a week, or 5."; the second question with its dates; Back; Add (toast "Moving
+up to your race block, with a 5th day from the week of 30 Nov.", the weeks from 30 Nov 20′ → 25′ → the full plan at the lighter
+week) and its Undo; Keep (the no stored) and its Undo; the Plan screen's line; the profile's days question offering 3/4/5 with 5
+held; no horizontal overflow, buttons 51–73 px, no console errors. ⚠️ The toast's Undo lasts six seconds — a tap after it has gone
+does nothing; not a defect. Screenshots in the session's notes folder.
+
+### Found, not changed (Road Map steps, his decisions)
+
+- **`pc-days-regular-short`**: a regular runner's yes to the review's "Add a 5th day" rebuilds the plan at once — measured over 192
+  cases, the next week a median 1.29× the week before (worst 1.49; 171 over 1.2), and the weeks already run are rewritten too.
+  Asked with it: should the review stop offering THEM a day after a run they said hurt, as it now does for a habit-builder? Not
+  done for them on purpose — the brief put any change of safety meaning to him first.
+- **`pc-days-harddays`**: the hard-days dial (B8) is hidden from a habit-builder even at five days in their race block, so they
+  cannot pick one hard day a week.
+- Fewer days through the picker rebuilds the weeks since the day was added (as any change of days does). A "day taken away" record
+  would keep them; not built.
+- ⚠️ Not a defect, recorded so nobody chases it: the browser seed copied the owner's Base length onto a slower runner and showed a
+  50 → 80-minute long-run step into the race block — the hand-made road, not the app (a road from the wizard budgets the
+  foundation the runner needs).
+
+### For the clinical reviewer (added)
+
+Offering a day at the checkpoint to somebody back from injury, on the checkpoint's evidence alone; the new day's start (20
+minutes, +5 a week, never longer than the week's shortest easy run) and the 1.2 joining rule; the review's new refusal after a
+run that hurt (a habit-builder in their race block only); the days question's words ("Your race block works on 4 days a week
+too"; the second harder session).

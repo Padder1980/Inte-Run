@@ -327,6 +327,12 @@ export type Session = {
    * checkpoint looks for. Absent on every other session, so a plan without a walk-run block is exactly what it was.
    */
   keyRun?: { minutes: number };
+  /**
+   * pc-days-raceblock (owner, 2026-11-20): this is a NEW RUNNING DAY being phased in — the short easy run a race block
+   * carries while a day the runner added grows to a full run (`phaseInAddedDays`). Absent on every other session, so a
+   * plan with no day added is exactly what it was.
+   */
+  newDay?: true;
 };
 
 export type PlannedWeek = {

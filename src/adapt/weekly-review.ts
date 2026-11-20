@@ -124,6 +124,27 @@ export type AddDayInput = {
   todayIso: string;
   /** True when the flags engine is already suggesting the runner eases off. */
   easingSuggested?: boolean;
+  /**
+   * pc-days-raceblock (owner, 2026-11-20): the highest answer this runner's own picker offers (`runningDayChoices`) — a
+   * habit-builder in their race block may pick up to five. The offer never names a day count the runner could not choose
+   * themselves. Absent: ADD_DAY_MAX alone.
+   */
+  maxDays?: number;
+  /**
+   * pc-days-raceblock: a run in the weeks the evidence covers was answered "Did anything hurt?" = yes. The owner's rule for
+   * the checkpoint's offer is "nothing hurt", and asking somebody who said a run hurt to run more is the prompt doing harm.
+   * The app sets it for a habit-builder in their race block (his approval); for a regular runner it is his to decide
+   * (Road Map pc-days-regular-short), so it is not sent for them.
+   */
+  painFlagged?: boolean;
+  /**
+   * pc-days-raceblock: the date a day was last ADDED where it is phased in (a habit-builder's race block). The next offer
+   * waits as long as after a no: the day is still settling in, and the plan's past keeps its old prescription, so the
+   * completion evidence would otherwise say "ask again" the very next week.
+   */
+  lastAddedIso?: string | null;
+  /** pc-days-raceblock: the day is phased in — it starts as a short easy run (`phaseInAddedDays`). Changes the words only. */
+  startsShort?: boolean;
 };
 
 /**
@@ -309,10 +330,16 @@ const ADD_DAY_WEEKS_OF_EVIDENCE = 3;
 
 export function addDayOffer(input: AddDayInput): WeeklySuggestion | null {
   if (input.unwell || input.returningFromInjury) return null;
+  // pc-days-raceblock: and not after a run the runner said hurt.
+  if (input.painFlagged) return null;
   // Beginners are on a deliberately gentle, capped track of their own; more days is not that track's
   // next step, and their plan does not read daysPerWeek the way this offer assumes.
+  // ⚠️ pc-days-raceblock (owner, 2026-11-20): "experience" is the TRACK THE WEEK IS BUILT ON, not the status card. A
+  // habit-builder's race block is built on the main track (raceTrackAthlete), so the app passes "recreational" for those
+  // weeks — and maxDays (their picker's five) for the ceiling.
   if (input.experience === "beginner") return null;
   if (input.daysPerWeek >= ADD_DAY_MAX) return null;
+  if (input.maxDays != null && input.daysPerWeek >= input.maxDays) return null;
   // ⚠️ Never in a peak or a taper. Adding a running day in the sharpening weeks is the worst possible
   // moment for it: the block is at its biggest, and the change would land with no time to absorb it.
   if (input.phase === "peak" || input.phase === "taper") return null;
@@ -321,6 +348,7 @@ export function addDayOffer(input: AddDayInput): WeeklySuggestion | null {
   // One voice: if the engine is already saying ease off, the app must not ask for more in the same breath.
   if (input.easingSuggested) return null;
   if (input.lastDeclinedIso && daysBetween(input.lastDeclinedIso, input.todayIso) < ADD_DAY_COOLDOWN_DAYS) return null;
+  if (input.lastAddedIso && daysBetween(input.lastAddedIso, input.todayIso) < ADD_DAY_COOLDOWN_DAYS) return null;
 
   const weeks = input.recentWeeks.slice(-ADD_DAY_WEEKS_OF_EVIDENCE);
   if (weeks.length < ADD_DAY_WEEKS_OF_EVIDENCE) return null;
@@ -337,9 +365,54 @@ export function addDayOffer(input: AddDayInput): WeeklySuggestion | null {
     kind: "add-a-day",
     from: input.daysPerWeek,
     to,
+    // ⚠️ pc-days-raceblock: THIS SAID "more easy running, not more hard work", AND THE ENGINE SAYS OTHERWISE. Measured over
+    // 120 main-track plans (4 distances × 5 abilities × 3/4/5 days × 2 levels), a day more gave half of them (60) a second
+    // harder session in some weeks — 270 of 1,920 weeks. Most of what a day adds is easy running, and the words say that.
     why: `You have run ${completed} of the last ${prescribed} sessions your plan asked for. `
-      + `A ${to}th day is the next step available to you — more easy running, not more hard work.`,
+      + (input.startsShort
+        ? `A ${to}th day is the next step available to you. It starts as a short easy run and grows a little each week.`
+        : `A ${to}th day is the next step available to you — mostly more easy running.`),
   };
+}
+
+/**
+ * ⚠️⚠️ pc-days-raceblock — ONE MORE RUNNING DAY, OFFERED AT THE CHECKPOINT INTO THE RACE BLOCK (the owner's yes to the
+ * recommendation in notes/plan-profile.md, "Days a week for a habit-builder once the road reaches the race block",
+ * 2026-11-20). A habit-builder's race block is built on the main track; the beginner picker stopped them at four, and
+ * the weekly review refused them outright. The evidence (notes): three runs a week is the norm and the minimum in novice
+ * 10K and half plans; NO study shows a fourth day is safer; the clearest injury signals are a single run more than 10%
+ * longer than any in the last 30 days (Frandsen et al., BJSM 2025) and weekly jumps of 20–60% (Damsted et al., JOSPT 2019).
+ *
+ * So it is a CHOICE, never a change (always with the runner), offered only on the checkpoint's own good evidence — most
+ * runs done (≥ 80% of the last two weeks) and no pain flagged — and the day it adds starts as a short easy run
+ * (`phaseInAddedDays`). Every refusal is a real one, as `addDayOffer`'s: unwell, already being told to ease off, a race block
+ * too short for a day to be worth the disruption, a no (here or in the weekly review) or a day added within two months,
+ * and the habit-builder's ceiling in the race block (RACE_BLOCK_BEGINNER_MAX) already reached.
+ */
+export type RaceBlockDayInput = {
+  /** The checkpoint's own evidence: `evaluateCheckpoint(…).met`. */
+  met: { runs: boolean; noPain: boolean };
+  /** The days the runner runs now. */
+  daysPerWeek: number;
+  /** The highest answer their picker offers in the race block (RACE_BLOCK_BEGINNER_MAX). */
+  maxDays: number;
+  /** Weeks in the race block they are moving into. */
+  raceWeeks: number;
+  unwell?: boolean;
+  easingSuggested?: boolean;
+  lastDeclinedIso?: string | null;
+  lastAddedIso?: string | null;
+  todayIso: string;
+};
+export function raceBlockDayOffer(input: RaceBlockDayInput): { from: number; to: number } | null {
+  if (!input.met || !input.met.runs || !input.met.noPain) return null;
+  if (input.unwell || input.easingSuggested) return null;
+  if (!(input.daysPerWeek >= 3) || input.daysPerWeek >= Math.min(ADD_DAY_MAX, input.maxDays)) return null;
+  if (!(input.raceWeeks >= ADD_DAY_MIN_RUNWAY_WEEKS)) return null;
+  for (const iso of [input.lastDeclinedIso, input.lastAddedIso]) {
+    if (iso && daysBetween(iso, input.todayIso) < ADD_DAY_COOLDOWN_DAYS) return null;
+  }
+  return { from: input.daysPerWeek, to: input.daysPerWeek + 1 };
 }
 
 /** The specification's retest window (§14): often enough to catch real change, rarely enough that

@@ -84,6 +84,9 @@ function sandbox(today = WED) {
     experienceFor: () => "recreational", strengthPrefsOf: () => null, progActive: () => false,
     todayTicks: () => [], restoreTicks: () => {}, seedDone: () => box.calls.push("seedDone"), saveProfileStore: () => box.calls.push("save"),
     saveDayOverride: () => {}, closeSheet: () => {}, render: () => {}, loadAddDayDeclined: () => null,
+    // pc-days-raceblock: addDayEvidence asks whether this week is a road's race block — not on this plan (no road).
+    dayRaceBlockNow: () => false, dayTrackFor: () => ({ experience: "recreational", runWalk: false, raceBlock: false }),
+    roadDayAddedLast: () => null, dayAddPhased: () => false,
     toast: (m: string) => box.toasts.push(m), toastUndo: (m: string, fn: () => void) => { box.toasts.push(m); box.undo = fn; },
   };
   const src = "let PLAN, RAW, FITNESS, CLASS, MASTERS, XWEEK = {}, PAUSE_DAYS = 7;\n" +

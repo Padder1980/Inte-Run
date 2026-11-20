@@ -26452,7 +26452,14 @@ function stravaRefresh() {
   if (!cfg.key || !stravaBase()) return Promise.resolve(cfg);
   return stravaCall("/strava/status?dk=" + encodeURIComponent(cfg.key)).then((r) => {
     const c = stravaCfg();
-    const was = !!c.connected;
+    // ⚠️ REDRAW ONLY WHEN THE ANSWER CHANGES WHAT THE SCREEN SHOWS: connected or not, the name, and the
+    // waiting state. The test used to be "was !== c.connected || !c.pending", and !c.pending is true
+    // whenever nothing is waiting -- the steady state of every connected runner -- so EVERY answer
+    // redrew Apps & devices, whose wire() then asked the server again: an endless loop of full-screen
+    // redraws (24 a second on a fast connection) that flickered and swallowed taps, 2026-11-20. An
+    // answer that changes nothing on screen has nothing to redraw.
+    const shown = (x) => [!!x.connected, String(x.name || ""), Number(x.pending) || 0].join("|");
+    const before = shown(c);
     c.connected = !!(r.json && r.json.connected && r.json.canWrite !== false);
     c.name = String((r.json && r.json.name) || "");
     // A8 -- what this Worker understands, straight off its own reply. Absent (an old deployment) or
@@ -26465,7 +26472,7 @@ function stravaRefresh() {
     // when they come back connected, and it times out either way so it can never stick.
     if (c.connected || !c.pending || Date.now() - Number(c.pending) > 600000) c.pending = 0;
     stravaSaveCfg(c);
-    if (was !== c.connected || !c.pending) stravaRerender();
+    if (shown(c) !== before) stravaRerender();
     return c;
   }).catch(() => cfg);
 }
@@ -26827,15 +26834,24 @@ function connectView() {
     '<div class="card"><div class="subhead" style="margin-top:0">Why so few toggles?</div>' +
     '<div class="bk-md">Inte-Run keeps your training on your devices, so other apps only get what you choose to send them. The connections above are the ones that genuinely work today; the planned ones are listed so you know they\u2019re coming, not to look busy.</div></div>';
 }
+// ⚠️ WHETHER THE LAST wire() FOUND APPS & DEVICES ON SCREEN. wire() runs after EVERY render, so on its own
+// it cannot tell OPENING this screen from REDRAWING it -- and the Strava answer below redraws it. Asking on
+// every wire() asked again on every answer, for ever (2026-11-20, notes/strava-and-alfie.md). Arriving asks;
+// a redraw, a sheet closing or the watch's answer landing does not.
+let CONNECT_SHOWN = false;
 function wireConnectView() {
-  if (!document.querySelector(".cn-row")) return;
+  const shown = !!document.querySelector(".cn-row");
+  const arrived = shown && !CONNECT_SHOWN;
+  CONNECT_SHOWN = shown;
+  if (!shown) return;
   if (NATIVE_WATCH && !WATCH_STATUS) { try { window.webkit.messageHandlers.interunWatch.postMessage({ action: "status" }); } catch (e) {} }
   document.querySelectorAll('[data-cn="cal"]').forEach((b) => b.onclick = openRemindersSheet);
   document.querySelectorAll('[data-cn="strava"]').forEach((b) => b.onclick = openStravaSheet);
   // ⚠️ ASK THE SERVER EVERY TIME THIS SCREEN IS OPENED. A runner can revoke Inte-Run from Strava's own
   // settings page, and this is the screen where they come to find out whether it is still connected —
-  // reporting our own stale copy of the answer is the one thing it must not do.
-  if (stravaCfg().key && stravaBase()) stravaRefresh();
+  // reporting our own stale copy of the answer is the one thing it must not do. ONLY when it is opened,
+  // though: see CONNECT_SHOWN above.
+  if (arrived && stravaCfg().key && stravaBase()) stravaRefresh();
 }
 // One line that diagnoses letterboxing from a screenshot: if "page" is short of "screen", iOS is
 // boxing the web app inside system bands and no CSS in this file can reach them — the Home Screen

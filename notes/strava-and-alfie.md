@@ -248,3 +248,85 @@ with no device key → `"configured":true`, `"origins":["recorded","added"]` (`s
 - ⚠️ **`run_in_terminal` only starts in this session's folders**, so from a worktree: symlink the main checkout's
   `alfie-proxy/node_modules` into the worktree's `alfie-proxy/` and log in there (the login itself is stored per user, not per
   folder). Deploy from a checkout whose `alfie-proxy/` matches main: `git diff <its HEAD> main -- alfie-proxy/` was empty.
+
+## Connected apps redrew itself for ever (2026-11-20)
+
+The owner: *"every time I press the Connected apps button, the page it takes me to is constantly flickering and it
+won't allow me to press anything on that screen."* The button with that name is the Plan page's **Connected apps**
+tile (`data-pact="apps"` → `planAction("apps")`); Profile › Connections › **Apps & devices** (`data-pf="connect"`) and
+Support's `connect` hub open the same screen (`state.support = "connect"`), so all three looped.
+
+**Measured, not guessed.** In a browser at phone size, with a device key in `interun_strava_v1` and `/strava/status`
+stubbed to answer in 40 ms: opening the screen ran **71 renders and 71 status requests in 3 s, then 47 more in the
+next 2 s** — one full redraw per answer, never stopping (on a real network, one per round trip). Every redraw restarts
+`#view`'s `viewIn` fade (the flicker) and rebuilds the rows under the finger, so a slow touch tap rarely lands.
+
+**The loop had two halves, both there since 72a4538 (2026-08-09):**
+- `wireConnectView()` called `stravaRefresh()` on every `wire()`, and `wire()` runs after every `render()` — so a
+  redraw asked exactly as an opening did. The comment said "every time this screen is OPENED"; the code said every
+  time it is drawn.
+- `stravaRefresh()` redrew after every answer: `if (was !== c.connected || !c.pending) stravaRerender();`.
+  `!c.pending` is true whenever nothing is waiting — always, for a connected runner. The intent was "the waiting
+  state has just ended".
+
+It needs only a device key (`cfg.key`, written the first time Connect is pressed, connected or not) and a server that
+answers (`STRAVA_SERVER` ships filled in and the Worker sends CORS headers), so every phone that ever pressed Connect
+had it. Under the Strava sheet it pauses (`stravaRerender` reopens the sheet instead of rendering) and it restarts on
+the next render of the screen. Each request costs the Worker one KV read (`status()` reads `tok:<hash>` and calls
+nothing at Strava), so no Strava rate limit was spent.
+
+**The fix — each half on its own:**
+- `let CONNECT_SHOWN` (beside `wireConnectView`): whether the last `wire()` found `.cn-row` on screen. Only an
+  ARRIVAL (`shown && !CONNECT_SHOWN`) asks the server; a redraw, a sheet closing or the watch's
+  `__interunWatch.status` answer landing does not. Leaving and coming back asks again — the promise in the comment,
+  kept and tested.
+- `stravaRefresh()` redraws only when what the screens show changed: `[connected, name, pending]` before and after
+  the answer (`shown(c) !== before`). `sportTypes` and `origins` are on neither screen, so they are saved without one.
+- Measured after, in headless Chrome over CDP with real touch taps (down, 120 ms, up), light and dark: opening asks
+  once, then **0 renders, 0 requests and 0 DOM mutations** over the next 3 s; the Strava row opens its sheet, the
+  calendar row opens "Get reminded on session days", both close, Back returns to where it came from ("‹ Profile" or
+  "‹ Support"), reopening asks once, the bottom bar works — entering from the Plan tile and from the profile row
+  alike. An answer that changes something (connected → revoked) redraws exactly once and shows "Ready".
+- ⚠️ **The full `npm run verify` took 63 minutes on 2026-11-20** (load average 21 while headless Chrome checks and a
+  subagent ran beside it); `verify:quick` alone took 2½. Don't run screenshot tools while verify runs.
+
+**Guard:** `test/connected-apps-still.test.ts` runs the real `wireConnectView`, `stravaRefresh` and `stravaRerender`
+(with the top-level lets they read, derived from the page) against a stand-in `render()` that ends in
+`wireConnectView()`, as `wire()` does — a reachability test holds the stand-in to that. Re-broken three ways, copying
+the file aside and back: the original code fails 5 of 6; the ask half alone fails 2 ("redraws it once, and only
+once", "a redraw of the screen is not an opening"); the redraw half alone fails 2 ("asks Strava once, and the screen
+then stays still", "an answer that changes nothing redraws nothing").
+
+- ⚠️ **A desktop mouse click is no test of a screen that keeps redrawing.** In the looping build a mouse click on the
+  Strava row still opened the sheet — it is quick enough to fall between two redraws; a thumb is not. Count renders
+  per second instead.
+- ⚠️ **The in-app Browser pane was hidden, and its screenshot showed the page mid-fade with Today highlighted** — a
+  stale frame: the live DOM said Support, opacity 1, `viewIn` finished. The screenshots came from headless Chrome.
+- **Follow-up, not changed:** the Strava sheet's "I've done that — check now" (`stvCheckLink`) sets "Checking…" and
+  relies on the answer's redraw. An answer of "still waiting" changes nothing on screen, so the button keeps saying
+  "Checking…" — before this fix as well as after (the old test skipped that redraw too).
+
+**The same shape elsewhere — swept 2026-11-20 (a subagent traced every request started from `render()`, `wire()`, the
+view builders and the sheet openers): no second endless loop.** Bounded or safe, with the guard that makes it so:
+`fetchWeather` (`WX_FETCHING` / `state.wx`; one redraw on success), `runPlaceLookup` (`run.placeTried` set before the
+fetch), `alfieExpandProbe` (`ALFIE_EXPAND_ASKED`), the week band's `onscroll` (renders only if the week changed),
+`__interunWatch.status` (sets `WATCH_STATUS` before rendering), `openStartWhereSheet` (asks once per opening), the
+reminders reply (`NOTIFY_RERENDER` asks nothing back). Found on the way — not loops, NOT changed, each a Road Map step:
+- **A closed Strava sheet pops back open by itself — seen in the browser.** `closeSheet` only hides the sheet, so
+  `#stvSheet` stays in `#sheetBody`, and `stravaRerender`'s `if ($("stvSheet"))` reopens it on the next answer that
+  changes something, instead of redrawing Apps & devices (whose row still said "Connected" underneath). Before this
+  fix it fired on every opening after the sheet had once been opened. Fix: also require `#sheetOv.on`, as
+  `refreshStartWhere` does. Road Map `pc-strava-sheet` (with the stuck "Checking…" above).
+- **Every render replays the 180 ms `viewIn` fade, same screen or not — read in the code.** `viewEnter(v)` ends
+  `render()` for the tabs and Profile with no "did the screen change" test (`LAST_SCROLL_KEY` already knows), so any
+  redraw in place blinks — and during a wrist run, Today redraws on every update from the watch. Road Map `pc-redraw-fade`.
+- **Inte-Club's back swipe piles up — read in the code.** `wireClubPostView` (run on every render of a post) calls
+  `clubWireBackSwipe($("view"), …)`, adding three listeners to the permanent `#view` each time, never removed and not
+  checking the screen: after a post has been open, a right swipe on any later screen runs `state.screen = null;
+  render()` once per copy. Road Map `pc-club-swipe`.
+- **A sample weather is undone — read in the code.** The weather sheet's preset buttons set `state.wx = null` and
+  `render()`, and that render's `fetchWeather()` asks again, so the live forecast replaces the preset when it lands;
+  with no signal or location refused, Today asks again on every render (every update during a wrist run). Road Map
+  `pc-weather-preset`.
+- Also reported, not checked: `wireTrialRun` starts a new animation-frame chain on every render without cancelling
+  the last (CPU only).

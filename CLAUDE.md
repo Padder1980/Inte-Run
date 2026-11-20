@@ -155,6 +155,8 @@ node --test            # the suite (about 1,800 tests)
   `new Date(iso + "T00:00:00")` has no Z.
 - Code that measures or scrolls a rendered screen goes in `wire()`, not `buildNav()` (which runs once at boot,
   before any screen exists). Never measure inside a bottom sheet before adding `.on`.
+- `wire()` runs after EVERY render, not once per screen. A request started there whose answer calls `render()`
+  loops for ever unless it asks only on arrival and redraws only on a change (Connected apps, 2026-11-20).
 - Don't re-render on every keystroke (it rebuilds the field under the finger). A DOM kept for a transition has
   duplicate ids, so `$()` finds the wrong node.
 - An undeclared `var(--x)` voids the whole CSS declaration silently. Theme tokens are declared in FOUR places

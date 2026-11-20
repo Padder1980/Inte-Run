@@ -109,6 +109,23 @@ if [ "${MAPS_OK}" != "1" ]; then
   fi
   echo "warning: maps will fall back to CARTO, whose free tiles now all read API KEY REQUIRED."
 fi
+
+# ⚠️ APPLE'S HEALTH ICON TRAVELS WITH THE APP AND NEVER WITH THE REPO OR THE WEB (2026-11-20). Apple's
+# Developer Artwork License Agreement for HealthKit allows it only in the user interface of iOS apps —
+# never website content, never redistributed — and this repo is public while docs/ is a website. So it
+# lives in ios/apple-health-icon.png (gitignored, Apple's file unchanged) and is copied into the bundle's
+# web/ folder here, where the scheme handler serves it at interun://app/apple-health.png. WebHost tells
+# the page it is there (window.__interunAppleHealthIcon); without the file the row keeps its plain heart.
+HICON="${SRCROOT}/apple-health-icon.png"
+rm -f "${DST}/apple-health.png"
+if [ -f "${HICON}" ]; then
+  # -X: no extended attributes. Apple's file comes out of a disk image carrying com.apple.FinderInfo, and code
+  # signing refuses a bundle holding it ("resource fork, Finder information, or similar detritus not allowed").
+  cp -X "${HICON}" "${DST}/apple-health.png"
+  echo "note: embedded Apple's Health icon for the Apple Health row"
+else
+  echo "note: no ios/apple-health-icon.png — the Apple Health row keeps its plain heart."
+fi
 '''
 
 

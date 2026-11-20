@@ -43,6 +43,14 @@ struct WebHost: UIViewRepresentable {
         }
         let tokenJS = mapboxToken.isEmpty ? ""
             : "window.__interunMapboxToken = \"\(mapboxToken.replacingOccurrences(of: "\"", with: ""))\";"
+        // ⚠️ APPLE'S HEALTH ICON, ONLY IN THIS APP AND ONLY IF THIS BUILD CARRIES IT (2026-11-20). Apple licenses
+        // it for the user interface of iOS apps alone, so it is never in docs/ or the repo: the "Embed web app"
+        // phase copies the gitignored ios/apple-health-icon.png into the bundle's web/ folder, and this flag is
+        // how the page learns it may ask for interun://app/apple-health.png. A capability flag, like the others:
+        // an over-the-air page must never guess what the Swift side has.
+        let healthIconJS = (Bundle.main.resourceURL.map {
+            FileManager.default.fileExists(atPath: $0.appendingPathComponent("web/apple-health.png").path)
+        } ?? false) ? "window.__interunAppleHealthIcon = \"apple-health.png\";" : ""
         config.userContentController.addUserScript(WKUserScript(
             source: "window.__interunLiveActivity = \"\(status)\";"
                   + "window.__interunCoachAudio = \"\(coachStatus)\";"
@@ -78,7 +86,8 @@ struct WebHost: UIViewRepresentable {
                   // sheet that does work there.
                   + PhotoBridge.capabilityJS()
                   + WebUpdateService.shared.diagnosticJS
-                  + tokenJS,
+                  + tokenJS
+                  + healthIconJS,
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
         #if DEBUG

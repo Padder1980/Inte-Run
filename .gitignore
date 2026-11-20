@@ -30,6 +30,12 @@ voice-dev/personal.json
 # that has been published, whatever is done afterwards.
 ios/mapbox-token.txt
 
+# ⚠️ Apple's Health icon is licensed only for the user interface of iOS apps (Apple's Developer Artwork License
+# Agreement for HealthKit, accepted 2026-11-20): never website content, never redistributed. This repo is public
+# and docs/ is a website, so the icon lives only here, outside git, and the "Embed web app" phase copies it into
+# the iPhone app. Without it the Apple Health row simply keeps its plain heart.
+ios/apple-health-icon.png
+
 # Strava API credentials — the client secret must never be committed.
 strava-secret.txt
 alfie-proxy/.dev.vars

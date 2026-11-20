@@ -662,3 +662,19 @@ identity, and the distribution certificate is cloud-managed — issued at export
 Program License Agreement. Only the owner can (developer.apple.com/account, his Apple ID). After he accepted,
 the SAME archive exported and uploaded unchanged; no rebuild. If the pair appears again, it is the agreement,
 not the keychain.
+
+## Apple's Health icon, bundled from a gitignored file (2026-11-20)
+
+The Apple Health row on Connected apps shows Apple's own Health icon in the iPhone app only (the brand rules and the
+licence are in notes/strava-and-alfie.md, "Brand logos on Connected apps"). The native half:
+- **`ios/apple-health-icon.png` is gitignored and must stay out of git** — Apple's Developer Artwork License Agreement
+  for HealthKit allows the artwork only in the screens of iOS apps, never as website content or redistributed, and this
+  repo is public. It is in the main checkout's `ios/` (put there 2026-11-20) and in the shared `.git/info/exclude` too.
+  A fresh clone has no icon, and the row then keeps its plain heart — nothing breaks.
+- The "Embed web app" phase (`make-project.py`) removes any stale `web/apple-health.png` and copies the file in when it
+  exists ("note: embedded Apple's Health icon…" in the build log). `BundleSchemeHandler` serves it at
+  `interun://app/apple-health.png` like any bundled file — only `index.html` comes from an over-the-air copy.
+- `WebHost` adds `window.__interunAppleHealthIcon = "apple-health.png"` to the document-start capability script only
+  when the bundle holds the file; the page checks that exact value (never a handler, never a guess).
+- A web-only push cannot deliver this half: the icon needs an Xcode build. Until then the over-the-air page shows the
+  heart, because the flag is absent.

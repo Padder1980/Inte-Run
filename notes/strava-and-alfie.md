@@ -368,3 +368,73 @@ Both were found while fixing the Connected apps loop (above), and both were seen
 - **`pc-toast-behind-sheet` was fixed the same day, on his yes:** `.app-toast` is z-index 99 now (notes/redesign-design-system.md,
   "Toasts were drawn behind sheets"). The "check now" answer stays in the sheet anyway — it belongs beside the button it
   answers, and must not vanish after four seconds.
+
+## Brand logos on Connected apps: what each brand allows (researched 2026-11-20)
+
+The owner asked for the real logos on Connected apps ("the strava logo would be used, the garmin logo, apple, google
+etc"). A subagent read each brand's own published rules on 2026-11-20; quotes are close paraphrases except where marked,
+so re-read the page before relying on a detail. Using a mark without permission risks App Review 5.2.1 (third-party
+trademarks need permission) and, for Strava, API Agreement §4.1 (no use of Strava marks beyond the guidelines).
+- **Strava — allowed with conditions, official lockups only** (developers.strava.com/guidelines, revised 29 Sep 2025).
+  Only Strava's own artwork, unchanged and not animated; never part of our app icon; never implying Strava sponsors us;
+  visually separate from our own name or logo and never more prominent. There is **no standalone Strava mark** to use as
+  a square icon, and cutting the chevron out of a lockup counts as changing the logo — so the row's small square cannot
+  hold a Strava logo; the "Compatible with Strava" / "Powered by Strava" lockup (wide text) can sit elsewhere. Packs:
+  `developers.strava.com/downloads/1.2-Strava-API-Logos.zip` (1,183,207 bytes; EPS, SVG, PNG; orange, white, black;
+  horizontal or stacked) and `1.1-Connect-with-Strava-Buttons.zip` (397,030 bytes), both last modified 17 Nov 2026.
+  ⚠️ **CORRECTS THE EARLIER NOTE ABOVE ("THE CONNECT BUTTON SHOULD BE STRAVA'S OWN ARTWORK"):** the guidelines' section
+  1.1 applies only to apps that CHOOSE the Connect with Strava button (48 px high, 96 @2x, orange or white, linked to
+  Strava's OAuth authorise URL); it is optional. Wording: a reference to working with Strava says "Powered by Strava" or
+  "Compatible with Strava"; links to Strava data say "View on Strava" (bold, underlined or #FC5200). API Agreement §4.4:
+  credit Garmin if we ever SHOW Strava activities recorded on Garmin devices.
+- **Garmin — not allowed until Garmin licenses us** (developer.garmin.com/brand-guidelines/connect): the assets are for
+  licensees with a commercially available Garmin Connect integration. Afterwards: unaltered images, the "works with…"
+  badge at least 88 px high, the full "Garmin Connect" name with its tile (API Brand Guidelines PDF, 30 Jun 2025).
+- **COROS — not allowed** without written permission (coros.com/terms §6); no partner guidelines found. Spelled "COROS".
+- **Apple logo, Apple Watch, Apple Calendar — not allowed** (apple.com/legal/intellectual-property/guidelinesfor3rdparties):
+  no Apple-owned logo, symbol or icon without a written licence; the names are fine in accurate text ("works with Apple
+  Watch"). No Apple Watch badge exists. SF Symbols (`applewatch`) are licensed for software running on Apple systems
+  only, so not in the public web page (seen quoted, not first-hand).
+- **Apple Health — allowed with conditions, iPhone app only.** Verbatim: "You can use the Apple Health app icon in your
+  app user interface" (developer.apple.com/health-fitness/works-with-apple-health/), for HealthKit apps. HIG HealthKit
+  "Apple Health icon": Apple's file only, only to show the app works with Health; "Apple Health" written beside it (never
+  "HealthKit" to users); the icon is not the button; no new corner shape, border, shadow or tile behind it; clear space
+  1/10 of its height; no smaller than the list's other icons. File: developer.apple.com/design/resources → Technologies →
+  "Apple Health Icon" (a PNG inside a DMG). Apple's artwork licence covers software running on Apple systems, and
+  `docs/index.html` is a public web page, so the icon belongs in the native app (supplied by the Swift side behind a
+  capability flag) — an Xcode build, not over the air.
+- **Google Calendar — not allowed without Google's approval** (Partner Marketing Hub account and an approval request;
+  even then never alone and with our brand more prominent). Plain text and "works with" are fine. We use no Google API.
+- **Microsoft Outlook — not allowed**: no Microsoft logos or icons, only true text statements (microsoft.com trademarks
+  page; Microsoft 365 Trademark Guidelines, 1 Sep 2026); first mention "Microsoft Outlook".
+
+**What was built (2026-11-20, his choice: "Strava badge + Apple Health"):**
+- **Strava row:** the plain word "Strava" became Strava's own "Compatible with Strava" horizontal artwork, 154×13 px
+  (`stravaMarkHtml`, `.stv-mark svg { height: 13px }`). Both official colours are inlined — orange (`#FC5200` wordmark,
+  black "compatible with") and white — and the stylesheet swaps them (`.brand-light` / `.brand-dark`): one plain rule each
+  for the default, then the system-dark swap and both `data-theme` rules written from `:root`, so specificity — not order —
+  settles it, and the duplicate-class ratchet in `test/community.test.ts` (ceiling 20) sees no second plain rule. The
+  first version wrote the swap as plain `.brand-dark` rules inside the media query, and that ratchet failed at 21. The small square keeps the app's own share glyph: there is no Strava mark that fits it.
+  `stravaCompatSvg` holds the artwork as Strava ships it, newlines between elements removed and nothing else, and is a
+  function rather than a const (no launch-order dead zone). Downloaded with his yes (file, source and size stated):
+  `1.2-Strava-API-Logos.zip`, 1,183,207 bytes.
+- **Apple Health row:** Apple's icon, iPhone app only. Downloaded with his yes (`Icon-Apple-Health.dmg`, 182,601 bytes,
+  devimages-cdn.apple.com); the disk image opens with Apple's **Developer Artwork License Agreement for HealthKit**, which
+  was read, summarised to him and accepted on his behalf on his explicit yes (`yes Y | hdiutil attach …`; without it
+  `hdiutil` answers "attach canceled"). The PNG (1920×1920, 55,090 bytes, Apple's file unchanged) lives in
+  `ios/apple-health-icon.png`: **gitignored** (this repo is public), also listed in the shared `.git/info/exclude` so the
+  main checkout was safe before it pulled the `.gitignore` line, and copied there too so his own builds carry it. The
+  "Embed web app" phase copies it into the bundle as `web/apple-health.png` (served at `interun://app/apple-health.png`
+  by the scheme handler, over-the-air page or not); `WebHost` sets `window.__interunAppleHealthIcon = "apple-health.png"`
+  only when that file is in the bundle; `nativeHealthIcon()` draws `<img class="cn-logo" src="apple-health.png" alt="">`
+  only in the native app and only for exactly that value, else the heart tile. `.cn-logo` is 34 px like the tiles, with
+  no tile, border, shadow or corner of ours (HIG). A build without the file — anyone else's checkout — shows the heart.
+- **Not changed, by the brands' rules:** Apple Watch, "Garmin, Coros & others" and the calendar row keep the app's own
+  glyphs and the names in text. Garmin's tile can come once Garmin licenses a live integration.
+- **Guard: `test/brand-marks.test.ts`** — both Strava strings against the SHA-256 of Strava's files (newlines removed); the
+  Strava row carries both colours with the right classes and the theme rules in the right order; the Health icon only
+  with the native flag set to exactly the file name (web, older build, a different name, a `javascript:` URL and a
+  number all get the heart); `.cn-logo` the tiles' size with no tile; the icon's bytes nowhere in the page (as base64) or
+  under `docs/` (by hash, any image name) on a Mac that holds it; gitignored and untracked; the build phase and WebHost
+  wiring. Re-broken five ways, each caught by its own test: one coordinate of the orange artwork nudged, the dark swap
+  removed, the native check removed, the icon copied into `docs/`, the Swift flag dropped.

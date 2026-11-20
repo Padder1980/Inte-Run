@@ -1205,7 +1205,9 @@ test("⚠️ a render of the same screen keeps its scroll position", () => {
   // class, not a coincidence.
   const html = page();
   assert.ok(!/v\.scrollTop = 0;/.test(html), "a render branch still resets the scroll unconditionally");
-  assert.match(html, /const keepScroll = scrollKey === LAST_SCROLL_KEY \? v\.scrollTop : 0;/,
+  // One answer, sameScreen, serves the scroll and the arrival fade since pc-redraw-fade (2026-11-20);
+  // test/redraw-no-fade.test.ts runs the real render() for both.
+  assert.match(html, /const sameScreen = scrollKey === LAST_SCROLL_KEY;\s*const keepScroll = sameScreen \? v\.scrollTop : 0;/,
     "there is no same-screen scroll preservation");
   assert.ok((html.match(/v\.scrollTop = keepScroll;/g) || []).length >= 8,
     "not every render branch goes through the preserved value");

@@ -45433,7 +45433,17 @@ function render() {
   // was forgotten, and there are a dozen ways off this screen.
   document.documentElement.classList.toggle("rd-open", state.screen === "runview");
   const scrollKey = [state.tab, state.screen, state.support, state.actTab, state.viewRunId, state.wizStep].join("|");
-  const keepScroll = scrollKey === LAST_SCROLL_KEY ? v.scrollTop : 0;
+  // ⚠️ AND THE SAME KEY DECIDES WHETHER THE SCREEN FADES IN (pc-redraw-fade, 2026-11-20). viewEnter
+  // replayed the 180 ms arrival on EVERY render, so anything that redrew the screen the runner was
+  // already on blinked it from nothing: a day tapped in Today's week strip, a Logbook filter, a sheet
+  // closing, and Today on every update from the watch during a wrist run. It is what made the
+  // Connected apps loop look like flicker. One answer serves the scroll and the fade, so the two can never disagree about whether
+  // the runner moved.
+  // ⚠️ A LOCAL, HANDED TO viewEnter -- never a top-level flag that viewEnter reads. wire() runs between
+  // here and viewEnter, and a render() it causes is a redraw of the screen just arrived on: through a
+  // shared flag, that inner "same screen" would swallow the arrival it sits inside.
+  const sameScreen = scrollKey === LAST_SCROLL_KEY;
+  const keepScroll = sameScreen ? v.scrollTop : 0;
   LAST_SCROLL_KEY = scrollKey;
   // A run under way no longer locks the app. Hiding the nav protected the run from a stray tap, but
   // it also trapped the runner: checking tomorrow's session mid-cool-down meant ending the run. The
@@ -45591,7 +45601,7 @@ function render() {
     v.scrollTop = keepScroll;
     document.querySelectorAll(".navbtn").forEach((b) => b.classList.remove("on"));
     wire();
-    viewEnter(v);
+    viewEnter(v, !sameScreen);
     return;
   }
   $("topTitle").textContent = state.support ? "Support & guidance" : TITLES[state.tab];
@@ -45607,20 +45617,8 @@ function render() {
   v.scrollTop = keepScroll;
   document.querySelectorAll(".navbtn").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
   wire();
-  viewEnter(v);
+  viewEnter(v, !sameScreen);
 }
-/**
- * The arrival of a screen, 180 ms.
- * ⚠️ CONTENT-PRESERVING MEANS NOTHING MOVES THAT THE RUNNER IS READING. It fades and rises
- * four pixels -- no slide, no scale, nothing that reflows -- so text is legible throughout rather
- * than arriving from off-screen. The brief asks for 160-220 ms; 180 sits in the middle.
- * ⚠️ THE CLASS IS REMOVED BEFORE IT IS ADDED, with a reflow read between. Without that, a
- * second render inside the animation window finds the class already present, the browser does not
- * restart the animation, and the screen simply appears -- which is most tab switches, because render()
- * is called from many paths.
- * ⚠️ Reduce Motion is handled globally (one rule for the whole stylesheet, so a new animation
- * cannot forget it), which is why there is no media query here.
- */
 /**
  * Publish the reader's own text-size preference as --tscale.
  *
@@ -45653,8 +45651,24 @@ function syncTextScale() {
     document.documentElement.style.setProperty("--tscale", String(Math.round(scale * 100) / 100));
   } catch (e) {}
 }
-function viewEnter(v) {
-  if (!v) return;
+/**
+ * The arrival of a screen, 180 ms.
+ * ⚠️ CONTENT-PRESERVING MEANS NOTHING MOVES THAT THE RUNNER IS READING. It fades and rises
+ * four pixels -- no slide, no scale, nothing that reflows -- so text is legible throughout rather
+ * than arriving from off-screen. The brief asks for 160-220 ms; 180 sits in the middle.
+ * ⚠️ THE CLASS IS REMOVED BEFORE IT IS ADDED, with a reflow read between. Without that, a
+ * second render inside the animation window finds the class already present, the browser does not
+ * restart the animation, and the screen simply appears -- which is most tab switches, because render()
+ * is called from many paths.
+ * ⚠️ ONLY ON AN ARRIVAL (pc-redraw-fade, 2026-11-20). "arrived" is render()'s own answer to "is this a
+ * different screen?" -- the key that also decides the scroll. A redraw of the screen the runner is on
+ * leaves the class alone: no fade, and an arrival still under way runs to its end rather than
+ * starting again from nothing.
+ * ⚠️ Reduce Motion is handled globally (one rule for the whole stylesheet, so a new animation
+ * cannot forget it), which is why there is no media query here.
+ */
+function viewEnter(v, arrived) {
+  if (!v || !arrived) return;
   v.classList.remove("view-in");
   void v.offsetWidth;
   v.classList.add("view-in");

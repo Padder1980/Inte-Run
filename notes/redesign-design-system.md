@@ -475,3 +475,43 @@ white: measured fill rgb(255,255,255) on a white sheet, 1.00:1. Dark mode showed
   `:root[data-theme]` token blocks, every band reached by answering the sheet, the bar's colour resolved as the browser would
   (most specific `.meter > i` rule that can match inside `.sheet`, then the last); at least 2.5:1 in both themes. Re-broken
   (the two rules removed): "light, ready: the bar is 1.00:1 against the sheet — it cannot be seen at all".
+
+## A screen fades in when you arrive, not every time it redraws (pc-redraw-fade, 2026-11-20)
+
+`render()` ended in `viewEnter(v)` for the five tabs and Profile, and `viewEnter` replays the 180 ms `viewIn` (take
+`.view-in` off `#view`, read layout, put it back) — on EVERY render. So any redraw of the screen the runner was already on
+blinked it from opacity 0: a day tapped in Today's week strip, a Logbook filter, a sheet closing, and Today on every update
+from the watch during a wrist run (`window.__interunWatchLive` redraws Today each tick, about every 2 s). Found while fixing
+the Connected apps loop (end of `notes/strava-and-alfie.md`): it is what made 24 redraws a second look like flicker.
+
+- **Fix: one answer to "is this a different screen?", used twice.** `const sameScreen = scrollKey === LAST_SCROLL_KEY;`
+  feeds the scroll (`keepScroll`) and the fade (`viewEnter(v, !sameScreen)`); `viewEnter(v, arrived)` returns unless
+  `arrived`. A redraw leaves `.view-in` alone, so an arrival still under way runs to its end instead of starting again from 0.
+- ⚠️ **A local handed to `viewEnter`, never a top-level flag it reads.** `wire()` runs between the key and `viewEnter`, and a
+  `render()` it causes is a same-screen redraw; through a shared flag that inner redraw would swallow the arrival around it.
+  Re-broken that way, the test's nested-redraw case fails.
+- **What counts as arriving is the scroll key**: tab, screen, Support page, Logbook sub-tab, run, wizard step. A Logbook
+  sub-tab or a Support page fades; a filter, a week-strip day or the Plan page's week does not. Re-tapping the tab you are
+  already on is a redraw now (no fade), as it already was for the scroll. The screens that never had a fade (calendar, run
+  debrief, the wrist mirror and the rest) still have none, and coming back from one to a tab fades. Reduce Motion unchanged.
+- **Measured in a browser at 375×812, light and dark**, the same probe on the fixed build and on the build before it
+  (HEAD's `docs/index.html` served from the scratchpad). Restarts counted by the identity of `#view`'s `viewIn` animation in
+  `getAnimations()` before and after each step (a restart is a new object), redraws by a MutationObserver on `#view`. Fixed:
+  **11 of 11 moves fade** (the five tabs, Profile, two Logbook sub-tabs, back from the wrist view) and **0 of 20 redraws do**
+  (two week-strip days, three `render()`s, Profile, the Logbook's Filter button twice and two filter chips, nine updates from
+  the watch on Today through the real `__interunWatchLive`, the run ending). Before: 20 of 20 redraws faded, 9 of 9 watch
+  updates. The Logbook's Filter button only shows with runs; three were added through the app's own `saveManualRun`.
+- ⚠️ **The hidden in-app Browser pane draws no frames**: 0 animation-frame callbacks in 600 ms, `document.timeline.currentTime`
+  0, every animation frozen on its first frame (so `#view` reads opacity 0). `animationstart` never fires there and a
+  screenshot is blank or stale — but animation identity still works, because `getAnimations()` flushes style. That is why the
+  count, not a picture, is the evidence; a still picture cannot show a blink anyway.
+- **Guard: `test/redraw-no-fade.test.ts`** runs the real `render()`, `viewEnter()`, `watchLiveActive()`,
+  `window.__interunWatchLive` and the wrist view's back button, lifted from the built page with the top-level lets they read,
+  inside a `with` scope whose stand-ins draw a marker per view builder. `#view` is modelled as the browser treats an
+  animation: it restarts at a style recalculation that finds the class present after one that found it absent
+  (`viewEnter`'s layout read, and the end of the task). It sweeps every screen named in `render()` and every tab (both
+  derived), and checks that every `viewEnter` call sits in `render()`, passes `!sameScreen` and was reached. Re-broken twice,
+  copying `web/app.ts` aside and back: the old `viewEnter` (ignoring `arrived`) fails 4 of 8, "Today blinked on 9 of 9
+  updates from the watch"; a shared top-level flag fails 2, "an arrival with a redraw inside it did not fade in".
+- `test/silent-defects.test.ts`'s static guard "a render of the same screen keeps its scroll position" now reads the
+  `sameScreen` form; the behaviour is also run for real in the new test.
